@@ -5,30 +5,61 @@ import ipyvuetify as v
 class TileIo():
     
     def __init__(self):
-        self.dummy = None
+        
+        # times
+        self.start = None
+        self.target_time = None
+        self.end = None
+        
+        # sensors
+        self.sensors = None
+        
+        # trajectory 
+        self.trajectory = None
+        
+        # matrix 
+        self.transition_matrix = [[0 for i in range(7)] for i in range(7)]
+        
         
 class PickerLine(v.Layout):
     
-    def __init__(self, io):
+    def __init__(self, io, output):
+        
+        self.io = io
+        self.output = output
         
         start_picker = sw.DatePicker('Start', xs4=True)
-        #self.output.bind(self.start_picker, self.io, 'start')
+        output.bind(start_picker, io, 'start')
         
         target_picker = sw.DatePicker('Start of the target period', xs4=True)
-        #self.output.bind(self.start_picker, self.io, 'start')
+        output.bind(target_picker, io, 'target_time')
         
         end_picker = sw.DatePicker('End', xs4=True)
-        #self.output.bind(self.end_picker, self.io, 'end')
+        output.bind(end_picker, io, 'end')
         
         super().__init__(xs=12, row=True,  children=[start_picker, target_picker, end_picker])
         
-class matrix_input(v.Html):
+class MatrixInput(v.Html):
     
-    VALUES = [1, 0, -1]
+    VALUES = {
+        '+': (1, v.theme.themes.dark.success),  
+        '': (0, v.theme.themes.dark.primary),
+        '-': (-1, v.theme.themes.dark.error)
+    }
     
-    def __init__(self):
+    def __init__(self, line, column, io, output):
         
-        self.val = v.Select(dense = True, color = 'white', items = self.VALUES, class_='ma-1', v_model = 0)
+        # get the io for dynamic modification
+        self.io = io
+        
+        # get the line and column of the td in the matrix
+        self.column = column
+        self.line = line
+        
+        # get the output
+        self.output = output
+        
+        self.val = v.Select(dense = True, color = 'white', items = [*self.VALUES], class_='ma-1', v_model = 0)
         
         super().__init__(
             style_ = f'background-color: {v.theme.themes.dark.primary}',
@@ -39,17 +70,14 @@ class matrix_input(v.Html):
         # connect the color to the value
         self.val.observe(self.color_change, 'v_model')
         
-    def color_change(self, change):
+    def color_change(self, change):            
         
-        # degradation
-        if change['new'] == self.VALUES[2]: 
-            self.style_ = f'background-color: {v.theme.themes.dark.error}'
-        # stable
-        elif change['new'] == self.VALUES[1]:
-            self.style_ = f'background-color: {v.theme.themes.dark.primary}'
-        # Improvement
-        elif change['new'] == self.VALUES[0]:
-            self.style_ = f'background-color: {v.theme.themes.dark.success}'
+        val, color = self.VALUES[change['new']]
+        
+        self.style_ = f'background-color: {color}'
+        self.io.transition_matrix[self.line][self.column] = val
+        
+        self.output.add_msg('You have changed your transition matrix')
             
         return 
         
@@ -57,21 +85,25 @@ class TransitionMatrix(v.SimpleTable):
     
     CLASSES = ['Forest', 'Grassland', 'Cropland', 'Wetland', 'Artificial area', 'Bare land', 'water body']
     
-    def __init__(self, io):
+    def __init__(self, io, output):
         
-        self.dummy = None
-        
+        # create a header 
         header = [v.Html(tag = 'tr', children = [v.Html(tag = 'th', children = [''])] + [v.Html(tag = 'th', children = [class_]) for class_ in self.CLASSES])]
         
+        # create a row
         rows = []
-        for baseline in self.CLASSES:
-            row = v.Html(tag = 'tr', children = (
-                [v.Html(tag = 'th', children = [baseline])]
-                + [v.Html(tag = 'td', class_='ma-0 pa-0', children = [matrix_input()]) for target in self.CLASSES]
-            ))
+        for i, baseline in enumerate(self.CLASSES):
+            
+            inputs = []
+            for j, target in enumerate(self.CLASSES):
+                matrix_input = MatrixInput(i, j, io, output)
+                input_ = v.Html(tag='td', class_='ma-0 pa-0', children=[matrix_input])
+                inputs.append(input_)
+                
+            row = v.Html(tag='tr', children=[v.Html(tag='th', children=[baseline])] + inputs)
             rows.append(row)
             
-            
+        # create the simple table 
         super().__init__(
             children = [
                 v.Html(tag = 'thead', children = header),
@@ -103,18 +135,28 @@ class Tile_15_3_1(sw.Tile):
     
     def __init__(self, aoi_io):
         
-        #use io 
+        # use io 
         self.aoi_io = aoi_io
         self.io = TileIo()
         
-        markdown = sw.Markdown('Some explainations should go here')
-        sensor_select = v.Select(items = self.SENSORS, label = "select sensor", multiple = True)
-        pickers = PickerLine(self.io)
-        trajectory = v.Select(label ='trajectory', items = self.TRAJECTORIES)
-        transition_label = v.Html(class_='grey--text mt-2', tag='h3', children =['Transition matrix'])
-        transition_matrix = TransitionMatrix(self.io)
-        btn = sw.Btn(class_='mt-5')
+        # output
         output = sw.Alert()
+        
+        markdown = sw.Markdown('Some explainations should go here')
+        
+        sensor_select = v.Select(items=self.SENSORS, label="select sensor", multiple=True, v_model=None)
+        output.bind(sensor_select, self.io, 'sensors')
+        
+        pickers = PickerLine(self.io, output)
+        
+        trajectory = v.Select(label='trajectory', items=self.TRAJECTORIES, v_model=None)
+        output.bind(trajectory, self.io, 'trajectory')
+        
+        transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=['Transition matrix'])
+        
+        transition_matrix = TransitionMatrix(self.io, output)
+        
+        btn = sw.Btn(class_='mt-5')
         
         super().__init__(
             '15_3_1_widgets',
