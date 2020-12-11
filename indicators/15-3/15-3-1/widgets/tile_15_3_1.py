@@ -1,4 +1,5 @@
 from sepal_ui import sepalwidgets as sw
+from sepal_ui import mapping as sm
 import ipyvuetify as v
 from datetime import datetime
 
@@ -146,7 +147,7 @@ class Tile_15_3_1(sw.Tile):
     
     TRAJECTORIES = ['NDVI trend', 'RUE', 'RESTREND']
     
-    def __init__(self, aoi_io):
+    def __init__(self, aoi_io, result_tile):
         
         # use io 
         self.aoi_io = aoi_io
@@ -154,6 +155,9 @@ class Tile_15_3_1(sw.Tile):
         
         # output
         self.output = sw.Alert()
+        
+        #result tile
+        self.result_tile = result_tile
         
         markdown = sw.Markdown('Some explainations should go here')
         
@@ -172,7 +176,7 @@ class Tile_15_3_1(sw.Tile):
         btn = sw.Btn(class_='mt-5')
         
         super().__init__(
-            '15_3_1_widgets',
+            self.result_tile._metadata['mount_id'],
             '15.3.1 Proportion of degraded land over total land area',
             inputs = [markdown, pickers, sensor_select, trajectory, transition_label, transition_matrix],
             btn = btn,
@@ -185,8 +189,18 @@ class Tile_15_3_1(sw.Tile):
         
         widget.toggle_loading()
         
-        output = run.land_cover(self.io, self.aoi_io, self.output)
-            
+        land_cover = run.land_cover(self.io, self.aoi_io, self.output)
+        
+        # create a map 
+        m = sm.SepalMap()
+        m.zoom_ee_object(self.aoi_io.get_aoi_ee().geometry())
+        
+        # add the layers 
+        m.addLayer(land_cover, {}, 'land_cover')
+        
+        # add the map to the result tile 
+        self.result_tile.set_content([m])
+        
         widget.toggle_loading()
             
         return 
