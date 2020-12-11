@@ -5,6 +5,9 @@
 # first images year
 L4_start = 1982
 
+# max year for land use 
+land_use_max_year = 2018
+
 # name of the sensor, GEE asset
 sensors = {
         'Landsat 4': 'LANDSAT/LT04/C01/T1_SR',
@@ -18,6 +21,19 @@ precipitation = 'NOAA/PERSIANN-CDR'
 
 land_cover = "users/geflanddegradation/toolbox_datasets/lcov_esacc_1992_2018"
 
+######################
+##      matrix      ##
+######################
+
+IPCC_matrix = [
+    11, 12, 13, 14, 15, 16, 17,
+    21, 22, 23, 24, 25, 26, 27,
+    31, 32, 33, 34, 35, 36, 37,
+    41, 42, 43, 44, 45, 46, 47,
+    51, 52, 53, 54, 55, 56, 57,
+    61, 62, 63, 64, 65, 66, 67,
+    71, 72, 73, 74, 75, 76, 77
+]
 
 #############################
 ##      kendall coeff      ##

@@ -3,6 +3,7 @@ import ipyvuetify as v
 from datetime import datetime
 
 from scripts import parameter as pm
+from scripts import run
 
 class TileIo():
     
@@ -25,7 +26,8 @@ class TileIo():
         
 class PickerLine(v.Layout):
     
-    YEAR_RANGE = [y for y in range(datetime.now().year, pm.L4_start - 1, -1)]
+    #YEAR_RANGE = [y for y in range(datetime.now().year, pm.L4_start - 1, -1)]
+    YEAR_RANGE = [y for y in range(pm.land_use_max_year, pm.L4_start - 1, -1)]
     
     def __init__(self, io, output):
         
@@ -151,21 +153,21 @@ class Tile_15_3_1(sw.Tile):
         self.io = TileIo()
         
         # output
-        output = sw.Alert()
+        self.output = sw.Alert()
         
         markdown = sw.Markdown('Some explainations should go here')
         
         sensor_select = v.Select(items=[*self.SENSORS], label="select sensor", multiple=True, v_model=None)
-        output.bind(sensor_select, self.io, 'sensors')
+        self.output.bind(sensor_select, self.io, 'sensors')
         
-        pickers = PickerLine(self.io, output)
+        pickers = PickerLine(self.io, self.output)
         
         trajectory = v.Select(label='trajectory', items=self.TRAJECTORIES, v_model=None)
-        output.bind(trajectory, self.io, 'trajectory')
+        self.output.bind(trajectory, self.io, 'trajectory')
         
         transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=['Transition matrix'])
         
-        transition_matrix = TransitionMatrix(self.io, output)
+        transition_matrix = TransitionMatrix(self.io, self.output)
         
         btn = sw.Btn(class_='mt-5')
         
@@ -174,5 +176,17 @@ class Tile_15_3_1(sw.Tile):
             '15.3.1 Proportion of degraded land over total land area',
             inputs = [markdown, pickers, sensor_select, trajectory, transition_label, transition_matrix],
             btn = btn,
-            output = output
+            output = self.output
         )
+        
+        btn.on_event('click', self.start_process)
+        
+    def start_process(self, widget, data, event):
+        
+        widget.toggle_loading()
+        
+        output = run.land_cover(self.io, self.aoi_io, self.output)
+            
+        widget.toggle_loading()
+            
+        return 
