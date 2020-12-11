@@ -1,6 +1,8 @@
 from sepal_ui import sepalwidgets as sw
 import ipyvuetify as v
+from datetime import datetime
 
+from scripts import parameter as pm
 
 class TileIo():
     
@@ -8,7 +10,7 @@ class TileIo():
         
         # times
         self.start = None
-        self.target_time = None
+        self.target_start = None
         self.end = None
         
         # sensors
@@ -23,18 +25,20 @@ class TileIo():
         
 class PickerLine(v.Layout):
     
+    YEAR_RANGE = [y for y in range(datetime.now().year, pm.L4_start - 1, -1)]
+    
     def __init__(self, io, output):
         
         self.io = io
         self.output = output
         
-        start_picker = sw.DatePicker('Start', xs4=True)
+        start_picker = v.Select(label='Start year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
         output.bind(start_picker, io, 'start')
         
-        target_picker = sw.DatePicker('Start of the target period', xs4=True)
-        output.bind(target_picker, io, 'target_time')
+        target_picker = v.Select(label='Start year of the target period', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
+        output.bind(target_picker, io, 'target_start')
         
-        end_picker = sw.DatePicker('End', xs4=True)
+        end_picker = v.Select(label='End year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
         output.bind(end_picker, io, 'end')
         
         super().__init__(xs=12, row=True,  children=[start_picker, target_picker, end_picker])
@@ -129,7 +133,14 @@ class TransitionMatrix(v.SimpleTable):
         
 class Tile_15_3_1(sw.Tile):
     
-    SENSORS = ['Landsat 4', 'Landsat 5', 'Landsat 6', 'Landsat 7', 'Landsat 8', 'Sentinel 2']
+    SENSORS = {
+        'Landsat 4': 'L4',
+        'Landsat 5': 'L5',
+        'Landsat 6': 'L6',
+        'Landsat 7': 'L7', 
+        'Landsat 8': 'L8', 
+        'Sentinel 2': 'S2'
+    }
     
     TRAJECTORIES = ['NDVI trend', 'RUE', 'RESTREND']
     
@@ -144,7 +155,7 @@ class Tile_15_3_1(sw.Tile):
         
         markdown = sw.Markdown('Some explainations should go here')
         
-        sensor_select = v.Select(items=self.SENSORS, label="select sensor", multiple=True, v_model=None)
+        sensor_select = v.Select(items=[*self.SENSORS], label="select sensor", multiple=True, v_model=None)
         output.bind(sensor_select, self.io, 'sensors')
         
         pickers = PickerLine(self.io, output)
@@ -161,7 +172,7 @@ class Tile_15_3_1(sw.Tile):
         super().__init__(
             '15_3_1_widgets',
             '15.3.1 Proportion of degraded land over total land area',
-            inputs = [markdown, sensor_select, pickers, trajectory, transition_label, transition_matrix],
+            inputs = [markdown, pickers, sensor_select, trajectory, transition_label, transition_matrix],
             btn = btn,
             output = output
         )
