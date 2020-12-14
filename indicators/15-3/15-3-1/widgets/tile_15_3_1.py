@@ -136,17 +136,6 @@ class TransitionMatrix(v.SimpleTable):
         
 class Tile_15_3_1(sw.Tile):
     
-    SENSORS = {
-        'Landsat 4': 'L4',
-        'Landsat 5': 'L5',
-        'Landsat 6': 'L6',
-        'Landsat 7': 'L7', 
-        'Landsat 8': 'L8', 
-        'Sentinel 2': 'S2'
-    }
-    
-    TRAJECTORIES = ['NDVI trend', 'RUE', 'RESTREND']
-    
     def __init__(self, aoi_io, result_tile):
         
         # use io 
@@ -161,12 +150,12 @@ class Tile_15_3_1(sw.Tile):
         
         markdown = sw.Markdown('Some explainations should go here')
         
-        sensor_select = v.Select(items=[*self.SENSORS], label="select sensor", multiple=True, v_model=None)
+        sensor_select = v.Select(items=[*pm.sensors], label="select sensor", multiple=True, v_model=None)
         self.output.bind(sensor_select, self.io, 'sensors')
         
         pickers = PickerLine(self.io, self.output)
         
-        trajectory = v.Select(label='trajectory', items=self.TRAJECTORIES, v_model=None)
+        trajectory = v.Select(label='trajectory', items=pm.trajectories, v_model=None)
         self.output.bind(trajectory, self.io, 'trajectory')
         
         transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=['Transition matrix'])
@@ -191,12 +180,22 @@ class Tile_15_3_1(sw.Tile):
         
         land_cover = run.land_cover(self.io, self.aoi_io, self.output)
         
+        ndvi_int, climate_int = run.integrate_ndvi_climate(self.aoi_io, self.io, self.output)
+        
+        productivity_trajectory = run.productivity_trajectory(self.io, ndvi_int, climate_int, self.output)
+        productivity_performance = run.productivity_performance(self.io_aoi, self.io, ndvi_int, climate_int, self.output)
+        productivity_state = run.productivity_state(self.io_aoi, self.io, ndvi_int, climate_int, self.output)
+                                                                
+        
         # create a map 
         m = sm.SepalMap()
         m.zoom_ee_object(self.aoi_io.get_aoi_ee().geometry())
         
         # add the layers 
         m.addLayer(land_cover, {}, 'land_cover')
+        m.addLayer(productivity_trajectory, pm.viz_trajectory, 'productivity_trajectory')
+        m.addLayer(productivity_performance, pm.viz_trajectory, 'productivity_performance')
+        m.addLayer(productivity_state, pm.viz_trajectory, 'productivity_state')
         
         # add the map to the result tile 
         self.result_tile.set_content([m])

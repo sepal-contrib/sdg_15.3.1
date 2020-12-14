@@ -8,6 +8,9 @@ L4_start = 1982
 # max year for land use 
 land_use_max_year = 2018
 
+lc_first_year = 1992
+lc_last_year = 2015
+
 # name of the sensor, GEE asset
 sensors = {
         'Landsat 4': 'LANDSAT/LT04/C01/T1_SR',
@@ -20,6 +23,7 @@ sensors = {
 precipitation = 'NOAA/PERSIANN-CDR'
 
 land_cover = "users/geflanddegradation/toolbox_datasets/lcov_esacc_1992_2018"
+soil_tax = "users/geflanddegradation/toolbox_datasets/soil_tax_usda_sgrid"
 
 ######################
 ##      matrix      ##
@@ -34,6 +38,12 @@ IPCC_matrix = [
     61, 62, 63, 64, 65, 66, 67,
     71, 72, 73, 74, 75, 76, 77
 ]
+
+###############################
+##      named parameter      ##
+###############################
+
+trajectories = ['ndvi_trend', 'p_restrend', 's_restrend', 'ue_trend']
 
 #############################
 ##      kendall coeff      ##
@@ -52,3 +62,9 @@ def get_kendall_coef(n, level=95):
             }
     
     return coefs[level][n]
+
+########################################
+##      vizualization parameters      ##
+########################################
+
+viz_trajectory = {"max": 3, "min":-3,"palette":["#762a83","#af8dc3","#e7d4e8","#f7f7f7","#d9f0d3","#7fbf7b","#1b7837"]}
