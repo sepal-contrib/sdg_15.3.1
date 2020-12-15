@@ -37,8 +37,7 @@ def land_cover(io, aoi_io, output):
     
     lc_dg = lc_tr.remap(pm.IPCC_matrix,io.transition_matrix)
 
-    ## Remap persistence classes so they are sequential. This
-    ## makes it easier to assign a clear color ramp in QGIS.
+    ## Remap persistence classes so they are sequential.
     
     sequential_matrix = [
         1, 12, 13, 14, 15, 16, 17,
@@ -102,7 +101,15 @@ def integrate_ndvi_climate(aoi_io, io, output):
     return (ndvi_int, climate_int)
 
 def productivity_trajectory(io, nvdi_yearly_integration, climate_yearly_integration, output):
-    """missing description"""
+    """Productivity Trend describes the trajectory of change in productivity over time. Trend is calculated by fitting a robust, non-parametric linear regression model.The significance of trajectory slopes at the P <= 0.05 level should be reported in terms of three classes:
+        1) Z score < -1.96 = Potential degradation, as indicated by a significant decreasing trend,
+        2) Z score > 1.96 = Potential improvement, as indicated by a significant increasing trend, or
+        3) Z score > -1.96 AND < 1.96 = No significant change
+
+In order to correct the effects of climate on productivity, climate adjusted trend analysis can be performed. There such methods are coded for the trajectory analysis. 
+
+The following code runs the selected trend method and produce an output by reclassifying the trajecry slopes. 
+    """
     
     trajectories = ['ndvi_trend', 'p_restrend', 's_restrend', 'ue_trend']
 
@@ -157,7 +164,14 @@ def productivity_trajectory(io, nvdi_yearly_integration, climate_yearly_integrat
     return out
 
 def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly_integration, output):
-    """missing description"""
+    """It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
+        Steps:
+        *Computation of mean NDVI for the analysis period,
+        *Creation of ecologically similar regions based on USDA taxonomy and ESA CCI land cover data sets.
+        *Extraction of mean NDVI for each region, creation of  a frequency distribution of this data to determine the value that represents 90th percentile,
+        *Computation of the ratio of mean NDVI and max productivity (90th percentile)
+
+    """
     
     #year_start, year_end, ndvi_1yr, AOI
 
@@ -262,7 +276,17 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     return output
 
 def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output):
-    """missing description"""
+    """It represents the level of relative roductivity in a pixel compred to a historical observations of productivity for that pixel. For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
+        It alows for the detection of recent changes in primary productivity as compared to the baseline period.
+        Steps:
+        *Definition of baselene and reporting perod,
+        *Computation of frequency distribution of mean NDVI for baseline period with addition of 5% at the both extremes of the distribution to alow inclusion of some, if an, missed extreme values in NDVI.
+        *Creation of 10 percentile classess using the data from the frequency distribution.
+        *computation of mean NDVI for baseline period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the base line period the number corresponding to that percentile class. 
+        *computation of mean NDVI for reporting period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the reporting period the number corresponding to that percentile class. 
+        *Determination of the difference in class number between the reporting and baseline period,
+        *
+    """
     
     #year_bl_start, year_bl_end, year_tg_start, year_tg_end, nvdi_yearly_integration
     

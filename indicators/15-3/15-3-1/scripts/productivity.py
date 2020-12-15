@@ -8,7 +8,7 @@ import utils as u
 ee.Initialize()
 
 def ndvi_trend(year_start, year_end, ndvi_yearly_integration):
-    """Calculate temporal NDVI analysis.
+    """Calculate NDVI trend.
     
     Calculates the trend of temporal NDVI using NDVI data from selected satellite dataset. Areas where changes are not significant
     are masked out using a Mann-Kendall test.
@@ -25,7 +25,8 @@ def ndvi_trend(year_start, year_end, ndvi_yearly_integration):
     return (lf_trend, mk_trend)
 
 def p_restrend(year_start, year_end, nvdi_yearly_integration, climate_yearly_integration)
-    """missing description"""
+    """Rasudial trend analsis predicts NDVI based on the given rainfall. p_restrend uses linear regression model to predict NDVI for a given rainfall amount. The residual (Predicted - Obsedved)NDVI trend is considered as productivity change that is indipendent of climatic variation. For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
+    """
     
     ## Apply function to create image collection of ndvi and climate
     nvdi_yearly_integration = f_img_coll(climate_yearly_integration, nvdi_yearly_integration, start, end)
@@ -54,7 +55,10 @@ def p_restrend(year_start, year_end, nvdi_yearly_integration, climate_yearly_int
     return (lf_trend, mk_trend)
 
 def ue_trend(start, end, nvdi_yearly_integration, climate_yearly_integration):
-    """missing description"""
+    """Calculate trend based on rain use efficiency.
+    It is the ratio of ANPP(annual integral of NDVI as proxy) to annual precipitation.
+
+    """
 
     # Convert the climate layer to meters (for precip) so that RUE layer can be
     # scaled correctly
@@ -181,7 +185,7 @@ def mann_kendall(imageCollection):
 ##################################
 
 def f_img_coll(climate_yearly_integration, nvdi_yearly_integration, start, end):
-    """missing descriptions"""
+    """Creat an ImageCollection of annual integral of NDVI and annual inegral of climate data"""
     
     img_list = ee.List([])
     for year in range(start, end + 1):
