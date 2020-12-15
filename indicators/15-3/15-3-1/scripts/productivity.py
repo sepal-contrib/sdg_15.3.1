@@ -29,28 +29,28 @@ def p_restrend(year_start, year_end, nvdi_yearly_integration, climate_yearly_int
     """
     
     ## Apply function to create image collection of ndvi and climate
-    nvdi_yearly_integration = f_img_coll(climate_yearly_integration, nvdi_yearly_integration, start, end)
+    ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end)
 
     ## Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
-    lf_clim_ndvi = nvdi_yearly_integration \
+    linear_model_climate_ndvi = ndvi_climate_yearly_integration \
         .select(['clim', 'ndvi']) \
         .reduce(ee.Reducer.linearFit())
 
     ## Apply function to  predict NDVI based on climate
-    ndvi_1yr_p = ee.ImageCollection(ee.List(
-        ndvi_1yr_coll \
+    predicted_yearly_ndvi = ee.ImageCollection(ee.List(
+        ndvi_climate_yearly_integration \
         .select('clim') \
-        .iterate(partial(f_ndvi_clim_p, lf_clim_ndvi = lf_clim_ndvi), first)
+        .iterate(partial(ndvi_prediction_climate, linear_model_climate_ndvi = linear_model_climate_ndvi), first)
     ))
 
     ## Apply function to compute NDVI annual residuals
-    ndvi_1yr_r = f_ndvi_clim_r_coll(io.start, io.end, nvdi_yearly_integration, ndvi_1yr_p)
+    residual_yearly_ndvi = image_collection_residuals(io.start, io.end, nvdi_yearly_integration, predicted_yearly_ndvi)
 
     ## Fit a linear regression to the NDVI residuals
-    lf_trend = ndvi_1yr_r.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
+    lf_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
 
     ## Compute Kendall statistics
-    mk_trend = u.mann_kendall(ndvi_1yr_r.select('ndvi_res'))
+    mk_trend = u.mann_kendall(residual_yearly_ndvi.select('ndvi_res'))
     
     return (lf_trend, mk_trend)
 
@@ -65,13 +65,13 @@ def ue_trend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     # TODO: Need to handle scaling for ET for WUE
     
     # Apply function to compute ue and store as a collection
-    ue_1yr_coll = u.f_img_coll(climate_yearly_integration, nvdi_yearly_integration, start, end)
+    ue_yearly_collection = use_efficiency(climate_yearly_integration, nvdi_yearly_integration, start, end)
 
     # Compute linear trend function to predict ndvi based on year (ndvi trend)
-    lf_trend = ue_1yr_coll.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
+    lf_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    trend = u.mann_kendall(ue_1yr_coll.select('ue'))
+    trend = u.mann_kendall(ue_yearly_collection.select('ue'))
     
     return (lf_trend, mk_trend)
 
@@ -184,7 +184,7 @@ def mann_kendall(imageCollection):
 ##      image manipulation      ##
 ##################################
 
-def f_img_coll(climate_yearly_integration, nvdi_yearly_integration, start, end):
+def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end):
     """Creat an ImageCollection of annual integral of NDVI and annual inegral of climate data"""
     
     img_list = ee.List([])
@@ -209,44 +209,18 @@ def f_img_coll(climate_yearly_integration, nvdi_yearly_integration, start, end):
     
     return out
 
-def f_ndvi_clim_p(image, list_, lf_clim_ndvi):
-    """predict NDVI from climate"""
+def ndvi_prediction_climate(image, list_, linear_model_climate_ndvi):
+    """predict NDVI from climate. part of p_restrend function"""
     
-    ndvi = lf_clim_ndvi \
+    ndvi = linear_model_climate_ndvi \
         .select('offset') \
         .add((lf_clim_ndvi.select('scale').multiply(image))) \
         .set({'year': image.get('year')})
     
     return ee.List(list_).add(ndvi)
 
-def stack(start, end, ndvi_1yr_o, clim_1yr_o):
-    """Function to compute differences between observed and predicted NDVI and compilation in an image collection"""
-    
-    img_coll = ee.List([])
-    for year in range(start, end + 1):
-            
-        ndvi = ndvi_1yr_o \
-            .filter(ee.Filter.eq('year', year)) \
-            .select('ndvi') \
-            .median()
-        
-        clim = clim_1yr_o \
-            .filter(ee.Filter.eq('year', year)) \
-            .select('ndvi') \
-            .median()
-            
-        img = ndvi \
-            .addBands(clim.addBands(ee.Image(k).float())) \
-            .rename(['ndvi', 'clim', 'year']) \
-            .set({'year': year})
-        
-        # add to the image collection
-        img_coll = img_coll.add(img)
-    
-    return ee.ImageCollection(img_coll)
-
-def f_ndvi_clim_r_img(year, ndvi_1yr_coll, ndvi_1yr_p):
-    """Function to compute residuals (ndvi obs - ndvi pred)"""
+def ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
+    """Function to compute residuals (ndvi obs - ndvi pred). part of p_restrend function"""
     
     ndvi_o = ndvi_1yr_coll \
         .filter(ee.Filter.eq('year', year)) \
@@ -263,30 +237,30 @@ def f_ndvi_clim_r_img(year, ndvi_1yr_coll, ndvi_1yr_p):
     
     return ndvi_r.rename(['year', 'ndvi_res'])
 
-def f_ndvi_clim_r_coll(start, end, ndvi_1yr_coll, ndvi_1yr_p):
-    """Function create image collection of residuals"""
+def image_collection_residuals(start, end, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
+    """Function to create image collection of residuals. part of p_restrend function"""
         
     res_list = ee.List([])
     for year in range(start, end + 1):
             
-        res_image = f_ndvi_clim_r_img(year, ndvi_1yr_coll, ndvi_1yr_p)
+        res_image = ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi)
         
         res_list = res_list.add(res_image)
         
     return ee.ImageCollection(res_list)
 
-def f_img_coll(start, end, ndvi_stack, climate_1yr):
-    """missing description"""
+def use_efficiency(start, end, ndvi_yearly_integration, climate_yearly_integration):
+    """Function to creat rain use efficiency and store as an imageCollection"""
         
     img_coll = ee.List([])
     for year in range(start, end + 1):
         
-        ndvi_img = ndvi_stack \
+        ndvi_img = ndvi_yearly_integration \
             .filter(ee.Filter.eq('year', year)) \
             .median() \
             .select('ndvi')
             
-        clim_img = climate_1yr \
+        clim_img = climate_yearly_integration \
             .filter(ee.Filter.eq('year', year)) \
             .median() \
             .select('clim') \
