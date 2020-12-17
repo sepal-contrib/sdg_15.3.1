@@ -191,13 +191,11 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     #############################################
 
     # compute mean ndvi for the period
-    years = ee.List([f'y{year}' for year in range(io.start, io.end + 1)])
     
-    ndvi_avg = nvdi_yearly_integration \
-        .select(years) \
+    ndvi_mean = nvdi_yearly_integration \
+        .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
-        .rename(['ndvi']) \
-        .clip(poly)
+        .rename(['ndvi'])
 
     ################################
     
@@ -209,62 +207,52 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     #################################
     
     # reclassify lc to ipcc classes
-    lc_t0 = lc.select('y{}'.format(lc_year_start)) \
+    lc_reclass = lc.select(f'y{lc_year_start}') \
         .remap(pm.ESA_lc_classes, 
                pm.reclassification_matrix)
 
     # create a binary mask.
-    mask = ndvi_avg.neq(0)
+    mask = ndvi_mean.neq(0)
 
     # define projection attributes
-    ndvi_proj = nvdi_yearly_integration.projection()
-
-    # reproject land cover, soil_tax_usda and avhrr to modis resolution
-    lc_proj = lc_t0.reproject(crs=ndvi_proj)
-    soil_tax_usda_proj = soil_tax_usda.reproject(crs=ndvi_proj)
-    ndvi_avg_proj = ndvi_avg.reproject(crs=ndvi_proj)
-
+    #TODO: reprojection does not work for a collection that has default projection WGS84(crs:4326). Need to find a solution to get the scale information from input sensors.
     # define unit of analysis as the intersect of soil_tax_usda and land cover
-    units = soil_tax_usda_proj.multiply(100).add(lc_proj)
+    similar_ecoregions = soil_tax_usda.multiply(100).add(lc_reclass)
 
-    # create a 2 band raster to compute 90th percentile per unit (analysis restricted by mask and study area)
-    ndvi_id = ndvi_avg_proj.addBands(units).updateMask(mask)
+    # create a 2 band raster to compute 90th percentile per ecoregion (analysis restricted by mask and study area)
+    ndvi_id = ndvi_mean.addBands(similar_ecoregion).updateMask(mask)
 
     # compute 90th percentile by unit
-    perc90 = ndvi_id.reduceRegion(
+    percentile_90 = ndvi_id.reduceRegion(
         reducer=ee.Reducer.percentile([90]).group(
             groupField=1, 
             groupName='code'
         ),
         geometry=poly,
-        scale=ee.Number(modis_proj.nominalScale()).getInfo(),
+        scale=30,
         maxPixels=1e15
     )
 
     # Extract the cluster IDs and the 90th percentile
-    groups = ee.List(perc90.get("groups"))
+    groups = ee.List(percentile_90.get("groups"))
     ids = groups.map(lambda d: ee.Dictionary(d).get('code'))
-    perc = groups.map(lambda d: ee.Dictionary(d).get('p90'))
+    percentile = groups.map(lambda d: ee.Dictionary(d).get('p90'))
 
-    # remap the units raster using their 90th percentile value
-    raster_perc = units.remap(ids, perc)
+    # remap the similar ecoregion raster using their 90th percentile value
+    ecoregion_perc90 = similar_ecoregions.remap(ids, percentile)
 
-    # compute the ration of observed ndvi to 90th for that class
-    obs_ratio = ndvi_avg_proj.divide(raster_perc)
-
-    # aggregate obs_ratio to original NDVI data resolution (for modis this step does not change anything)
-    obs_ratio_2 = obs_ratio.reduceResolution(reducer=ee.Reducer.mean(), maxPixels=2000) \
-        .reproject(crs=ndvi_1yr.projection())
+    # compute the ratio of observed ndvi to 90th for that class
+    observed_ratio = ndvi_mean.divide(ecoregion_perc90)
 
     # create final degradation output layer (9999 is background), 0 is not
     # degreaded, -1 is degraded
-    lp_perf_deg = ee.Image(-32768) \
-        .where(obs_ratio_2.gte(0.5), 0) \
-        .where(obs_ratio_2.lte(0.5), -1)
+    prod_performance_class = ee.Image(-32768) \
+        .where(observed_ratio.gte(0.5), 0) \
+        .where(observed_ratio.lte(0.5), -1)
 
     output = ee.Image(
-        lp_perf_deg.addBands(obs_ratio_2.multiply(10000)) \
-        .addBands(units) \
+        prod_performance_class.addBands(observed_ratio.multiply(10000)) \
+        .addBands(similar_ecoregions) \
         .unmask(-32768) \
         .int16()
     )
