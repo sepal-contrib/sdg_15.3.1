@@ -210,8 +210,8 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     
     # reclassify lc to ipcc classes
     lc_t0 = lc.select('y{}'.format(lc_year_start)) \
-        .remap([10, 11, 12, 20 , 30, 40, 50, 60, 61, 62, 70, 71, 72, 80, 81, 82, 90, 100, 160, 170, 110, 130, 180, 190, 120, 121, 122, 140, 150, 151, 152, 153, 200, 201, 202, 210], 
-               [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36])
+        .remap(pm.ESA_lc_classes, 
+               pm.reclassification_matrix)
 
     # create a binary mask.
     mask = ndvi_avg.neq(0)
