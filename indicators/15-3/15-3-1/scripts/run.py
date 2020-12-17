@@ -275,93 +275,96 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     #year_bl_start, year_bl_end, year_tg_start, year_tg_end, nvdi_yearly_integration
     
     
-    ############################
-    
-    # why do we need to use ee.Image ?
-    nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
-    
-    ############################
-
     # compute min and max of annual ndvi for the baseline period
-    years = ee.List([f'y{year}' for year in range(year_bl_start, year_bl_end + 1)])
+    baseline_filter = ee.Filter.rangeContains('year', year_bl_start, year_bl_end)
+    target_filter =ee.Filter.rangeContains('year', year_tg_start, year_tg_end)
     
-    bl_ndvi_range = nvdi_yearly_integration \
-        .select(years) \
+    baseline_ndvi_range = nvdi_yearly_integration \
+        .filter(baseline_filter) \
+        .select('ndvi') \
         .reduce(ee.Reducer.percentile([0, 100]))
+
+    #convert baseline ndvi imagecollection to bands
+    baseline_ndvi_collection = nvdi_yearly_integration \
+        .filter(baseline_filter) \
+        .select('ndvi')
+
+    baseline_ndvi_images = ee.ImageCollection.toBands(baseline_ndvi_collection)
 
     # add two bands to the time series: one 5% lower than min and one 5% higher than max
     
     ##############################
     
     # this var needs to have an explicit name
-    name_this_var = (bl_ndvi_range.select('p100').subtract(bl_ndvi_range.select('p0'))).multiply(0.05)
+    baseline_ndvi_5p = (baseline_ndvi_range.select('ndvi_p100').subtract(baseline_ndvi_range.select('ndvi_p0'))).multiply(0.05)
     
     #############################
     
-    bl_ndvi_ext = nvdi_yearly_integration \
-        .select(years) \
+    baseline_ndvi_extended = baseline_ndvi_images \
         .addBands(
-            bl_ndvi_range \
-            .select('p0') \
-            .subtract(name_this_var)
+            baseline_ndvi_range \
+            .select('ndvi_p0') \
+            .subtract(baseline_ndvi_5p)
         ) \
         .addBands(
-            bl_ndvi_range \
-            .select('p100') \
-            .add(name_this_var)
+            baseline_ndvi_range \
+            .select('ndvi_p100') \
+            .add(baseline_ndvi_5p)
         )
 
     # compute percentiles of annual ndvi for the extended baseline period
     percentiles = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-    bl_ndvi_perc = bl_ndvi_ext.reduce(ee.Reducer.percentile(percentiles))
+    baseline_ndvi_perc = baseline_ndvi_extended.reduce(ee.Reducer.percentile(percentiles))
 
     # compute mean ndvi for the baseline and target period period
-    bl_ndvi_mean = nvdi_yearly_integration \
-        .select(years) \
+    baseline_ndvi_mean = nvdi_yearly_integration \
+        .filter(baseline_filter) \
+        .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
         .rename(['ndvi'])
     
-    tg_ndvi_mean = nvdi_yearly_integration \
-        .select(years) \
+    target_ndvi_mean = nvdi_yearly_integration \
+        .filter(target_filter) \
+        .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
         .rename(['ndvi'])
 
     # reclassify mean ndvi for baseline period based on the percentiles
-    bl_classes = ee.Image(-32768) \
-        .where(bl_ndvi_mean.lte(bl_ndvi_perc.select('p10')), 1) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p10')), 2) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p20')), 3) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p30')), 4) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p40')), 5) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p50')), 6) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p60')), 7) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p70')), 8) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p80')), 9) \
-        .where(bl_ndvi_mean.gt(bl_ndvi_perc.select('p90')), 10)
+    baseline_classes = ee.Image(-32768) \
+        .where(baseline_ndvi_mean.lte(baseline_ndvi_perc.select('p10')), 1) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p10')), 2) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p20')), 3) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p30')), 4) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p40')), 5) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p50')), 6) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p60')), 7) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p70')), 8) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p80')), 9) \
+        .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p90')), 10)
 
     # reclassify mean ndvi for target period based on the percentiles
-    tg_classes = ee.Image(-32768) \
-        .where(tg_ndvi_mean.lte(bl_ndvi_perc.select('p10')), 1) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p10')), 2) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p20')), 3) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p30')), 4) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p40')), 5) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p50')), 6) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p60')), 7) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p70')), 8) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p80')), 9) \
-        .where(tg_ndvi_mean.gt(bl_ndvi_perc.select('p90')), 10)
+    target_classes = ee.Image(-32768) \
+        .where(target_ndvi_mean.lte(baseline_ndvi_perc.select('p10')), 1) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p10')), 2) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p20')), 3) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p30')), 4) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p40')), 5) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p50')), 6) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p60')), 7) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p70')), 8) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p80')), 9) \
+        .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p90')), 10)
 
     # difference between start and end clusters >= 2 means improvement (<= -2 
     # is degradation)
-    classes_chg = tg_classes.subtract(bl_classes).where(bl_ndvi_mean.subtract(tg_ndvi_mean).abs().lte(100), 0)
+    classes_change = target_classes.subtract(baseline_classes).where(baseline_ndvi_mean.subtract(target_ndvi_mean).abs().lte(100), 0)
 
     out = ee.Image(
-        lasses_chg \
-        .addBands(bl_classes) \
-        .addBands(tg_classes) \
-        .addBands(bl_ndvi_mean) \
-        .addBands(tg_ndvi_mean) \
+        classes_change \
+        .addBands(baseline_classes) \
+        .addBands(target_classes) \
+        .addBands(baseline_ndvi_mean) \
+        .addBands(target_ndvi_mean) \
         .int16()
     )
     
