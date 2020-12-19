@@ -24,6 +24,8 @@ precipitation = 'NOAA/PERSIANN-CDR'
 
 land_cover = "users/geflanddegradation/toolbox_datasets/lcov_esacc_1992_2018"
 soil_tax = "users/geflanddegradation/toolbox_datasets/soil_tax_usda_sgrid"
+soc ="users/geflanddegradation/toolbox_datasets/soc_sgrid_30cm"
+ipcc_climate_zones = "users/geflanddegradation/toolbox_datasets/ipcc_climate_zones"
 
 ######################
 ##      matrix      ##
@@ -73,6 +75,36 @@ sequential_matrix = [
         71, 72, 73, 74, 75, 76, 7
         ]
 
+
+
+climate_conversion_matrix = [
+        [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12       
+        ],
+        [
+        0, 0.69, 0.8, 0.69, 0.8, 0.69, 0.8, 0.69, 0.8, 0.64, 0.48, 0.48, 0.58        
+        ]
+        ]
+        
+conversion_factor = [
+                    1, 1, 99, 1, 0.1, 0.1, 1,
+                    1, 1, 99, 1, 0.1, 0.1, 1,
+                    -99, -99, 1, 1 / 0.71, 0.1, 
+                    0.1, 1, 1, 1, 0.71, 1, 0.1, 
+                    0.1, 1, 2, 2, 2, 2, 1, 1,
+                    1, 2, 2, 2, 2, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1
+                    ]
+
+management_factor = [
+                    1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1,
+                    1, 1, 1, 1, 1, 1, 1
+                    ]
 ###############################
 ##      named parameter      ##
 ###############################
