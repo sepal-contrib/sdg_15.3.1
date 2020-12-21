@@ -113,7 +113,8 @@ def soil_organic_carbon(io,aoi_io, output):
                          .multiply(100)
     soc_class = ee.Image(-32768) \
             .where(soc_percent_change.gt(10),1) \
-            .where(soc_percent_change.lt(10),-1)\
+            .where(soc_percent_change.lt(10).And(soc_percent_change.gt(-10)),0) \
+            .where(soc_percent_change.lt(-10),-1)\
             .rename('soc_class')
 
     output = soc_class.unmask(-32768).int16()
@@ -542,7 +543,7 @@ def indicator_15_3_1(productivity, landcover,soc, output):
     indicator = ee.Image(-32768) \
             .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
             .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
-            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq()),-1) \
+            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq-1()),-1) \
             .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
             .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
             .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
@@ -572,7 +573,7 @@ def indicator_15_3_1(productivity, landcover,soc, output):
             .int16()
     return output
 
-def area2table(image, io_aoi, io.plot_id):
+def area2table(image, io_aoi, io.plot_id, output):
 
     area_data = ee.Image.pixelArea(io_aoi)\
             .addbands(image)

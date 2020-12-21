@@ -24,6 +24,9 @@ class TileIo():
         # matrix 
         self.transition_matrix = [[0 for i in range(7)] for i in range(7)]
         
+        #Climate coefficient
+        #TODO:
+        
         
 class PickerLine(v.Layout):
     
@@ -179,6 +182,8 @@ class Tile_15_3_1(sw.Tile):
         widget.toggle_loading()
         
         land_cover = run.land_cover(self.io, self.aoi_io, self.output)
+
+        soc = run.soil_organic_carbon(self.io, self.aoi_io, self.ouput))
         
         ndvi_int, climate_int = run.integrate_ndvi_climate(self.aoi_io, self.io, self.output)
         
@@ -186,16 +191,20 @@ class Tile_15_3_1(sw.Tile):
         productivity_performance = run.productivity_performance(self.io_aoi, self.io, ndvi_int, climate_int, self.output)
         productivity_state = run.productivity_state(self.io_aoi, self.io, ndvi_int, climate_int, self.output)
                                                                 
-        
+        productivity = productivity_final(productivity_trajectory, productivity_performance, productivity_state, self.output)
+
+        indicator_15_3_1 = indicator_15_3_1(productivity, land_cover, soc, self.output)
+
+
         # create a map 
         m = sm.SepalMap()
         m.zoom_ee_object(self.aoi_io.get_aoi_ee().geometry())
         
         # add the layers 
-        m.addLayer(land_cover, {}, 'land_cover')
-        m.addLayer(productivity_trajectory, pm.viz_trajectory, 'productivity_trajectory')
-        m.addLayer(productivity_performance, pm.viz_trajectory, 'productivity_performance')
-        m.addLayer(productivity_state, pm.viz_trajectory, 'productivity_state')
+        m.addLayer(productivity, pm.viz, 'productivity')
+        m.addLayer(land_cover, pm.viz, 'land_cover')
+        m.addLayer(soc, pm.viz, 'soil_organic_carbon')
+        m.addLayer(indicator_15_3_1, pm.viz, 'indicator_15_3_1')
         
         # add the map to the result tile 
         self.result_tile.set_content([m])
