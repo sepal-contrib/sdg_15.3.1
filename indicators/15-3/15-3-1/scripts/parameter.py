@@ -86,10 +86,10 @@ climate_conversion_matrix = [
         ]
         ]
         
-conversion_factor = [
-                    1, 1, 99, 1, 0.1, 0.1, 1,
-                    1, 1, 99, 1, 0.1, 0.1, 1,
-                    -99, -99, 1, 1 / 0.71, 0.1, 
+c_conversion_factor = [
+                    1, 1, 333, 1, 0.1, 0.1, 1,
+                    1, 1, 333, 1, 0.1, 0.1, 1,
+                    -333, -333, 1, 1 / 0.71, 0.1, 
                     0.1, 1, 1, 1, 0.71, 1, 0.1, 
                     0.1, 1, 2, 2, 2, 2, 1, 1,
                     1, 2, 2, 2, 2, 1, 1, 1, 1,
@@ -133,4 +133,4 @@ def get_kendall_coef(n, level=95):
 ##      vizualization parameters      ##
 ########################################
 
-viz_trajectory = {"max": 3, "min":-3,"palette":["#762a83","#af8dc3","#e7d4e8","#f7f7f7","#d9f0d3","#7fbf7b","#1b7837"]}
+viz_trajectory = {"max": 1, "min":-1,"palette":["#762a83","#f7f7f7","#1b7837"]}

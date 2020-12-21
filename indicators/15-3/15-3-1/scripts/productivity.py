@@ -2,8 +2,8 @@ from functools import partial
 
 import ee
 
-import parameter as pm
-import utils as u
+from scripts import parameter as pm
+from scripts import utils as u
 
 ee.Initialize()
 
@@ -24,7 +24,7 @@ def ndvi_trend(year_start, year_end, ndvi_yearly_integration):
 
     return (lf_trend, mk_trend)
 
-def p_restrend(year_start, year_end, nvdi_yearly_integration, climate_yearly_integration)
+def p_restrend(year_start, year_end, nvdi_yearly_integration, climate_yearly_integration):
     """Rasudial trend analsis predicts NDVI based on the given rainfall. p_restrend uses linear regression model to predict NDVI for a given rainfall amount. The residual (Predicted - Obsedved)NDVI trend is considered as productivity change that is indipendent of climatic variation. For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
     """
     

@@ -29,7 +29,7 @@ def soil_organic_carbon(io,aoi_io, output):
     soc_images = ee.Image().select()
     
     for year in range(io.end - io.start):
-        lc_time0 = lc \ 
+        lc_time0 = lc \
                     .select(year) \
                     .remap(transition_matrix[0],transition_matrix[1])
         lc_time1 = lc \
@@ -52,7 +52,7 @@ def soil_organic_carbon(io,aoi_io, output):
         
         #stock change factor for land use
         #333 and -333 will be recoded using the choosen climate coef.
-        lc_transition_climate_coef_time0 = lc_transition.remap(IPCC_matrix, conversion_factor)
+        lc_transition_climate_coef_time0 = lc_transition.remap(IPCC_matrix, c_conversion_factor)
         
         
         if io.conversion_coef == 'per pixel':
@@ -90,11 +90,11 @@ def soil_organic_carbon(io,aoi_io, output):
             organic_carbon_change = organic_carbon_change \
                                     .where(lc_time0.neq(lc_time1),
                                            (soc_images.select(year) \
-                                            subtract(soc_images.select(year) \
+                                            .subtract(soc_images.select(year) \
                                                      .multiply(lc_transition_climate_coef) \
                                                      .multiply(lc_transition_management_factor) \
                                                      .multiply(lc_transition_organic_factor))) \
-                                            devide(20)) \
+                                            .devide(20)) \
                                     .where(lc_transition_time.gt(20),0)
             soc_final = soc_images \
                         .select(year) \
@@ -111,9 +111,13 @@ def soil_organic_carbon(io,aoi_io, output):
                                     .select(0))) \
                           .divide(soc_images(0))) \
                          .multiply(100)
-    out = ee.Image(soc_percent_change)
-    out = out.unmask(-32768).int16()
-    return out
+    soc_class = ee.Image(-32768) \
+            .where(soc_percent_change.gt(10),1) \
+            .where(soc_percent_change.lt(10),-1)\
+            .rename('soc_class')
+
+    output = soc_class.unmask(-32768).int16()
+    return output
     
                   
 
@@ -262,15 +266,22 @@ The following code runs the selected trend method and produce an output by recla
         .where(mk_trend.abs().lte(kendall90), 0) \
         .where(lf_trend.select('scale').abs().lte(10), 0).rename('signif')
 
-    out = ee.Image(
-        lf_trend.select('scale') \
+    trajectory_class = ee.Image(-32768) \
+        .where(signif.gt(0),1) \
+        .where(signif.eq(0),0) \
+        .where(signif.lt(0).And(signif.neq(-32768)),-1) \
+        .rename('trajectory_class')
+
+    output = ee.Image(
+        trajectory_class \
+        .addBands(lf_trend.select('scale')) \
         .addBands(signif) \
         .addBands(mk_trend) \
         .unmask(-32768) \
         .int16()
     )
     
-    return out
+    return output
 
 def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly_integration, output):
     """It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
@@ -361,7 +372,8 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     # degreaded, -1 is degraded
     prod_performance_class = ee.Image(-32768) \
         .where(observed_ratio.gte(0.5), 0) \
-        .where(observed_ratio.lte(0.5), -1)
+        .where(observed_ratio.lte(0.5), -1) \
+        .rename('performance_class')
 
     output = ee.Image(
         prod_performance_class.addBands(observed_ratio.multiply(10000)) \
@@ -470,16 +482,29 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
 
     # difference between start and end clusters >= 2 means improvement (<= -2 
     # is degradation)
-    classes_change = target_classes.subtract(baseline_classes).where(baseline_ndvi_mean.subtract(target_ndvi_mean).abs().lte(100), 0)
+    classes_change = target_classes \
+            .subtract(baseline_classes) \
+            .where(baseline_ndvi_mean \
+                .subtract(target_ndvi_mean) \
+                .abs().lte(100) \
+            , 0)
+    #reclassification to get the degredation classes
+    degredation_classes = ee.Image(-32768) \
+        .where(classes_change.gte(2),1) \
+        .where(classes_change.lte(-2),-1) \
+        .rename("state_class")
 
-    out = ee.Image(
-        classes_change \
+    output = ee.Image(
+        degredation_classes \
+        .addBands(classes_change) \
         .addBands(baseline_classes) \
         .addBands(target_classes) \
         .addBands(baseline_ndvi_mean) \
         .addBands(target_ndvi_mean) \
+        .unmask(-32768) \
         .int16()
     )
-    
-    return out
+
+   
+    return output
 
