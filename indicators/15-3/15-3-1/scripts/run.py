@@ -491,7 +491,8 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     #reclassification to get the degredation classes
     degredation_classes = ee.Image(-32768) \
         .where(classes_change.gte(2),1) \
-        .where(classes_change.lte(-2),-1) \
+        .where(classes_change.lte(-2).And(classes_change.neq(-32768)),-1) \
+        .where(classes_change.lt(2).And(classes_change.gt(-2)),0)
         .rename("state_class")
 
     output = ee.Image(
@@ -507,4 +508,96 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
 
    
     return output
+
+def productivity_final(trajectory, performance, state, output):
+    trajectory_class = trajectory.select('trajectory_class')
+    performance_class = performance.select('performance_class')
+    state_class = state.select('state_class')
+
+    productivity = ee.Image(-32768)\
+            .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(0)),1) \
+            .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(-1)),1) \
+            .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(0)),1) \
+            .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(-1)),1) \
+            .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(0)),1) \
+            .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1) \
+            .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(0)),0) \
+            .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(-1)),0) \
+            .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(0)),0) \
+            .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
+            .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
+            .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)\
+            .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(0)),-1) \
+            .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(-1)),-1) \
+            .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(0)),-1) \
+            .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
+            .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
+            .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)
+    
+    output = productivity \
+            .unmask(-32768) \
+            .int16()
+    return output
+def indicator_15_3_1(productivity, landcover,soc, output):
+    indicator = ee.Image(-32768) \
+            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
+            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
+            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq()),-1) \
+            .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
+            .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
+            .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+            .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+            .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+            .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
+            .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(1)),1) \
+            .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(0)),1) \
+            .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+            .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(1)),1) \
+            .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(0)),0) \
+            .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+            .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+            .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+            .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(1)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(0)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(1)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(0)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+            .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) 
+    output = indicator \
+            .unmask(-32768) \
+            .int16()
+    return output
+
+def area2table(image, io_aoi, io.plot_id):
+
+    area_data = ee.Image.pixelArea(io_aoi)\
+            .addbands(image)
+    def area_calculation(io_aoi):
+        area_per_class =area_data.reduceRegion({
+            reducer: ee.Reducer.sum()group({
+                                       groupField:1,
+                                       groupName: 'class'
+                                          }),
+            geometry: io_aoi.geometry(),
+            scale: 30,
+            maxPixels: 1e13
+            })
+        class_areas =ee.List(area_per_class.get('groups'))
+        def get_itemize_area(item):
+            area_dict = ee.Dictionary(item)
+            class_number = ee.Number(area_dict.get('class')).format()
+            area = ee.Number(area_dict.get('sum')).divide(1e6).round()
+            return ee.List([class_number, area])
+        class_area_lists = class_areas.map(get_itemize_area)
+        class_area_flatten = ee.Dictionary(class_area_lists.flatten())
+        plot = io_aoi.get(io.plot_id)
+        output =ee.Feature(io_aoi.geometry(),class_area_flatten.set('plot',plot))
+        return output
+    output = io_aoi.map(area_calculation)
+    return output
+                
 
