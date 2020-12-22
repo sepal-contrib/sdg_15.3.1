@@ -111,6 +111,14 @@ management_factor = [
 
 trajectories = ['ndvi_trend', 'p_restrend', 's_restrend', 'ue_trend']
 
+climate_regime = {
+        'Temperate dry (coef = 0.8)': 0.80,
+        'Temperate moist (coef = 0.69)': 0.69,
+        'Tropical dry (coef = 0.58)': 0.58,
+        'Tropical moist (coef = 0.48)': 0.48,
+        'Tropical montane (coef = 0.64)': 0.64
+                 }
+
 #############################
 ##      kendall coeff      ##
 #############################
@@ -133,4 +141,4 @@ def get_kendall_coef(n, level=95):
 ##      vizualization parameters      ##
 ########################################
 
-viz_trajectory = {"max": 1, "min":-1,"palette":["#762a83","#f7f7f7","#1b7837"]}
+viz = {"max": 1, "min":-1,"palette":["#F99B72","#F9F372","#12C341"]}

@@ -21,12 +21,15 @@ class TileIo():
         # trajectory 
         self.trajectory = None
         
-        # matrix 
+        # matrix, change output format to a plain list. we need it to remap the land cover instead of a matrix.
         self.transition_matrix = [[0 for i in range(7)] for i in range(7)]
         
-        #Climate coefficient
-        #TODO:
-        
+        #Climate regime
+        #TODO:There are three options
+                     #  'per pixel',label: Per pixel based  on global climate data.  set this one as default
+                     #  'Specify': v.Select(items=[*pm.climate_regime], label="Select climate regime", multiple=False, v_model=None)
+                     #  'Custom':     label:
+        self.conversion_coef =None
         
 class PickerLine(v.Layout):
     
