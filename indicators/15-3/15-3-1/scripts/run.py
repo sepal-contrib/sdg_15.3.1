@@ -12,7 +12,7 @@ def soil_organic_carbon(io, aoi_io, output):
     #Inputs: start_year, end_year, conversion_coef
     
     soc = ee.Image(pm.soc)
-    soc = soc.updateMapsk(soc.neq(-32767))
+    soc = soc.updateMask(soc.neq(-32767))
     
     lc = ee.Image(pm.land_cover) \
         .select(ee.List.sequence(io.start - 1992, io.end -1992, 1))
@@ -32,8 +32,6 @@ def soil_organic_carbon(io, aoi_io, output):
     
     # Creat an empty image to store yearly soc maps
     soc_images = ee.Image().select()
-    
-    #initialisation 
     
     
     for year in range(io.end - io.start):
