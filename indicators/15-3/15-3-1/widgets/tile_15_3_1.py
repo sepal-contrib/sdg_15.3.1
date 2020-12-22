@@ -110,17 +110,22 @@ class TransitionMatrix(v.SimpleTable):
             inputs = []
             for j, target in enumerate(self.CLASSES):
                 matrix_input = MatrixInput(i, j, io, output)
+                
                 input_ = v.Html(tag='td', class_='ma-0 pa-0', children=[matrix_input])
                 inputs.append(input_)
                 
-            row = v.Html(tag='tr', children=[v.Html(tag='th', children=[baseline])] + inputs)
+            row = v.Html(tag='tr', children=(
+                [v.Html(tag='th', children=[baseline])] 
+                + inputs
+            ))
             rows.append(row)
+                   
+                   
             
         # create the simple table 
         super().__init__(
             children = [
-                v.Html(tag = 'thead', children = header),
-                v.Html(tag = 'tbody', children = rows)
+                v.Html(tag = 'tbody', children = header + rows)
             ]
         )
         
