@@ -155,14 +155,11 @@ def land_cover(io, aoi_io, output):
             .add(lc_tg)
 
     ## definition of land cover transitions as degradation (-1), improvement (1), or no relevant change (0)
-    
     lc_dg = lc_tr \
             .remap(pm.IPCC_matrix, io.transition_matrix) \
             .rename("degredation")
 
     ## Remap persistence classes so they are sequential.
-    
-    
     lc_tr = lc_tr.remap(pm.IPCC_matrix, pm.sequential_matrix)
 
     out = ee.Image(
@@ -293,8 +290,6 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
         *Computation of the ratio of mean NDVI and max productivity (90th percentile)
 
     """
-    
-    #year_start, year_end, ndvi_1yr, AOI
 
     nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
 
@@ -332,9 +327,9 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     #################################
     
     # reclassify lc to ipcc classes
-    lc_reclass = lc.select(f'y{lc_year_start}') \
-        .remap(pm.ESA_lc_classes, 
-               pm.reclassification_matrix)
+    lc_reclass = lc \
+        .select(f'y{lc_year_start}') \
+        .remap(pm.ESA_lc_classes, pm.reclassification_matrix)
 
     # create a binary mask.
     mask = ndvi_mean.neq(0)
@@ -396,10 +391,7 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
         *computation of mean NDVI for reporting period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the reporting period the number corresponding to that percentile class. 
         *Determination of the difference in class number between the reporting and baseline period,
         *
-    """
-    
-    #year_bl_start, year_bl_end, year_tg_start, year_tg_end, nvdi_yearly_integration
-    
+    """    
     
     # compute min and max of annual ndvi for the baseline period
     baseline_filter = ee.Filter.rangeContains('year', year_bl_start, year_bl_end)
@@ -493,7 +485,7 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     degredation_classes = ee.Image(-32768) \
         .where(classes_change.gte(2),1) \
         .where(classes_change.lte(-2).And(classes_change.neq(-32768)),-1) \
-        .where(classes_change.lt(2).And(classes_change.gt(-2)),0)
+        .where(classes_change.lt(2).And(classes_change.gt(-2)),0) \
         .rename("state_class")
 
     output = ee.Image(
@@ -573,32 +565,34 @@ def indicator_15_3_1(productivity, landcover,soc, output):
             .int16()
     return output
 
-def area2table(image, io_aoi, io.plot_id, output):
 
-    area_data = ee.Image.pixelArea(io_aoi)\
-            .addbands(image)
-    def area_calculation(io_aoi):
-        area_per_class =area_data.reduceRegion({
-            reducer: ee.Reducer.sum()group({
-                                       groupField:1,
-                                       groupName: 'class'
-                                          }),
-            geometry: io_aoi.geometry(),
-            scale: 30,
-            maxPixels: 1e13
-            })
-        class_areas =ee.List(area_per_class.get('groups'))
-        def get_itemize_area(item):
-            area_dict = ee.Dictionary(item)
-            class_number = ee.Number(area_dict.get('class')).format()
-            area = ee.Number(area_dict.get('sum')).divide(1e6).round()
-            return ee.List([class_number, area])
-        class_area_lists = class_areas.map(get_itemize_area)
-        class_area_flatten = ee.Dictionary(class_area_lists.flatten())
-        plot = io_aoi.get(io.plot_id)
-        output =ee.Feature(io_aoi.geometry(),class_area_flatten.set('plot',plot))
-        return output
-    output = io_aoi.map(area_calculation)
-    return output
+#def area2table(image, io_aoi, io.plot_id, output):
+#
+#    # This is not an image io.aoi is a not even a featurecollection object 
+#    area_data = ee.Image.pixelArea(io_aoi).addbands(image)
+#    
+#    def area_calculation(io_aoi):
+#        area_per_class =area_data.reduceRegion({
+#            reducer: ee.Reducer.sum()group({
+#                                       groupField:1,
+#                                       groupName: 'class'
+#                                          }),
+#            geometry: io_aoi.geometry(),
+#            scale: 30,
+#            maxPixels: 1e13
+#            })
+#        class_areas =ee.List(area_per_class.get('groups'))
+#        def get_itemize_area(item):
+#            area_dict = ee.Dictionary(item)
+#            class_number = ee.Number(area_dict.get('class')).format()
+#            area = ee.Number(area_dict.get('sum')).divide(1e6).round()
+#            return ee.List([class_number, area])
+#        class_area_lists = class_areas.map(get_itemize_area)
+#        class_area_flatten = ee.Dictionary(class_area_lists.flatten())
+#        plot = io_aoi.get(io.plot_id)
+#        output =ee.Feature(io_aoi.geometry(),class_area_flatten.set('plot',plot))
+#        return output
+#    output = io_aoi.map(area_calculation)
+#    return output
                 
 

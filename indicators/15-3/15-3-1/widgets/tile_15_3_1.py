@@ -41,8 +41,8 @@ class PickerLine(v.Layout):
         self.io = io
         self.output = output
         
-        start_picker = v.Select(label='Start year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
-        output.bind(start_picker, io, 'start')
+        self.start_picker = v.Select(label='Start year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
+        output.bind(self.start_picker, io, 'start')
         
         target_picker = v.Select(label='Start year of the target period', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
         output.bind(target_picker, io, 'target_start')
@@ -50,7 +50,7 @@ class PickerLine(v.Layout):
         end_picker = v.Select(label='End year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
         output.bind(end_picker, io, 'end')
         
-        super().__init__(xs=12, row=True,  children=[start_picker, target_picker, end_picker])
+        super().__init__(xs=12, row=True,  children=[self.start_picker, target_picker, end_picker])
         
 class MatrixInput(v.Html):
     
@@ -139,6 +139,32 @@ class TransitionMatrix(v.SimpleTable):
         td = v.Html(tag='td', style_=f'background-color: {color}', children=[str(val)])
         
         return td
+    
+class SensorSelect(v.Select):
+    
+    def __init__(self, **kwargs):
+        
+        super().__init__(**kwargs)
+        
+    def update_sensors(self, change):
+        
+        # deselect all 
+        self.v_model = None
+        
+        # define the offset that should be used based on the yearr in the sensors list
+        if change['new'] >= 2015: # launch of Sentinel 2
+            last_sat = 5
+        elif change['new'] >= 2013: # launch of Landsat 8
+            last_sat = 4
+        elif change['new'] >= 1999: #launch of landsat 7
+            last_sat = 3
+        elif change['new'] >= 1984: #launch of landsat 5
+            last_sat = 2
+        else:
+            last_sat = 1
+            
+        self.items = [*pm.sensors][:last_sat]
+            
         
 class Tile_15_3_1(sw.Tile):
     
@@ -156,10 +182,10 @@ class Tile_15_3_1(sw.Tile):
         
         markdown = sw.Markdown('Some explainations should go here')
         
-        sensor_select = v.Select(items=[*pm.sensors], label="select sensor", multiple=True, v_model=None)
-        self.output.bind(sensor_select, self.io, 'sensors')
-        
         pickers = PickerLine(self.io, self.output)
+        
+        self.sensor_select = SensorSelect(items=[], label="select sensor", multiple=True, v_model=None)
+        self.output.bind(self.sensor_select, self.io, 'sensors')
         
         trajectory = v.Select(label='trajectory', items=pm.trajectories, v_model=None)
         self.output.bind(trajectory, self.io, 'trajectory')
@@ -173,12 +199,14 @@ class Tile_15_3_1(sw.Tile):
         super().__init__(
             self.result_tile._metadata['mount_id'],
             '15.3.1 Proportion of degraded land over total land area',
-            inputs = [markdown, pickers, sensor_select, trajectory, transition_label, transition_matrix],
+            inputs = [markdown, pickers, self.sensor_select, trajectory, transition_label, transition_matrix],
             btn = btn,
             output = self.output
         )
         
         btn.on_event('click', self.start_process)
+        pickers.start_picker.observe(self.sensor_select.update_sensors, 'v_model')
+        
         
     def start_process(self, widget, data, event):
         
@@ -186,7 +214,7 @@ class Tile_15_3_1(sw.Tile):
         
         land_cover = run.land_cover(self.io, self.aoi_io, self.output)
 
-        soc = run.soil_organic_carbon(self.io, self.aoi_io, self.ouput))
+        soc = run.soil_organic_carbon(self.io, self.aoi_io, self.ouput)
         
         ndvi_int, climate_int = run.integrate_ndvi_climate(self.aoi_io, self.io, self.output)
         
