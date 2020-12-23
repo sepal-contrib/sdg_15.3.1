@@ -550,7 +550,7 @@ def indicator_15_3_1(productivity, landcover,soc, output):
     indicator = ee.Image(-32768) \
             .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
             .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
-            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq-1()),-1) \
+            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
             .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
             .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
             .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
