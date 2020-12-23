@@ -580,34 +580,3 @@ def indicator_15_3_1(productivity, landcover,soc, output):
             .int16()
     return output
 
-
-#def area2table(image, io_aoi, io.plot_id, output):
-#
-#    # This is not an image io.aoi is a not even a featurecollection object 
-#    area_data = ee.Image.pixelArea(io_aoi).addbands(image)
-#    
-#    def area_calculation(io_aoi):
-#        area_per_class =area_data.reduceRegion({
-#            reducer: ee.Reducer.sum()group({
-#                                       groupField:1,
-#                                       groupName: 'class'
-#                                          }),
-#            geometry: io_aoi.geometry(),
-#            scale: 30,
-#            maxPixels: 1e13
-#            })
-#        class_areas =ee.List(area_per_class.get('groups'))
-#        def get_itemize_area(item):
-#            area_dict = ee.Dictionary(item)
-#            class_number = ee.Number(area_dict.get('class')).format()
-#            area = ee.Number(area_dict.get('sum')).divide(1e6).round()
-#            return ee.List([class_number, area])
-#        class_area_lists = class_areas.map(get_itemize_area)
-#        class_area_flatten = ee.Dictionary(class_area_lists.flatten())
-#        plot = io_aoi.get(io.plot_id)
-#        output =ee.Feature(io_aoi.geometry(),class_area_flatten.set('plot',plot))
-#        return output
-#    output = io_aoi.map(area_calculation)
-#    return output
-                
-
