@@ -31,7 +31,7 @@ ipcc_climate_zones = "users/geflanddegradation/toolbox_datasets/ipcc_climate_zon
 ##      matrix      ##
 ######################
 
-IPCC_matrix = [
+IPCC_lc_change_matrix = [
     11, 12, 13, 14, 15, 16, 17,
     21, 22, 23, 24, 25, 26, 27,
     31, 32, 33, 34, 35, 36, 37,
@@ -99,6 +99,18 @@ management_factor = [
     1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1
 ]
+
+
+input_factor = [
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1
+]
+
 
 ###############################
 ##      named parameter      ##
