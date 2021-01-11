@@ -48,9 +48,8 @@ def soil_organic_carbon(io, aoi_io, output):
     #stock change factor for land use
     #333 and -333 will be recoded using the choosen climate coef.
     
-    lc_transition_climate_coef_temporary =  lc_transition \
-            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
-    lc_transition_climate_coef = lc_transition_climate_coef_temporary  \
+    lc_transition_climate_coef =  lc_transition \
+            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor) \
             .where(lc_transition_climate_coef_temporary.eq(333),climate_conversion_coef) \
             .where(lc_transition_climate_coef_temporary.eq(-333), ee.Image(1).divide(climate_conversion_coef))
                             
@@ -100,8 +99,7 @@ def soil_organic_carbon(io, aoi_io, output):
         #stock change factor for land use
         #333 and -333 will be recoded using the choosen climate coef.            
         lc_transition_climate_coef_temporary =  lc_transition \
-            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
-        lc_transition_climate_coef = lc_transition_climate_coef_temporary  \
+            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor) \
             .where(lc_transition_climate_coef_temporary.eq(333),climate_conversion_coef) \
             .where(lc_transition_climate_coef_temporary.eq(-333), ee.Image(1).divide(climate_conversion_coef))
                             
