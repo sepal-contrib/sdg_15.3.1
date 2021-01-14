@@ -23,7 +23,7 @@ class TileIo():
         self.trajectory = None
         
         # matrix, change output format to a plain list. we need it to remap the land cover instead of a matrix.
-        self.transition_matrix = [[0 for i in range(7)] for i in range(7)]
+        self.transition_matrix = pm.default_trans_matrix
         
         #Climate regime
         self.conversion_coef =None
@@ -111,6 +111,12 @@ class MatrixInput(v.Html):
         '-': (-1, v.theme.themes.dark.error)
     }
     
+    DECODE = {
+        1: '+',
+        0: '',
+        -1:'-'
+    }
+    
     def __init__(self, line, column, io, output):
         
         # get the io for dynamic modification
@@ -136,6 +142,10 @@ class MatrixInput(v.Html):
         
     def color_change(self, change):            
         
+        # to decode the defaulted matrix 
+        if isinstance(change['new'], int):
+            change['new'] = self.DECODE[change['new']]
+            
         val, color = self.VALUES[change['new']]
         
         self.style_ = f'background-color: {color}'
@@ -160,7 +170,9 @@ class TransitionMatrix(v.SimpleTable):
             
             inputs = []
             for j, target in enumerate(self.CLASSES):
+                # create a input with default matrix value
                 matrix_input = MatrixInput(i, j, io, output)
+                matrix_input.color_change({'new': pm.default_trans_matrix[i][j]})
                 
                 input_ = v.Html(tag='td', class_='ma-0 pa-0', children=[matrix_input])
                 inputs.append(input_)
@@ -207,7 +219,7 @@ class SensorSelect(v.Select):
         # deselect all 
         self.v_model = None
         
-        # define the offset that should be used based on the yearr in the sensors list
+        # define the offset that should be used based on the year in the sensors list
         if change['new'] >= 2015: # launch of Sentinel 2
             last_sat = 5
         elif change['new'] >= 2013: # launch of Landsat 8

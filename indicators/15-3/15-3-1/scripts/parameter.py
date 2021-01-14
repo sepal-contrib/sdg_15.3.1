@@ -31,6 +31,16 @@ ipcc_climate_zones = "users/geflanddegradation/toolbox_datasets/ipcc_climate_zon
 ##      matrix      ##
 ######################
 
+default_trans_matrix = [
+    [0, -1, -1, -1, -1, -1, 0], # Tree-covered
+    [1, 0, 1, -1, -1, -1, 0], # grassland
+    [1, -1, 0, -1, -1, -1, 0], # cropland
+    [-1, -1, -1, 0, -1, -1, 0], # wetland
+    [1, 1, 1, 1, 0, 1, 0], # artificial
+    [1, 1, 1, 1, -1, 0, 0,], # Other land
+    [0, 0, 0, 0, 0, 0, 0] # water body 
+]
+
 IPCC_lc_change_matrix = [
     11, 12, 13, 14, 15, 16, 17,
     21, 22, 23, 24, 25, 26, 27,
