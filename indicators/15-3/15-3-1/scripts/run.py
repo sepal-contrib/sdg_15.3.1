@@ -181,8 +181,9 @@ def land_cover(io, aoi_io, output):
             .add(lc_tg)
 
     ## definition of land cover transitions as degradation (-1), improvement (1), or no relevant change (0)
+    trans_matrix_flatten = [item for sublist in io.transition_matrix for item in sublist]
     lc_dg = lc_tr \
-            .remap(pm.IPCC_lc_change_matrix, io.transition_matrix) \
+            .remap(pm.IPCC_lc_change_matrix, trans_matrix_flatten) \
             .rename("degredation")
 
     ## Remap persistence classes so they are sequential.
