@@ -7,7 +7,7 @@ from scripts import utils as u
 
 ee.Initialize()
 
-def ndvi_trend(year_start, year_end, ndvi_yearly_integration):
+def ndvi_trend(start, end, ndvi_yearly_integration):
     """Calculate NDVI trend.
     
     Calculates the trend of temporal NDVI using NDVI data from selected satellite dataset. Areas where changes are not significant
@@ -24,7 +24,7 @@ def ndvi_trend(year_start, year_end, ndvi_yearly_integration):
 
     return (lf_trend, mk_trend)
 
-def p_restrend(year_start, year_end, nvdi_yearly_integration, climate_yearly_integration):
+def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     """Rasudial trend analsis predicts NDVI based on the given rainfall. p_restrend uses linear regression model to predict NDVI for a given rainfall amount. The residual (Predicted - Obsedved)NDVI trend is considered as productivity change that is indipendent of climatic variation. For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
     """
     
@@ -120,10 +120,10 @@ def int_yearly_climate(precipitation, start, end):
     """Function to integrate observed precipitation datasets at the annual level"""
     
     img_coll = ee.List([])
-    for year in range(year_start, year_end+1):
+    for year in range(start, end+1):
         # get the precipitation img
         prec_img = precipitation \
-            .filterDate(f'{year}-01-01', '{year}-12-31') \
+            .filterDate(f'{year}-01-01', f'{year}-12-31') \
             .reduce(ee.Reducer.sum()) \
             .rename('clim')
         
