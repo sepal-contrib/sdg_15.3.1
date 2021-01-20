@@ -20,7 +20,7 @@ def ndvi_trend(start, end, ndvi_yearly_integration):
         .reduce(ee.Reducer.linearFit())
 
     ## Compute Kendall statistics
-    mk_trend = mann_kendall(ndvi_yearly_integration.select('ndvi'))
+    mk_trend = u.mann_kendall(ndvi_yearly_integration.select('ndvi'))
 
     return (lf_trend, mk_trend)
 

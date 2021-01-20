@@ -1,5 +1,7 @@
 import ee 
+from functools import partial
 
+from scripts import utils as u
 from scripts import parameter as pm
 from scripts import productivity as prod
 
@@ -98,7 +100,7 @@ def soil_organic_carbon(io, aoi_io, output):
         
         #stock change factor for land use
         #333 and -333 will be recoded using the choosen climate coef.            
-        lc_transition_climate_coef_temporary =  lc_transition \
+        lc_transition_climate_coef =  lc_transition \
             .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor) \
             .where(lc_transition_climate_coef_temporary.eq(333),climate_conversion_coef) \
             .where(lc_transition_climate_coef_temporary.eq(-333), ee.Image(1).divide(climate_conversion_coef))
@@ -209,8 +211,8 @@ def integrate_ndvi_climate(aoi_io, io, output):
     i_img_coll = ee.ImageCollection([])
     
     for sensor in io.sensors:
-        # get the featureCollection 
-        sat = ee.FeatureCollection(pm.sensors[sensor])
+        # get the imagecollection 
+        sat = ee.ImageCollection(pm.sensors[sensor])
         # rename the bands 
         sat = sat.map(partial(u.rename_band, sensor=sensor))
         # mask the clouds 
@@ -219,7 +221,7 @@ def integrate_ndvi_climate(aoi_io, io, output):
         i_img_coll = i_img_coll.merge(sat)
     
     # Filtering the img collection  using start year and end year and filtering to the bb area of interest
-    i_img_coll = i_img_coll.filterDate(io.start, io.end).filterBounds(aoi_io.get_aoi_ee())
+    i_img_coll = i_img_coll.filterDate(f'{io.start}-01-01', f'{io.end}-12-31').filterBounds(aoi_io.get_aoi_ee())
 
     # Function to integrate observed NDVI datasets at the annual level
     ndvi_coll = i_img_coll.map(prod.CalcNDVI)
@@ -231,7 +233,7 @@ def integrate_ndvi_climate(aoi_io, io, output):
 
     # process the climate dataset to use with the pixel restrend, RUE calculation
     precipitation = ee.ImageCollection(pm.precipitation) \
-        .filterDate(io.start,io.end) \
+        .filterDate(f'{io.start}-01-01',f'{io.end}-12-31') \
         .select('precipitation')
     
     climate_int = prod.int_yearly_climate(precipitation, io.start, io.end)
@@ -249,7 +251,7 @@ In order to correct the effects of climate on productivity, climate adjusted tre
 The following code runs the selected trend method and produce an output by reclassifying the trajecry slopes. 
     """
     
-    trajectories = ['ndvi_trend', 'p_restrend', 's_restrend', 'ue_trend']
+    #trajectories = ['ndvi_trend', 'p_restrend', 's_restrend', 'ue_trend']
 
     # Run the selected algorithm
     # nvi trend
@@ -269,7 +271,7 @@ The following code runs the selected trend method and produce an output by recla
         raise NameError(f'Unrecognized method "{io.trajectory}"')
 
     # Define Kendall parameter values for a significance of 0.05
-    period = io.start - io.end + 1
+    period = io.end - io.start + 1
     kendall90 = pm.get_kendall_coef(period, 90)
     kendall95 = pm.get_kendall_coef(period, 95)
     kendall99 = pm.get_kendall_coef(period, 99)
@@ -362,7 +364,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     similar_ecoregions = soil_tax_usda.multiply(100).add(lc_reclass)
 
     # create a 2 band raster to compute 90th percentile per ecoregion (analysis restricted by mask and study area)
-    ndvi_id = ndvi_mean.addBands(similar_ecoregion).updateMask(mask)
+    ndvi_id = ndvi_mean.addBands(similar_ecoregions).updateMask(mask)
 
     # compute 90th percentile by unit
     percentile_90 = ndvi_id.reduceRegion(
@@ -416,8 +418,8 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     """    
     
     # compute min and max of annual ndvi for the baseline period
-    baseline_filter = ee.Filter.rangeContains('year', year_bl_start, year_bl_end)
-    target_filter =ee.Filter.rangeContains('year', year_tg_start, year_tg_end)
+    baseline_filter = ee.Filter.rangeContains('year', io.start, io.target_start)
+    target_filter =ee.Filter.rangeContains('year', io.target_start, io.end)
     
     baseline_ndvi_range = nvdi_yearly_integration \
         .filter(baseline_filter) \
