@@ -87,6 +87,7 @@ def CalcNDVI(img):
     
     ndvi = nir.subtract(red) \
         .divide(nir.add(red)) \
+        .multiply(10000) \
         .rename('ndvi') \
         .set('system:time_start', img.get('system:time_start'))
     

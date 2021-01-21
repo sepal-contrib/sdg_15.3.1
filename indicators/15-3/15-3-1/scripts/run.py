@@ -315,7 +315,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
 
     """
 
-    nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
+    #nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
 
     # land cover data from esa cci
     lc = ee.Image(pm.land_cover)
@@ -331,7 +331,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     
     # Make sure the bounding box of the poly is used, and not the geodesic 
     # version, for the clipping
-    poly = io_aoi.get_aoi_ee().geometry(geodesics=False)
+    poly = io_aoi.get_aoi_ee().geometry()
     #############################################
 
     # compute mean ndvi for the period
@@ -346,7 +346,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     # should not be here it's a hidden parameter
     
     # Handle case of year_start that isn't included in the CCI data
-    lc_year_start = min(max(io.start, pm.lc_first_year), pm.ls_last_year)
+    lc_year_start = min(max(io.start, pm.lc_first_year), pm.lc_last_year)
     
     #################################
     
@@ -404,7 +404,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     
     return output
 
-def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output):
+def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output):
     """It represents the level of relative roductivity in a pixel compred to a historical observations of productivity for that pixel. For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
         It alows for the detection of recent changes in primary productivity as compared to the baseline period.
         Steps:
@@ -421,13 +421,13 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     baseline_filter = ee.Filter.rangeContains('year', io.start, io.target_start)
     target_filter =ee.Filter.rangeContains('year', io.target_start, io.end)
     
-    baseline_ndvi_range = nvdi_yearly_integration \
+    baseline_ndvi_range = ndvi_yearly_integration \
         .filter(baseline_filter) \
         .select('ndvi') \
         .reduce(ee.Reducer.percentile([0, 100]))
 
     #convert baseline ndvi imagecollection to bands
-    baseline_ndvi_collection = nvdi_yearly_integration \
+    baseline_ndvi_collection = ndvi_yearly_integration \
         .filter(baseline_filter) \
         .select('ndvi')
 
@@ -459,13 +459,13 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     baseline_ndvi_perc = baseline_ndvi_extended.reduce(ee.Reducer.percentile(percentiles))
 
     # compute mean ndvi for the baseline and target period period
-    baseline_ndvi_mean = nvdi_yearly_integration \
+    baseline_ndvi_mean = ndvi_yearly_integration \
         .filter(baseline_filter) \
         .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
         .rename(['ndvi'])
     
-    target_ndvi_mean = nvdi_yearly_integration \
+    target_ndvi_mean = ndvi_yearly_integration \
         .filter(target_filter) \
         .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
