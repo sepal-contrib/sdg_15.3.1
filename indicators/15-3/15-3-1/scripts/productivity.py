@@ -55,7 +55,7 @@ def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     
     return (lf_trend, mk_trend)
 
-def ue_trend(start, end, nvdi_yearly_integration, climate_yearly_integration):
+def ue_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     """Calculate trend based on rain use efficiency.
     It is the ratio of ANPP(annual integral of NDVI as proxy) to annual precipitation.
 
@@ -66,13 +66,13 @@ def ue_trend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     # TODO: Need to handle scaling for ET for WUE
     
     # Apply function to compute ue and store as a collection
-    ue_yearly_collection = use_efficiency(climate_yearly_integration, nvdi_yearly_integration, start, end)
+    ue_yearly_collection = use_efficiency(start, end, ndvi_yearly_integration, climate_yearly_integration)
 
     # Compute linear trend function to predict ndvi based on year (ndvi trend)
     lf_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    trend = mann_kendall(ue_yearly_collection.select('ue'))
+    mk_trend = mann_kendall(ue_yearly_collection.select('ue'))
     
     return (lf_trend, mk_trend)
 
@@ -272,7 +272,7 @@ def use_efficiency(start, end, ndvi_yearly_integration, climate_yearly_integrati
             .divide(clim_img) \
             .addBands(ee.Image(year).float()) \
             .rename(['ue', 'year']) \
-            .set({'year': k})
+            .set({'year': year})
             
         img_coll = img_coll.add(divide_img)
         
