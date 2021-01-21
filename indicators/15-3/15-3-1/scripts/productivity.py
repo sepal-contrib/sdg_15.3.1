@@ -20,7 +20,7 @@ def ndvi_trend(start, end, ndvi_yearly_integration):
         .reduce(ee.Reducer.linearFit())
 
     ## Compute Kendall statistics
-    mk_trend = u.mann_kendall(ndvi_yearly_integration.select('ndvi'))
+    mk_trend = mann_kendall(ndvi_yearly_integration.select('ndvi'))
 
     return (lf_trend, mk_trend)
 
@@ -37,6 +37,7 @@ def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
         .reduce(ee.Reducer.linearFit())
 
     ## Apply function to  predict NDVI based on climate
+    first = ee.List([])
     predicted_yearly_ndvi = ee.ImageCollection(ee.List(
         ndvi_climate_yearly_integration \
         .select('clim') \
@@ -44,13 +45,13 @@ def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     ))
 
     ## Apply function to compute NDVI annual residuals
-    residual_yearly_ndvi = image_collection_residuals(io.start, io.end, nvdi_yearly_integration, predicted_yearly_ndvi)
+    residual_yearly_ndvi = image_collection_residuals(start, end, nvdi_yearly_integration, predicted_yearly_ndvi)
 
     ## Fit a linear regression to the NDVI residuals
     lf_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
 
     ## Compute Kendall statistics
-    mk_trend = u.mann_kendall(residual_yearly_ndvi.select('ndvi_res'))
+    mk_trend = mann_kendall(residual_yearly_ndvi.select('ndvi_res'))
     
     return (lf_trend, mk_trend)
 
@@ -71,7 +72,7 @@ def ue_trend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     lf_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    trend = u.mann_kendall(ue_yearly_collection.select('ue'))
+    trend = mann_kendall(ue_yearly_collection.select('ue'))
     
     return (lf_trend, mk_trend)
 
@@ -215,7 +216,7 @@ def ndvi_prediction_climate(image, list_, linear_model_climate_ndvi):
     
     ndvi = linear_model_climate_ndvi \
         .select('offset') \
-        .add((lf_clim_ndvi.select('scale').multiply(image))) \
+        .add((linear_model_climate_ndvi.select('scale').multiply(image))) \
         .set({'year': image.get('year')})
     
     return ee.List(list_).add(ndvi)
@@ -223,12 +224,12 @@ def ndvi_prediction_climate(image, list_, linear_model_climate_ndvi):
 def ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
     """Function to compute residuals (ndvi obs - ndvi pred). part of p_restrend function"""
     
-    ndvi_o = ndvi_1yr_coll \
+    ndvi_o = ndvi_climate_yearly_integration \
         .filter(ee.Filter.eq('year', year)) \
         .select('ndvi') \
         .median()
     
-    ndvi_p = ndvi_1yr_p \
+    ndvi_p = predicted_yearly_ndvi \
         .filter(ee.Filter.eq('year', year)) \
         .median()
     
