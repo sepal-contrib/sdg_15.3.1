@@ -317,7 +317,7 @@ class Tile_15_3_1(sw.Tile):
         
         # add the layers 
         m.addLayer(productivity, pm.viz, 'productivity')
-        m.addLayer(land_cover, pm.viz, 'land_cover')
+        m.addLayer(land_cover.select('degredation'), pm.viz, 'land_cover')
         m.addLayer(soc, pm.viz, 'soil_organic_carbon')
         m.addLayer(indicator_15_3_1, pm.viz, 'indicator_15_3_1')
         
