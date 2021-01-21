@@ -4,6 +4,9 @@ from sepal_ui.scripts import utils as su
 import ipyvuetify as v
 from datetime import datetime
 
+import os
+import geemap
+
 from scripts import parameter as pm
 from scripts import run
 
@@ -289,13 +292,24 @@ class Tile_15_3_1(sw.Tile):
         ndvi_int, climate_int = run.integrate_ndvi_climate(self.aoi_io, self.io, self.output)
         
         productivity_trajectory = run.productivity_trajectory(self.io, ndvi_int, climate_int, self.output)
-        productivity_performance = run.productivity_performance(self.io_aoi, self.io, ndvi_int, climate_int, self.output)
-        productivity_state = run.productivity_state(self.io_aoi, self.io, ndvi_int, climate_int, self.output)
+        productivity_performance = run.productivity_performance(self.aoi_io, self.io, ndvi_int, climate_int, self.output)
+        productivity_state = run.productivity_state(self.aoi_io, self.io, ndvi_int, climate_int, self.output)
                                                                 
-        productivity = productivity_final(productivity_trajectory, productivity_performance, productivity_state, self.output)
+        productivity = run.productivity_final(productivity_trajectory, productivity_performance, productivity_state, self.output)
 
-        indicator_15_3_1 = indicator_15_3_1(productivity, land_cover, soc, self.output)
+        indicator_15_3_1 = run.indicator_15_3_1(productivity, land_cover, soc, self.output)
 
+
+        aoi_name = self.aoi_io.get_aoi_name()
+        out_dir = os.path.join(os.path.expanduser('~'),'downloads')
+        indicator_15_3_1_stats = os.path.join(out_dir, f'{aoi_name}_indicator_15_3_1.csv')
+        #geemap.zonal_statistics_by_group(
+        #        in_value_raster = indicator_15_3_1,
+        #        in_zone_vector = self.aoi_io.get_aoi_ee(),
+        #        out_file_path = indicator_15_3_1_stats,
+        #        statistics_type = "PERCENTAGE",
+        #        decimal_places=2,
+        #        tile_scale=1.0)
 
         # create a map 
         m = sm.SepalMap()

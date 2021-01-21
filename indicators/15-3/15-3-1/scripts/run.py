@@ -1,7 +1,9 @@
 from functools import partial
 
 import ee 
+from functools import partial
 
+from scripts import utils as u
 from scripts import parameter as pm
 from scripts import productivity as prod
 from scripts import utils as u
@@ -18,7 +20,7 @@ def soil_organic_carbon(io, aoi_io, output):
     soc = soc.updateMask(soc.neq(-32767))
     
     lc = ee.Image(pm.land_cover) \
-        .select(ee.List.sequence(io.start - 1992, io.end -1992, 1))
+        .select(ee.List.sequence(io.start - 1993, io.end -1993, 1))
     
     lc = lc \
         .where(lc.eq(9999), -32768) \
@@ -48,13 +50,14 @@ def soil_organic_carbon(io, aoi_io, output):
     # compute raster to registrar years since transition for the first and second year
     lc_transition_time =ee.Image(2).where(lc_time0.neq(lc_time1),1)
     
-    # stock change factor for land use
-    # 333 and -333 will be recoded using the choosen climate coef.
-    lc_transition_climate_coef_temporary =  lc_transition \
-        .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor) 
-    lc_transition_climate_coef = lc_transition_climate_coef_temporary \
-        .where(lc_transition_climate_coef_temporary.eq(333),climate_conversion_coef) \
-        .where(lc_transition_climate_coef_temporary.eq(-333), ee.Image(1).divide(climate_conversion_coef))
+    #stock change factor for land use
+    #333 and -333 will be recoded using the choosen climate coef.
+    
+    lc_transition_climate_coef_tmp =  lc_transition \
+            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
+    lc_transition_climate_coef = lc_transition_climate_coef_tmp \
+            .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
+            .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
                             
     # stock change factor for management regime
     lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
@@ -97,12 +100,13 @@ def soil_organic_carbon(io, aoi_io, output):
         lc_transition_temp = lc_time0.multiply(10).add(lc_time1)
         lc_transition =lc_transition.where(lc_time0.neq(lc_time1), lc_transition_temp)
         
-        # stock change factor for land use
-        # 333 and -333 will be recoded using the choosen climate coef.            
-        lc_transition_climate_coef_temporary =  lc_transition \
-            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor) \
-            .where(lc_transition_climate_coef_temporary.eq(333),climate_conversion_coef) \
-            .where(lc_transition_climate_coef_temporary.eq(-333), ee.Image(1).divide(climate_conversion_coef))
+        #stock change factor for land use
+        #333 and -333 will be recoded using the choosen climate coef.            
+        lc_transition_climate_coef_tmp =  lc_transition \
+            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
+        lc_transition_climate_coef = lc_transition_climate_coef_tmp \
+            .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
+            .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
                             
         # stock change factor for management regime
         lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
@@ -168,7 +172,7 @@ def land_cover(io, aoi_io, output):
         .select(f'y{io.start}') \
         .remap(pm.translation_matrix[0], pm.translation_matrix[1])
     
-    for year in range(io.start + 1, io.end + 1):
+    for year in range(io.start + 1, io.end):
         lc_remapped = lc_remapped \
             .addBands(lc.select(f'y{year}')) \
             .remap(pm.translation_matrix[0],pm.translation_matrix[1])
@@ -185,8 +189,9 @@ def land_cover(io, aoi_io, output):
             .add(lc_tg)
 
     ## definition of land cover transitions as degradation (-1), improvement (1), or no relevant change (0)
+    trans_matrix_flatten = [item for sublist in io.transition_matrix for item in sublist]
     lc_dg = lc_tr \
-            .remap(pm.IPCC_lc_change_matrix, io.transition_matrix) \
+            .remap(pm.IPCC_lc_change_matrix, trans_matrix_flatten) \
             .rename("degredation")
 
     ## Remap persistence classes so they are sequential.
@@ -212,8 +217,8 @@ def integrate_ndvi_climate(aoi_io, io, output):
     i_img_coll = ee.ImageCollection([])
     
     for sensor in io.sensors:
-        # get the featureCollection 
-        sat = ee.FeatureCollection(pm.sensors[sensor])
+        # get the imagecollection 
+        sat = ee.ImageCollection(pm.sensors[sensor])
         # rename the bands 
         sat = sat.map(partial(u.rename_band, sensor=sensor))
         # mask the clouds 
@@ -222,7 +227,7 @@ def integrate_ndvi_climate(aoi_io, io, output):
         i_img_coll = i_img_coll.merge(sat)
     
     # Filtering the img collection  using start year and end year and filtering to the bb area of interest
-    i_img_coll = i_img_coll.filterDate(io.start, io.end).filterBounds(aoi_io.get_aoi_ee())
+    i_img_coll = i_img_coll.filterDate(f'{io.start}-01-01', f'{io.end}-12-31').filterBounds(aoi_io.get_aoi_ee())
 
     # Function to integrate observed NDVI datasets at the annual level
     ndvi_coll = i_img_coll.map(prod.CalcNDVI)
@@ -234,7 +239,7 @@ def integrate_ndvi_climate(aoi_io, io, output):
 
     # process the climate dataset to use with the pixel restrend, RUE calculation
     precipitation = ee.ImageCollection(pm.precipitation) \
-        .filterDate(io.start,io.end) \
+        .filterDate(f'{io.start}-01-01',f'{io.end}-12-31') \
         .select('precipitation')
     
     climate_int = prod.int_yearly_climate(precipitation, io.start, io.end)
@@ -251,8 +256,6 @@ In order to correct the effects of climate on productivity, climate adjusted tre
 
 The following code runs the selected trend method and produce an output by reclassifying the trajecry slopes. 
     """
-    
-    trajectories = ['ndvi_trend', 'p_restrend', 's_restrend', 'ue_trend']
 
     # Run the selected algorithm
     # nvi trend
@@ -272,7 +275,7 @@ The following code runs the selected trend method and produce an output by recla
         raise NameError(f'Unrecognized method "{io.trajectory}"')
 
     # Define Kendall parameter values for a significance of 0.05
-    period = io.start - io.end + 1
+    period = io.end - io.start + 1
     kendall90 = pm.get_kendall_coef(period, 90)
     kendall95 = pm.get_kendall_coef(period, 95)
     kendall99 = pm.get_kendall_coef(period, 99)
@@ -316,7 +319,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
 
     """
 
-    nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
+    #nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
 
     # land cover data from esa cci
     lc = ee.Image(pm.land_cover)
@@ -332,7 +335,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     
     # Make sure the bounding box of the poly is used, and not the geodesic 
     # version, for the clipping
-    poly = io_aoi.get_aoi_ee().geometry(geodesics=False)
+    poly = io_aoi.get_aoi_ee().geometry()
     #############################################
 
     # compute mean ndvi for the period
@@ -347,7 +350,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     # should not be here it's a hidden parameter
     
     # Handle case of year_start that isn't included in the CCI data
-    lc_year_start = min(max(io.start, pm.lc_first_year), pm.ls_last_year)
+    lc_year_start = min(max(io.start, pm.lc_first_year), pm.lc_last_year)
     
     #################################
     
@@ -365,7 +368,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     similar_ecoregions = soil_tax_usda.multiply(100).add(lc_reclass)
 
     # create a 2 band raster to compute 90th percentile per ecoregion (analysis restricted by mask and study area)
-    ndvi_id = ndvi_mean.addBands(similar_ecoregion).updateMask(mask)
+    ndvi_id = ndvi_mean.addBands(similar_ecoregions).updateMask(mask)
 
     # compute 90th percentile by unit
     percentile_90 = ndvi_id.reduceRegion(
@@ -405,7 +408,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     
     return output
 
-def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output):
+def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output):
     """It represents the level of relative roductivity in a pixel compred to a historical observations of productivity for that pixel. For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
         It alows for the detection of recent changes in primary productivity as compared to the baseline period.
         Steps:
@@ -419,16 +422,16 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     """    
     
     # compute min and max of annual ndvi for the baseline period
-    baseline_filter = ee.Filter.rangeContains('year', year_bl_start, year_bl_end)
-    target_filter =ee.Filter.rangeContains('year', year_tg_start, year_tg_end)
+    baseline_filter = ee.Filter.rangeContains('year', io.start, io.target_start)
+    target_filter =ee.Filter.rangeContains('year', io.target_start, io.end)
     
-    baseline_ndvi_range = nvdi_yearly_integration \
+    baseline_ndvi_range = ndvi_yearly_integration \
         .filter(baseline_filter) \
         .select('ndvi') \
         .reduce(ee.Reducer.percentile([0, 100]))
 
     #convert baseline ndvi imagecollection to bands
-    baseline_ndvi_collection = nvdi_yearly_integration \
+    baseline_ndvi_collection = ndvi_yearly_integration \
         .filter(baseline_filter) \
         .select('ndvi')
 
@@ -460,13 +463,13 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     baseline_ndvi_perc = baseline_ndvi_extended.reduce(ee.Reducer.percentile(percentiles))
 
     # compute mean ndvi for the baseline and target period period
-    baseline_ndvi_mean = nvdi_yearly_integration \
+    baseline_ndvi_mean = ndvi_yearly_integration \
         .filter(baseline_filter) \
         .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
         .rename(['ndvi'])
     
-    target_ndvi_mean = nvdi_yearly_integration \
+    target_ndvi_mean = ndvi_yearly_integration \
         .filter(target_filter) \
         .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
@@ -501,11 +504,14 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
     # difference between start and end clusters >= 2 means improvement (<= -2 
     # is degradation)
     classes_change = target_classes \
-            .subtract(baseline_classes) \
-            .where(baseline_ndvi_mean \
+        .subtract(baseline_classes) \
+        .where(
+            baseline_ndvi_mean \
                 .subtract(target_ndvi_mean) \
-                .abs().lte(100) \
-            , 0)
+                .abs().lte(100), \
+            0
+        )
+    
     #reclassification to get the degredation classes
     degredation_classes = ee.Image(-32768) \
         .where(classes_change.gte(2),1) \
@@ -524,7 +530,6 @@ def productivity_state(io_aoi, io, nvdi_yearly_integration, climate_int, output)
         .int16()
     )
 
-   
     return output
 
 def productivity_final(trajectory, performance, state, output):
@@ -533,60 +538,65 @@ def productivity_final(trajectory, performance, state, output):
     state_class = state.select('state_class')
 
     productivity = ee.Image(-32768)\
-            .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(0)),1) \
-            .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(-1)),1) \
-            .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(0)),1) \
-            .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(-1)),1) \
-            .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(0)),1) \
-            .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1) \
-            .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(0)),0) \
-            .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(-1)),0) \
-            .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(0)),0) \
-            .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
-            .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
-            .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)\
-            .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(0)),-1) \
-            .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(-1)),-1) \
-            .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(0)),-1) \
-            .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
-            .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
-            .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)
+        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(0)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(-1)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(0)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(-1)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(0)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1) \
+        .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(0)),0) \
+        .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(-1)),0) \
+        .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(0)),0) \
+        .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
+        .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
+        .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)\
+        .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(0)),-1) \
+        .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(-1)),-1) \
+        .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(0)),-1) \
+        .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
+        .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
+        .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)
     
     output = productivity \
-            .unmask(-32768) \
-            .int16()
+        .unmask(-32768) \
+        .int16()
+    
     return output
+
 def indicator_15_3_1(productivity, landcover,soc, output):
+    
     indicator = ee.Image(-32768) \
-            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
-            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
-            .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
-            .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
-            .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-            .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-            .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(1)),1) \
-            .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(0)),1) \
-            .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(1)),1) \
-            .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(0)),0) \
-            .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-            .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-            .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(1)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(0)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(1)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(0)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-            .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) 
+        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
+        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
+        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
+        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
+        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(1)),1) \
+        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(0)),1) \
+        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(1)),1) \
+        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(0)),0) \
+        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(1)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(0)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(1)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(0)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) 
+    
     output = indicator \
-            .unmask(-32768) \
-            .int16()
+        .unmask(-32768) \
+        .int16()
+    
     return output
 
