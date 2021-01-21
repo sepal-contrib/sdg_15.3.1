@@ -17,7 +17,7 @@ def soil_organic_carbon(io, aoi_io, output):
     soc = soc.updateMask(soc.neq(-32767))
     
     lc = ee.Image(pm.land_cover) \
-        .select(ee.List.sequence(io.start - 1992, io.end -1992, 1))
+        .select(ee.List.sequence(io.start - 1993, io.end -1993, 1))
     
     lc = lc \
         .where(lc.eq(9999), -32768) \
@@ -50,10 +50,11 @@ def soil_organic_carbon(io, aoi_io, output):
     #stock change factor for land use
     #333 and -333 will be recoded using the choosen climate coef.
     
-    lc_transition_climate_coef =  lc_transition \
-            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor) \
-            .where(lc_transition_climate_coef_temporary.eq(333),climate_conversion_coef) \
-            .where(lc_transition_climate_coef_temporary.eq(-333), ee.Image(1).divide(climate_conversion_coef))
+    lc_transition_climate_coef_tmp =  lc_transition \
+            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
+    lc_transition_climate_coef = lc_transition_climate_coef_tmp \
+            .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
+            .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
                             
     #stock change factor for management regime
     lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
@@ -100,10 +101,11 @@ def soil_organic_carbon(io, aoi_io, output):
         
         #stock change factor for land use
         #333 and -333 will be recoded using the choosen climate coef.            
-        lc_transition_climate_coef =  lc_transition \
-            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor) \
-            .where(lc_transition_climate_coef_temporary.eq(333),climate_conversion_coef) \
-            .where(lc_transition_climate_coef_temporary.eq(-333), ee.Image(1).divide(climate_conversion_coef))
+        lc_transition_climate_coef_tmp =  lc_transition \
+            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
+        lc_transition_climate_coef = lc_transition_climate_coef_tmp \
+            .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
+            .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
                             
         #stock change factor for management regime
         lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
@@ -166,7 +168,7 @@ def land_cover(io, aoi_io, output):
         .select(f'y{io.start}') \
         .remap(pm.translation_matrix[0], pm.translation_matrix[1])
     
-    for year in range(io.start + 1, io.end + 1):
+    for year in range(io.start + 1, io.end):
         lc_remapped = lc_remapped \
             .addBands(lc.select(f'y{year}')) \
             .remap(pm.translation_matrix[0],pm.translation_matrix[1])
