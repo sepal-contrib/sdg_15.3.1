@@ -564,6 +564,7 @@ def productivity_final(trajectory, performance, state, output):
     return output
 
 def indicator_15_3_1(productivity, landcover,soc, output):
+    landcover = landcover.select('degredation')
     
     indicator = ee.Image(-32768) \
         .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
