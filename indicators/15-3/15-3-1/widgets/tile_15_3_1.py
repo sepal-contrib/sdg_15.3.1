@@ -251,34 +251,46 @@ class Tile_15_3_1(sw.Tile):
         #result tile
         self.result_tile = result_tile
         
+        # create the widgets that will be displayed
         markdown = sw.Markdown('Some explainations should go here')
-        
         pickers = PickerLine(self.io, self.output)
-        
         self.sensor_select = SensorSelect(items=[], label="select sensor", multiple=True, v_model=None)
-        self.output.bind(self.sensor_select, self.io, 'sensors')
-        
         trajectory = v.Select(label='trajectory', items=pm.trajectories, v_model=None)
-        self.output.bind(trajectory, self.io, 'trajectory')
-        
         transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=['Transition matrix'])
-        
         transition_matrix = TransitionMatrix(self.io, self.output)
-        
         climate_regime = ClimateRegime(self.io, self.output)
         
-        btn = sw.Btn(class_='mt-5')
+        # bind the standars widgets to variables 
+        self.output \
+            .bind(self.sensor_select, self.io, 'sensors') \
+            .bind(trajectory, self.io, 'trajectory')
         
+        # 
+        self.btn = sw.Btn(class_='mt-5')
+        
+        # create the actual tile
         super().__init__(
             self.result_tile._metadata['mount_id'],
             '15.3.1 Proportion of degraded land over total land area',
-            inputs = [markdown, pickers, self.sensor_select, trajectory, transition_label, transition_matrix, climate_regime],
-            btn = btn,
+            inputs = [
+                markdown, 
+                pickers, 
+                self.sensor_select, 
+                trajectory, 
+                transition_label, 
+                transition_matrix, 
+                climate_regime
+            ],
+            btn = self.btn,
             output = self.output
         )
         
-        btn.on_event('click', self.start_process)
+        # add links between the widgets
+        self.btn.on_event('click', self.start_process)
         pickers.start_picker.observe(self.sensor_select.update_sensors, 'v_model')
+        
+        # clear the alert 
+        self.output.reset()
         
         
     def start_process(self, widget, data, event):
