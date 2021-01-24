@@ -7,6 +7,7 @@ from sepal_ui.scripts import utils as su
 import ipyvuetify as v
 import geemap
 import ee 
+from ipywidgets import Output, Layout
 
 from scripts import parameter as pm
 from scripts import run
@@ -321,15 +322,21 @@ class Tile_15_3_1(sw.Tile):
 
         # create the csv result
         indicator_15_3_1_stats = Path('~', 'downloads', f'{self.aoi_io.get_aoi_name()}_indicator_15_3_1.csv').expanduser()
-        #geemap.zonal_statistics_by_group(
-        #        in_value_raster = indicator_15_3_1,
-        #        in_zone_vector = self.aoi_io.get_aoi_ee(),
-        #        out_file_path = indicator_15_3_1_stats,
-        #        statistics_type = "PERCENTAGE",
-        #        decimal_places=2,
-        #        tile_scale=1.0)
+        
+        output_widget = Output()
+        self.output.add_msg(output_widget)
+        
+        with output_widget:
+            geemap.zonal_statistics_by_group(
+                in_value_raster = indicator_15_3_1,
+                in_zone_vector = self.aoi_io.get_aoi_ee(),
+                out_file_path = indicator_15_3_1_stats,
+                statistics_type = "PERCENTAGE",
+                decimal_places=2,
+                tile_scale=1.0
+            )
+        self.result_tile.csv_btn.set_url(str(indicator_15_3_1_stats))
 
-         
         # get the result map 
         m = self.result_tile.m
         m.zoom_ee_object(self.aoi_io.get_aoi_ee().geometry())
