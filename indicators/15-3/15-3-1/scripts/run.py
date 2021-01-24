@@ -1,7 +1,7 @@
 from functools import partial
 
 import ee 
-from functools import partial
+import numpy as np
 
 from scripts import utils as u
 from scripts import parameter as pm
@@ -14,17 +14,15 @@ ee.Initialize()
 def soil_organic_carbon(io, aoi_io, output):
     """Calculate soil organic carbon indicator"""
     
-    # Inputs: start_year, end_year, conversion_coef
-    
     soc = ee.Image(pm.soc)
-    soc = soc.updateMask(soc.neq(-32767))
+    soc = soc.updateMask(soc.neq(pm.int_16_min))
     
     lc = ee.Image(pm.land_cover) \
         .select(ee.List.sequence(io.start - 1993, io.end -1993, 1))
     
     lc = lc \
-        .where(lc.eq(9999), -32768) \
-        .updateMask(lc.neq(-32768))
+        .where(lc.eq(9999), pm.int_16_min) \
+        .updateMask(lc.neq(pm.int_16_min))
     
     if not io.conversion_coef:
         ipcc_climate_zones = ee.Image(pm.ipcc_climate_zones)
@@ -47,12 +45,11 @@ def soil_organic_carbon(io, aoi_io, output):
         .multiply(10) \
         .add(lc_time1)
             
-    # compute raster to registrar years since transition for the first and second year
+    # compute raster to register years since transition for the first and second year
     lc_transition_time =ee.Image(2).where(lc_time0.neq(lc_time1),1)
     
     #stock change factor for land use
     #333 and -333 will be recoded using the choosen climate coef.
-    
     lc_transition_climate_coef_tmp =  lc_transition \
             .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
     lc_transition_climate_coef = lc_transition_climate_coef_tmp \
@@ -147,13 +144,13 @@ def soil_organic_carbon(io, aoi_io, output):
         .divide(soc_images.select(0)) \
         .multiply(100)
     
-    soc_class = ee.Image(-32768) \
+    soc_class = ee.Image(pm.int_16_min) \
         .where(soc_percent_change.gt(10),1) \
         .where(soc_percent_change.lt(10).And(soc_percent_change.gt(-10)),0) \
         .where(soc_percent_change.lt(-10),-1)\
         .rename('soc_class')
 
-    output = soc_class.unmask(-32768).int16()
+    output = soc_class.unmask(pm.int_16_min).int16()
     
     return output
     
@@ -163,8 +160,8 @@ def land_cover(io, aoi_io, output):
     ## load the land cover map
     lc = ee.Image(pm.land_cover)
     lc = lc \
-        .where(lc.eq(9999), -32768) \
-        .updateMask(lc.neq(-32768))
+        .where(lc.eq(9999), pm.int_16_min) \
+        .updateMask(lc.neq(pm.int_16_min))
 
     # Remap LC according to input matrix, aggregation of land cover classesclasses to IPCC classes.
     #TODO:custom aggregation based on user inputs
@@ -207,7 +204,7 @@ def land_cover(io, aoi_io, output):
     # Return the full land cover timeseries so it is available for reporting
     out.addBands(lc_remapped)
 
-    out= out.unmask(-32768).int16()
+    out= out.unmask(pm.int_16_min).int16()
 
     return out
 
@@ -217,25 +214,27 @@ def integrate_ndvi_climate(aoi_io, io, output):
     i_img_coll = ee.ImageCollection([])
     
     for sensor in io.sensors:
-        # get the imagecollection 
-        sat = ee.ImageCollection(pm.sensors[sensor])
+        
+        # get the image collection 
+        # filter its bounds to fit the aoi extends 
         # rename the bands 
-        sat = sat.map(partial(u.rename_band, sensor=sensor))
-        # mask the clouds 
-        sat = sat.map(partial(u.cloud_mask, sensor=sensor))
+        # adapt the resolution to meet sentinel 2 native one (10m)
+        # mask the clouds and adapt the scale 
+        sat = ee.ImageCollection(pm.sensors[sensor]) \
+            .filterBounds(aoi_io.get_aoi_ee()) \
+            .map(partial(u.rename_band, sensor=sensor)) \
+            .map(partial(u.adapt_res, sensor=sensor)) \
+            .map(partial(u.cloud_mask, sensor=sensor)) 
     
         i_img_coll = i_img_coll.merge(sat)
     
-    # Filtering the img collection  using start year and end year and filtering to the bb area of interest
-    i_img_coll = i_img_coll.filterDate(f'{io.start}-01-01', f'{io.end}-12-31').filterBounds(aoi_io.get_aoi_ee())
+    # Filtering the img collection  using start year and end year
+    i_img_coll = i_img_coll.filterDate(f'{io.start}-01-01', f'{io.end}-12-31')
 
     # Function to integrate observed NDVI datasets at the annual level
     ndvi_coll = i_img_coll.map(prod.CalcNDVI)
     
     ndvi_int = prod.int_yearly_ndvi(ndvi_coll, io.start, io.end)
-
-    # get the trends
-    # trend = ndvi_trend(io.start, io.end, ndvi_int)
 
     # process the climate dataset to use with the pixel restrend, RUE calculation
     precipitation = ee.ImageCollection(pm.precipitation) \
@@ -282,7 +281,7 @@ The following code runs the selected trend method and produce an output by recla
 
     # Create final productivity trajectory output layer. Positive values are 
     # significant increase, negative values are significant decrease.
-    signif = ee.Image(-32768) \
+    signif = ee.Image(pm.int_16_min) \
         .where(lf_trend.select('scale').gt(0).And(mk_trend.abs().gte(kendall90)), 1) \
         .where(lf_trend.select('scale').gt(0).And(mk_trend.abs().gte(kendall95)), 2) \
         .where(lf_trend.select('scale').gt(0).And(mk_trend.abs().gte(kendall99)), 3) \
@@ -292,10 +291,10 @@ The following code runs the selected trend method and produce an output by recla
         .where(mk_trend.abs().lte(kendall90), 0) \
         .where(lf_trend.select('scale').abs().lte(10), 0).rename('signif')
 
-    trajectory_class = ee.Image(-32768) \
+    trajectory_class = ee.Image(pm.int_16_min) \
         .where(signif.gt(0),1) \
         .where(signif.eq(0),0) \
-        .where(signif.lt(0).And(signif.neq(-32768)),-1) \
+        .where(signif.lt(0).And(signif.neq(pm.int_16_min)),-1) \
         .rename('trajectory_class')
 
     output = ee.Image(
@@ -303,7 +302,7 @@ The following code runs the selected trend method and produce an output by recla
         .addBands(lf_trend.select('scale')) \
         .addBands(signif) \
         .addBands(mk_trend) \
-        .unmask(-32768) \
+        .unmask(pm.int_16_min) \
         .int16()
     )
     
@@ -324,8 +323,8 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     # land cover data from esa cci
     lc = ee.Image(pm.land_cover)
     lc = lc \
-        .where(lc.eq(9999), -32768) \
-        .updateMask(lc.neq(-32768))
+        .where(lc.eq(9999), pm.int_16_min) \
+        .updateMask(lc.neq(pm.int_16_min))
 
     # global agroecological zones from IIASA
     soil_tax_usda = ee.Image(pm.soil_tax)
@@ -394,7 +393,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
 
     # create final degradation output layer (9999 is background), 0 is not
     # degreaded, -1 is degraded
-    prod_performance_class = ee.Image(-32768) \
+    prod_performance_class = ee.Image(pm.int_16_min) \
         .where(observed_ratio.gte(0.5), 0) \
         .where(observed_ratio.lte(0.5), -1) \
         .rename('performance_class')
@@ -402,7 +401,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     output = ee.Image(
         prod_performance_class.addBands(observed_ratio.multiply(10000)) \
         .addBands(similar_ecoregions) \
-        .unmask(-32768) \
+        .unmask(pm.int_16_min) \
         .int16()
     )
     
@@ -476,7 +475,7 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
         .rename(['ndvi'])
 
     # reclassify mean ndvi for baseline period based on the percentiles
-    baseline_classes = ee.Image(-32768) \
+    baseline_classes = ee.Image(pm.int_16_min) \
         .where(baseline_ndvi_mean.lte(baseline_ndvi_perc.select('p10')), 1) \
         .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p10')), 2) \
         .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p20')), 3) \
@@ -489,7 +488,7 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
         .where(baseline_ndvi_mean.gt(baseline_ndvi_perc.select('p90')), 10)
 
     # reclassify mean ndvi for target period based on the percentiles
-    target_classes = ee.Image(-32768) \
+    target_classes = ee.Image(pm.int_16_min) \
         .where(target_ndvi_mean.lte(baseline_ndvi_perc.select('p10')), 1) \
         .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p10')), 2) \
         .where(target_ndvi_mean.gt(baseline_ndvi_perc.select('p20')), 3) \
@@ -513,9 +512,9 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
         )
     
     #reclassification to get the degredation classes
-    degredation_classes = ee.Image(-32768) \
+    degredation_classes = ee.Image(pm.int_16_min) \
         .where(classes_change.gte(2),1) \
-        .where(classes_change.lte(-2).And(classes_change.neq(-32768)),-1) \
+        .where(classes_change.lte(-2).And(classes_change.neq(pm.int_16_min)),-1) \
         .where(classes_change.lt(2).And(classes_change.gt(-2)),0) \
         .rename("state_class")
 
@@ -526,7 +525,7 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
         .addBands(target_classes) \
         .addBands(baseline_ndvi_mean) \
         .addBands(target_ndvi_mean) \
-        .unmask(-32768) \
+        .unmask(pm.int_16_min) \
         .int16()
     )
 
@@ -537,7 +536,7 @@ def productivity_final(trajectory, performance, state, output):
     performance_class = performance.select('performance_class')
     state_class = state.select('state_class')
 
-    productivity = ee.Image(-32768)\
+    productivity = ee.Image(pm.int_16_min)\
         .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(0)),1) \
         .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(-1)),1) \
         .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(0)),1) \
@@ -558,7 +557,7 @@ def productivity_final(trajectory, performance, state, output):
         .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)
     
     output = productivity \
-        .unmask(-32768) \
+        .unmask(pm.int_16_min) \
         .int16()
     
     return output
@@ -566,7 +565,7 @@ def productivity_final(trajectory, performance, state, output):
 def indicator_15_3_1(productivity, landcover,soc, output):
     landcover = landcover.select('degredation')
     
-    indicator = ee.Image(-32768) \
+    indicator = ee.Image(pm.int_16_min) \
         .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
         .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
         .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
@@ -596,7 +595,7 @@ def indicator_15_3_1(productivity, landcover,soc, output):
         .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) 
     
     output = indicator \
-        .unmask(-32768) \
+        .unmask(pm.int_16_min) \
         .int16()
     
     return output
