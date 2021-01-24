@@ -1,4 +1,8 @@
+from pathlib import Path
+
 import numpy as np
+
+result_dir = Path('~', 'downloads', 'sdg_indicators').expanduser()
 
 ##########################
 ##      staellites      ##

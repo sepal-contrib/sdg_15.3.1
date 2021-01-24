@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+import time
 
 from sepal_ui import sepalwidgets as sw
 from sepal_ui import mapping as sm
@@ -8,16 +9,23 @@ import ipyvuetify as v
 import geemap
 import ee 
 from ipywidgets import Output, Layout
+import rasterio as rio
+from rasterio.merge import merge
 
 from scripts import parameter as pm
 from scripts import run
+from scripts import gdrive
+from scripts import utils
 
 ee.Initialize()
 
-class TileIo():
+class Io_15_3_1():
     
     def __init__(self):
         
+        #####################
+        ##      input      ##
+        #####################
         # times
         self.start = None
         self.target_start = None
@@ -34,6 +42,15 @@ class TileIo():
         
         #Climate regime
         self.conversion_coef =None
+        
+        ######################
+        ##      output      ##
+        ######################
+        
+        self.land_cover = None
+        self.soc = None
+        self.productivity = None
+        self.indicator_15_3_1 = None
         
 class ClimateRegime(v.Col):
     
@@ -243,11 +260,11 @@ class SensorSelect(v.Select):
         
 class Tile_15_3_1(sw.Tile):
     
-    def __init__(self, aoi_io, result_tile):
+    def __init__(self, aoi_io, io, result_tile):
         
         # use io 
         self.aoi_io = aoi_io
-        self.io = TileIo()
+        self.io = io
         
         # output
         self.output = sw.Alert()
@@ -313,22 +330,22 @@ class Tile_15_3_1(sw.Tile):
         productivity_state = run.productivity_state(self.aoi_io, self.io, ndvi_int, climate_int, self.output) 
         
         # compute result maps 
-        land_cover = run.land_cover(self.io, self.aoi_io, self.output)
-        soc = run.soil_organic_carbon(self.io, self.aoi_io, self.output)
-        productivity = run.productivity_final(productivity_trajectory, productivity_performance, productivity_state, self.output)
+        self.io.land_cover = run.land_cover(self.io, self.aoi_io, self.output)
+        self.io.soc = run.soil_organic_carbon(self.io, self.aoi_io, self.output)
+        self.io.productivity = run.productivity_final(productivity_trajectory, productivity_performance, productivity_state, self.output)
         
         # sump up in a map
-        indicator_15_3_1 = run.indicator_15_3_1(productivity, land_cover, soc, self.output)
+        self.io.indicator_15_3_1 = run.indicator_15_3_1(self.io.productivity, self.io.land_cover, self.io.soc, self.output)
 
         # create the csv result
-        indicator_15_3_1_stats = Path('~', 'downloads', f'{self.aoi_io.get_aoi_name()}_indicator_15_3_1.csv').expanduser()
+        indicator_15_3_1_stats = pm.result_dir.joinpath(f'{self.aoi_io.get_aoi_name()}_indicator_15_3_1.csv')
         
         output_widget = Output()
         self.output.add_msg(output_widget)
         
         with output_widget:
             geemap.zonal_statistics_by_group(
-                in_value_raster = indicator_15_3_1,
+                in_value_raster = self.io.indicator_15_3_1,
                 in_zone_vector = self.aoi_io.get_aoi_ee(),
                 out_file_path = indicator_15_3_1_stats,
                 statistics_type = "PERCENTAGE",
@@ -343,13 +360,16 @@ class Tile_15_3_1(sw.Tile):
         
         # add the layers 
         geom = self.aoi_io.get_aoi_ee().geometry().bounds()
-        m.addLayer(productivity.clip(geom), pm.viz, 'productivity')
-        m.addLayer(land_cover.select('degredation').clip(geom), pm.viz, 'land_cover')
-        m.addLayer(soc.clip(geom), pm.viz, 'soil_organic_carbon')
-        m.addLayer(indicator_15_3_1.clip(geom), pm.viz, 'indicator_15_3_1')
+        m.addLayer(self.io.productivity.clip(geom), pm.viz, 'productivity')
+        m.addLayer(self.io.land_cover.select('degredation').clip(geom), pm.viz, 'land_cover')
+        m.addLayer(self.io.soc.clip(geom), pm.viz, 'soil_organic_carbon')
+        m.addLayer(self.io.indicator_15_3_1.clip(geom), pm.viz, 'indicator_15_3_1')
         
         # add the aoi on the map 
         m.addLayer(self.aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
+        
+        # release the download btn
+        self.result_tile.tif_btn.disabled = False
         
         #except Exception as e:
         #    self.output.add_live_msg(e, 'error')
@@ -360,13 +380,14 @@ class Tile_15_3_1(sw.Tile):
     
 class Result_15_3_1(sw.Tile):
     
-    def __init__(self, aoi_io, **kwargs):
+    def __init__(self, aoi_io, io, **kwargs):
         
         # create an output for the downloading method
         self.output = sw.Alert()
         
         # get io for the downloading 
         self.aoi_io = aoi_io
+        self.io = io
         
         # create the result map
         self.m = sm.SepalMap()
@@ -391,8 +412,99 @@ class Result_15_3_1(sw.Tile):
         )
         
         # link the downlad as tif to a function
+        self.tif_btn.on_event('click', self.download_maps)
         
         
+    def download_maps(self, widget, event, data):
+        
+        widget.toggle_loading()
+            
+        # get the export scale 
+        scale = 10 if 'Sentinel 2' in self.io.sensors else 30
+        
+        # create the export path
+        land_cover_desc = f'{self.aoi_io.get_aoi_name()}_land_cover'
+        soc_desc = f'{self.aoi_io.get_aoi_name()}_soc'
+        productivity_desc = f'{self.aoi_io.get_aoi_name()}_productivity'
+        indicator_15_3_1_desc = f'{self.aoi_io.get_aoi_name()}_indicator_15_3_1'
+        
+        # load the drive_handler
+        drive_handler = gdrive.gdrive()
+        
+        # download all files
+        downloads = drive_handler.download_to_disk(land_cover_desc, self.io.land_cover, self.aoi_io, self.output)
+        downloads = drive_handler.download_to_disk(soc_desc, self.io.soc, self.aoi_io, self.output)
+        downloads = drive_handler.download_to_disk(productivity_desc, self.io.productivity, self.aoi_io, self.output)
+        downloads = drive_handler.download_to_disk(indicator_15_3_1_desc, self.io.indicator_15_3_1, self.aoi_io, self.output)
+        
+        # I assume that they are always launch at the same time 
+        # If not it's going to crash
+        if downloads:
+            utils.wait_for_completion([land_cover_desc, soc_desc, productivity_desc, indicator_15_3_1_desc], self.output)
+        self.output.add_live_msg('GEE tasks completed', 'success') 
+        
+        # digest the tiles
+        digest_tiles(self.aoi_io, land_cover_desc, pm.result_dir, self.output, pm.result_dir.joinpath(f'{land_cover_desc}_merge.tif'))
+        digest_tiles(self.aoi_io, soc_desc, pm.result_dir, self.output, pm.result_dir.joinpath(f'{soc_desc}_merge.tif'))
+        digest_tiles(self.aoi_io, productivity_desc, pm.result_dir, self.output, pm.result_dir.joinpath(f'{productivity_desc}_merge.tif'))
+        digest_tiles(self.aoi_io, indicator_15_3_1_desc, pm.result_dir, self.output, pm.result_dir.joinpath(f'{indicator_15_3_1_desc}_merge.tif'))
+        
+        # remove the files from drive
+        drive_handler.delete_files(drive_handler.get_files(land_cover_desc))
+        drive_handler.delete_files(drive_handler.get_files(soc_desc))
+        drive_handler.delete_files(drive_handler.get_files(productivity_desc))
+        drive_handler.delete_files(drive_handler.get_files(indicator_15_3_1_desc))
+        
+        #display msg 
+        self.output.add_live_msg('Download complete', 'success')
+        
+        widget.toggle_loading()
+            
+        return
+        
+def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
+    
+    drive_handler = gdrive.gdrive()
+    files = drive_handler.get_files(filename)
+    
+    # if no file, it means that the download had failed
+    if not len(files):
+        raise Exception(ms.NO_FILES)
+        
+    drive_handler.download_files(files, result_dir)
+    
+    pathname = f'{filename}*.tif'
+    
+    files = [file for file in result_dir.glob(pathname)]
+        
+    #run the merge process
+    output.add_live_msg("merge tiles")
+    time.sleep(2)
+    
+    #manual open and close because I don't know how many file there are
+    sources = [rio.open(file) for file in files]
+
+    data, output_transform = merge(sources)
+    
+    out_meta = sources[0].meta.copy()    
+    out_meta.update(
+        driver    = "GTiff",
+        height    =  data.shape[1],
+        width     =  data.shape[2],
+        transform = output_transform,
+        compress  = 'lzw'
+    )
+    
+    with rio.open(tmp_file, "w", **out_meta) as dest:
+        dest.write(data)
+    
+    # manually close the files
+    [src.close() for src in sources]
+    
+    # delete local files
+    [file.unlink() for file in files]
+    
+    return
         
         
         
