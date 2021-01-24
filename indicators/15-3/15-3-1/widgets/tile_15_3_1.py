@@ -1,10 +1,10 @@
+from pathlib import Path
+from datetime import datetime
+
 from sepal_ui import sepalwidgets as sw
 from sepal_ui import mapping as sm
 from sepal_ui.scripts import utils as su
 import ipyvuetify as v
-from datetime import datetime
-
-import os
 import geemap
 
 from scripts import parameter as pm
@@ -114,13 +114,9 @@ class MatrixInput(v.Html):
         '-': (-1, v.theme.themes.dark.error)
     }
     
-    DECODE = {
-        1: '+',
-        0: '',
-        -1:'-'
-    }
     
-    def __init__(self, line, column, io, output):
+    
+    def __init__(self, line, column, io, default_value, output):
         
         # get the io for dynamic modification
         self.io = io
@@ -132,7 +128,7 @@ class MatrixInput(v.Html):
         # get the output
         self.output = output
         
-        self.val = v.Select(dense = True, color = 'white', items = [*self.VALUES], class_='ma-1', v_model = 0)
+        self.val = v.Select(dense = True, color = 'white', items = [*self.VALUES], class_='ma-1', v_model = default_value)
         
         super().__init__(
             style_ = f'background-color: {v.theme.themes.dark.primary}',
@@ -143,11 +139,7 @@ class MatrixInput(v.Html):
         # connect the color to the value
         self.val.observe(self.color_change, 'v_model')
         
-    def color_change(self, change):            
-        
-        # to decode the defaulted matrix 
-        if isinstance(change['new'], int):
-            change['new'] = self.DECODE[change['new']]
+    def color_change(self, change):
             
         val, color = self.VALUES[change['new']]
         
@@ -162,6 +154,8 @@ class TransitionMatrix(v.SimpleTable):
     
     CLASSES = ['Forest', 'Grassland', 'Cropland', 'Wetland', 'Artificial area', 'Bare land', 'water body']
     
+    DECODE = {1: '+', 0: '', -1:'-'}
+    
     def __init__(self, io, output):
         
         # create a header 
@@ -174,8 +168,9 @@ class TransitionMatrix(v.SimpleTable):
             inputs = []
             for j, target in enumerate(self.CLASSES):
                 # create a input with default matrix value
-                matrix_input = MatrixInput(i, j, io, output)
-                matrix_input.color_change({'new': pm.default_trans_matrix[i][j]})
+                default_value = self.DECODE[pm.default_trans_matrix[i][j]]
+                matrix_input = MatrixInput(i, j, io, default_value, output)
+                matrix_input.color_change({'new': default_value})
                 
                 input_ = v.Html(tag='td', class_='ma-0 pa-0', children=[matrix_input])
                 inputs.append(input_)
@@ -297,6 +292,11 @@ class Tile_15_3_1(sw.Tile):
         
         widget.toggle_loading()
         
+        # check the inputs 
+        
+        
+        #try 
+        
         land_cover = run.land_cover(self.io, self.aoi_io, self.output)
 
         soc = run.soil_organic_carbon(self.io, self.aoi_io, self.output)
@@ -313,8 +313,7 @@ class Tile_15_3_1(sw.Tile):
 
 
         aoi_name = self.aoi_io.get_aoi_name()
-        out_dir = os.path.join(os.path.expanduser('~'),'downloads')
-        indicator_15_3_1_stats = os.path.join(out_dir, f'{aoi_name}_indicator_15_3_1.csv')
+        indicator_15_3_1_stats = Path('~', 'downloads', f'{aoi_name}_indicator_15_3_1.csv').expanduser()
         #geemap.zonal_statistics_by_group(
         #        in_value_raster = indicator_15_3_1,
         #        in_zone_vector = self.aoi_io.get_aoi_ee(),
@@ -336,6 +335,48 @@ class Tile_15_3_1(sw.Tile):
         # add the map to the result tile 
         self.result_tile.set_content([m])
         
+        #except Exception as e:
+        #    self.output.add_live_msg(e, 'error')
+        
         widget.toggle_loading()
             
         return 
+    
+class Result_15_3_1(sw.Tile):
+    
+    def __init__(self, aoi_io, **kwargs):
+        
+        # create an output for the downloading method
+        self.output = sw.Alert()
+        
+        # get io for the downloading 
+        self.aoi_io = aoi_io
+        
+        # create the result map
+        self.m = sm.SepalMap()
+        
+        # add a download btn for csv and a download btn for the sepal
+        self.csv_btn = sw.DownloadBtn('Downlad stats in .csv')
+        
+        self.tif_btn = sw.Btn(text = 'Download maps as .tif in sepal',icon = 'mdi-download')
+        self.tif_btn.color = 'success'
+        self.tif_btn.disabled = True
+        self.tif_btn.class_ = 'ma-2'
+        
+        # aggregate the btn as a line 
+        btn_line =  v.Layout(Row=True, children=[self.csv_btn, self.tif_btn])
+        
+        # init the tile 
+        super().__init__(
+            '15_3_1_widgets', 
+            'Results', 
+            [btn_line, self.m],
+            output = self.output
+        )
+        
+        # link the downlad as tif to a function
+        
+        
+        
+        
+        
