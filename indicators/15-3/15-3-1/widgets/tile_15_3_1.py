@@ -98,16 +98,18 @@ class PickerLine(v.Layout):
         self.io = io
         self.output = output
         
+        # create the widgets
         self.start_picker = v.Select(label='Start year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
-        output.bind(self.start_picker, io, 'start')
+        self.target_picker = v.Select(label='Start year of the target period', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
+        self.end_picker = v.Select(label='End year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
         
-        target_picker = v.Select(label='Start year of the target period', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
-        output.bind(target_picker, io, 'target_start')
+        # bind them to the output
+        output = output \
+            .bind(self.start_picker, io, 'start') \
+            .bind(self.target_picker, io, 'target_start') \
+            .bind(self.end_picker, io, 'end')
         
-        end_picker = v.Select(label='End year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
-        output.bind(end_picker, io, 'end')
-        
-        super().__init__(xs=12, row=True,  children=[self.start_picker, target_picker, end_picker])
+        super().__init__(xs=12, row=True,  children=[self.start_picker, self.target_picker, self.end_picker])
         
 class MatrixInput(v.Html):
     
@@ -231,9 +233,14 @@ class SensorSelect(v.Select):
             last_sat = 2
         else:
             last_sat = 1
-            
+        
+        # change senso items 
         self.items = [*pm.sensors][:last_sat]
-            
+        
+        # select them all by default 
+        self.v_model = [*pm.sensors][:last_sat]
+        
+        return
         
 class Tile_15_3_1(sw.Tile):
     
@@ -252,7 +259,7 @@ class Tile_15_3_1(sw.Tile):
         # create the widgets that will be displayed
         markdown = sw.Markdown('Some explainations should go here')
         pickers = PickerLine(self.io, self.output)
-        self.sensor_select = SensorSelect(items=[], label="select sensor", multiple=True, v_model=None)
+        self.sensor_select = SensorSelect(items=[], label="select sensor", multiple=True, v_model=None, chips=True)
         trajectory = v.Select(label='trajectory', items=pm.trajectories, v_model=None)
         transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=['Transition matrix'])
         transition_matrix = TransitionMatrix(self.io, self.output)
@@ -285,7 +292,7 @@ class Tile_15_3_1(sw.Tile):
         
         # add links between the widgets
         self.btn.on_event('click', self.start_process)
-        pickers.start_picker.observe(self.sensor_select.update_sensors, 'v_model')
+        pickers.end_picker.observe(self.sensor_select.update_sensors, 'v_model')
         
         # clear the alert 
         self.output.reset()
