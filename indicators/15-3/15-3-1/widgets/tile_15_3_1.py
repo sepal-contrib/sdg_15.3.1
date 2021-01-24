@@ -6,9 +6,12 @@ from sepal_ui import mapping as sm
 from sepal_ui.scripts import utils as su
 import ipyvuetify as v
 import geemap
+import ee 
 
 from scripts import parameter as pm
 from scripts import run
+
+ee.Initialize()
 
 class TileIo():
     
@@ -332,6 +335,9 @@ class Tile_15_3_1(sw.Tile):
         m.addLayer(land_cover.select('degredation'), pm.viz, 'land_cover')
         m.addLayer(soc, pm.viz, 'soil_organic_carbon')
         m.addLayer(indicator_15_3_1, pm.viz, 'indicator_15_3_1')
+        
+        # add the aoi on the map 
+        m.addLayer(self.aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
         
         #except Exception as e:
         #    self.output.add_live_msg(e, 'error')
