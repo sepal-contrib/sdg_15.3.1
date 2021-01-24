@@ -14,10 +14,11 @@ ee.Initialize()
 def soil_organic_carbon(io, aoi_io, output):
     """Calculate soil organic carbon indicator"""
     
-    soc = ee.Image(pm.soc)
+    soc = ee.Image(pm.soc).clip(aoi_io.get_aoi_ee().geometry().bounds())
     soc = soc.updateMask(soc.neq(pm.int_16_min))
     
     lc = ee.Image(pm.land_cover) \
+        .clip(aoi_io.get_aoi_ee().geometry().bounds()) \
         .select(ee.List.sequence(io.start - 1993, io.end -1993, 1))
     
     lc = lc \
@@ -25,7 +26,7 @@ def soil_organic_carbon(io, aoi_io, output):
         .updateMask(lc.neq(pm.int_16_min))
     
     if not io.conversion_coef:
-        ipcc_climate_zones = ee.Image(pm.ipcc_climate_zones)
+        ipcc_climate_zones = ee.Image(pm.ipcc_climate_zones).clip(aoi_io.get_aoi_ee().geometry().bounds())
         climate_conversion_coef = ipcc_climate_zones.remap(pm.climate_conversion_matrix[0], pm.climate_conversion_matrix[1])
     else: 
         climate_conversion_coef = io.conversion_coef 
@@ -158,7 +159,7 @@ def land_cover(io, aoi_io, output):
     """Calculate land cover indicator"""
 
     ## load the land cover map
-    lc = ee.Image(pm.land_cover)
+    lc = ee.Image(pm.land_cover).clip(aoi_io.get_aoi_ee().geometry().bounds())
     lc = lc \
         .where(lc.eq(9999), pm.int_16_min) \
         .updateMask(lc.neq(pm.int_16_min))
@@ -238,6 +239,7 @@ def integrate_ndvi_climate(aoi_io, io, output):
 
     # process the climate dataset to use with the pixel restrend, RUE calculation
     precipitation = ee.ImageCollection(pm.precipitation) \
+        .filterBounds(aoi_io.get_aoi_ee()) \
         .filterDate(f'{io.start}-01-01',f'{io.end}-12-31') \
         .select('precipitation')
     
@@ -308,7 +310,7 @@ The following code runs the selected trend method and produce an output by recla
     
     return output
 
-def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly_integration, output):
+def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly_integration, output):
     """It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
         Steps:
         *Computation of mean NDVI for the analysis period,
@@ -321,21 +323,13 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
     #nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
 
     # land cover data from esa cci
-    lc = ee.Image(pm.land_cover)
+    lc = ee.Image(pm.land_cover).clip(aoi_io.get_aoi_ee().geometry().bounds())
     lc = lc \
         .where(lc.eq(9999), pm.int_16_min) \
         .updateMask(lc.neq(pm.int_16_min))
 
     # global agroecological zones from IIASA
     soil_tax_usda = ee.Image(pm.soil_tax)
-
-    ###############################################
-    # why clipping twice ??
-    
-    # Make sure the bounding box of the poly is used, and not the geodesic 
-    # version, for the clipping
-    poly = io_aoi.get_aoi_ee().geometry()
-    #############################################
 
     # compute mean ndvi for the period
     
@@ -375,7 +369,7 @@ def productivity_performance(io_aoi, io, nvdi_yearly_integration, climate_yearly
             groupField=1, 
             groupName='code'
         ),
-        geometry=poly,
+        geometry=aoi_io.get_aoi_ee().geometry(),
         scale=30,
         maxPixels=1e15
     )

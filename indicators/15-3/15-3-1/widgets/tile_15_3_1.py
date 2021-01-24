@@ -186,8 +186,6 @@ class TransitionMatrix(v.SimpleTable):
             ))
             rows.append(row)
                    
-                   
-            
         # create the simple table 
         super().__init__(
             children = [
@@ -307,23 +305,22 @@ class Tile_15_3_1(sw.Tile):
         
         #try 
         
-        land_cover = run.land_cover(self.io, self.aoi_io, self.output)
-
-        soc = run.soil_organic_carbon(self.io, self.aoi_io, self.output)
-        
+        # compute intermediary maps 
         ndvi_int, climate_int = run.integrate_ndvi_climate(self.aoi_io, self.io, self.output)
-        
         productivity_trajectory = run.productivity_trajectory(self.io, ndvi_int, climate_int, self.output)
         productivity_performance = run.productivity_performance(self.aoi_io, self.io, ndvi_int, climate_int, self.output)
-        productivity_state = run.productivity_state(self.aoi_io, self.io, ndvi_int, climate_int, self.output)
-                                                                
+        productivity_state = run.productivity_state(self.aoi_io, self.io, ndvi_int, climate_int, self.output) 
+        
+        # compute result maps 
+        land_cover = run.land_cover(self.io, self.aoi_io, self.output)
+        soc = run.soil_organic_carbon(self.io, self.aoi_io, self.output)
         productivity = run.productivity_final(productivity_trajectory, productivity_performance, productivity_state, self.output)
-
+        
+        # sump up in a map
         indicator_15_3_1 = run.indicator_15_3_1(productivity, land_cover, soc, self.output)
 
-
-        aoi_name = self.aoi_io.get_aoi_name()
-        indicator_15_3_1_stats = Path('~', 'downloads', f'{aoi_name}_indicator_15_3_1.csv').expanduser()
+        # create the csv result
+        indicator_15_3_1_stats = Path('~', 'downloads', f'{self.aoi_io.get_aoi_name()}_indicator_15_3_1.csv').expanduser()
         #geemap.zonal_statistics_by_group(
         #        in_value_raster = indicator_15_3_1,
         #        in_zone_vector = self.aoi_io.get_aoi_ee(),
@@ -338,10 +335,11 @@ class Tile_15_3_1(sw.Tile):
         m.zoom_ee_object(self.aoi_io.get_aoi_ee().geometry())
         
         # add the layers 
-        m.addLayer(productivity, pm.viz, 'productivity')
-        m.addLayer(land_cover.select('degredation'), pm.viz, 'land_cover')
-        m.addLayer(soc, pm.viz, 'soil_organic_carbon')
-        m.addLayer(indicator_15_3_1, pm.viz, 'indicator_15_3_1')
+        geom = self.aoi_io.get_aoi_ee().geometry().bounds()
+        m.addLayer(productivity.clip(geom), pm.viz, 'productivity')
+        m.addLayer(land_cover.select('degredation').clip(geom), pm.viz, 'land_cover')
+        m.addLayer(soc.clip(geom), pm.viz, 'soil_organic_carbon')
+        m.addLayer(indicator_15_3_1.clip(geom), pm.viz, 'indicator_15_3_1')
         
         # add the aoi on the map 
         m.addLayer(self.aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
