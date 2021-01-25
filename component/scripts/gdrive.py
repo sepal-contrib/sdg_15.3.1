@@ -4,7 +4,7 @@ import ee
 import io
 from googleapiclient.http import MediaIoBaseDownload
 from apiclient import discovery
-from . import utils
+from .gee import search_task
 
 import logging
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
@@ -133,7 +133,7 @@ class gdrive(object):
             
             return download
         
-        task = utils.search_task(filename)
+        task = search_task(filename)
         if not task:
             download = launch_task(filename, image, aoi_io, output)
         else:

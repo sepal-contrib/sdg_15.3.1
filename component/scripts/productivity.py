@@ -1,251 +1,8 @@
-from functools import partial
-
 import ee 
-import numpy as np
 
-from scripts import utils as u
-from scripts import parameter as pm
-from scripts import productivity as prod
-from scripts import utils as u
+from component import parameter as pm
 
 ee.Initialize()
-
-
-def soil_organic_carbon(io, aoi_io, output):
-    """Calculate soil organic carbon indicator"""
-    
-    soc = ee.Image(pm.soc).clip(aoi_io.get_aoi_ee().geometry().bounds())
-    soc = soc.updateMask(soc.neq(pm.int_16_min))
-    
-    lc = ee.Image(pm.land_cover) \
-        .clip(aoi_io.get_aoi_ee().geometry().bounds()) \
-        .select(ee.List.sequence(io.start - 1993, io.end -1993, 1))
-    
-    lc = lc \
-        .where(lc.eq(9999), pm.int_16_min) \
-        .updateMask(lc.neq(pm.int_16_min))
-    
-    if not io.conversion_coef:
-        ipcc_climate_zones = ee.Image(pm.ipcc_climate_zones).clip(aoi_io.get_aoi_ee().geometry().bounds())
-        climate_conversion_coef = ipcc_climate_zones.remap(pm.climate_conversion_matrix[0], pm.climate_conversion_matrix[1])
-    else: 
-        climate_conversion_coef = io.conversion_coef 
-        
-        
-    # Cumpute the soc change for the first two years
-    lc_time0 = lc \
-        .select(0) \
-        .remap(pm.translation_matrix[0],pm.translation_matrix[1])
-        
-    lc_time1 = lc \
-        .select(1) \
-        .remap(pm.translation_matrix[0],pm.translation_matrix[1])
-    
-     # compute transition map for the first two years(1st digit for baseline land cover, 2nd for target land cover)
-    lc_transition = lc_time0 \
-        .multiply(10) \
-        .add(lc_time1)
-            
-    # compute raster to register years since transition for the first and second year
-    lc_transition_time =ee.Image(2).where(lc_time0.neq(lc_time1),1)
-    
-    #stock change factor for land use
-    #333 and -333 will be recoded using the choosen climate coef.
-    lc_transition_climate_coef_tmp =  lc_transition \
-            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
-    lc_transition_climate_coef = lc_transition_climate_coef_tmp \
-            .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
-            .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
-                            
-    # stock change factor for management regime
-    lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
-    
-    # Stock change factor for input of organic matter
-    lc_transition_organic_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.input_factor)
-    
-    organic_carbon_change = soc \
-        .subtract(soc \
-            .multiply(lc_transition_climate_coef) \
-            .multiply(lc_transition_management_factor) \
-            .multiply(lc_transition_organic_factor)
-         ) \
-         .divide(20)
-            
-    # compute final soc for the period
-    soc_time1 = soc.subtract(organic_carbon_change)
-            
-    # add to land cover and soc to stacks from both dates for the first period
-    lc_images = ee.Image(lc_time0).addBands(lc_time1)
-            
-    soc_images = ee.Image(soc).addBands(soc_time1)
-    
-    # Cumpute the soc change for the rest of  the years
-    for year_index in range(1, io.end - io.start):
-        lc_time0 = lc \
-            .select(year_index) \
-            .remap(pm.translation_matrix[0],pm.translation_matrix[1])
-        
-        lc_time1 = lc \
-            .select(year_index +1) \
-            .remap(pm.translation_matrix[0],pm.translation_matrix[1])
-        
-        lc_transition_time = lc_transition_time \
-            .where(lc_time0.eq(lc_time1),lc_transition_time.add(ee.Image(1))) \
-            .where(lc_time0.neq(lc_time1),ee.Image(1))
-                
-        # compute transition map (1st digit for baseline land cover, 2nd for target land cover)
-        # But only update where changes acually occured.
-        lc_transition_temp = lc_time0.multiply(10).add(lc_time1)
-        lc_transition =lc_transition.where(lc_time0.neq(lc_time1), lc_transition_temp)
-        
-        #stock change factor for land use
-        #333 and -333 will be recoded using the choosen climate coef.            
-        lc_transition_climate_coef_tmp =  lc_transition \
-            .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
-        lc_transition_climate_coef = lc_transition_climate_coef_tmp \
-            .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
-            .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
-                            
-        # stock change factor for management regime
-        lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
-        
-        # Stock change factor for input of organic matter
-        lc_transition_organic_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.input_factor)
-            
-        organic_carbon_change = organic_carbon_change \
-            .where(
-                lc_time0.neq(lc_time1),
-                soc_images \
-                    .select(year_index) \
-                    .subtract(soc_images \
-                        .select(year_index) \
-                        .multiply(lc_transition_climate_coef) \
-                        .multiply(lc_transition_management_factor) \
-                        .multiply(lc_transition_organic_factor)
-                    ) \
-                    .divide(20) \
-            ) \
-            .where(lc_transition_time.gt(20),0)
-            
-            
-        soc_final = soc_images \
-            .select(year_index) \
-            .subtract(organic_carbon_change)
-                        
-        lc_images = lc_images \
-            .addBands(lc_time1)
-            
-        soc_images = soc_images \
-            .addBands(soc_final)
-            
-    # Compute soc percent change for the analsis period
-    soc_percent_change = soc_images \
-        .select(io.end - io.start) \
-        .subtract(soc_images.select(0)) \
-        .divide(soc_images.select(0)) \
-        .multiply(100)
-    
-    soc_class = ee.Image(pm.int_16_min) \
-        .where(soc_percent_change.gt(10),1) \
-        .where(soc_percent_change.lt(10).And(soc_percent_change.gt(-10)),0) \
-        .where(soc_percent_change.lt(-10),-1)\
-        .rename('soc_class')
-
-    output = soc_class.unmask(pm.int_16_min).int16()
-    
-    return output
-    
-def land_cover(io, aoi_io, output):
-    """Calculate land cover indicator"""
-
-    ## load the land cover map
-    lc = ee.Image(pm.land_cover).clip(aoi_io.get_aoi_ee().geometry().bounds())
-    lc = lc \
-        .where(lc.eq(9999), pm.int_16_min) \
-        .updateMask(lc.neq(pm.int_16_min))
-
-    # Remap LC according to input matrix, aggregation of land cover classesclasses to IPCC classes.
-    #TODO:custom aggregation based on user inputs
-    lc_remapped = lc \
-        .select(f'y{io.start}') \
-        .remap(pm.translation_matrix[0], pm.translation_matrix[1])
-    
-    for year in range(io.start + 1, io.end):
-        lc_remapped = lc_remapped \
-            .addBands(lc.select(f'y{year}')) \
-            .remap(pm.translation_matrix[0],pm.translation_matrix[1])
-
-    ## target land cover map reclassified to IPCC 6 classes
-    lc_bl = lc_remapped.select(0)
-
-    ## baseline land cover map reclassified to IPCC 6 classes
-    lc_tg = lc_remapped.select(len(lc_remapped.getInfo()['bands']) - 1)
-
-    ## compute transition map (first digit for baseline land cover, and second digit for target year land cover)
-    lc_tr = lc_bl \
-            .multiply(10) \
-            .add(lc_tg)
-
-    ## definition of land cover transitions as degradation (-1), improvement (1), or no relevant change (0)
-    trans_matrix_flatten = [item for sublist in io.transition_matrix for item in sublist]
-    lc_dg = lc_tr \
-            .remap(pm.IPCC_lc_change_matrix, trans_matrix_flatten) \
-            .rename("degredation")
-
-    ## Remap persistence classes so they are sequential.
-    lc_tr = lc_tr.remap(pm.IPCC_lc_change_matrix, pm.sequential_matrix)
-
-    out = ee.Image(
-        lc_dg \
-        .addBands(lc.select(f'y{io.start}')) \
-        .addBands(lc.select(f'y{io.target_start}')) \
-        .addBands(lc_tr)
-    )
-
-    # Return the full land cover timeseries so it is available for reporting
-    out.addBands(lc_remapped)
-
-    out= out.unmask(pm.int_16_min).int16()
-
-    return out
-
-def integrate_ndvi_climate(aoi_io, io, output):
-    
-    # create the composite image collection
-    i_img_coll = ee.ImageCollection([])
-    
-    for sensor in io.sensors:
-        
-        # get the image collection 
-        # filter its bounds to fit the aoi extends 
-        # rename the bands 
-        # adapt the resolution to meet sentinel 2 native one (10m)
-        # mask the clouds and adapt the scale 
-        sat = ee.ImageCollection(pm.sensors[sensor]) \
-            .filterBounds(aoi_io.get_aoi_ee()) \
-            .map(partial(u.rename_band, sensor=sensor)) \
-            .map(partial(u.adapt_res, sensor=sensor)) \
-            .map(partial(u.cloud_mask, sensor=sensor)) 
-    
-        i_img_coll = i_img_coll.merge(sat)
-    
-    # Filtering the img collection  using start year and end year
-    i_img_coll = i_img_coll.filterDate(f'{io.start}-01-01', f'{io.end}-12-31')
-
-    # Function to integrate observed NDVI datasets at the annual level
-    ndvi_coll = i_img_coll.map(prod.CalcNDVI)
-    
-    ndvi_int = prod.int_yearly_ndvi(ndvi_coll, io.start, io.end)
-
-    # process the climate dataset to use with the pixel restrend, RUE calculation
-    precipitation = ee.ImageCollection(pm.precipitation) \
-        .filterBounds(aoi_io.get_aoi_ee()) \
-        .filterDate(f'{io.start}-01-01',f'{io.end}-12-31') \
-        .select('precipitation')
-    
-    climate_int = prod.int_yearly_climate(precipitation, io.start, io.end)
-    
-    return (ndvi_int, climate_int)
 
 def productivity_trajectory(io, nvdi_yearly_integration, climate_yearly_integration, output):
     """Productivity Trend describes the trajectory of change in productivity over time. Trend is calculated by fitting a robust, non-parametric linear regression model.The significance of trajectory slopes at the P <= 0.05 level should be reported in terms of three classes:
@@ -261,17 +18,17 @@ The following code runs the selected trend method and produce an output by recla
     # Run the selected algorithm
     # nvi trend
     if io.trajectory == pm.trajectories[0]:
-        lf_trend, mk_trend = prod.ndvi_trend(io.start, io.end, nvdi_yearly_integration)
+        lf_trend, mk_trend = ndvi_trend(io.start, io.end, nvdi_yearly_integration)
     # p restrend
     elif io.trajectory == pm.trajectories[1]:
-        lf_trend, mk_trend = prod.p_restrend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
+        lf_trend, mk_trend = p_restrend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
     # s restrend
     elif io.trajectory == pm.trajectories[2]:
         #TODO: need to code this
         raise NameError("s_restrend method not yet supported")
     # ue trend
     elif io.trajectory == pm.trajectories[3]:
-        lf_trend, mk_trend = prod.ue_trend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
+        lf_trend, mk_trend = ue_trend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
     else:
         raise NameError(f'Unrecognized method "{io.trajectory}"')
 
@@ -556,41 +313,206 @@ def productivity_final(trajectory, performance, state, output):
     
     return output
 
-def indicator_15_3_1(productivity, landcover,soc, output):
-    landcover = landcover.select('degredation')
+def ndvi_trend(start, end, ndvi_yearly_integration):
+    """Calculate NDVI trend.
     
-    indicator = ee.Image(pm.int_16_min) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
-        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(0)),1) \
-        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(1)),1) \
-        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(0)),0) \
-        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) 
-    
-    output = indicator \
-        .unmask(pm.int_16_min) \
-        .int16()
-    
-    return output
+    Calculates the trend of temporal NDVI using NDVI data from selected satellite dataset. Areas where changes are not significant
+    are masked out using a Mann-Kendall test.
+    """
 
+    ## Compute linear trend function to predict ndvi based on year (ndvi trend)
+    lf_trend = ndvi_yearly_integration \
+        .select(['year', 'ndvi']) \
+        .reduce(ee.Reducer.linearFit())
+
+    ## Compute Kendall statistics
+    mk_trend = mann_kendall(ndvi_yearly_integration.select('ndvi'))
+
+    return (lf_trend, mk_trend)
+
+def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
+    """Rasudial trend analsis predicts NDVI based on the given rainfall. p_restrend uses linear regression model to predict NDVI for a given rainfall amount. The residual (Predicted - Obsedved)NDVI trend is considered as productivity change that is indipendent of climatic variation. For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
+    """
+    
+    ## Apply function to create image collection of ndvi and climate
+    ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end)
+
+    ## Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
+    linear_model_climate_ndvi = ndvi_climate_yearly_integration \
+        .select(['clim', 'ndvi']) \
+        .reduce(ee.Reducer.linearFit())
+
+    ## Apply function to  predict NDVI based on climate
+    first = ee.List([])
+    predicted_yearly_ndvi = ee.ImageCollection(ee.List(
+        ndvi_climate_yearly_integration \
+        .select('clim') \
+        .iterate(partial(ndvi_prediction_climate, linear_model_climate_ndvi = linear_model_climate_ndvi), first)
+    ))
+
+    ## Apply function to compute NDVI annual residuals
+    residual_yearly_ndvi = image_collection_residuals(start, end, nvdi_yearly_integration, predicted_yearly_ndvi)
+
+    ## Fit a linear regression to the NDVI residuals
+    lf_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
+
+    ## Compute Kendall statistics
+    mk_trend = mann_kendall(residual_yearly_ndvi.select('ndvi_res'))
+    
+    return (lf_trend, mk_trend)
+
+def ue_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
+    """Calculate trend based on rain use efficiency.
+    It is the ratio of ANPP(annual integral of NDVI as proxy) to annual precipitation.
+
+    """
+
+    # Convert the climate layer to meters (for precip) so that RUE layer can be
+    # scaled correctly
+    # TODO: Need to handle scaling for ET for WUE
+    
+    # Apply function to compute ue and store as a collection
+    ue_yearly_collection = use_efficiency(start, end, ndvi_yearly_integration, climate_yearly_integration)
+
+    # Compute linear trend function to predict ndvi based on year (ndvi trend)
+    lf_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
+
+    # Compute Kendall statistics
+    mk_trend = mann_kendall(ue_yearly_collection.select('ue'))
+    
+    return (lf_trend, mk_trend)
+
+#############################
+##      kendall index      ##
+#############################
+
+def mann_kendall(imageCollection):
+    """Calculate Mann Kendall's S statistic.
+    This function returns the Mann Kendall's S statistic, assuming that n is
+    less than 40. The significance of a calculated S statistic is found in
+    table A.30 of Nonparametric Statistical Methods, second edition by
+    Hollander & Wolfe.
+    Args:
+        imageCollection: A Google Earth Engine image collection.
+    Returns:
+        A Google Earth Engine image collection with Mann Kendall statistic for
+            each pixel.
+    """
+    
+    TimeSeriesList = imageCollection.toList(50)
+    
+    NumberOfItems = TimeSeriesList.length().getInfo()
+    ConcordantArray = []
+    DiscordantArray = []
+    for i in range(0, NumberOfItems - 1):
+        
+        CurrentImage = ee.Image(TimeSeriesList.get(i))
+        
+        for j in range(i + 1, NumberOfItems):
+            
+            nextImage = ee.Image(TimeSeriesList.get(j))
+            
+            Concordant = CurrentImage.lt(nextImage)
+            ConcordantArray.append(Concordant)
+            
+            Discordant = CurrentImage.gt(nextImage)
+            DiscordantArray.append(Discordant)
+            
+    ConcordantSum = ee.ImageCollection(ConcordantArray).sum()
+    DiscordantSum = ee.ImageCollection(DiscordantArray).sum()
+    
+    MKSstat = ConcordantSum.subtract(DiscordantSum)
+    
+    return MKSstat
+
+def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end):
+    """Creat an ImageCollection of annual integral of NDVI and annual inegral of climate data"""
+    
+    img_list = ee.List([])
+    for year in range(start, end + 1):
+        
+        ndvi_img = nvdi_yearly_integration \
+            .filter(ee.Filter.eq('year', year)) \
+            .first() \
+            .select('ndvi') \
+            .addBands(
+                climate_yearly_integration \
+                .filter(ee.Filter.eq('year', year)) \
+                .first() \
+                .select('clim')
+            ) \
+            .rename(['ndvi', 'clim']) \
+            .set({'year': year})
+        
+        img_list = img_list.add(ndvi_img)
+    
+    out = ee.ImageCollection(img_list)
+    
+    return out
+
+def ndvi_prediction_climate(image, list_, linear_model_climate_ndvi):
+    """predict NDVI from climate. part of p_restrend function"""
+    
+    ndvi = linear_model_climate_ndvi \
+        .select('offset') \
+        .add((linear_model_climate_ndvi.select('scale').multiply(image))) \
+        .set({'year': image.get('year')})
+    
+    return ee.List(list_).add(ndvi)
+
+def ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
+    """Function to compute residuals (ndvi obs - ndvi pred). part of p_restrend function"""
+    
+    ndvi_o = ndvi_climate_yearly_integration \
+        .filter(ee.Filter.eq('year', year)) \
+        .select('ndvi') \
+        .median()
+    
+    ndvi_p = predicted_yearly_ndvi \
+        .filter(ee.Filter.eq('year', year)) \
+        .median()
+    
+    ndvi_r = ee.Image(year) \
+        .float() \
+        .addBands(ndvi_o.subtract(ndvi_p))
+    
+    return ndvi_r.rename(['year', 'ndvi_res'])
+
+def image_collection_residuals(start, end, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
+    """Function to create image collection of residuals. part of p_restrend function"""
+        
+    res_list = ee.List([])
+    for year in range(start, end + 1):
+            
+        res_image = ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi)
+        
+        res_list = res_list.add(res_image)
+        
+    return ee.ImageCollection(res_list)
+
+def use_efficiency(start, end, ndvi_yearly_integration, climate_yearly_integration):
+    """Function to creat rain use efficiency and store it as an imageCollection"""
+        
+    img_coll = ee.List([])
+    for year in range(start, end + 1):
+        
+        ndvi_img = ndvi_yearly_integration \
+            .filter(ee.Filter.eq('year', year)) \
+            .median() \
+            .select('ndvi')
+            
+        clim_img = climate_yearly_integration \
+            .filter(ee.Filter.eq('year', year)) \
+            .median() \
+            .select('clim') \
+            .divide(1000)
+            
+        divide_img = ndvi_img \
+            .divide(clim_img) \
+            .addBands(ee.Image(year).float()) \
+            .rename(['ue', 'year']) \
+            .set({'year': year})
+            
+        img_coll = img_coll.add(divide_img)
+        
+    return ee.ImageCollection(img_coll)
