@@ -16,18 +16,20 @@ The following code runs the selected trend method and produce an output by recla
     """
 
     # Run the selected algorithm
+    trajectories = [traj['text'] for traj in pm.trajectories]
+    
     # nvi trend
-    if io.trajectory == pm.trajectories[0]:
+    if io.trajectory == trajectories[0]:
         lf_trend, mk_trend = ndvi_trend(io.start, io.end, nvdi_yearly_integration)
     # p restrend
-    elif io.trajectory == pm.trajectories[1]:
+    elif io.trajectory == trajectories[1]:
         lf_trend, mk_trend = p_restrend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
     # s restrend
-    elif io.trajectory == pm.trajectories[2]:
+    elif io.trajectory == trajectories[2]:
         #TODO: need to code this
         raise NameError("s_restrend method not yet supported")
     # ue trend
-    elif io.trajectory == pm.trajectories[3]:
+    elif io.trajectory == trajectories[3]:
         lf_trend, mk_trend = ue_trend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
     else:
         raise NameError(f'Unrecognized method "{io.trajectory}"')

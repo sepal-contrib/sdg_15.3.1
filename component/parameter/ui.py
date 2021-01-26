@@ -1,4 +1,9 @@
-trajectories = ['ndvi_trend', 'p_restrend', 's_restrend', 'ue_trend']
+trajectories = [
+    {'text': 'ndvi_trend', 'value': 'ndvi_trend', 'disabled': False},
+    {'text': 'p_restrend', 'value': 'p_restrend', 'disabled': False},
+    {'text': 's_restrend', 'value': 's_restrend', 'disabled': True},
+    {'text': 'ue_trend',   'value': 'ue_trend',   'disabled': False}
+]
 
 climate_regimes = [
     {'text': 'Temperate dry (coef = 0.8)',    'value': 0.80},
