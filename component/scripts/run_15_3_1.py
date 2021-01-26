@@ -64,10 +64,13 @@ def display_maps(aoi_io, io, m, output):
         
     # add the layers 
     geom = aoi_io.get_aoi_ee().geometry().bounds()
-    m.addLayer(io.productivity.clip(geom), pm.viz, 'productivity')
-    m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz, 'land_cover')
-    m.addLayer(io.soc.clip(geom), pm.viz, 'soil_organic_carbon')
-    m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz, 'indicator_15_3_1')
+    m.addLayer(io.productivity.clip(geom), pm.viz_prod, 'productivity')
+    m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, 'land_cover')
+    m.addLayer(io.soc.clip(geom), pm.viz_soc, 'soil_organic_carbon')
+    m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, 'indicator_15_3_1')
+    
+    # add the legend 
+    m.add_legend(legend_dict=pm.legend, position='topleft')
         
     # add the aoi on the map 
     m.addLayer(aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
