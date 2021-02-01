@@ -67,7 +67,13 @@ class Tile_15_3_1(sw.Tile):
         widget.toggle_loading()
         
         # check the inputs 
-        
+        if not self.output.check_input(self.aoi_io.get_aoi_name(), 'no aoi'): return widget.toggle_loading()
+        if not self.output.check_input(self.io.start, 'no start'): return widget.toggle_loading()
+        if not self.output.check_input(self.io.target_start, 'no target'): return widget.toggle_loading()
+        if not self.output.check_input(self.io.end, 'no end'): return widget.toggle_loading()
+        if not self.output.check_input(self.io.trajectory, 'no trajectory'): return widget.toggle_loading()
+        # will work in next sepal_ui patch
+        #if not self.output.check_input(self.io.sensors, 'no sensors'): return widget.toggle_loading()
         
         #try 
         cs.compute_indicator_maps(self.aoi_io, self.io, self.output)

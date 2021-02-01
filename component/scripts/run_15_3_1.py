@@ -79,6 +79,10 @@ def display_maps(aoi_io, io, m, output):
 
 def compute_indicator_maps(aoi_io, io, output):
     
+    # raise an error if the years are not in the rigth order 
+    if not (io.start < io.target_start < io.end):
+        raise Exception('the years are not in the right order')
+    
     # compute intermediary maps 
     ndvi_int, climate_int = integrate_ndvi_climate(aoi_io, io, output)
     prod_trajectory = productivity_trajectory(io, ndvi_int, climate_int, output)
