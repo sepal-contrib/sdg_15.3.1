@@ -75,7 +75,7 @@ class Tile_15_3_1(sw.Tile):
         # will work in next sepal_ui patch
         #if not self.output.check_input(self.io.sensors, 'no sensors'): return widget.toggle_loading()
         
-        try 
+        try: 
             cs.compute_indicator_maps(self.aoi_io, self.io, self.output)
 
             # create the csv result

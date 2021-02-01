@@ -70,7 +70,7 @@ def display_maps(aoi_io, io, m, output):
     m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, 'indicator_15_3_1')
     
     # add the legend 
-    m.add_legend(legend_dict=pm.legend, position='topleft')
+    m.add_legend(legend_dict=pm.legend_test, position='topleft')
         
     # add the aoi on the map 
     m.addLayer(aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')

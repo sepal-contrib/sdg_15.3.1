@@ -1,3 +1,5 @@
+import ipyvuetify as v
+
 trajectories = [
     {'text': 'ndvi_trend', 'value': 'ndvi_trend', 'disabled': False},
     {'text': 'p_restrend', 'value': 'p_restrend', 'disabled': False},
@@ -13,18 +15,24 @@ climate_regimes = [
     {'text': 'Tropical montane (coef = 0.64)','value': 0.64}
 ]
 legend = {
-    '<b>productivity</b> degraded': '#e9a3c9',
-    '<b>productivity</b> stable': '#ffffbf',
-    '<b>productivity</b> improved': '#a1d76a',
-    '<b>land cover</b> degraded': '#d8b365',
-    '<b>land cover</b> stable': '#fde0dd',
-    '<b>land cover</b> improved': '#5ab4ac',
-    '<b>soc</b> degraded': '#ef8a62',
-    '<b>soc</b> stable': '#ffffff',
-    '<b>soc</b> improved': '#999999',
-    '<b>indicator</b> degraded': '#fc8d59',
-    '<b>indicator</b> stable': '#ffffbf',
-    '<b>indicator</b> improved': '#91cf60',
+    '<b>productivity</b> degraded': v.theme.themes.dark.error,
+    '<b>productivity</b> stable'  : v.theme.themes.dark.primary,
+    '<b>productivity</b> improved': v.theme.themes.dark.success,
+    '<b>land cover</b> degraded'  : v.theme.themes.dark.error,
+    '<b>land cover</b> stable'    : v.theme.themes.dark.primary,
+    '<b>land cover</b> improved'  : v.theme.themes.dark.success,
+    '<b>soc</b> degraded'         : v.theme.themes.dark.error,
+    '<b>soc</b> stable'           : v.theme.themes.dark.primary,
+    '<b>soc</b> improved'         : v.theme.themes.dark.success,
+    '<b>indicator</b> degraded'   : v.theme.themes.dark.error,
+    '<b>indicator</b> stable'     : v.theme.themes.dark.primary,
+    '<b>indicator</b> improved'   : v.theme.themes.dark.success,
+}
+
+legend_test = {
+    'degraded' : v.theme.themes.dark.error,
+    'stable'   : v.theme.themes.dark.primary,
+    'improved' : v.theme.themes.dark.success
 }
 
 viz_prod      = {"max": 1, "min":-1, "palette": list(legend.values())[:3]}
