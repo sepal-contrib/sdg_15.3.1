@@ -80,7 +80,7 @@ class Tile_15_3_1(sw.Tile):
 
             # create the csv result
             stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
-            self.result_tile.csv_btn.set_url(str(stats))
+            self.result_tile.shp_btn.set_url(str(stats))
 
             # get the result map        
             cs.display_maps(self.aoi_io, self.io, self.result_tile.m, self.output)
@@ -116,22 +116,31 @@ class Result_15_3_1(sw.Tile):
         )
         
         # add a download btn for csv and a download btn for the sepal
-        self.csv_btn = sw.DownloadBtn('zonal statistics')
+        self.shp_btn = sw.DownloadBtn('zonal statistics')
+        self.prod_btn = sw.DownloadBtn('productivity')
+        self.land_cover_btn = sw.DownloadBtn('land cover')
+        self.soc_btn = sw.DownloadBtn('soil organic carbon')
+        self.indicator_btn = sw.DownloadBtn('indicator 15.3.1')
         
-        self.tif_btn = sw.Btn(text = 'Download maps as .tif in sepal',icon = 'mdi-download')
-        self.tif_btn.color = 'success'
+        self.tif_btn = sw.Btn(text = 'Download maps as .tif in sepal',icon = 'mdi-download', class_='ma-5')
         self.tif_btn.disabled = True
-        self.tif_btn.class_ = 'ma-2'
         
         # aggregate the btn as a line 
-        btn_line =  v.Layout(Row=True, children=[self.csv_btn, self.tif_btn])
+        btn_line =  v.Layout(Row=True, children=[
+            self.shp_btn, 
+            self.prod_btn,
+            self.land_cover_btn,
+            self.soc_btn,
+            self.indicator_btn
+        ])
         
         # init the tile 
         super().__init__(
             '15_3_1_widgets', 
             'Results', 
             [btn_line, self.m],
-            output = self.output
+            output = self.output, 
+            btn = self.tif_btn
         )
         
         # link the downlad as tif to a function
@@ -141,9 +150,20 @@ class Result_15_3_1(sw.Tile):
     def download_maps(self, widget, event, data):
         
         widget.toggle_loading()
-            
-        cs.download_maps(self.aoi_io, self.io, self.output)
         
+        try:
+            # download the files 
+            links = cs.download_maps(self.aoi_io, self.io, self.output)
+            
+            # update the btns
+            self.land_cover_btn.set_url(str(links[0]))
+            self.soc_btn.set_url(str(links[1]))
+            self.prod_btn.set_url(str(links[2]))
+            self.indicator_btn.set_url(str(links[3]))
+        
+        except Exception as e:
+            self.output.add_live_msg(str(e), 'error')
+            
         widget.toggle_loading()
             
         return

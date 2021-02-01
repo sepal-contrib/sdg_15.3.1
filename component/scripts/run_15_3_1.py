@@ -28,7 +28,7 @@ def download_maps(aoi_io, io, output):
     land_cover_desc = f'{aoi_io.get_aoi_name()}_land_cover'
     soc_desc = f'{aoi_io.get_aoi_name()}_soc'
     productivity_desc = f'{aoi_io.get_aoi_name()}_productivity'
-    indicator_15_3_1_desc = f'{aoi_io.get_aoi_name()}_indicator_15_3_1'
+    indicator_desc = f'{aoi_io.get_aoi_name()}_indicator_15_3_1'
         
     # load the drive_handler
     drive_handler = gdrive()
@@ -39,41 +39,47 @@ def download_maps(aoi_io, io, output):
         land_cover = io.land_cover.clip(geom)
         soc = io.soc.clip(geom)
         productivity = io.productivity.clip(geom)
-        indicator_15_3_1 = io.indicator_15_3_1.clip(geom)
+        indicator = io.indicator_15_3_1.clip(geom)
     else:
         land_cover = io.land_cover
         soc = io.soc
         productivity = io.productivity
-        indicator_15_3_1 = io.indicator_15_3_1
+        indicator = io.indicator_15_3_1
         
     # download all files
     downloads = drive_handler.download_to_disk(land_cover_desc, land_cover, aoi_io, output)
     downloads = drive_handler.download_to_disk(soc_desc, soc, aoi_io, output)
     downloads = drive_handler.download_to_disk(productivity_desc, productivity, aoi_io, output)
-    downloads = drive_handler.download_to_disk(indicator_15_3_1_desc, indicator_15_3_1, aoi_io, output)
+    downloads = drive_handler.download_to_disk(indicator_desc, indicator, aoi_io, output)
         
     # I assume that they are always launch at the same time 
     # If not it's going to crash
     if downloads:
-        wait_for_completion([land_cover_desc, soc_desc, productivity_desc, indicator_15_3_1_desc], output)
+        wait_for_completion([land_cover_desc, soc_desc, productivity_desc, indicator_desc], output)
     output.add_live_msg('GEE tasks completed', 'success') 
-        
+    
+    # create merge names 
+    land_cover_merge = pm.result_dir.joinpath(f'{land_cover_desc}_merge.tif')
+    soc_merge = pm.result_dir.joinpath(f'{soc_desc}_merge.tif')
+    productivity_merge = pm.result_dir.joinpath(f'{productivity_desc}_merge.tif')
+    indicator_merge = pm.result_dir.joinpath(f'{indicator_desc}_merge.tif')
+    
     # digest the tiles
-    digest_tiles(aoi_io, land_cover_desc, pm.result_dir, output, pm.result_dir.joinpath(f'{land_cover_desc}_merge.tif'))
-    digest_tiles(aoi_io, soc_desc, pm.result_dir, output, pm.result_dir.joinpath(f'{soc_desc}_merge.tif'))
-    digest_tiles(aoi_io, productivity_desc, pm.result_dir, output, pm.result_dir.joinpath(f'{productivity_desc}_merge.tif'))
-    digest_tiles(aoi_io, indicator_15_3_1_desc, pm.result_dir, output, pm.result_dir.joinpath(f'{indicator_15_3_1_desc}_merge.tif'))
+    digest_tiles(aoi_io, land_cover_desc, pm.result_dir, output, land_cover_merge)
+    digest_tiles(aoi_io, soc_desc, pm.result_dir, output, soc_merge)
+    digest_tiles(aoi_io, productivity_desc, pm.result_dir, output, productivity_merge)
+    digest_tiles(aoi_io, indicator_desc, pm.result_dir, output, indicator_merge)
         
     # remove the files from drive
     drive_handler.delete_files(drive_handler.get_files(land_cover_desc))
     drive_handler.delete_files(drive_handler.get_files(soc_desc))
     drive_handler.delete_files(drive_handler.get_files(productivity_desc))
-    drive_handler.delete_files(drive_handler.get_files(indicator_15_3_1_desc))
+    drive_handler.delete_files(drive_handler.get_files(indicator_desc))
         
     #display msg 
     output.add_live_msg('Download complete', 'success')
 
-    return
+    return (land_cover_merge, soc_merge, productivity_merge, indicator_merge)
 
 def display_maps(aoi_io, io, m, output):
     
