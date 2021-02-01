@@ -4,6 +4,8 @@ import ee
 import geemap
 from ipywidgets import Output
 import ipyvuetify as v
+import geopandas as gpd
+import pandas as pd
 
 from component import parameter as pm
 
@@ -133,16 +135,24 @@ def compute_zonal_analysis(aoi_io, io, output):
             decimal_places=2,
             tile_scale=1.0
         )
-        
+    # this should be removed once geemap is repaired
+    #########################################################################
+    aoi_json = geemap.ee_to_geojson(aoi_io.get_aoi_ee())
+    aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs('EPSG:4326')
+    indicator_df = pd.read_csv(indicator_csv)
+    aoi_gdf['Class_sum'] = indicator_df.Class_sum
+    aoi_gdf.to_file(indicator_stats.with_suffix('.shp'))
+    #########################################################################
+    
     # get all the shp extentions
-    #suffixes = ['.dbf', '.fix', '.prj', '.shp', '.cpg', '.shx']
+    suffixes = ['.dbf', '.prj', '.shp', '.cpg', '.shx'] # , '.fix']
     
     # write the zip file
-    #indicator_zip = indicator_stats.with_suffix('.zip')
-    #with ZipFile(indicator_zip, 'w') as myzip:
-    #    for suffix in suffixes:
-    #        file = indicator_stats.with_suffix(suffix)
-    #        myzip.write(file, file.name)
+    indicator_zip = indicator_stats.with_suffix('.zip')
+    with ZipFile(indicator_zip, 'w') as myzip:
+        for suffix in suffixes:
+            file = indicator_stats.with_suffix(suffix)
+            myzip.write(file, file.name)
         
     return indicator_zip
     

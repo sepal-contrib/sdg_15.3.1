@@ -116,7 +116,7 @@ class Result_15_3_1(sw.Tile):
         )
         
         # add a download btn for csv and a download btn for the sepal
-        self.csv_btn = sw.DownloadBtn('Downlad stats in .csv')
+        self.csv_btn = sw.DownloadBtn('zonal statistics')
         
         self.tif_btn = sw.Btn(text = 'Download maps as .tif in sepal',icon = 'mdi-download')
         self.tif_btn.color = 'success'
