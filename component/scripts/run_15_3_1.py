@@ -118,35 +118,44 @@ def compute_zonal_analysis(aoi_io, io, output):
 def indicator_15_3_1(productivity, landcover, soc, output):
     
     landcover = landcover.select('degredation')
-    
+
     indicator = ee.Image(pm.int_16_min) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
-        .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(0)),1) \
-        .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(1)),1) \
-        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(0)),0) \
-        .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
-        .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) 
+    .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
+    .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(0)),1) \
+    .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(1)),1) \
+    .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(0)),1) \
+    .where(productivity.eq(1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+    .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+    .where(productivity.eq(1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(1)),1) \
+    .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(0)),1) \
+    .where(productivity.eq(0).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(1)),1) \
+    .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(0)),0) \
+    .where(productivity.eq(0).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+    .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+    .where(productivity.eq(0).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(1)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(0)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(1)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(1)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(0)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(0)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(1)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(0)),-1) \
+    .where(productivity.eq(-1).And(landcover.eq(-1)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(-1).And(landcover.lt(-1)).And(soc.lt(-1)),-1) \
+    .where(productivity.lt(-1).And(landcover.eq(-1)).And(soc.lt(-1)),-1) \
+    .where(productivity.lt(-1).And(landcover.lt(-1)).And(soc.eq(-1)),-1) \
+    .where(productivity.eq(0).And(landcover.lt(-1)).And(soc.lt(-1)),0) \
+    .where(productivity.lt(-1).And(landcover.eq(0)).And(soc.lt(-1)),0) \
+    .where(productivity.lt(-1).And(landcover.lt(-1)).And(soc.eq(0)),0) \
+    .where(productivity.eq(1).And(landcover.lt(-1)).And(soc.lt(-1)),1) \
+    .where(productivity.lt(-1).And(landcover.eq(1)).And(soc.lt(-1)),1) \
+    .where(productivity.lt(-1).And(landcover.lt(-1)).And(soc.eq(1)),1)
     
     output = indicator \
         .unmask(pm.int_16_min) \
