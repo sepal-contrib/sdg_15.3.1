@@ -1,3 +1,5 @@
+from zipfile import ZipFile
+
 import ee
 import geemap
 from ipywidgets import Output
@@ -86,9 +88,6 @@ def display_maps(aoi_io, io, m, output):
     m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, 'land_cover')
     m.addLayer(io.soc.clip(geom), pm.viz_soc, 'soil_organic_carbon')
     m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, 'indicator_15_3_1')
-    
-    # add the legend 
-    m.add_legend(legend_dict=pm.legend_test, position='topleft')
         
     # add the aoi on the map 
     m.addLayer(aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
@@ -119,22 +118,33 @@ def compute_indicator_maps(aoi_io, io, output):
 
 def compute_zonal_analysis(aoi_io, io, output):
     
-    indicator_15_3_1_stats = pm.result_dir.joinpath(f'{aoi_io.get_aoi_name()}_indicator_15_3_1.csv')
+    indicator_stats = pm.result_dir.joinpath(f'{aoi_io.get_aoi_name()}_indicator_15_3_1')
         
     output_widget = Output()
     output.add_msg(output_widget)
         
+    indicator_csv = indicator_stats.with_suffix('.csv') # to be removed when moving to shp
     with output_widget:
         geemap.zonal_statistics_by_group(
             in_value_raster = io.indicator_15_3_1,
             in_zone_vector = aoi_io.get_aoi_ee(),
-            out_file_path = indicator_15_3_1_stats,
+            out_file_path = indicator_csv,
             statistics_type = "PERCENTAGE",
             decimal_places=2,
             tile_scale=1.0
         )
-            
-    return indicator_15_3_1_stats
+        
+    # get all the shp extentions
+    #suffixes = ['.dbf', '.fix', '.prj', '.shp', '.cpg', '.shx']
+    
+    # write the zip file
+    #indicator_zip = indicator_stats.with_suffix('.zip')
+    #with ZipFile(indicator_zip, 'w') as myzip:
+    #    for suffix in suffixes:
+    #        file = indicator_stats.with_suffix(suffix)
+    #        myzip.write(file, file.name)
+        
+    return indicator_zip
     
 
 def indicator_15_3_1(productivity, landcover, soc, output):

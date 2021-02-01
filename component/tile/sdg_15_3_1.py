@@ -107,7 +107,13 @@ class Result_15_3_1(sw.Tile):
         self.io = io
         
         # create the result map
-        self.m = sm.SepalMap()
+        # with its legend
+        self.m = sm.SepalMap() 
+        self.m.add_legend(
+            legend_title = 'Indicators state', 
+            legend_dict=pm.legend_test, 
+            position='topleft'
+        )
         
         # add a download btn for csv and a download btn for the sepal
         self.csv_btn = sw.DownloadBtn('Downlad stats in .csv')
