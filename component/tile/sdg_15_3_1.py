@@ -75,21 +75,21 @@ class Tile_15_3_1(sw.Tile):
         # will work in next sepal_ui patch
         #if not self.output.check_input(self.io.sensors, 'no sensors'): return widget.toggle_loading()
         
-        #try 
-        cs.compute_indicator_maps(self.aoi_io, self.io, self.output)
+        try 
+            cs.compute_indicator_maps(self.aoi_io, self.io, self.output)
 
-        # create the csv result
-        stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
-        self.result_tile.csv_btn.set_url(str(stats))
+            # create the csv result
+            stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
+            self.result_tile.csv_btn.set_url(str(stats))
 
-        # get the result map        
-        cs.display_maps(self.aoi_io, self.io, self.result_tile.m, self.output)
+            # get the result map        
+            cs.display_maps(self.aoi_io, self.io, self.result_tile.m, self.output)
         
-        # release the download btn
-        self.result_tile.tif_btn.disabled = False
+            # release the download btn
+            self.result_tile.tif_btn.disabled = False
         
-        #except Exception as e:
-        #    self.output.add_live_msg(e, 'error')
+        except Exception as e:
+            self.output.add_live_msg(e, 'error')
         
         widget.toggle_loading()
             
