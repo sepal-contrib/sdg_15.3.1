@@ -28,12 +28,25 @@ def download_maps(aoi_io, io, output):
         
     # load the drive_handler
     drive_handler = gdrive()
+    
+    # clip the images if it's an administrative layer and keep the bounding box if not
+    if aoi_io.feature_collection:
+        geom = aoi_io.get_aoi_ee().geometry()
+        land_cover = io.land_cover.clip(geom)
+        soc = io.soc.clip(geom)
+        productivity = io.productivity.clip(geom)
+        indicator_15_3_1 = io.indicator_15_3_1.clip(geom)
+    else:
+        land_cover = io.land_cover
+        soc = io.soc
+        productivity = io.productivity
+        indicator_15_3_1 = io.indicator_15_3_1
         
     # download all files
-    downloads = drive_handler.download_to_disk(land_cover_desc, io.land_cover, aoi_io, output)
-    downloads = drive_handler.download_to_disk(soc_desc, io.soc, aoi_io, output)
-    downloads = drive_handler.download_to_disk(productivity_desc, io.productivity, aoi_io, output)
-    downloads = drive_handler.download_to_disk(indicator_15_3_1_desc, io.indicator_15_3_1, aoi_io, output)
+    downloads = drive_handler.download_to_disk(land_cover_desc, land_cover, aoi_io, output)
+    downloads = drive_handler.download_to_disk(soc_desc, soc, aoi_io, output)
+    downloads = drive_handler.download_to_disk(productivity_desc, productivity, aoi_io, output)
+    downloads = drive_handler.download_to_disk(indicator_15_3_1_desc, indicator_15_3_1, aoi_io, output)
         
     # I assume that they are always launch at the same time 
     # If not it's going to crash
@@ -61,9 +74,14 @@ def download_maps(aoi_io, io, output):
 def display_maps(aoi_io, io, m, output):
     
     m.zoom_ee_object(aoi_io.get_aoi_ee().geometry())
+    
+    # get the geometry to clip on 
+    geom = aoi_io.get_aoi_ee().geometry()
+    # clip on the bounding box when we use a custom aoi
+    if aoi_io.assetId: 
+        geom = geom.bounds()
         
-    # add the layers 
-    geom = aoi_io.get_aoi_ee().geometry().bounds()
+    # add the layers
     m.addLayer(io.productivity.clip(geom), pm.viz_prod, 'productivity')
     m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, 'land_cover')
     m.addLayer(io.soc.clip(geom), pm.viz_soc, 'soil_organic_carbon')
