@@ -38,20 +38,15 @@ def land_cover(io, aoi_io, output):
     landcover_degredation = landcover_transition \
             .remap(pm.IPCC_lc_change_matrix, trans_matrix_flatten) \
             .rename("degredation")
-
-    # Remap persistence classes so they are sequential.
-    landcover_transition = landcover_transition.remap(pm.IPCC_lc_change_matrix, pm.sequential_matrix)    
-
-    # to improve output speed 
-    # convert the results into bytes (uint8)
-    # 0 nodata - 1 degraded - 2 stable - 3 improved
-    landcover_transition = landcover_transition \
-        .rename("degredation") \
+    
+    # use the byte convention 
+    # 1 degraded - 2 stable - 3 improved
+    landcover_degredation = landcover_degredation \
+        .unmask(pm.int_16_min) \
+        .where(1,3) \
+        .where(0,2) \
         .where(-1, 1) \
-        .where(0, 2) \
-        .where(1, 3) \
         .where(pm.int_16_min, 0) \
-        .unmask(0) \
         .uint8()
 
-    return landcover_transition
+    return landcover_degredation

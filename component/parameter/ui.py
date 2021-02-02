@@ -35,7 +35,7 @@ legend_test = {
     'improved' : v.theme.themes.dark.success
 }
 
-viz_prod      = {"palette": list(legend.values())[:3]}
+viz_prod      = {"max": 3, "min":1, "palette": list(legend.values())[:3]}
 viz_lc        = {"max": 3, "min":1, "palette": list(legend.values())[3:6]}
 viz_soc       = {"max": 3, "min":1, "palette": list(legend.values())[6:9]}
 viz_indicator = {"max": 3, "min":1, "palette": list(legend.values())[9:12]}

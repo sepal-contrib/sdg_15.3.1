@@ -169,41 +169,41 @@ def indicator_15_3_1(productivity, landcover, soc, output):
     landcover = landcover.select('degredation')
 
     indicator = ee.Image(0) \
-        .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(3)),3) \
-        .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(2)),3) \
-        .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(1)),1) \
-        .where(productivity.eq(3).And(landcover.eq(2)).And(soc.eq(3)),3) \
-        .where(productivity.eq(3).And(landcover.eq(2)).And(soc.eq(2)),3) \
-        .where(productivity.eq(3).And(landcover.eq(2)).And(soc.eq(1)),1) \
-        .where(productivity.eq(3).And(landcover.eq(1)).And(soc.eq(3)),1) \
-        .where(productivity.eq(3).And(landcover.eq(1)).And(soc.eq(2)),1) \
-        .where(productivity.eq(3).And(landcover.eq(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(2).And(landcover.eq(3)).And(soc.eq(3)),3) \
-        .where(productivity.eq(2).And(landcover.eq(3)).And(soc.eq(2)),3) \
-        .where(productivity.eq(2).And(landcover.eq(3)).And(soc.eq(1)),1) \
-        .where(productivity.eq(2).And(landcover.eq(2)).And(soc.eq(3)),3) \
-        .where(productivity.eq(2).And(landcover.eq(2)).And(soc.eq(2)),2) \
-        .where(productivity.eq(2).And(landcover.eq(2)).And(soc.eq(1)),1) \
-        .where(productivity.eq(2).And(landcover.eq(1)).And(soc.eq(3)),1) \
-        .where(productivity.eq(2).And(landcover.eq(1)).And(soc.eq(2)),1) \
-        .where(productivity.eq(2).And(landcover.eq(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.eq(3)).And(soc.eq(3)),1) \
-        .where(productivity.eq(1).And(landcover.eq(3)).And(soc.eq(2)),1) \
-        .where(productivity.eq(1).And(landcover.eq(3)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.eq(2)).And(soc.eq(3)),1) \
-        .where(productivity.eq(1).And(landcover.eq(2)).And(soc.eq(2)),1) \
-        .where(productivity.eq(1).And(landcover.eq(2)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(3)),1) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(2)),1) \
-        .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(1).And(landcover.lt(1)).And(soc.lt(1)),1) \
-        .where(productivity.lt(1).And(landcover.eq(1)).And(soc.lt(1)),1) \
-        .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(1)),1) \
-        .where(productivity.eq(2).And(landcover.lt(1)).And(soc.lt(1)),2) \
-        .where(productivity.lt(0).And(landcover.eq(2)).And(soc.lt(1)),2) \
-        .where(productivity.lt(0).And(landcover.lt(1)).And(soc.eq(2)),2) \
-        .where(productivity.eq(3).And(landcover.lt(1)).And(soc.lt(1)),3) \
-        .where(productivity.lt(1).And(landcover.eq(3)).And(soc.lt(1)),3) \
-        .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3)
+    .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(3)),3) \
+    .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(2)),3) \
+    .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(1)),1) \
+    .where(productivity.eq(3).And(landcover.eq(2)).And(soc.eq(3)),3) \
+    .where(productivity.eq(3).And(landcover.eq(2)).And(soc.eq(2)),3) \
+    .where(productivity.eq(3).And(landcover.eq(2)).And(soc.eq(1)),1) \
+    .where(productivity.eq(3).And(landcover.eq(1)).And(soc.eq(3)),1) \
+    .where(productivity.eq(3).And(landcover.eq(1)).And(soc.eq(2)),1) \
+    .where(productivity.eq(3).And(landcover.eq(1)).And(soc.eq(1)),1) \
+    .where(productivity.eq(2).And(landcover.eq(3)).And(soc.eq(3)),3) \
+    .where(productivity.eq(2).And(landcover.eq(3)).And(soc.eq(2)),3) \
+    .where(productivity.eq(2).And(landcover.eq(3)).And(soc.eq(1)),1) \
+    .where(productivity.eq(2).And(landcover.eq(2)).And(soc.eq(3)),3) \
+    .where(productivity.eq(2).And(landcover.eq(2)).And(soc.eq(2)),2) \
+    .where(productivity.eq(2).And(landcover.eq(2)).And(soc.eq(1)),1) \
+    .where(productivity.eq(2).And(landcover.eq(1)).And(soc.eq(3)),1) \
+    .where(productivity.eq(2).And(landcover.eq(1)).And(soc.eq(2)),1) \
+    .where(productivity.eq(2).And(landcover.eq(1)).And(soc.eq(1)),1) \
+    .where(productivity.eq(1).And(landcover.eq(3)).And(soc.eq(3)),1) \
+    .where(productivity.eq(1).And(landcover.eq(3)).And(soc.eq(2)),1) \
+    .where(productivity.eq(1).And(landcover.eq(3)).And(soc.eq(1)),1) \
+    .where(productivity.eq(1).And(landcover.eq(2)).And(soc.eq(3)),1) \
+    .where(productivity.eq(1).And(landcover.eq(2)).And(soc.eq(2)),1) \
+    .where(productivity.eq(1).And(landcover.eq(2)).And(soc.eq(1)),1) \
+    .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(3)),1) \
+    .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(2)),1) \
+    .where(productivity.eq(1).And(landcover.eq(1)).And(soc.eq(1)),1) \
+    .where(productivity.eq(1).And(landcover.lt(1)).And(soc.lt(1)),1) \
+    .where(productivity.lt(1).And(landcover.eq(1)).And(soc.lt(1)),1) \
+    .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(1)),1) \
+    .where(productivity.eq(2).And(landcover.lt(1)).And(soc.lt(1)),2) \
+    .where(productivity.lt(1).And(landcover.eq(2)).And(soc.lt(1)),2) \
+    .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(2)),2) \
+    .where(productivity.eq(3).And(landcover.lt(1)).And(soc.lt(1)),3) \
+    .where(productivity.lt(1).And(landcover.eq(3)).And(soc.lt(1)),3) \
+    .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3)
     
     return indicator.uint8()
