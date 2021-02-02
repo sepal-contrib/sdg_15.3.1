@@ -138,12 +138,13 @@ def soil_organic_carbon(io, aoi_io, output):
         .divide(soc_images.select(0)) \
         .multiply(100)
     
-    soc_class = ee.Image(pm.int_16_min) \
-        .where(soc_percent_change.gt(10),1) \
-        .where(soc_percent_change.lt(10).And(soc_percent_change.gt(-10)),0) \
-        .where(soc_percent_change.lt(-10),-1)\
-        .rename('soc_class')
-
-    output = soc_class.unmask(pm.int_16_min).int16()
+    # use the bytes convention 
+    # 1 degraded - 2 stable - 3 improved
+    soc_class = ee.Image(0) \
+        .where(soc_percent_change.gt(10),3) \
+        .where(soc_percent_change.lt(10).And(soc_percent_change.gt(-10)),2) \
+        .where(soc_percent_change.lt(-10),1)\
+        .rename('soc') \
+        .uint8()
     
-    return output
+    return soc_class

@@ -52,12 +52,14 @@ The following code runs the selected trend method and produce an output by recla
         .where(mk_trend.abs().lte(kendall90), 0) \
         .where(lf_trend.select('scale').abs().lte(10), 0).rename('signif')
 
-    trajectory = ee.Image(pm.int_16_min) \
-        .where(signif.gt(0),1) \
-        .where(signif.eq(0),0) \
-        .where(signif.lt(0).And(signif.neq(pm.int_16_min)),-1) \
+    # use the bytes convention 
+    # 1 degraded - 2 stable - 3 improved
+    trajectory = ee.Image(0) \
+        .where(signif.gt(0),3) \
+        .where(signif.eq(0),2) \
+        .where(signif.lt(0).And(signif.neq(pm.int_16_min)),1) \
         .rename('trajectory') \
-        .int16()
+        .uint8()
     
     return trajectory
 
@@ -136,13 +138,13 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
     # compute the ratio of observed ndvi to 90th for that class
     observed_ratio = ndvi_mean.divide(ecoregion_perc90)
 
-    # create final degradation output layer (9999 is background), 0 is not
-    # degreaded, -1 is degraded
-    prod_performance = ee.Image(pm.int_16_min) \
-        .where(observed_ratio.gte(0.5), 0) \
-        .where(observed_ratio.lte(0.5), -1) \
+    # create final degradation output layer (9999 is background), 2 is not
+    # degreaded, 1 is degraded
+    prod_performance = ee.Image(0) \
+        .where(observed_ratio.gte(0.5), 2) \
+        .where(observed_ratio.lte(0.5), 1) \
         .rename('performance') \
-        .int16()
+        .uint8()
 
     
     return prod_performance
@@ -251,13 +253,15 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
             0
         )
     
-    #reclassification to get the degredation classes
+    # reclassification to get the degredation classes
+    # use the bytes convention 
+    # 1 degraded - 2 stable - 3 improved
     degredation = ee.Image(pm.int_16_min) \
-        .where(classes_change.gte(2),1) \
-        .where(classes_change.lte(-2).And(classes_change.neq(pm.int_16_min)),-1) \
-        .where(classes_change.lt(2).And(classes_change.gt(-2)),0) \
+        .where(classes_change.gte(2),3) \
+        .where(classes_change.lte(-2).And(classes_change.neq(pm.int_16_min)),1) \
+        .where(classes_change.lt(2).And(classes_change.gt(-2)),2) \
         .rename("state") \
-        .int16()
+        .uint8()
 
     return degredation
 
@@ -266,31 +270,28 @@ def productivity_final(trajectory, performance, state, output):
     performance_class = performance.select('performance')
     state_class = state.select('state')
 
-    productivity = ee.Image(pm.int_16_min)\
-        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(0)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(-1)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(0)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(-1)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(0)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(0)),0) \
-        .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(-1)),0) \
-        .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(0)),0) \
-        .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)\
-        .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)
+    productivity = ee.Image(0)\
+        .where(trajectory_class.eq(3).And(state_class.eq(3)).And(performance_class.eq(2)),3) \
+        .where(trajectory_class.eq(3).And(state_class.eq(3)).And(performance_class.eq(1)),3) \
+        .where(trajectory_class.eq(3).And(state_class.eq(2)).And(performance_class.eq(2)),3) \
+        .where(trajectory_class.eq(3).And(state_class.eq(2)).And(performance_class.eq(1)),3) \
+        .where(trajectory_class.eq(3).And(state_class.eq(1)).And(performance_class.eq(2)),3) \
+        .where(trajectory_class.eq(3).And(state_class.eq(1)).And(performance_class.eq(1)),1) \
+        .where(trajectory_class.eq(2).And(state_class.eq(3)).And(performance_class.eq(2)),2) \
+        .where(trajectory_class.eq(2).And(state_class.eq(3)).And(performance_class.eq(1)),2) \
+        .where(trajectory_class.eq(2).And(state_class.eq(2)).And(performance_class.eq(2)),2) \
+        .where(trajectory_class.eq(2).And(state_class.eq(2)).And(performance_class.eq(1)),1) \
+        .where(trajectory_class.eq(2).And(state_class.eq(1)).And(performance_class.eq(2)),1) \
+        .where(trajectory_class.eq(2).And(state_class.eq(1)).And(performance_class.eq(1)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(3)).And(performance_class.eq(2)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(3)).And(performance_class.eq(1)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(2)).And(performance_class.eq(2)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(2)).And(performance_class.eq(1)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(2)),1) \
+        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(1)),1) \
+        .rename('productivity')
     
-    output = productivity \
-        .unmask(pm.int_16_min) \
-        .int16()
-    
-    return output
+    return productivity.uint8()
 
 def ndvi_trend(start, end, ndvi_yearly_integration):
     """Calculate NDVI trend.
