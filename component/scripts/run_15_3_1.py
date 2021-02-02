@@ -25,6 +25,8 @@ def download_maps(aoi_io, io, output):
     
     # get the export scale 
     scale = 10 if 'Sentinel 2' in io.sensors else 30
+    
+    output.add_live_msg(ms.download.start_download)
         
     # create the export path
     land_cover_desc = f'{aoi_io.get_aoi_name()}_land_cover'
@@ -72,6 +74,7 @@ def download_maps(aoi_io, io, output):
     digest_tiles(aoi_io, productivity_desc, pm.result_dir, output, productivity_merge)
     digest_tiles(aoi_io, indicator_desc, pm.result_dir, output, indicator_merge)
         
+    output.add_live_msg(ms.download.remove_gdrive)
     # remove the files from drive
     drive_handler.delete_files(drive_handler.get_files(land_cover_desc))
     drive_handler.delete_files(drive_handler.get_files(soc_desc))
@@ -95,12 +98,19 @@ def display_maps(aoi_io, io, m, output):
         geom = geom.bounds()
         
     # add the layers
-    m.addLayer(io.productivity.clip(geom), pm.viz_prod, 'productivity')
-    m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, 'land_cover')
-    m.addLayer(io.soc.clip(geom), pm.viz_soc, 'soil_organic_carbon')
-    m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, 'indicator_15_3_1')
+    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.prod_layer))
+    m.addLayer(io.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
+    
+    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
+    m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
+    
+    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
+    m.addLayer(io.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
+    
+    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.ind_layer))
+    m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, ms._15_3_1.ind_layer)
         
-    # add the aoi on the map 
+    # add the aoi on the map
     m.addLayer(aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
     
     return 
@@ -168,6 +178,8 @@ def compute_zonal_analysis(aoi_io, io, output):
         for suffix in suffixes:
             file = indicator_stats.with_suffix(suffix)
             myzip.write(file, file.name)
+            
+    output.add_live_msg(ms._15_3_1.stats_complete.format(indicator_zip), 'success')
         
     return indicator_zip
     
