@@ -52,22 +52,14 @@ The following code runs the selected trend method and produce an output by recla
         .where(mk_trend.abs().lte(kendall90), 0) \
         .where(lf_trend.select('scale').abs().lte(10), 0).rename('signif')
 
-    trajectory_class = ee.Image(pm.int_16_min) \
+    trajectory = ee.Image(pm.int_16_min) \
         .where(signif.gt(0),1) \
         .where(signif.eq(0),0) \
         .where(signif.lt(0).And(signif.neq(pm.int_16_min)),-1) \
-        .rename('trajectory_class')
-
-    output = ee.Image(
-        trajectory_class \
-        .addBands(lf_trend.select('scale')) \
-        .addBands(signif) \
-        .addBands(mk_trend) \
-        .unmask(pm.int_16_min) \
+        .rename('trajectory') \
         .int16()
-    )
     
-    return output
+    return trajectory
 
 def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly_integration, output):
     """It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
@@ -146,19 +138,14 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
 
     # create final degradation output layer (9999 is background), 0 is not
     # degreaded, -1 is degraded
-    prod_performance_class = ee.Image(pm.int_16_min) \
+    prod_performance = ee.Image(pm.int_16_min) \
         .where(observed_ratio.gte(0.5), 0) \
         .where(observed_ratio.lte(0.5), -1) \
-        .rename('performance_class')
-
-    output = ee.Image(
-        prod_performance_class.addBands(observed_ratio.multiply(10000)) \
-        .addBands(similar_ecoregions) \
-        .unmask(pm.int_16_min) \
+        .rename('performance') \
         .int16()
-    )
+
     
-    return output
+    return prod_performance
 
 def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output):
     """It represents the level of relative roductivity in a pixel compred to a historical observations of productivity for that pixel. For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
@@ -265,29 +252,19 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
         )
     
     #reclassification to get the degredation classes
-    degredation_classes = ee.Image(pm.int_16_min) \
+    degredation = ee.Image(pm.int_16_min) \
         .where(classes_change.gte(2),1) \
         .where(classes_change.lte(-2).And(classes_change.neq(pm.int_16_min)),-1) \
         .where(classes_change.lt(2).And(classes_change.gt(-2)),0) \
-        .rename("state_class")
-
-    output = ee.Image(
-        degredation_classes \
-        .addBands(classes_change) \
-        .addBands(baseline_classes) \
-        .addBands(target_classes) \
-        .addBands(baseline_ndvi_mean) \
-        .addBands(target_ndvi_mean) \
-        .unmask(pm.int_16_min) \
+        .rename("state") \
         .int16()
-    )
 
-    return output
+    return degredation
 
 def productivity_final(trajectory, performance, state, output):
-    trajectory_class = trajectory.select('trajectory_class')
-    performance_class = performance.select('performance_class')
-    state_class = state.select('state_class')
+    trajectory_class = trajectory.select('trajectory')
+    performance_class = performance.select('performance')
+    state_class = state.select('state')
 
     productivity = ee.Image(pm.int_16_min)\
         .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(0)),1) \

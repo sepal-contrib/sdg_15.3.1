@@ -82,8 +82,8 @@ class Tile_15_3_1(sw.Tile):
             cs.display_maps(self.aoi_io, self.io, self.result_tile.m, self.output)
             
             # create the csv result
-            stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
-            self.result_tile.shp_btn.set_url(str(stats))
+            #stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
+            #self.result_tile.shp_btn.set_url(str(stats))
         
             # release the download btn
             self.result_tile.tif_btn.disabled = False
