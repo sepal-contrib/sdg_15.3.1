@@ -79,8 +79,8 @@ class Tile_15_3_1(sw.Tile):
             cs.compute_indicator_maps(self.aoi_io, self.io, self.output)
 
             # create the csv result
-            stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
-            self.result_tile.shp_btn.set_url(str(stats))
+            #stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
+            #self.result_tile.shp_btn.set_url(str(stats))
 
             # get the result map        
             cs.display_maps(self.aoi_io, self.io, self.result_tile.m, self.output)
@@ -89,7 +89,7 @@ class Tile_15_3_1(sw.Tile):
             self.result_tile.tif_btn.disabled = False
         
         except Exception as e:
-            self.output.add_live_msg(e, 'error')
+            self.output.add_live_msg(str(e), 'error')
         
         widget.toggle_loading()
             

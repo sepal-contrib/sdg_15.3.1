@@ -30,7 +30,7 @@ def integrate_ndvi_climate(aoi_io, io, output):
     i_img_coll = i_img_coll.filterDate(f'{io.start}-01-01', f'{io.end}-12-31')
 
     # Function to integrate observed NDVI datasets at the annual level
-    ndvi_coll = i_img_coll.map(CalcNDVI)
+    ndvi_coll = i_img_coll.map(CalcNDVI).select('ndvi')
     
     ndvi_int = int_yearly_ndvi(ndvi_coll, io.start, io.end)
 
@@ -108,42 +108,38 @@ def cloud_mask(img, sensor):
 def int_yearly_ndvi(ndvi_coll, start, end):
     """Function to integrate observed NDVI datasets at the annual level"""
     
-    img_coll = ee.List([])
-    for year in range(start, end + 1):
-        # get the ndvi img
-        ndvi_img = ndvi_coll \
-            .filterDate(f'{year}-01-01', f'{year}-12-31') \
-            .reduce(ee.Reducer.mean()) \
-            .rename('ndvi')
-        
-        # convert to float
-        con_img = ee.Image(year).float().rename('year')
-        img = ndvi_img.addBands(con_img).set({'year': year})
-        
-        # append to the collection
-        img_coll = img_coll.add(img)
-        
-    return ee.ImageCollection(img_coll)
+    years = ee.List.sequence(start, end)
+    
+    img_coll = ee.ImageCollection.fromImages(
+        years.map(lambda year:
+            ndvi_coll \
+                .filter(ee.Filter.calendarRange(year, year, 'year')) \
+                .reduce(ee.Reducer.mean()) \
+                .rename('ndvi') \
+                .set('year', year) \
+                .addBands(ee.Image.constant(year).rename('year'))
+        )
+    )
+    
+    return img_coll
 
 def int_yearly_climate(precipitation, start, end):
     """Function to integrate observed precipitation datasets at the annual level"""
     
-    img_coll = ee.List([])
-    for year in range(start, end+1):
-        # get the precipitation img
-        prec_img = precipitation \
-            .filterDate(f'{year}-01-01', f'{year}-12-31') \
-            .reduce(ee.Reducer.sum()) \
-            .rename('clim')
-        
-        # convert to float
-        con_img = ee.Image(year).float().rename('year')
-        img = prec_img.addBands(con_img).set({'year': year})
-        
-        # append to the collection
-        img_coll = img_coll.add(img)
-        
-    return ee.ImageCollection(img_coll)
+    years = ee.List.sequence(start, end)
+    
+    img_coll = ee.ImageCollection.fromImages(
+        years.map(lambda year:
+            precipitation \
+                .filter(ee.Filter.calendarRange(year, year, 'year')) \
+                .reduce(ee.Reducer.sum()) \
+                .rename('clim') \
+                .set('year', year) \
+                .addBands(ee.Image.constant(year).rename('year'))
+        )
+    )
+    
+    return img_coll
 
 def CalcNDVI(img):
     """compute the ndvi on renamed bands"""

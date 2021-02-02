@@ -1,18 +1,20 @@
 import ee 
+import json
 
 from component import parameter as pm
 
 ee.Initialize()
 
 def productivity_trajectory(io, nvdi_yearly_integration, climate_yearly_integration, output):
-    """Productivity Trend describes the trajectory of change in productivity over time. Trend is calculated by fitting a robust, non-parametric linear regression model.The significance of trajectory slopes at the P <= 0.05 level should be reported in terms of three classes:
+    """
+    Productivity Trend describes the trajectory of change in productivity over time. Trend is calculated by fitting a robust, non-parametric linear regression model.The significance of trajectory slopes at the P <= 0.05 level should be reported in terms of three classes:
         1) Z score < -1.96 = Potential degradation, as indicated by a significant decreasing trend,
         2) Z score > 1.96 = Potential improvement, as indicated by a significant increasing trend, or
         3) Z score > -1.96 AND < 1.96 = No significant change
 
 In order to correct the effects of climate on productivity, climate adjusted trend analysis can be performed. There such methods are coded for the trajectory analysis. 
 
-The following code runs the selected trend method and produce an output by reclassifying the trajecry slopes. 
+The following code runs the selected trend method and produce an output by reclassifying the trajectory slopes. 
     """
 
     # Run the selected algorithm
@@ -50,61 +52,48 @@ The following code runs the selected trend method and produce an output by recla
         .where(lf_trend.select('scale').lt(0).And(mk_trend.abs().gte(kendall95)), -2) \
         .where(lf_trend.select('scale').lt(0).And(mk_trend.abs().gte(kendall99)), -3) \
         .where(mk_trend.abs().lte(kendall90), 0) \
-        .where(lf_trend.select('scale').abs().lte(10), 0).rename('signif')
+        .where(lf_trend.select('scale').abs().lte(10), 0) \
+        .rename('signif')
 
     trajectory_class = ee.Image(pm.int_16_min) \
         .where(signif.gt(0),1) \
         .where(signif.eq(0),0) \
         .where(signif.lt(0).And(signif.neq(pm.int_16_min)),-1) \
-        .rename('trajectory_class')
-
-    output = ee.Image(
-        trajectory_class \
-        .addBands(lf_trend.select('scale')) \
-        .addBands(signif) \
-        .addBands(mk_trend) \
-        .unmask(pm.int_16_min) \
+        .rename('trajectory_class') \
         .int16()
-    )
     
-    return output
+    return trajectory_class
 
 def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly_integration, output):
-    """It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
+    """
+    It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
         Steps:
-        *Computation of mean NDVI for the analysis period,
-        *Creation of ecologically similar regions based on USDA taxonomy and ESA CCI land cover data sets.
-        *Extraction of mean NDVI for each region, creation of  a frequency distribution of this data to determine the value that represents 90th percentile,
-        *Computation of the ratio of mean NDVI and max productivity (90th percentile)
+        * Computation of mean NDVI for the analysis period,
+        * Creation of ecologically similar regions based on USDA taxonomy and ESA CCI land cover data sets.
+        * Extraction of mean NDVI for each region, creation of  a frequency distribution of this data to determine the value that represents 90th percentile,
+        * Computation of the ratio of mean NDVI and max productivity (90th percentile)
 
     """
-
-    #nvdi_yearly_integration = ee.Image(nvdi_yearly_integration)
-
+    
     # land cover data from esa cci
-    lc = ee.Image(pm.land_cover).clip(aoi_io.get_aoi_ee().geometry().bounds())
+    lc = ee.Image(pm.land_cover) \
+        .clip(aoi_io.get_aoi_ee().geometry().bounds())
     lc = lc \
         .where(lc.eq(9999), pm.int_16_min) \
         .updateMask(lc.neq(pm.int_16_min))
 
     # global agroecological zones from IIASA
-    soil_tax_usda = ee.Image(pm.soil_tax)
+    soil_tax_usda = ee.Image(pm.soil_tax) \
+        .clip(aoi_io.get_aoi_ee().geometry().bounds())
 
     # compute mean ndvi for the period
-    
     ndvi_mean = nvdi_yearly_integration \
         .select('ndvi') \
         .reduce(ee.Reducer.mean()) \
         .rename(['ndvi'])
-
-    ################################
-    
-    # should not be here it's a hidden parameter
     
     # Handle case of year_start that isn't included in the CCI data
     lc_year_start = min(max(io.start, pm.lc_first_year), pm.lc_last_year)
-    
-    #################################
     
     # reclassify lc to ipcc classes
     lc_reclass = lc \
@@ -144,33 +133,29 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
     # compute the ratio of observed ndvi to 90th for that class
     observed_ratio = ndvi_mean.divide(ecoregion_perc90)
 
-    # create final degradation output layer (9999 is background), 0 is not
+    # create final degradation output layer (pm.int_16_min is background), 0 is not
     # degreaded, -1 is degraded
     prod_performance_class = ee.Image(pm.int_16_min) \
         .where(observed_ratio.gte(0.5), 0) \
         .where(observed_ratio.lte(0.5), -1) \
-        .rename('performance_class')
-
-    output = ee.Image(
-        prod_performance_class.addBands(observed_ratio.multiply(10000)) \
-        .addBands(similar_ecoregions) \
-        .unmask(pm.int_16_min) \
+        .rename('performance_class') \
         .int16()
-    )
     
-    return output
+    return prod_performance_class
 
 def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output):
-    """It represents the level of relative roductivity in a pixel compred to a historical observations of productivity for that pixel. For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
-        It alows for the detection of recent changes in primary productivity as compared to the baseline period.
-        Steps:
-        *Definition of baselene and reporting perod,
-        *Computation of frequency distribution of mean NDVI for baseline period with addition of 5% at the both extremes of the distribution to alow inclusion of some, if an, missed extreme values in NDVI.
-        *Creation of 10 percentile classess using the data from the frequency distribution.
-        *computation of mean NDVI for baseline period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the base line period the number corresponding to that percentile class. 
-        *computation of mean NDVI for reporting period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the reporting period the number corresponding to that percentile class. 
-        *Determination of the difference in class number between the reporting and baseline period,
-        *
+    """
+    It represents the level of relative productivity in a pixel compred to a historical observations of productivity for that pixel. 
+    For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
+    It alows for the detection of recent changes in primary productivity as compared to the baseline period.
+    
+    Steps:
+        * Definition of baseline and reporting perod,
+        * Computation of frequency distribution of mean NDVI for baseline period with addition of 5% at the both extremes of the distribution to alow inclusion of some, if an, missed extreme values in NDVI.
+        * Creation of 10 percentile classess using the data from the frequency distribution.
+        * computation of mean NDVI for baseline period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the base line period the number corresponding to that percentile class. 
+        * computation of mean NDVI for reporting period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the reporting period the number corresponding to that percentile class. 
+        * Determination of the difference in class number between the reporting and baseline period
     """    
     
     # compute min and max of annual ndvi for the baseline period
@@ -182,7 +167,7 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
         .select('ndvi') \
         .reduce(ee.Reducer.percentile([0, 100]))
 
-    #convert baseline ndvi imagecollection to bands
+    # convert baseline ndvi imagecollection to bands
     baseline_ndvi_collection = ndvi_yearly_integration \
         .filter(baseline_filter) \
         .select('ndvi')
@@ -190,13 +175,7 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
     baseline_ndvi_images = ee.ImageCollection.toBands(baseline_ndvi_collection)
 
     # add two bands to the time series: one 5% lower than min and one 5% higher than max
-    
-    ##############################
-    
-    # this var needs to have an explicit name
     baseline_ndvi_5p = (baseline_ndvi_range.select('ndvi_p100').subtract(baseline_ndvi_range.select('ndvi_p0'))).multiply(0.05)
-    
-    #############################
     
     baseline_ndvi_extended = baseline_ndvi_images \
         .addBands(
@@ -269,49 +248,45 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
         .where(classes_change.gte(2),1) \
         .where(classes_change.lte(-2).And(classes_change.neq(pm.int_16_min)),-1) \
         .where(classes_change.lt(2).And(classes_change.gt(-2)),0) \
-        .rename("state_class")
-
-    output = ee.Image(
-        degredation_classes \
-        .addBands(classes_change) \
-        .addBands(baseline_classes) \
-        .addBands(target_classes) \
-        .addBands(baseline_ndvi_mean) \
-        .addBands(target_ndvi_mean) \
-        .unmask(pm.int_16_min) \
+        .rename("state_class") \
         .int16()
-    )
 
-    return output
+    return degredation_classes
 
 def productivity_final(trajectory, performance, state, output):
-    trajectory_class = trajectory.select('trajectory_class')
-    performance_class = performance.select('performance_class')
-    state_class = state.select('state_class')
+    trajectory = trajectory.select('trajectory_class')
+    performance = performance.select('performance_class')
+    state = state.select('state_class')
 
     productivity = ee.Image(pm.int_16_min)\
-        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(0)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(-1)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(0)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(0)).And(performance_class.eq(-1)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(0)),1) \
-        .where(trajectory_class.eq(1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(0)),0) \
-        .where(trajectory_class.eq(0).And(state_class.eq(1)).And(performance_class.eq(-1)),0) \
-        .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(0)),0) \
-        .where(trajectory_class.eq(0).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(0).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)\
-        .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(1)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(0)).And(performance_class.eq(-1)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(0)),-1) \
-        .where(trajectory_class.eq(-1).And(state_class.eq(-1)).And(performance_class.eq(-1)),-1)
+        .where(trajectory.eq(1).And(state.eq(1)).And(performance.eq(0)),1) \
+        .where(trajectory.eq(1).And(state.eq(1)).And(performance.eq(-1)),1) \
+        .where(trajectory.eq(1).And(state.eq(0)).And(performance.eq(0)),1) \
+        .where(trajectory.eq(1).And(state.eq(0)).And(performance.eq(-1)),1) \
+        .where(trajectory.eq(1).And(state.eq(-1)).And(performance.eq(0)),1) \
+        .where(trajectory.eq(1).And(state.eq(-1)).And(performance.eq(-1)),-1) \
+        .where(trajectory.eq(0).And(state.eq(1)).And(performance.eq(0)),0) \
+        .where(trajectory.eq(0).And(state.eq(1)).And(performance.eq(-1)),0) \
+        .where(trajectory.eq(0).And(state.eq(0)).And(performance.eq(0)),0) \
+        .where(trajectory.eq(0).And(state.eq(0)).And(performance.eq(-1)),-1) \
+        .where(trajectory.eq(0).And(state.eq(-1)).And(performance.eq(0)),-1) \
+        .where(trajectory.eq(0).And(state.eq(-1)).And(performance.eq(-1)),-1)\
+        .where(trajectory.eq(-1).And(state.eq(1)).And(performance.eq(0)),-1) \
+        .where(trajectory.eq(-1).And(state.eq(1)).And(performance.eq(-1)),-1) \
+        .where(trajectory.eq(-1).And(state.eq(0)).And(performance.eq(0)),-1) \
+        .where(trajectory.eq(-1).And(state.eq(0)).And(performance.eq(-1)),-1) \
+        .where(trajectory.eq(-1).And(state.eq(-1)).And(performance.eq(0)),-1) \
+        .where(trajectory.eq(-1).And(state.eq(-1)).And(performance.eq(-1)),-1)
     
+    # to improve output speed 
+    # convert the results into bytes (uint8)
+    # 0 nodata - 1 degraded - 2 stable - 3 improved
     output = productivity \
-        .unmask(pm.int_16_min) \
-        .int16()
+        .where(1, 3) \
+        .where(-1, 1) \
+        .where(0, 2) \
+        .where(pm.int_16_min, 0) \
+        .uint8()
     
     return output
 
@@ -333,27 +308,28 @@ def ndvi_trend(start, end, ndvi_yearly_integration):
     return (lf_trend, mk_trend)
 
 def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
-    """Rasudial trend analsis predicts NDVI based on the given rainfall. p_restrend uses linear regression model to predict NDVI for a given rainfall amount. The residual (Predicted - Obsedved)NDVI trend is considered as productivity change that is indipendent of climatic variation. For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
+    """
+    Residual trend analysis predicts NDVI based on the given rainfall.
+    p_restrend uses linear regression model to predict NDVI for a given rainfall amount. 
+    The residual (Predicted - Obsedved) NDVI trend is considered as productivity change that is indipendent of climatic variation. 
+    For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
     """
     
-    ## Apply function to create image collection of ndvi and climate
-    ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end)
+    # Apply function to create image collection of ndvi and climate
+    ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration)
 
-    ## Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
+    # Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
     linear_model_climate_ndvi = ndvi_climate_yearly_integration \
         .select(['clim', 'ndvi']) \
         .reduce(ee.Reducer.linearFit())
 
-    ## Apply function to  predict NDVI based on climate
-    first = ee.List([])
-    predicted_yearly_ndvi = ee.ImageCollection(ee.List(
-        ndvi_climate_yearly_integration \
-        .select('clim') \
-        .iterate(partial(ndvi_prediction_climate, linear_model_climate_ndvi = linear_model_climate_ndvi), first)
-    ))
+    # Apply function to predict NDVI based on climate
+    predicted_yearly_ndvi = ndvi_climate_yearly_integration.map(
+        partial(ndvi_prediction_climate, linear_model = linear_model_climate_ndvi)
+    )
 
     ## Apply function to compute NDVI annual residuals
-    residual_yearly_ndvi = image_collection_residuals(start, end, nvdi_yearly_integration, predicted_yearly_ndvi)
+    residual_yearly_ndvi = nvdi_yearly_integration.map(partial(ndvi_residuals, model = predicted_yearly_ndvi))
 
     ## Fit a linear regression to the NDVI residuals
     lf_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
@@ -364,17 +340,20 @@ def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     return (lf_trend, mk_trend)
 
 def ue_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
-    """Calculate trend based on rain use efficiency.
+    """
+    Calculate trend based on rain use efficiency.
     It is the ratio of ANPP(annual integral of NDVI as proxy) to annual precipitation.
-
     """
 
     # Convert the climate layer to meters (for precip) so that RUE layer can be
     # scaled correctly
     # TODO: Need to handle scaling for ET for WUE
     
+    # Apply function to create image collection of ndvi and climate
+    ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration)
+    
     # Apply function to compute ue and store as a collection
-    ue_yearly_collection = use_efficiency(start, end, ndvi_yearly_integration, climate_yearly_integration)
+    ue_yearly_collection = ndvi_climate_yearly_integration.map(use_efficiency)
 
     # Compute linear trend function to predict ndvi based on year (ndvi trend)
     lf_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
@@ -427,94 +406,78 @@ def mann_kendall(imageCollection):
     
     return MKSstat
 
-def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end):
+def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration):
     """Creat an ImageCollection of annual integral of NDVI and annual inegral of climate data"""
     
-    img_list = ee.List([])
-    for year in range(start, end + 1):
-        
-        ndvi_img = nvdi_yearly_integration \
-            .filter(ee.Filter.eq('year', year)) \
-            .first() \
-            .select('ndvi') \
-            .addBands(
-                climate_yearly_integration \
-                .filter(ee.Filter.eq('year', year)) \
-                .first() \
-                .select('clim')
-            ) \
-            .rename(['ndvi', 'clim']) \
-            .set({'year': year})
-        
-        img_list = img_list.add(ndvi_img)
+    # create the filter to use in the join
+    join_filter = ee.Filter.equals(
+        leftField = 'year',
+        rightField = 'year'
+    )
     
-    out = ee.ImageCollection(img_list)
+    join = ee.Join.inner('clim', 'ndvi', 'year')
     
-    return out
+    # join the 2 collections
+    inner_join = join.apply(
+        climate_yearly_integration.select('clim'),
+        nvdi_yearly_integration.select('ndvi'),
+        join_filter
+    )
+    
+    joined = inner_join.map(lambda feature:
+        ee.Image \
+            .cat(feature.get('clim'), feature.get('ndvi')) \
+            .set('year', ee.Image(feature.get('clim')).get('year')) # both have the same year
+    )
+    
+    return joined
 
-def ndvi_prediction_climate(image, list_, linear_model_climate_ndvi):
+def ndvi_prediction_climate(image, linear_model):
     """predict NDVI from climate. part of p_restrend function"""
     
-    ndvi = linear_model_climate_ndvi \
+    ndvi = linear_model \
         .select('offset') \
-        .add((linear_model_climate_ndvi.select('scale').multiply(image))) \
+        .add(
+            linear_model \
+            .select('scale') \
+            .multiply(image.select('clim'))
+        ) \
         .set({'year': image.get('year')})
     
-    return ee.List(list_).add(ndvi)
+    return ndvi
 
-def ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
+def ndvi_residuals(image, model):
     """Function to compute residuals (ndvi obs - ndvi pred). part of p_restrend function"""
     
-    ndvi_o = ndvi_climate_yearly_integration \
-        .filter(ee.Filter.eq('year', year)) \
+    # get the year from image props
+    year = image.get('year')
+    
+    ndvi_o = image \
         .select('ndvi') \
         .median()
     
-    ndvi_p = predicted_yearly_ndvi \
+    ndvi_p = model \
         .filter(ee.Filter.eq('year', year)) \
         .median()
     
     ndvi_r = ee.Image(year) \
         .float() \
-        .addBands(ndvi_o.subtract(ndvi_p))
-    
-    return ndvi_r.rename(['year', 'ndvi_res'])
+        .addBands(ndvi_o.subtract(ndvi_p)) \
+        .rename(['year', 'ndvi_res'])
+        
+    return ndvi_r
 
-def image_collection_residuals(start, end, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
-    """Function to create image collection of residuals. part of p_restrend function"""
-        
-    res_list = ee.List([])
-    for year in range(start, end + 1):
-            
-        res_image = ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi)
-        
-        res_list = res_list.add(res_image)
-        
-    return ee.ImageCollection(res_list)
-
-def use_efficiency(start, end, ndvi_yearly_integration, climate_yearly_integration):
+def use_efficiency(image):
     """Function to creat rain use efficiency and store it as an imageCollection"""
         
-    img_coll = ee.List([])
-    for year in range(start, end + 1):
-        
-        ndvi_img = ndvi_yearly_integration \
-            .filter(ee.Filter.eq('year', year)) \
-            .median() \
-            .select('ndvi')
-            
-        clim_img = climate_yearly_integration \
-            .filter(ee.Filter.eq('year', year)) \
-            .median() \
-            .select('clim') \
-            .divide(1000)
-            
-        divide_img = ndvi_img \
-            .divide(clim_img) \
-            .addBands(ee.Image(year).float()) \
-            .rename(['ue', 'year']) \
-            .set({'year': year})
-            
-        img_coll = img_coll.add(divide_img)
-        
-    return ee.ImageCollection(img_coll)
+    # extract climate and ndvi median values
+    ndvi_img = image.select('ndvi').median()
+    clim_img = image.select('clim').median().divide(1000)
+    
+    divide_img = ndvi_img \
+        .divide(clim_img) \
+        .addBands(ee.Image(year)) \
+        .rename(['ue', 'year']) \
+        .set({'year': year})
+
+    return divide_img

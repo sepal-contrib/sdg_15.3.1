@@ -25,7 +25,7 @@ def soil_organic_carbon(io, aoi_io, output):
         climate_conversion_coef = io.conversion_coef 
         
         
-    # Cumpute the soc change for the first two years
+    # compute the soc change for the first two years
     lc_time0 = lc \
         .select(0) \
         .remap(pm.translation_matrix[0],pm.translation_matrix[1])
@@ -42,18 +42,18 @@ def soil_organic_carbon(io, aoi_io, output):
     # compute raster to register years since transition for the first and second year
     lc_transition_time =ee.Image(2).where(lc_time0.neq(lc_time1),1)
     
-    #stock change factor for land use
-    #333 and -333 will be recoded using the choosen climate coef.
+    # store change factor for land use
+    #333 and -333 will be recoded using the chosen climate coef.
     lc_transition_climate_coef_tmp =  lc_transition \
             .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
     lc_transition_climate_coef = lc_transition_climate_coef_tmp \
             .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
             .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
                             
-    # stock change factor for management regime
+    # store change factor for management regime
     lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
     
-    # Stock change factor for input of organic matter
+    # store change factor for input of organic matter
     lc_transition_organic_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.input_factor)
     
     organic_carbon_change = soc \
@@ -72,7 +72,13 @@ def soil_organic_carbon(io, aoi_io, output):
             
     soc_images = ee.Image(soc).addBands(soc_time1)
     
-    # Cumpute the soc change for the rest of  the years
+    # Compute the soc change for the rest of  the years
+    #years = ee.List.sequence(1, io.end - io.start)
+    #soc_images = years.itterate(compute_soc, soc_images)
+    
+    
+    
+    
     for year_index in range(1, io.end - io.start):
         lc_time0 = lc \
             .select(year_index) \
@@ -131,7 +137,7 @@ def soil_organic_carbon(io, aoi_io, output):
         soc_images = soc_images \
             .addBands(soc_final)
             
-    # Compute soc percent change for the analsis period
+    # Compute soc percent change for the analysis period
     soc_percent_change = soc_images \
         .select(io.end - io.start) \
         .subtract(soc_images.select(0)) \
@@ -143,7 +149,77 @@ def soil_organic_carbon(io, aoi_io, output):
         .where(soc_percent_change.lt(10).And(soc_percent_change.gt(-10)),0) \
         .where(soc_percent_change.lt(-10),-1)\
         .rename('soc_class')
-
-    output = soc_class.unmask(pm.int_16_min).int16()
     
-    return output
+    # to improve output speed 
+    # convert the results into bytes (uint8)
+    # 0 nodata - 1 degraded - 2 stable - 3 improved
+    soc_class = soc_class \
+        .where(-1, 1) \
+        .where(0, 2) \
+        .where(1, 3) \
+        .where(pm.int_16_min, 0) \
+        .unmask(0) \
+        .uint8()
+    
+    return soc_class
+
+def compute_soc(year, soc_images, lc, lc_transition_time):
+
+    lc_time0 = lc \
+        .select(year_index) \
+        .remap(pm.translation_matrix[0],pm.translation_matrix[1])
+        
+    lc_time1 = lc \
+        .select(year_index +1) \
+        .remap(pm.translation_matrix[0],pm.translation_matrix[1])
+        
+    lc_transition_time = lc_transition_time \
+        .where(lc_time0.eq(lc_time1),lc_transition_time.add(ee.Image(1))) \
+        .where(lc_time0.neq(lc_time1),ee.Image(1))
+                
+    # compute transition map (1st digit for baseline land cover, 2nd for target land cover)
+    # But only update where changes acually occured.
+    lc_transition_temp = lc_time0.multiply(10).add(lc_time1)
+    lc_transition =lc_transition.where(lc_time0.neq(lc_time1), lc_transition_temp)
+        
+    #stock change factor for land use
+    #333 and -333 will be recoded using the choosen climate coef.            
+    lc_transition_climate_coef_tmp =  lc_transition \
+        .remap(pm.IPCC_lc_change_matrix, pm.c_conversion_factor)
+    lc_transition_climate_coef = lc_transition_climate_coef_tmp \
+        .where(lc_transition_climate_coef_tmp.eq(333),climate_conversion_coef) \
+        .where(lc_transition_climate_coef_tmp.eq(-333), ee.Image(1).divide(climate_conversion_coef))
+                            
+    # stock change factor for management regime
+    lc_transition_management_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.management_factor)
+        
+    # Stock change factor for input of organic matter
+    lc_transition_organic_factor = lc_transition.remap(pm.IPCC_lc_change_matrix, pm.input_factor)
+            
+    organic_carbon_change = organic_carbon_change \
+        .where(
+            lc_time0.neq(lc_time1),
+            soc_images \
+                .select(year_index) \
+                .subtract(soc_images \
+                .select(year_index) \
+                    .multiply(lc_transition_climate_coef) \
+                    .multiply(lc_transition_management_factor) \
+                    .multiply(lc_transition_organic_factor)
+                ) \
+                .divide(20) \
+        ) \
+        .where(lc_transition_time.gt(20),0)
+            
+            
+    soc_final = soc_images \
+        .select(year_index) \
+        .subtract(organic_carbon_change)
+                        
+    lc_images = lc_images \
+        .addBands(lc_time1)
+            
+    soc_images = soc_images \
+        .addBands(soc_final)
+    
+    return soc_images
