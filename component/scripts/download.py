@@ -2,8 +2,10 @@ import time
 
 import rasterio as rio
 from rasterio.merge import merge
+from matplotlib.colors import to_rgba
 
 from component.message import ms
+from component import parameter as pm
 from .gdrive import gdrive
 
 def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
@@ -26,11 +28,11 @@ def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
     
     files = [file for file in result_dir.glob(pathname)]
         
-    #run the merge process
+    # run the merge process
     output.add_live_msg(ms.download.merge_tile)
     time.sleep(2)
     
-    #manual open and close because I don't know how many file there are
+    # manual open and close because I don't know how many file there are
     sources = [rio.open(file) for file in files]
 
     data, output_transform = merge(sources)
@@ -45,8 +47,15 @@ def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
         compress  = 'lzw'
     )
     
+    # create a colormap
+    colormap = {}
+    for i, color in enumerate(pm.legend.values()):
+        color = tuple(int(c*255) for c in to_rgba(color))
+        colormap[i+1] = color
+    
     with rio.open(tmp_file, "w", **out_meta) as dest:
         dest.write(data)
+        dest.write_colormap(1, colormap)
     
     # manually close the files
     [src.close() for src in sources]

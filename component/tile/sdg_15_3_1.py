@@ -114,7 +114,7 @@ class Result_15_3_1(sw.Tile):
         self.m = sm.SepalMap() 
         self.m.add_legend(
             legend_title = ms._15_3_1.map_legend, 
-            legend_dict=pm.legend_test, 
+            legend_dict=pm.legend, 
             position='topleft'
         )
         

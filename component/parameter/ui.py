@@ -17,14 +17,14 @@ climate_regimes = [
     {'text': ms._15_3_1.clim_regim.trop_mont,'value': 0.64}
 ]
 
-legend_test = {
+legend = {
     ms._15_3_1.legend.degraded : v.theme.themes.dark.error,
     ms._15_3_1.legend.stable : v.theme.themes.dark.primary,
     ms._15_3_1.legend.improved : v.theme.themes.dark.success
 }
 
-viz_prod      = {"max": 3, "min":1, "palette": list(legend_test.values())}
-viz_lc        = {"max": 3, "min":1, "palette": list(legend_test.values())}
-viz_soc       = {"max": 3, "min":1, "palette": list(legend_test.values())}
-viz_indicator = {"max": 3, "min":1, "palette": list(legend_test.values())}
+viz_prod      = {"max": 3, "min":1, "palette": list(legend.values())}
+viz_lc        = {"max": 3, "min":1, "palette": list(legend.values())}
+viz_soc       = {"max": 3, "min":1, "palette": list(legend.values())}
+viz_indicator = {"max": 3, "min":1, "palette": list(legend.values())}
 
