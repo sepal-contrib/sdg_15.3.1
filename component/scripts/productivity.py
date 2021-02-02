@@ -1,3 +1,5 @@
+from functools import partial 
+
 import ee 
 
 from component import parameter as pm
@@ -91,14 +93,14 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
         .reduce(ee.Reducer.mean()) \
         .rename(['ndvi'])
 
-    ################################
+    ################
     
     # should not be here it's a hidden parameter
     
     # Handle case of year_start that isn't included in the CCI data
     lc_year_start = min(max(io.start, pm.lc_first_year), pm.lc_last_year)
     
-    #################################
+    #################
     
     # reclassify lc to ipcc classes
     lc_reclass = lc \
@@ -180,12 +182,12 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
 
     # add two bands to the time series: one 5% lower than min and one 5% higher than max
     
-    ##############################
+    ###############
     
     # this var needs to have an explicit name
     baseline_ndvi_5p = (baseline_ndvi_range.select('ndvi_p100').subtract(baseline_ndvi_range.select('ndvi_p0'))).multiply(0.05)
     
-    #############################
+    ###############
     
     baseline_ndvi_extended = baseline_ndvi_images \
         .addBands(
@@ -300,12 +302,12 @@ def ndvi_trend(start, end, ndvi_yearly_integration):
     are masked out using a Mann-Kendall test.
     """
 
-    ## Compute linear trend function to predict ndvi based on year (ndvi trend)
+    # Compute linear trend function to predict ndvi based on year (ndvi trend)
     lf_trend = ndvi_yearly_integration \
         .select(['year', 'ndvi']) \
         .reduce(ee.Reducer.linearFit())
 
-    ## Compute Kendall statistics
+    # Compute Kendall statistics
     mk_trend = mann_kendall(ndvi_yearly_integration.select('ndvi'))
 
     return (lf_trend, mk_trend)
@@ -314,15 +316,15 @@ def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     """Rasudial trend analsis predicts NDVI based on the given rainfall. p_restrend uses linear regression model to predict NDVI for a given rainfall amount. The residual (Predicted - Obsedved)NDVI trend is considered as productivity change that is indipendent of climatic variation. For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
     """
     
-    ## Apply function to create image collection of ndvi and climate
+    # Apply function to create image collection of ndvi and climate
     ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end)
 
-    ## Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
+    # Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
     linear_model_climate_ndvi = ndvi_climate_yearly_integration \
         .select(['clim', 'ndvi']) \
         .reduce(ee.Reducer.linearFit())
 
-    ## Apply function to  predict NDVI based on climate
+    # Apply function to  predict NDVI based on climate
     first = ee.List([])
     predicted_yearly_ndvi = ee.ImageCollection(ee.List(
         ndvi_climate_yearly_integration \
@@ -330,13 +332,14 @@ def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
         .iterate(partial(ndvi_prediction_climate, linear_model_climate_ndvi = linear_model_climate_ndvi), first)
     ))
 
-    ## Apply function to compute NDVI annual residuals
+    # Apply function to compute NDVI annual residuals
     residual_yearly_ndvi = image_collection_residuals(start, end, nvdi_yearly_integration, predicted_yearly_ndvi)
+    #residual_yearly_ndvi = nvdi_yearly_integration.map(partial(ndvi_residuals, model = predicted_yearly_ndvi))
 
-    ## Fit a linear regression to the NDVI residuals
+    # Fit a linear regression to the NDVI residuals
     lf_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
 
-    ## Compute Kendall statistics
+    # Compute Kendall statistics
     mk_trend = mann_kendall(residual_yearly_ndvi.select('ndvi_res'))
     
     return (lf_trend, mk_trend)
@@ -362,9 +365,9 @@ def ue_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     
     return (lf_trend, mk_trend)
 
-#############################
-##      kendall index      ##
-#############################
+###########################
+#      kendall index      #
+###########################
 
 def mann_kendall(imageCollection):
     """Calculate Mann Kendall's S statistic.
@@ -405,7 +408,7 @@ def mann_kendall(imageCollection):
     
     return MKSstat
 
-def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start, end):
+def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start=None, end=None):
     """Creat an ImageCollection of annual integral of NDVI and annual inegral of climate data"""
     
     img_list = ee.List([])
@@ -440,23 +443,40 @@ def ndvi_prediction_climate(image, list_, linear_model_climate_ndvi):
     
     return ee.List(list_).add(ndvi)
 
-def ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
+def ndvi_residuals(image, model):
     """Function to compute residuals (ndvi obs - ndvi pred). part of p_restrend function"""
     
-    ndvi_o = ndvi_climate_yearly_integration \
-        .filter(ee.Filter.eq('year', year)) \
-        .select('ndvi') \
-        .median()
+    # get the year from image props
+    year = image.get('year')
     
-    ndvi_p = predicted_yearly_ndvi \
-        .filter(ee.Filter.eq('year', year)) \
-        .median()
+    ndvi_o = image.select('ndvi')
+    
+    ndvi_p = model.filter(ee.Filter.eq('year', year))
     
     ndvi_r = ee.Image(year) \
         .float() \
-        .addBands(ndvi_o.subtract(ndvi_p))
-    
-    return ndvi_r.rename(['year', 'ndvi_res'])
+        .addBands(ndvi_o.subtract(ndvi_p)) \
+        .rename(['year', 'ndvi_res'])
+        
+    return ndvi_r
+
+#def ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
+#    """Function to compute residuals (ndvi obs - ndvi pred). part of p_restrend function"""
+#    
+#    ndvi_o = ndvi_climate_yearly_integration \
+#        .filter(ee.Filter.eq('year', year)) \
+#        .select('ndvi') \
+#        .median() # I assume there is only one
+#    
+#    ndvi_p = predicted_yearly_ndvi \
+#        .filter(ee.Filter.eq('year', year)) \
+#        .median() # I assume there is only one
+#    
+#    ndvi_r = ee.Image(year) \
+#        .float() \
+#        .addBands(ndvi_o.subtract(ndvi_p))
+#    
+#    return ndvi_r.rename(['year', 'ndvi_res'])
 
 def image_collection_residuals(start, end, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
     """Function to create image collection of residuals. part of p_restrend function"""

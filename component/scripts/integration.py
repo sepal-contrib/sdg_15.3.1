@@ -1,4 +1,5 @@
 from functools import partial
+import json
 
 import ee 
 
@@ -108,6 +109,19 @@ def cloud_mask(img, sensor):
 def int_yearly_ndvi(ndvi_coll, start, end):
     """Function to integrate observed NDVI datasets at the annual level"""
     
+    #years = ee.List.sequence(start, end)
+    #
+    #img_coll = ee.ImageCollection.fromImages(
+    #    years.map(lambda year:
+    #        ndvi_coll \
+    #            .filter(ee.Filter.calendarRange(year, field = 'year')) \
+    #            .reduce(ee.Reducer.mean()) \
+    #            .rename('ndvi') \
+    #            .addBands(ee.Image().constant(year).rename('year')) \
+    #            .set('year', year)
+    #    )
+    #)
+
     img_coll = ee.List([])
     for year in range(start, end + 1):
         # get the ndvi img
@@ -123,10 +137,25 @@ def int_yearly_ndvi(ndvi_coll, start, end):
         # append to the collection
         img_coll = img_coll.add(img)
         
-    return ee.ImageCollection(img_coll)
+    img_coll = ee.ImageCollection(img_coll)
+    
+    return img_coll
 
 def int_yearly_climate(precipitation, start, end):
     """Function to integrate observed precipitation datasets at the annual level"""
+    
+    #years = ee.List.sequence(start, end)
+    #
+    #img_coll = ee.ImageCollection.fromImages(
+    #    years.map(lambda year:
+    #        precipitation \
+    #            .filter(ee.Filter.calendarRange(year, field = 'year')) \
+    #            .reduce(ee.Reducer.mean()) \
+    #            .rename('clim') \
+    #            .addBands(ee.Image().constant(year).rename('year')) \
+    #            .set('year', year)
+    #    )
+    #)
     
     img_coll = ee.List([])
     for year in range(start, end+1):
