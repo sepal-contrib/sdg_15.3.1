@@ -43,7 +43,18 @@
             "no_end": "Please provide a end date for the assesment period",
             "no_traj": "Please provide a trajectory for the trend analysis"
         },
-        "process_text": "Some explainations should go here",
+        "process_text": [
+            "This process tile will allow you to compute the value if the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
+            "By clicking on the process button, you will:",
+            "",
+            "- start the computation of the layers in GEE and display them on the map",
+            "- Download to ypur sepal folder the zonal statistics of the indicators perform on your AOI (you can click on the green btn to download it)",
+            "- release the result tile button to download your indicators map locally"
+        ],
+        "result_text": [
+            "Once the layers are loaded on the map, click on the \"download\" button to download the indicators .tif in your sepal folder",
+            "The green buttons will be released once the files are retrieved from Gdrive and they will allow you to download them on your local computer."
+        ],
         "sensor_lbl": "Select sensor",
         "traj_lbl": "Select trajectory",
         "transition_matrix": "Transition matrix",

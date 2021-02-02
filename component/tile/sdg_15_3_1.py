@@ -22,7 +22,7 @@ class Tile_15_3_1(sw.Tile):
         self.result_tile = result_tile
         
         # create the widgets that will be displayed
-        markdown = sw.Markdown(ms._15_3_1.process_text)
+        markdown = sw.Markdown("""{}""".format('  \n'.join(ms._15_3_1.process_text)))
         pickers = cw.PickerLine(self.io, self.output)
         self.sensor_select = cw.SensorSelect(items=[], label=ms._15_3_1.sensor_lbl, multiple=True, v_model=None, chips=True)
         trajectory = v.Select(label=ms._15_3_1.traj_lbl, items=pm.trajectories, v_model=None)
@@ -107,6 +107,8 @@ class Result_15_3_1(sw.Tile):
         self.aoi_io = aoi_io
         self.io = io
         
+        markdown = sw.Markdown("""{}""".format('  \n'.join(ms._15_3_1.result_text)))
+        
         # create the result map
         # with its legend
         self.m = sm.SepalMap() 
@@ -139,7 +141,7 @@ class Result_15_3_1(sw.Tile):
         super().__init__(
             '15_3_1_widgets', 
             ms._15_3_1.results, 
-            [btn_line, self.m],
+            [markdown, btn_line, self.m],
             output = self.output, 
             btn = self.tif_btn
         )
