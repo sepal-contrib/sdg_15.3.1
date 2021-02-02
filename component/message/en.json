@@ -74,13 +74,14 @@
     },
     "download": {
         "merge_tile": "Merging the tile from Gdrive",
-        "completed": "Download completed"
+        "completed": "Download completed",
+        "file_exist": "The file {} is already available on your computer"
     }, 
     "gee": {
         "status": "Status: {}",
         "tasks_completed": "GEE task are completed" 
     },
     "error": {
-        "no_aoi": "No aoi have been provided"
+        "no_aoi": "No aoi have been provided",
     }
 }

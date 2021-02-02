@@ -8,6 +8,11 @@ from .gdrive import gdrive
 
 def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
     
+    if tmp_file.is_file():
+        output.add_live_msg(ms.download.file_exist.format(tmp_file, 'warning')
+        time.sleep(2)
+        return 
+    
     drive_handler = gdrive()
     files = drive_handler.get_files(filename)
     

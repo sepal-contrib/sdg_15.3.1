@@ -1,4 +1,5 @@
 from zipfile import ZipFile
+import time
 
 import ee
 import geemap
@@ -116,11 +117,10 @@ def compute_indicator_maps(aoi_io, io, output):
     prod_performance = productivity_performance(aoi_io, io, ndvi_int, climate_int, output)
     prod_state = productivity_state(aoi_io, io, ndvi_int, climate_int, output) 
     
-    io.productivity = prod_trajectory
     # compute result maps 
     io.land_cover = land_cover(io, aoi_io, output)
     io.soc = soil_organic_carbon(io, aoi_io, output)
-    #io.productivity = productivity_final(prod_trajectory, prod_performance, prod_state, output)
+    io.productivity = productivity_final(prod_trajectory, prod_performance, prod_state, output)
     
     # sump up in a map
     io.indicator_15_3_1 = indicator_15_3_1(io.productivity, io.land_cover, io.soc, output)
@@ -130,6 +130,13 @@ def compute_indicator_maps(aoi_io, io, output):
 def compute_zonal_analysis(aoi_io, io, output):
     
     indicator_stats = pm.result_dir.joinpath(f'{aoi_io.get_aoi_name()}_indicator_15_3_1')
+    
+    #check if the file already exist
+    indicator_zip = indicator_stats.with_suffix('.zip')
+    if indicator_zip.is_file():
+        output.add_live_messenger(ms.download.already_exist.format(indicator_zip), 'warning')
+        time.sleep(2)
+        return indicator_zip
         
     output_widget = Output()
     output.add_msg(output_widget)
@@ -157,7 +164,6 @@ def compute_zonal_analysis(aoi_io, io, output):
     suffixes = ['.dbf', '.prj', '.shp', '.cpg', '.shx'] # , '.fix']
     
     # write the zip file
-    indicator_zip = indicator_stats.with_suffix('.zip')
     with ZipFile(indicator_zip, 'w') as myzip:
         for suffix in suffixes:
             file = indicator_stats.with_suffix(suffix)
@@ -165,7 +171,6 @@ def compute_zonal_analysis(aoi_io, io, output):
         
     return indicator_zip
     
-
 def indicator_15_3_1(productivity, landcover, soc, output):
     
     landcover = landcover.select('degredation')
