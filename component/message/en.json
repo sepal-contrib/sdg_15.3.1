@@ -82,6 +82,6 @@
         "tasks_completed": "GEE task are completed" 
     },
     "error": {
-        "no_aoi": "No aoi have been provided",
+        "no_aoi": "No aoi have been provided"
     }
 }
