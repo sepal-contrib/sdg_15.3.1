@@ -1,7 +1,7 @@
 import os 
 from pathlib import Path
 
-from seapl_ui.translator import Translator
+from sepal_ui.translator import Translator
 
 # select the target language
 lang = 'en'

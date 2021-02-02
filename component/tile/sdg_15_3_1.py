@@ -5,6 +5,7 @@ from sepal_ui import mapping as sm
 from component import widget as cw 
 from component import scripts as cs
 from component import parameter as pm
+from component.message import ms
 
 class Tile_15_3_1(sw.Tile):
     
@@ -21,11 +22,11 @@ class Tile_15_3_1(sw.Tile):
         self.result_tile = result_tile
         
         # create the widgets that will be displayed
-        markdown = sw.Markdown('Some explainations should go here')
+        markdown = sw.Markdown(ms._15_3_1.process_text)
         pickers = cw.PickerLine(self.io, self.output)
-        self.sensor_select = cw.SensorSelect(items=[], label="select sensor", multiple=True, v_model=None, chips=True)
-        trajectory = v.Select(label='trajectory', items=pm.trajectories, v_model=None)
-        transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=['Transition matrix'])
+        self.sensor_select = cw.SensorSelect(items=[], label=ms._15_3_1.sensor_lbl, multiple=True, v_model=None, chips=True)
+        trajectory = v.Select(label=ms._15_3_1.traj_lbl, items=pm.trajectories, v_model=None)
+        transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=[ms._15_3_1.transition_matrix])
         transition_matrix = cw.TransitionMatrix(self.io, self.output)
         climate_regime = cw.ClimateRegime(self.io, self.output)
         
@@ -35,12 +36,12 @@ class Tile_15_3_1(sw.Tile):
             .bind(trajectory, self.io, 'trajectory')
         
         # 
-        self.btn = sw.Btn(class_='mt-5')
+        self.btn = sw.Btn(ms._15_3_1.process_btn, class_='mt-5')
         
         # create the actual tile
         super().__init__(
             self.result_tile._metadata['mount_id'],
-            '15.3.1 Proportion of degraded land over total land area',
+            ms._15_3_1.title,
             inputs = [
                 markdown, 
                 pickers, 
@@ -67,29 +68,29 @@ class Tile_15_3_1(sw.Tile):
         widget.toggle_loading()
         
         # check the inputs 
-        if not self.output.check_input(self.aoi_io.get_aoi_name(), 'no aoi'): return widget.toggle_loading()
-        if not self.output.check_input(self.io.start, 'no start'): return widget.toggle_loading()
-        if not self.output.check_input(self.io.target_start, 'no target'): return widget.toggle_loading()
-        if not self.output.check_input(self.io.end, 'no end'): return widget.toggle_loading()
-        if not self.output.check_input(self.io.trajectory, 'no trajectory'): return widget.toggle_loading()
+        if not self.output.check_input(self.aoi_io.get_aoi_name(), ms.error.no_aoi): return widget.toggle_loading()
+        if not self.output.check_input(self.io.start, ms._15_3_1.error.no_start): return widget.toggle_loading()
+        if not self.output.check_input(self.io.target_start, ms._15_3_1.error.no_target): return widget.toggle_loading()
+        if not self.output.check_input(self.io.end, ms._15_3_1.error.no_end): return widget.toggle_loading()
+        if not self.output.check_input(self.io.trajectory, ms._15_3_1.error.no_traj): return widget.toggle_loading()
         # will work in next sepal_ui patch
         #if not self.output.check_input(self.io.sensors, 'no sensors'): return widget.toggle_loading()
         
-        #try: 
-        cs.compute_indicator_maps(self.aoi_io, self.io, self.output)
+        try: 
+            cs.compute_indicator_maps(self.aoi_io, self.io, self.output)
 
             # get the result map        
-        cs.display_maps(self.aoi_io, self.io, self.result_tile.m, self.output)
+            cs.display_maps(self.aoi_io, self.io, self.result_tile.m, self.output)
             
             # create the csv result
-            #stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
-            #self.result_tile.shp_btn.set_url(str(stats))
+            stats = cs.compute_zonal_analysis(self.aoi_io, self.io, self.output)
+            self.result_tile.shp_btn.set_url(str(stats))
         
             # release the download btn
-        self.result_tile.tif_btn.disabled = False
+            self.result_tile.tif_btn.disabled = False
         
-        #except Exception as e:
-        #    self.output.add_live_msg(str(e), 'error')
+        except Exception as e:
+            self.output.add_live_msg(str(e), 'error')
         
         widget.toggle_loading()
             
@@ -110,19 +111,19 @@ class Result_15_3_1(sw.Tile):
         # with its legend
         self.m = sm.SepalMap() 
         self.m.add_legend(
-            legend_title = 'Indicators state', 
+            legend_title = ms._15_3_1.map_legend, 
             legend_dict=pm.legend_test, 
             position='topleft'
         )
         
         # add a download btn for csv and a download btn for the sepal
-        self.shp_btn = sw.DownloadBtn('zonal statistics')
-        self.prod_btn = sw.DownloadBtn('productivity')
-        self.land_cover_btn = sw.DownloadBtn('land cover')
-        self.soc_btn = sw.DownloadBtn('soil organic carbon')
-        self.indicator_btn = sw.DownloadBtn('indicator 15.3.1')
+        self.shp_btn = sw.DownloadBtn(ms._15_3_1.down_zonal)
+        self.prod_btn = sw.DownloadBtn(ms._15_3_1.down_prod)
+        self.land_cover_btn = sw.DownloadBtn(ms._15_3_1.down_lc)
+        self.soc_btn = sw.DownloadBtn(ms._15_3_1.down_soc)
+        self.indicator_btn = sw.DownloadBtn(ms._15_3_1.down_ind)
         
-        self.tif_btn = sw.Btn(text = 'Download maps as .tif in sepal',icon = 'mdi-download', class_='ma-5')
+        self.tif_btn = sw.Btn(text = ms._15_3_1.result_btn, icon = 'mdi-download', class_='ma-5')
         self.tif_btn.disabled = True
         
         # aggregate the btn as a line 
@@ -137,7 +138,7 @@ class Result_15_3_1(sw.Tile):
         # init the tile 
         super().__init__(
             '15_3_1_widgets', 
-            'Results', 
+            ms._15_3_1.results, 
             [btn_line, self.m],
             output = self.output, 
             btn = self.tif_btn

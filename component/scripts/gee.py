@@ -2,6 +2,8 @@ import time
 
 import ee 
 
+from component.message import ms
+
 ee.Initialize()
 
 #messages 
@@ -18,7 +20,7 @@ def wait_for_completion(task_descripsion, output):
     """
     state = 'UNSUBMITTED'
     while not (state == 'COMPLETED' or state =='FAILED'):
-        output.add_live_msg(STATUS.format(state))
+        output.add_live_msg(ms.gee.status.format(state))
         time.sleep(5)
                     
         #search for the task in task_list

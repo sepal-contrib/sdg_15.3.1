@@ -1,6 +1,7 @@
 import ipyvuetify as v 
 
 from component import parameter as pm
+from component.message import ms
 
 class MatrixInput(v.Html):
     
@@ -41,13 +42,21 @@ class MatrixInput(v.Html):
         self.style_ = f'background-color: {color}'
         self.io.transition_matrix[self.line][self.column] = val
         
-        self.output.add_msg('You have changed your transition matrix')
+        self.output.add_msg(ms._15_3_1.matrix_changed)
             
         return 
     
 class TransitionMatrix(v.SimpleTable):
     
-    CLASSES = ['Forest', 'Grassland', 'Cropland', 'Wetland', 'Artificial area', 'Bare land', 'water body']
+    CLASSES = [
+        ms._15_3_1.classes.forest,
+        ms._15_3_1.classes.grassland,
+        ms._15_3_1.classes.cropland,
+        ms._15_3_1.classes.wetland,
+        ms._15_3_1.classes.artificial,
+        ms._15_3_1.classes.bareland,
+        ms._15_3_1.classes.water
+    ]
     
     DECODE = {1: '+', 0: '', -1:'-'}
     

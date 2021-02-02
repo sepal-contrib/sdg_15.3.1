@@ -20,7 +20,7 @@ The following code runs the selected trend method and produce an output by recla
     """
 
     # Run the selected algorithm
-    trajectories = [traj['text'] for traj in pm.trajectories]
+    trajectories = [traj['value'] for traj in pm.trajectories]
     
     # nvi trend
     if io.trajectory == trajectories[0]:

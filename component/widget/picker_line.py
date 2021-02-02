@@ -1,6 +1,7 @@
 import ipyvuetify as v
 
 from component import parameter as pm
+from component.message import ms
 
 class PickerLine(v.Layout):
     
@@ -12,9 +13,9 @@ class PickerLine(v.Layout):
         self.output = output
         
         # create the widgets
-        self.start_picker = v.Select(label='Start year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
-        self.target_picker = v.Select(label='Start year of the target period', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
-        self.end_picker = v.Select(label='End year', items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
+        self.start_picker = v.Select(label=ms._15_3_1.start_lbl, items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
+        self.target_picker = v.Select(label=ms._15_3_1.target_start_lbl, items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
+        self.end_picker = v.Select(label=ms._15_3_1.end_lbl, items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
         
         # bind them to the output
         output \

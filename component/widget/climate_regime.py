@@ -2,13 +2,14 @@ import ipyvuetify as v
 from sepal_ui.scripts import utils as su
 
 from component import parameter as pm
+from component.message import ms
 
 class ClimateRegime(v.Col):
     
     REGIMES = [
-        'Per pixel based  on global climate data', 
-        'Use predefined climate regime',
-        'Use custom value'
+        ms._15_3_1.clim_regim.per_pixel, 
+        ms._15_3_1.clim_regim.predifined,
+        ms._15_3_1.clim_regim.custom
     ]
     
     def __init__(self, io, output):
@@ -17,9 +18,9 @@ class ClimateRegime(v.Col):
         self.output = output
         
         # create the widgets 
-        self.type_select = v.Select(label = 'Climate regime options', items = self.REGIMES, v_model=self.REGIMES[0])
-        self.climate_regimes = v.Select(label = 'Climate regime', items = pm.climate_regimes, v_model=None)
-        self.custom_regime = v.Slider(label = 'Custom climate regime value', max = 1, step = .01, v_model = None)
+        self.type_select = v.Select(label = ms._15_3_1.clim_option_lbl, items = self.REGIMES, v_model=self.REGIMES[0])
+        self.climate_regimes = v.Select(label = ms._15_3_1.clim_default_lbl, items = pm.climate_regimes, v_model=None)
+        self.custom_regime = v.Slider(label = ms._15_3_1.clim_custom_lbl, max = 1, step = .01, v_model = None)
         
         # bind the to the output
         output \

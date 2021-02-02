@@ -1,9 +1,11 @@
-#!/usr/bin/env python3
 from pathlib import Path
+
 import ee
 import io
 from googleapiclient.http import MediaIoBaseDownload
 from apiclient import discovery
+
+from component.message import ms
 from .gee import search_task
 
 import logging
@@ -25,8 +27,9 @@ class gdrive(object):
 
         for task in tasks['items']:
             print(task['title'])
-
-
+            
+        return 
+    
     def print_file_list(self):
         """ for debugging purpose, print the list of all the file in the Gdrive"""
         service = self.service
@@ -129,7 +132,7 @@ class gdrive(object):
                 task.start()
                 download = True
             else:
-                output.add_live_msg(f'{filename} was already completed', 'success')
+                output.add_live_msg(ms.gdrive.already_done.format(filename), 'success')
             
             return download
         
@@ -138,7 +141,7 @@ class gdrive(object):
             download = launch_task(filename, image, aoi_io, output)
         else:
             if task.state == 'RUNNING':
-                output.add_live_msg(f'{filename}: RUNNING')
+                output.add_live_msg(f'{filename}: {task.state}')
                 download = True
             else: 
                 download = launch_task(filename, image, aoi_io, output)

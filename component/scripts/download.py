@@ -3,6 +3,7 @@ import time
 import rasterio as rio
 from rasterio.merge import merge
 
+from component.message import ms
 from .gdrive import gdrive
 
 def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
@@ -12,7 +13,7 @@ def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
     
     # if no file, it means that the download had failed
     if not len(files):
-        raise Exception('no files in Gdrive')
+        raise Exception(ms.gdrive.error.no_file)
         
     drive_handler.download_files(files, result_dir)
     
@@ -21,7 +22,7 @@ def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
     files = [file for file in result_dir.glob(pathname)]
         
     #run the merge process
-    output.add_live_msg("merge tiles")
+    output.add_live_msg(ms.download.merge_tile)
     time.sleep(2)
     
     #manual open and close because I don't know how many file there are

@@ -8,6 +8,7 @@ import geopandas as gpd
 import pandas as pd
 
 from component import parameter as pm
+from component.message import ms 
 
 from .gdrive import gdrive
 from .gee import wait_for_completion
@@ -56,7 +57,7 @@ def download_maps(aoi_io, io, output):
     # If not it's going to crash
     if downloads:
         wait_for_completion([land_cover_desc, soc_desc, productivity_desc, indicator_desc], output)
-    output.add_live_msg('GEE tasks completed', 'success') 
+    output.add_live_msg(ms.gee.tasks_completed, 'success') 
     
     # create merge names 
     land_cover_merge = pm.result_dir.joinpath(f'{land_cover_desc}_merge.tif')
@@ -77,7 +78,7 @@ def download_maps(aoi_io, io, output):
     drive_handler.delete_files(drive_handler.get_files(indicator_desc))
         
     #display msg 
-    output.add_live_msg('Download complete', 'success')
+    output.add_live_msg(ms.download.completed, 'success')
 
     return (land_cover_merge, soc_merge, productivity_merge, indicator_merge)
 
@@ -87,18 +88,19 @@ def display_maps(aoi_io, io, m, output):
     
     # get the geometry to clip on 
     geom = aoi_io.get_aoi_ee().geometry()
+    
     # clip on the bounding box when we use a custom aoi
     if aoi_io.assetId: 
         geom = geom.bounds()
         
     # add the layers
     m.addLayer(io.productivity.clip(geom), pm.viz_prod, 'productivity')
-    #m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, 'land_cover')
-    #m.addLayer(io.soc.clip(geom), pm.viz_soc, 'soil_organic_carbon')
-    #m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, 'indicator_15_3_1')
+    m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, 'land_cover')
+    m.addLayer(io.soc.clip(geom), pm.viz_soc, 'soil_organic_carbon')
+    m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, 'indicator_15_3_1')
         
     # add the aoi on the map 
-    #m.addLayer(aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
+    m.addLayer(aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
     
     return 
 
@@ -106,7 +108,7 @@ def compute_indicator_maps(aoi_io, io, output):
     
     # raise an error if the years are not in the rigth order 
     if not (io.start < io.target_start < io.end):
-        raise Exception('the years are not in the right order')
+        raise Exception(ms._15_3_1.error.wrong_year)
     
     # compute intermediary maps 
     ndvi_int, climate_int = integrate_ndvi_climate(aoi_io, io, output)
