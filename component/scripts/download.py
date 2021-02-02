@@ -35,7 +35,8 @@ def digest_tiles(aoi_io, filename, result_dir, output, tmp_file):
 
     data, output_transform = merge(sources)
     
-    out_meta = sources[0].meta.copy() 
+    out_meta = sources[0].meta.copy()
+    out_meta.update(nodata=0)
     out_meta.update(
         driver    = "GTiff",
         height    =  data.shape[1],
