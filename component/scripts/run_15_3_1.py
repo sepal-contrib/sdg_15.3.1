@@ -102,7 +102,7 @@ def display_maps(aoi_io, io, m, output):
     m.addLayer(io.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
-    m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
+    m.addLayer(io.land_cover.clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
     m.addLayer(io.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
