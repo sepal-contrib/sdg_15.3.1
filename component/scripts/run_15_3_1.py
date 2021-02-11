@@ -157,16 +157,21 @@ def compute_zonal_analysis(aoi_io, io, output):
             in_value_raster = io.indicator_15_3_1,
             in_zone_vector = aoi_io.get_aoi_ee(),
             out_file_path = indicator_csv,
-            statistics_type = "PERCENTAGE",
-            decimal_places=2,
-            tile_scale=1.0
+            statistics_type = "SUM",
+            denominator = 1000000,
+            decimal_places = 2,
+            scale = 10,
+            tile_scale = 1.0
         )
     # this should be removed once geemap is repaired
     #########################################################################
     aoi_json = geemap.ee_to_geojson(aoi_io.get_aoi_ee())
     aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs('EPSG:4326')
     indicator_df = pd.read_csv(indicator_csv)
-    aoi_gdf['Class_sum'] = indicator_df.Class_sum
+    aoi_gdf['NoData'] = indicator_df.Class_0
+    aoi_gdf['Improve'] = indicator_df.Class_3
+    aoi_gdf['Stable'] = indicator_df.Class_2
+    aoi_gdf['Degrade'] = indicator_df.Class_1
     aoi_gdf.to_file(indicator_stats.with_suffix('.shp'))
     #########################################################################
     
