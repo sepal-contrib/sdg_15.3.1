@@ -144,7 +144,7 @@ def compute_zonal_analysis(aoi_io, io, output):
     #check if the file already exist
     indicator_zip = indicator_stats.with_suffix('.zip')
     if indicator_zip.is_file():
-        output.add_live_messenger(ms.download.already_exist.format(indicator_zip), 'warning')
+        output.add_live_msg(ms.download.already_exist.format(indicator_zip), 'warning')
         time.sleep(2)
         return indicator_zip
         

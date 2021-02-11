@@ -6,7 +6,7 @@ from component.message import ms
 
 ee.Initialize()
 
-#messages 
+# messages 
 STATUS = "Status : {0}"
     
 def wait_for_completion(task_descripsion, output):
@@ -23,7 +23,7 @@ def wait_for_completion(task_descripsion, output):
         output.add_live_msg(ms.gee.status.format(state))
         time.sleep(5)
                     
-        #search for the task in task_list
+        # search for the task in task_list
         for task in task_descripsion:
             current_task = search_task(task)
             state = current_task.state
