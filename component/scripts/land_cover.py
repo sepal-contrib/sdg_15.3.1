@@ -36,17 +36,13 @@ def land_cover(io, aoi_io, output):
     # definition of land cover transitions as degradation (-1), improvement (1), or no relevant change (0)
     trans_matrix_flatten = [item for sublist in io.transition_matrix for item in sublist]
     landcover_degredation = landcover_transition \
-            .remap(pm.IPCC_lc_change_matrix, trans_matrix_flatten) \
-            .rename("degredation")
+            .remap(pm.IPCC_lc_change_matrix, trans_matrix_flatten)
     
     # use the byte convention 
     # 1 degraded - 2 stable - 3 improved
     landcover_degredation = landcover_degredation \
-        .unmask(pm.int_16_min) \
-        .where(1,3) \
-        .where(0,2) \
-        .where(-1, 1) \
-        .where(pm.int_16_min, 0) \
-        .uint8()
+        .remap([1,0,-1,pm.int_16_min],[3,2,1,0]) \
+        .uint8() \
+        .rename("degradation")
 
     return landcover_degredation
