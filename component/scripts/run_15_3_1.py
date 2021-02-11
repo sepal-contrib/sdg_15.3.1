@@ -185,7 +185,6 @@ def compute_zonal_analysis(aoi_io, io, output):
     
 def indicator_15_3_1(productivity, landcover, soc, output):
     
-    landcover = landcover.select('degredation')
 
     indicator = ee.Image(0) \
     .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(3)),3) \
