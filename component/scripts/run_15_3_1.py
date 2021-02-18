@@ -102,7 +102,7 @@ def display_maps(aoi_io, io, m, output):
     m.addLayer(io.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
-    m.addLayer(io.land_cover.select('degredation').clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
+    m.addLayer(io.land_cover.clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
     m.addLayer(io.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
@@ -157,16 +157,21 @@ def compute_zonal_analysis(aoi_io, io, output):
             in_value_raster = io.indicator_15_3_1,
             in_zone_vector = aoi_io.get_aoi_ee(),
             out_file_path = indicator_csv,
-            statistics_type = "PERCENTAGE",
-            decimal_places=2,
-            tile_scale=1.0
+            statistics_type = "SUM",
+            denominator = 1000000,
+            decimal_places = 2,
+            scale = 10,
+            tile_scale = 1.0
         )
     # this should be removed once geemap is repaired
     #########################################################################
     aoi_json = geemap.ee_to_geojson(aoi_io.get_aoi_ee())
     aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs('EPSG:4326')
     indicator_df = pd.read_csv(indicator_csv)
-    aoi_gdf['Class_sum'] = indicator_df.Class_sum
+    aoi_gdf['NoData'] = indicator_df.Class_0
+    aoi_gdf['Improve'] = indicator_df.Class_3
+    aoi_gdf['Stable'] = indicator_df.Class_2
+    aoi_gdf['Degrade'] = indicator_df.Class_1
     aoi_gdf.to_file(indicator_stats.with_suffix('.shp'))
     #########################################################################
     
@@ -185,7 +190,6 @@ def compute_zonal_analysis(aoi_io, io, output):
     
 def indicator_15_3_1(productivity, landcover, soc, output):
     
-    landcover = landcover.select('degredation')
 
     indicator = ee.Image(0) \
     .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(3)),3) \
