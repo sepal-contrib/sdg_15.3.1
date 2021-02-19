@@ -2,7 +2,7 @@
 
 
 ## 2.1 Select Date
-Firt you will need to select **start year**, **Start year of the target period (= end yaer of the baseline period)**(= end yaer of the baseline period), and **end year** of the analysis.
+Fir you will need to select **start year**, **Start year of the target period** (= end yaer of the baseline period), and **end year** of the analysis.
 ![select date](./img/select_date.png)
 
 ## 2.2 Select sensors
