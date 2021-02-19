@@ -168,10 +168,14 @@ def compute_zonal_analysis(aoi_io, io, output):
     aoi_json = geemap.ee_to_geojson(aoi_io.get_aoi_ee())
     aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs('EPSG:4326')
     indicator_df = pd.read_csv(indicator_csv)
-    aoi_gdf['NoData'] = indicator_df.Class_0
-    aoi_gdf['Improve'] = indicator_df.Class_3
-    aoi_gdf['Stable'] = indicator_df.Class_2
-    aoi_gdf['Degrade'] = indicator_df.Class_1
+    if indicator_df.Class_0:
+        aoi_gdf['NoData'] = indicator_df.Class_0
+    if indicator_df.Class_3:
+        aoi_gdf['Improve'] = indicator_df.Class_3
+    if aindicator_df.Class_2:
+        oi_gdf['Stable'] = indicator_df.Class_2
+    if indicator_df.Class_1:
+        aoi_gdf['Degrade'] = indicator_df.Class_1
     aoi_gdf.to_file(indicator_stats.with_suffix('.shp'))
     #########################################################################
     
