@@ -175,7 +175,7 @@ def compute_zonal_analysis(aoi_io, io, output):
     if 'Class_3' in indicator_df.columns:
         aoi_gdf['Improve'] = indicator_df['Class_3']
     if 'Class_2' in indicator_df.columns:
-        oi_gdf['Stable'] = indicator_df['Class_2']
+        aoi_gdf['Stable'] = indicator_df['Class_2']
     if 'Class_1' in indicator_df.columns:
         aoi_gdf['Degrade'] = indicator_df['Class_1']
     aoi_gdf.to_file(indicator_stats.with_suffix('.shp'))

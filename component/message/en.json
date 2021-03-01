@@ -93,7 +93,8 @@
         "completed": "Download completed",
         "file_exist": "The file {} is already available on your computer",
         "start_download": "Start the exportation of your maps",
-        "remove_gdrive": "Remove the files from your Gdrive folder"
+        "remove_gdrive": "Remove the files from your Gdrive folder",
+	"already_exist": "Folder {} already exist"
     }, 
     "gee": {
         "status": "Status: {}",
