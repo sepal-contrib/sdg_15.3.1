@@ -3,6 +3,7 @@ L4_start = 1982
 
 # max year for land use 
 land_use_max_year = 2018
+sensor_max_year = 2020
 
 lc_first_year = 1992
 lc_last_year = 2015

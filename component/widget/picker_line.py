@@ -5,7 +5,7 @@ from component.message import ms
 
 class PickerLine(v.Layout):
     
-    YEAR_RANGE = [y for y in range(pm.land_use_max_year, pm.L4_start - 1, -1)]
+    YEAR_RANGE = [y for y in range(pm.sensor_max_year, pm.L4_start - 1, -1)]
     
     def __init__(self, io, output):
         
