@@ -12,7 +12,7 @@ def soil_organic_carbon(io, aoi_io, output):
     
     lc = ee.Image(pm.land_cover) \
         .clip(aoi_io.get_aoi_ee().geometry().bounds()) \
-        .select(ee.List.sequence(io.start - 1993, io.end -1993, 1))
+        .select(ee.List.sequence(io.start - 1992, pm.land_use_max_year -1992, 1))
     
     lc = lc \
         .where(lc.eq(9999), pm.int_16_min) \
@@ -79,7 +79,7 @@ def soil_organic_carbon(io, aoi_io, output):
     
     
     
-    for year_index in range(1, io.end - io.start):
+    for year_index in range(1, pm.land_use_max_year - io.start):
         lc_time0 = lc \
             .select(year_index) \
             .remap(pm.translation_matrix[0],pm.translation_matrix[1])
@@ -139,7 +139,7 @@ def soil_organic_carbon(io, aoi_io, output):
             
     # Compute soc percent change for the analysis period
     soc_percent_change = soc_images \
-        .select(io.end - io.start) \
+        .select(pm.land_use_max_year - io.start) \
         .subtract(soc_images.select(0)) \
         .divide(soc_images.select(0)) \
         .multiply(100)

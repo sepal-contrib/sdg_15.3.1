@@ -152,6 +152,7 @@ def compute_zonal_analysis(aoi_io, io, output):
     output.add_msg(output_widget)
         
     indicator_csv = indicator_stats.with_suffix('.csv') # to be removed when moving to shp
+    scale = 100 if 'Sentinel 2' in io.sensors else 300
     with output_widget:
         geemap.zonal_statistics_by_group(
             in_value_raster = io.indicator_15_3_1,
@@ -160,22 +161,23 @@ def compute_zonal_analysis(aoi_io, io, output):
             statistics_type = "SUM",
             denominator = 1000000,
             decimal_places = 2,
-            scale = 10,
+            scale = scale,
             tile_scale = 1.0
         )
     # this should be removed once geemap is repaired
     #########################################################################
     aoi_json = geemap.ee_to_geojson(aoi_io.get_aoi_ee())
     aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs('EPSG:4326')
+    aoi_gdf =aoi_gdf[aoi_gdf['geometry'].apply(lambda x : x.type == 'Polygon')]
     indicator_df = pd.read_csv(indicator_csv)
-    if indicator_df.Class_0:
-        aoi_gdf['NoData'] = indicator_df.Class_0
-    if indicator_df.Class_3:
-        aoi_gdf['Improve'] = indicator_df.Class_3
-    if aindicator_df.Class_2:
-        oi_gdf['Stable'] = indicator_df.Class_2
-    if indicator_df.Class_1:
-        aoi_gdf['Degrade'] = indicator_df.Class_1
+    if 'Class_0' in indicator_df.columns:
+        aoi_gdf['NoData'] = indicator_df['Class_0']
+    if 'Class_3' in indicator_df.columns:
+        aoi_gdf['Improve'] = indicator_df['Class_3']
+    if 'Class_2' in indicator_df.columns:
+        aoi_gdf['Stable'] = indicator_df['Class_2']
+    if 'Class_1' in indicator_df.columns:
+        aoi_gdf['Degrade'] = indicator_df['Class_1']
     aoi_gdf.to_file(indicator_stats.with_suffix('.shp'))
     #########################################################################
     
