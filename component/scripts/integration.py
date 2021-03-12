@@ -106,39 +106,41 @@ def cloud_mask(img, sensor):
         
     return img 
 
+def month_number(img_collection):
+    def iterate_function(image, mm_list):
+        month = ee.Number.parse(image.date().format("MM"))
+        mm_list = ee.List(mm_list)
+        return ee.List(mm_list.add(month))
+    month_list = img_collection.iterate(iterate_function, ee.List([]))
+    return month_list
+
 def int_yearly_ndvi(ndvi_coll, start, end):
     """Function to integrate observed NDVI datasets at the annual level"""
-    
-    #years = ee.List.sequence(start, end)
-    #
-    #img_coll = ee.ImageCollection.fromImages(
-    #    years.map(lambda year:
-    #        ndvi_coll \
-    #            .filter(ee.Filter.calendarRange(year, field = 'year')) \
-    #            .reduce(ee.Reducer.mean()) \
-    #            .rename('ndvi') \
-    #            .addBands(ee.Image().constant(year).rename('year')) \
-    #            .set('year', year)
-    #    )
-    #)
+    def daily_to_monthly_to_annual(year):
+        
+        ndvi_collection = ndvi_coll
+        ndvi_coll_ann = ndvi_collection.filter(ee.Filter.calendarRange(year, field = 'year'))
+        months = ee.List(month_number(ndvi_coll_ann))
+ 
 
-    img_coll = ee.List([])
-    for year in range(start, end + 1):
-        # get the ndvi img
-        ndvi_img = ndvi_coll \
-            .filterDate(f'{year}-01-01', f'{year}-12-31') \
+        img_coll= ee.ImageCollection.fromImages(
+        months.map(lambda month:
+                  ndvi_coll_ann \
+                  .filter(ee.Filter.calendarRange(month, field = 'month')) \
+                  .reduce(ee.Reducer.mean()))
+             )
+        img_coll_ndvi = img_coll \
             .reduce(ee.Reducer.mean()) \
-            .rename('ndvi')
-        
-        # convert to float
-        con_img = ee.Image(year).float().rename('year')
-        img = ndvi_img.addBands(con_img).set({'year': year})
-        
-        # append to the collection
-        img_coll = img_coll.add(img)
-        
-    img_coll = ee.ImageCollection(img_coll)
-    
+            .float() \
+            .rename('ndvi') \
+            .addBands(ee.Image().constant(year).float().rename('year')) \
+            .set('year',year)
+        return img_coll_ndvi
+    years = ee.List.sequence(start, end)
+    img_coll = ee.ImageCollection.fromImages(
+        years.map(daily_to_monthly_to_annual)
+    )
+   
     return img_coll
 
 def int_yearly_climate(precipitation, start, end):
