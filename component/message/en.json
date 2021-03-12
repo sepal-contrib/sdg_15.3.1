@@ -1,0 +1,107 @@
+{
+    "app": {
+        "title": "SDG indicator module",
+        "aoi_drawer": "Aoi selector",
+        "_15_3_1_drawer": "Indicator 15.3.1",
+        "about_drawer": "About"
+    },
+    "_15_3_1": {
+        "classes": {
+            "forest": "Forest",
+            "grassland": "Grassland",
+            "cropland": "Cropland",
+            "wetland": "Wetland",
+            "artificial": "Artificial area",
+            "bareland": "Bare land",
+            "water": "Water body"
+        },
+        "trend": {
+            "ndvi": "ndvi trend",
+            "p_res": "p_res trend",
+            "s_res": "s_res trend",
+            "ue": "ue trend"
+        },
+        "clim_regim": {
+            "temp_dry": "Temperate dry",
+            "temp_moist": "Temperate moist",
+            "trop_dry": "Tropical dry",
+            "trop_moist": "Tropical moist",
+            "trop_mont": "Tropical montain",
+            "per_pixel": "Per pixel based  on global climate data",
+            "predifined": "Use predefined climate regime",
+            "custom": "Use custom value"
+        },
+        "legend": {
+            "degraded" : "degraded",
+            "stable" : "stable",
+            "improved" : "improved"
+        },
+        "error": {
+            "wrong_year": "The year are not set in the corret order. <br> start < target_year < end",
+            "no_start": "Please provide a start date for baseline period",
+            "no_target": "please provide a start date of assemsment period",
+            "no_end": "Please provide a end date for the assesment period",
+            "no_traj": "Please provide a trajectory for the trend analysis"
+        },
+        "process_text": [
+            "This process tile will allow you to compute the value if the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
+            "By clicking on the process button, you will:",
+            "",
+            "- start the computation of the layers in GEE and display them on the map",
+            "- Download to ypur sepal folder the zonal statistics of the indicators perform on your AOI (you can click on the green btn to download it)",
+            "- release the result tile button to download your indicators map locally"
+        ],
+        "result_text": [
+            "Once the layers are loaded on the map, click on the \"download\" button to download the indicators .tif in your sepal folder",
+            "The green buttons will be released once the files are retrieved from Gdrive and they will allow you to download them on your local computer."
+        ],
+        "sensor_lbl": "Select sensor",
+        "traj_lbl": "Select trajectory",
+        "transition_matrix": "Transition matrix",
+        "title": "15.3.1 Proportion of degraded land over total land area",
+        "process_btn": "Load the indicators",
+        "results": "Results",
+        "map_legend": "Indicator state",
+        "down_zonal": "Zonal statistics",
+        "down_lc": "Land Cover",
+        "down_prod": "Productivity",
+        "down_soc": "Soil Organic Carbon",
+        "down_ind": "Indicator 15.3.1",
+        "result_btn": "Download maps as .tif in sepal",
+        "clim_option_lbl": "Climate regime options",
+        "clim_default_lbl": "Climate regime",
+        "clim_custom_lbl": "Custom climate regime value",
+        "start_lbl": "Start historical period",
+        "target_start_lbl": "Start monitoring period",
+        "end_lbl": "End monitoring period",
+        "matrix_changed": "You have changed your transition matrix",
+        "prod_layer": "Productivity",
+        "lc_layer": "Land cover",
+        "soc_layer": "Soil organic carbon",
+        "ind_layer": "Indicator 15.3.1",
+        "stats_complete": "The statistics are now avaliable in the {} file of your computer or downloadable with the result tile link"
+        
+    },
+    "gdrive": {
+        "already_done" : "{} was already completed",
+        "error": {
+            "no_file": "The files are not available in your Gdrive"
+        }
+    },
+    "download": {
+        "merge_tile": "Merging the tile from Gdrive",
+        "completed": "Download completed",
+        "file_exist": "The file {} is already available on your computer",
+        "start_download": "Start the exportation of your maps",
+        "remove_gdrive": "Remove the files from your Gdrive folder",
+	"already_exist": "Folder {} already exist"
+    }, 
+    "gee": {
+        "status": "Status: {}",
+        "tasks_completed": "GEE task are completed",
+        "add_layer": "Loading the layer ({}) on the map"
+    },
+    "error": {
+        "no_aoi": "No aoi have been provided"
+    }
+}
