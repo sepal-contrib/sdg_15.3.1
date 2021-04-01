@@ -10,7 +10,7 @@ class Io_15_3_1():
         # times
         self.start = None
         self.target_start = None
-        self.baseline_end_picker = None
+        self.baseline_end = None
         self.end = None
         
         # sensors
