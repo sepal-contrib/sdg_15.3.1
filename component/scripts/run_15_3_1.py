@@ -118,7 +118,7 @@ def display_maps(aoi_io, io, m, output):
 def compute_indicator_maps(aoi_io, io, output):
     
     # raise an error if the years are not in the rigth order 
-    if not (io.start < io.target_start < io.end):
+    if not (io.start <io.baseline_end <= io.target_start < io.end):
         raise Exception(ms._15_3_1.error.wrong_year)
     
     # compute intermediary maps 
@@ -168,7 +168,7 @@ def compute_zonal_analysis(aoi_io, io, output):
     #########################################################################
     aoi_json = geemap.ee_to_geojson(aoi_io.get_aoi_ee())
     aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs('EPSG:4326')
-    aoi_gdf =aoi_gdf[aoi_gdf['geometry'].apply(lambda x : x.type == 'Polygon')]
+    
     indicator_df = pd.read_csv(indicator_csv)
     if 'Class_0' in indicator_df.columns:
         aoi_gdf['NoData'] = indicator_df['Class_0']
@@ -178,6 +178,7 @@ def compute_zonal_analysis(aoi_io, io, output):
         aoi_gdf['Stable'] = indicator_df['Class_2']
     if 'Class_1' in indicator_df.columns:
         aoi_gdf['Degrade'] = indicator_df['Class_1']
+    aoi_gdf = aoi_gdf[aoi_gdf.geom_type !="LineString"]
     aoi_gdf.to_file(indicator_stats.with_suffix('.shp'))
     #########################################################################
     
