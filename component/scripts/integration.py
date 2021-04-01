@@ -52,7 +52,7 @@ def rename_band(img, sensor):
     elif sensor == 'Landsat 8':
         img = img.select(['B4', 'B5', 'pixel_qa'],['Red', 'NIR', 'pixel_qa']) 
     elif sensor == 'Sentinel 2':
-        img = img.select(['B8', 'B4', 'QA60'],['Red', 'NIR', 'QA60'])
+        img = img.select(['B4', 'B8', 'QA60'],['Red', 'NIR', 'QA60'])
         
     return img
 
