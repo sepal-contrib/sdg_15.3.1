@@ -21,7 +21,7 @@ class PickerLine(v.Layout):
         # bind them to the output
         output \
             .bind(self.start_picker, io, 'start') \
-            .bind(self.baseline_end_picker, io, 'baseline_end')
+            .bind(self.baseline_end_picker, io, 'baseline_end') \
             .bind(self.target_picker, io, 'target_start') \
             .bind(self.end_picker, io, 'end')
         
