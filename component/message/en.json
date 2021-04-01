@@ -72,7 +72,7 @@
         "clim_default_lbl": "Climate regime",
         "clim_custom_lbl": "Custom climate regime value",
         "start_lbl": "Start historical period",
-        "baseline_end_lbl": "End historical period"
+        "baseline_end_lbl": "End historical period",
         "target_start_lbl": "Start monitoring period",
         "end_lbl": "End monitoring period",
         "matrix_changed": "You have changed your transition matrix",
