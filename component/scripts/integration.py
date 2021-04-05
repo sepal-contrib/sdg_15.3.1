@@ -52,7 +52,7 @@ def rename_band(img, sensor):
     elif sensor == 'Landsat 8':
         img = img.select(['B4', 'B5', 'pixel_qa'],['Red', 'NIR', 'pixel_qa']) 
     elif sensor == 'Sentinel 2':
-        img = img.select(['B8', 'B4', 'QA60'],['Red', 'NIR', 'QA60'])
+        img = img.select(['B4', 'B8', 'QA60'],['Red', 'NIR', 'QA60'])
         
     return img
 
@@ -106,21 +106,14 @@ def cloud_mask(img, sensor):
         
     return img 
 
-def month_number(img_collection):
-    def iterate_function(image, mm_list):
-        month = ee.Number.parse(image.date().format("MM"))
-        mm_list = ee.List(mm_list)
-        return ee.List(mm_list.add(month))
-    month_list = img_collection.iterate(iterate_function, ee.List([]))
-    return month_list
-
 def int_yearly_ndvi(ndvi_coll, start, end):
     """Function to integrate observed NDVI datasets at the annual level"""
     def daily_to_monthly_to_annual(year):
         
         ndvi_collection = ndvi_coll
         ndvi_coll_ann = ndvi_collection.filter(ee.Filter.calendarRange(year, field = 'year'))
-        months = ee.List(month_number(ndvi_coll_ann))
+        months = (ndvi_coll_ann.aggregate_array("system:time_start")
+                .map(lambda x: ee.Number.parse(ee.Date(x).format("MM"))))
  
 
         img_coll= ee.ImageCollection.fromImages(

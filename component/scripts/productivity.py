@@ -170,7 +170,7 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
     """    
     
     # compute min and max of annual ndvi for the baseline period
-    baseline_filter = ee.Filter.rangeContains('year', io.start, io.target_start)
+    baseline_filter = ee.Filter.rangeContains('year', io.start, io.baseline_end)
     target_filter =ee.Filter.rangeContains('year', io.target_start, io.end)
     
     baseline_ndvi_range = ndvi_yearly_integration \
