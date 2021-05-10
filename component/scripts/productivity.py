@@ -378,13 +378,18 @@ def ue_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     return (lf_trend, mk_trend)
 
 ###########################
-#      kendall index      #
+#   kendall S statistic   #
 ###########################
 
-def mann_kendall(imageCollection):
+def sign(i, j):
+    return ee.Image(ee.Image(j).subtract(i).clamp(-1,1)).int()
+def after_collection(current):
+    after_collection = ee.ImageCollection.fromImages(current.get('after'))
+    return after_collection.map(lambda image: ee.Image(sign(current, image)).unmask(0))
+
+def mann_kendall(image_collection):
     """Calculate Mann Kendall's S statistic.
-    This function returns the Mann Kendall's S statistic, assuming that n is
-    less than 40. The significance of a calculated S statistic is found in
+    This function returns the Mann Kendall's S statistic. The significance of a calculated S statistic is found in
     table A.30 of Nonparametric Statistical Methods, second edition by
     Hollander & Wolfe.
     Args:
@@ -393,32 +398,14 @@ def mann_kendall(imageCollection):
         A Google Earth Engine image collection with Mann Kendall statistic for
             each pixel.
     """
-    
-    TimeSeriesList = imageCollection.toList(50)
-    
-    NumberOfItems = TimeSeriesList.length().getInfo()
-    ConcordantArray = []
-    DiscordantArray = []
-    for i in range(0, NumberOfItems - 1):
-        
-        CurrentImage = ee.Image(TimeSeriesList.get(i))
-        
-        for j in range(i + 1, NumberOfItems):
-            
-            nextImage = ee.Image(TimeSeriesList.get(j))
-            
-            Concordant = CurrentImage.lt(nextImage)
-            ConcordantArray.append(Concordant)
-            
-            Discordant = CurrentImage.gt(nextImage)
-            DiscordantArray.append(Discordant)
-            
-    ConcordantSum = ee.ImageCollection(ConcordantArray).sum()
-    DiscordantSum = ee.ImageCollection(DiscordantArray).sum()
-    
-    MKSstat = ConcordantSum.subtract(DiscordantSum)
-    
-    return MKSstat
+    afterFilter = ee.Filter.lessThan(leftField = 'year', rightField = 'year')
+    joined = ee.ImageCollection(ee.Join.saveAll('after').apply(
+      primary = image_collection,
+      secondary = image_collection,
+      condition = afterFilter ))
+    bands = image_collection.first().bandNames()
+    kendall = ee.ImageCollection(joined.map(after_collection).flatten()).reduce('sum', 2).rename(bands)
+    return kendall
 
 def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start=None, end=None):
     """Creat an ImageCollection of annual integral of NDVI and annual inegral of climate data"""
