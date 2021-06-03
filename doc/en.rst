@@ -40,11 +40,11 @@ Afetr selecting the date all the available sensors within the timeframe will be 
 Select a trajectory
 ^^^^^^^^^^^^^^^^^^^
 
-There are three options available to calculate the productivity trend that describe trajectry of change^
+There are three options available to calculate the productivity trend that describe trajectry of change
 
- - Based on NDVI trend
- - Based on residual trend
- - Trend based on water use efficiency
+-   Based on NDVI trend
+-   Based on residual trend
+-   Trend based on water use efficiency
 
 ..  figure:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/select_trajectory.png
 
