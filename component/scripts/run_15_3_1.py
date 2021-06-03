@@ -21,40 +21,40 @@ from .land_cover import *
 
 ee.Initialize()
 
-def download_maps(aoi_io, io, output):
+def download_maps(aoi_model, model, output):
     
     # get the export scale 
-    scale = 10 if 'Sentinel 2' in io.sensors else 30
+    scale = 10 if 'Sentinel 2' in model.sensors else 30
     
     output.add_live_msg(ms.download.start_download)
         
     # create the export path
-    land_cover_desc = f'{aoi_io.get_aoi_name()}_land_cover'
-    soc_desc = f'{aoi_io.get_aoi_name()}_soc'
-    productivity_desc = f'{aoi_io.get_aoi_name()}_productivity'
-    indicator_desc = f'{aoi_io.get_aoi_name()}_indicator_15_3_1'
+    land_cover_desc = f'{aoi_model.name}_land_cover'
+    soc_desc = f'{aoi_model.name}_soc'
+    productivity_desc = f'{aoi_model.name}_productivity'
+    indicator_desc = f'{aoi_model.name}_indicator_15_3_1'
         
     # load the drive_handler
     drive_handler = gdrive()
     
     # clip the images if it's an administrative layer and keep the bounding box if not
-    if aoi_io.feature_collection:
-        geom = aoi_io.get_aoi_ee().geometry()
-        land_cover = io.land_cover.clip(geom)
-        soc = io.soc.clip(geom)
-        productivity = io.productivity.clip(geom)
-        indicator = io.indicator_15_3_1.clip(geom)
+    if aoi_model.feature_collection:
+        geom = aoi_model.feature_collection.geometry()
+        land_cover = model.land_cover.clip(geom)
+        soc = model.soc.clip(geom)
+        productivity = model.productivity.clip(geom)
+        indicator = model.indicator_15_3_1.clip(geom)
     else:
-        land_cover = io.land_cover
-        soc = io.soc
-        productivity = io.productivity
-        indicator = io.indicator_15_3_1
+        land_cover = model.land_cover
+        soc = model.soc
+        productivity = model.productivity
+        indicator = model.indicator_15_3_1
         
     # download all files
-    downloads = drive_handler.download_to_disk(land_cover_desc, land_cover, aoi_io, output)
-    downloads = drive_handler.download_to_disk(soc_desc, soc, aoi_io, output)
-    downloads = drive_handler.download_to_disk(productivity_desc, productivity, aoi_io, output)
-    downloads = drive_handler.download_to_disk(indicator_desc, indicator, aoi_io, output)
+    downloads = drive_handler.download_to_disk(land_cover_desc, land_cover, aoi_model, output)
+    downloads = drive_handler.download_to_disk(soc_desc, soc, aoi_model, output)
+    downloads = drive_handler.download_to_disk(productivity_desc, productivity, aoi_model, output)
+    downloads = drive_handler.download_to_disk(indicator_desc, indicator, aoi_model, output)
         
     # I assume that they are always launch at the same time 
     # If not it's going to crash
@@ -69,10 +69,10 @@ def download_maps(aoi_io, io, output):
     indicator_merge = pm.result_dir.joinpath(f'{indicator_desc}_merge.tif')
     
     # digest the tiles
-    digest_tiles(aoi_io, land_cover_desc, pm.result_dir, output, land_cover_merge)
-    digest_tiles(aoi_io, soc_desc, pm.result_dir, output, soc_merge)
-    digest_tiles(aoi_io, productivity_desc, pm.result_dir, output, productivity_merge)
-    digest_tiles(aoi_io, indicator_desc, pm.result_dir, output, indicator_merge)
+    digest_tiles(land_cover_desc, pm.result_dir, output, land_cover_merge)
+    digest_tiles(soc_desc, pm.result_dir, output, soc_merge)
+    digest_tiles(productivity_desc, pm.result_dir, output, productivity_merge)
+    digest_tiles(indicator_desc, pm.result_dir, output, indicator_merge)
         
     output.add_live_msg(ms.download.remove_gdrive)
     # remove the files from drive
@@ -86,60 +86,60 @@ def download_maps(aoi_io, io, output):
 
     return (land_cover_merge, soc_merge, productivity_merge, indicator_merge)
 
-def display_maps(aoi_io, io, m, output):
+def display_maps(aoi_model, model, m, output):
     
-    m.zoom_ee_object(aoi_io.get_aoi_ee().geometry())
+    m.zoom_ee_object(aoi_model.feature_collection.geometry())
     
     # get the geometry to clip on 
-    geom = aoi_io.get_aoi_ee().geometry()
+    geom = aoi_model.feature_collection.geometry()
     
     # clip on the bounding box when we use a custom aoi
-    if aoi_io.assetId: 
+    if not ('ADMIN' in aoi_model.method): 
         geom = geom.bounds()
         
     # add the layers
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.prod_layer))
-    m.addLayer(io.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
+    m.addLayer(model.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
-    m.addLayer(io.land_cover.clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
+    m.addLayer(model.land_cover.clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
-    m.addLayer(io.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
+    m.addLayer(model.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.ind_layer))
-    m.addLayer(io.indicator_15_3_1.clip(geom), pm.viz_indicator, ms._15_3_1.ind_layer)
+    m.addLayer(model.indicator_15_3_1.clip(geom), pm.viz_indicator, ms._15_3_1.ind_layer)
         
     # add the aoi on the map
-    m.addLayer(aoi_io.get_aoi_ee(), {'color': v.theme.themes.dark.info}, 'aoi')
+    m.addLayer(aoi_model.feature_collection, {'color': v.theme.themes.dark.info}, 'aoi')
     
     return 
 
-def compute_indicator_maps(aoi_io, io, output):
+def compute_indicator_maps(aoi_model, model, output):
     
     # raise an error if the years are not in the rigth order 
-    if not (io.start <io.baseline_end <= io.target_start < io.end):
+    if not (model.start <model.baseline_end <= model.target_start < model.end):
         raise Exception(ms._15_3_1.error.wrong_year)
     
     # compute intermediary maps 
-    ndvi_int, climate_int = integrate_ndvi_climate(aoi_io, io, output)
-    prod_trajectory = productivity_trajectory(io, ndvi_int, climate_int, output)
-    prod_performance = productivity_performance(aoi_io, io, ndvi_int, climate_int, output)
-    prod_state = productivity_state(aoi_io, io, ndvi_int, climate_int, output) 
+    ndvi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
+    prod_trajectory = productivity_trajectory(model, ndvi_int, climate_int, output)
+    prod_performance = productivity_performance(aoi_model, model, ndvi_int, climate_int, output)
+    prod_state = productivity_state(aoi_model, model, ndvi_int, climate_int, output) 
     
     # compute result maps 
-    io.land_cover = land_cover(io, aoi_io, output)
-    io.soc = soil_organic_carbon(io, aoi_io, output)
-    io.productivity = productivity_final(prod_trajectory, prod_performance, prod_state, output)
+    model.land_cover = land_cover(model, aoi_model, output)
+    model.soc = soil_organic_carbon(model, aoi_model, output)
+    model.productivity = productivity_final(prod_trajectory, prod_performance, prod_state, output)
     
     # sump up in a map
-    io.indicator_15_3_1 = indicator_15_3_1(io.productivity, io.land_cover, io.soc, output)
+    model.indicator_15_3_1 = indicator_15_3_1(model.productivity, model.land_cover, model.soc, output)
 
     return 
 
-def compute_zonal_analysis(aoi_io, io, output):
+def compute_zonal_analysis(aoi_model, model, output):
     
-    indicator_stats = pm.result_dir.joinpath(f'{aoi_io.get_aoi_name()}_indicator_15_3_1')
+    indicator_stats = pm.result_dir.joinpath(f'{aoi_model.name}_indicator_15_3_1')
     
     #check if the file already exist
     indicator_zip = indicator_stats.with_suffix('.zip')
@@ -152,11 +152,11 @@ def compute_zonal_analysis(aoi_io, io, output):
     output.add_msg(output_widget)
         
     indicator_csv = indicator_stats.with_suffix('.csv') # to be removed when moving to shp
-    scale = 100 if 'Sentinel 2' in io.sensors else 300
+    scale = 100 if 'Sentinel 2' in model.sensors else 300
     with output_widget:
         geemap.zonal_statistics_by_group(
-            in_value_raster = io.indicator_15_3_1,
-            in_zone_vector = aoi_io.get_aoi_ee(),
+            in_value_raster = model.indicator_15_3_1,
+            in_zone_vector = aoi_model.feature_collection,
             out_file_path = indicator_csv,
             statistics_type = "SUM",
             denominator = 1000000,
@@ -166,7 +166,7 @@ def compute_zonal_analysis(aoi_io, io, output):
         )
     # this should be removed once geemap is repaired
     #########################################################################
-    aoi_json = geemap.ee_to_geojson(aoi_io.get_aoi_ee())
+    aoi_json = geemap.ee_to_geojson(aoi_model.feature_collection)
     aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs('EPSG:4326')
     
     indicator_df = pd.read_csv(indicator_csv)

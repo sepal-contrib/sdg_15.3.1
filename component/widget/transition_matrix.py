@@ -12,10 +12,10 @@ class MatrixInput(v.Html):
     }
     
     
-    def __init__(self, line, column, io, default_value, output):
+    def __init__(self, line, column, model, default_value, output):
         
         # get the io for dynamic modification
-        self.io = io
+        self.model = model
         
         # get the line and column of the td in the matrix
         self.column = column
@@ -40,7 +40,7 @@ class MatrixInput(v.Html):
         val, color = self.VALUES[change['new']]
         
         self.style_ = f'background-color: {color}'
-        self.io.transition_matrix[self.line][self.column] = val
+        self.model.transition_matrix[self.line][self.column] = val
         
         self.output.add_msg(ms._15_3_1.matrix_changed)
             
@@ -60,7 +60,7 @@ class TransitionMatrix(v.SimpleTable):
     
     DECODE = {1: '+', 0: '', -1:'-'}
     
-    def __init__(self, io, output):
+    def __init__(self, model, output):
         
         # create a header        
         header = [
@@ -81,7 +81,7 @@ class TransitionMatrix(v.SimpleTable):
             for j, target in enumerate(self.CLASSES):
                 # create a input with default matrix value
                 default_value = self.DECODE[pm.default_trans_matrix[i][j]]
-                matrix_input = MatrixInput(i, j, io, default_value, output)
+                matrix_input = MatrixInput(i, j, model, default_value, output)
                 matrix_input.color_change({'new': default_value})
                 
                 input_ = v.Html(tag='td', class_='ma-0 pa-0', children=[matrix_input])

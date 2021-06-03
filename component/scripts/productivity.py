@@ -7,7 +7,7 @@ from component import parameter as pm
 
 ee.Initialize()
 
-def productivity_trajectory(io, nvdi_yearly_integration, climate_yearly_integration, output):
+def productivity_trajectory(model, nvdi_yearly_integration, climate_yearly_integration, output):
     """
     Productivity Trend describes the trajectory of change in productivity over time. Trend is calculated by fitting a robust, non-parametric linear regression model.The significance of trajectory slopes at the P <= 0.05 level should be reported in terms of three classes:
         1) Z score < -1.96 = Potential degradation, as indicated by a significant decreasing trend,
@@ -23,23 +23,23 @@ The following code runs the selected trend method and produce an output by recla
     trajectories = [traj['value'] for traj in pm.trajectories]
     
     # nvi trend
-    if io.trajectory == trajectories[0]:
-        lf_trend, mk_trend = ndvi_trend(io.start, io.end, nvdi_yearly_integration)
+    if model.trajectory == trajectories[0]:
+        lf_trend, mk_trend = ndvi_trend(model.start, model.end, nvdi_yearly_integration)
     # p restrend
-    elif io.trajectory == trajectories[1]:
-        lf_trend, mk_trend = p_restrend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
+    elif model.trajectory == trajectories[1]:
+        lf_trend, mk_trend = p_restrend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
     # s restrend
-    elif io.trajectory == trajectories[2]:
+    elif model.trajectory == trajectories[2]:
         #TODO: need to code this
         raise NameError("s_restrend method not yet supported")
     # ue trend
-    elif io.trajectory == trajectories[3]:
-        lf_trend, mk_trend = ue_trend(io.start, io.end, nvdi_yearly_integration, climate_yearly_integration)
+    elif model.trajectory == trajectories[3]:
+        lf_trend, mk_trend = ue_trend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
     else:
-        raise NameError(f'Unrecognized method "{io.trajectory}"')
+        raise NameError(f'Unrecognized method "{model.trajectory}"')
 
     # Define Kendall parameter values for a significance of 0.05
-    period = io.end - io.start + 1
+    period = model.end - model.start + 1
     kendall90 = pm.get_kendall_coef(period, 90)
     kendall95 = pm.get_kendall_coef(period, 95)
     kendall99 = pm.get_kendall_coef(period, 99)
@@ -68,7 +68,7 @@ The following code runs the selected trend method and produce an output by recla
     
     return trajectory
 
-def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly_integration, output):
+def productivity_performance(aoi_model, model, nvdi_yearly_integration, climate_yearly_integration, output):
     """
     It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
         Steps:
@@ -81,14 +81,14 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
     
     # land cover data from esa cci
     lc = ee.Image(pm.land_cover) \
-        .clip(aoi_io.get_aoi_ee().geometry().bounds())
+        .clip(aoi_model.feature_collection.geometry().bounds())
     lc = lc \
         .where(lc.eq(9999), pm.int_16_min) \
         .updateMask(lc.neq(pm.int_16_min))
 
     # global agroecological zones from IIASA
     soil_tax_usda = ee.Image(pm.soil_tax) \
-        .clip(aoi_io.get_aoi_ee().geometry().bounds())
+        .clip(aoi_model.feature_collection.geometry().bounds())
 
     # compute mean ndvi for the period
     ndvi_mean = nvdi_yearly_integration \
@@ -101,7 +101,7 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
     # should not be here it's a hidden parameter
     
     # Handle case of year_start that isn't included in the CCI data
-    lc_year_start = min(max(io.start, pm.lc_first_year), pm.lc_last_year)
+    lc_year_start = min(max(model.start, pm.lc_first_year), pm.lc_last_year)
     
     #################
     
@@ -127,7 +127,7 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
             groupField=1, 
             groupName='code'
         ),
-        geometry=aoi_io.get_aoi_ee().geometry(),
+        geometry=aoi_model.feature_collection.geometry(),
         scale=30,
         maxPixels=1e15
     )
@@ -154,7 +154,7 @@ def productivity_performance(aoi_io, io, nvdi_yearly_integration, climate_yearly
     
     return prod_performance
 
-def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output):
+def productivity_state(aoi_model, model, ndvi_yearly_integration, climate_int, output):
     """
     It represents the level of relative productivity in a pixel compred to a historical observations of productivity for that pixel. 
     For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
@@ -170,8 +170,8 @@ def productivity_state(aoi_io, io, ndvi_yearly_integration, climate_int, output)
     """    
     
     # compute min and max of annual ndvi for the baseline period
-    baseline_filter = ee.Filter.rangeContains('year', io.start, io.baseline_end)
-    target_filter =ee.Filter.rangeContains('year', io.target_start, io.end)
+    baseline_filter = ee.Filter.rangeContains('year', model.start, model.baseline_end)
+    target_filter =ee.Filter.rangeContains('year', model.target_start, model.end)
     
     baseline_ndvi_range = ndvi_yearly_integration \
         .filter(baseline_filter) \
