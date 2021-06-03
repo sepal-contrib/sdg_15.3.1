@@ -1,7 +1,3 @@
-# SDG indicators module
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
 monitor SDG indicators at plot level
 
 ## about 
@@ -25,4 +21,5 @@ Set up your parmaters
 Display your results  
   
 ![display results](https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/results.png)
+
 
