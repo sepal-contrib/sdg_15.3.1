@@ -7,12 +7,12 @@ from component import parameter as pm
 
 ee.Initialize()
 
-def integrate_ndvi_climate(aoi_io, io, output):
+def integrate_ndvi_climate(aoi_model, model, output):
     
     # create the composite image collection
     i_img_coll = ee.ImageCollection([])
     
-    for sensor in io.sensors:
+    for sensor in model.sensors:
         
         # get the image collection 
         # filter its bounds to fit the aoi extends 
@@ -20,7 +20,7 @@ def integrate_ndvi_climate(aoi_io, io, output):
         # adapt the resolution to meet sentinel 2 native one (10m)
         # mask the clouds and adapt the scale 
         sat = ee.ImageCollection(pm.sensors[sensor]) \
-            .filterBounds(aoi_io.get_aoi_ee()) \
+            .filterBounds(aoi_model.feature_collection) \
             .map(partial(rename_band, sensor=sensor)) \
             .map(partial(adapt_res, sensor=sensor)) \
             .map(partial(cloud_mask, sensor=sensor)) 
@@ -28,20 +28,20 @@ def integrate_ndvi_climate(aoi_io, io, output):
         i_img_coll = i_img_coll.merge(sat)
     
     # Filtering the img collection  using start year and end year
-    i_img_coll = i_img_coll.filterDate(f'{io.start}-01-01', f'{io.end}-12-31')
+    i_img_coll = i_img_coll.filterDate(f'{model.start}-01-01', f'{model.end}-12-31')
 
     # Function to integrate observed NDVI datasets at the annual level
     ndvi_coll = i_img_coll.map(CalcNDVI).select('ndvi')
     
-    ndvi_int = int_yearly_ndvi(ndvi_coll, io.start, io.end)
+    ndvi_int = int_yearly_ndvi(ndvi_coll, model.start, model.end)
 
     # process the climate dataset to use with the pixel restrend, RUE calculation
     precipitation = ee.ImageCollection(pm.precipitation) \
-        .filterBounds(aoi_io.get_aoi_ee()) \
-        .filterDate(f'{io.start}-01-01',f'{io.end}-12-31') \
+        .filterBounds(aoi_model.feature_collection) \
+        .filterDate(f'{model.start}-01-01',f'{model.end}-12-31') \
         .select('precipitation')
     
-    climate_int = int_yearly_climate(precipitation, io.start, io.end)
+    climate_int = int_yearly_climate(precipitation, model.start, model.end)
     
     return (ndvi_int, climate_int)
 

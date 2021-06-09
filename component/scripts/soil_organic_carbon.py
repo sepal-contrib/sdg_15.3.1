@@ -4,25 +4,25 @@ ee.Initialize()
 
 from component import parameter as pm
 
-def soil_organic_carbon(io, aoi_io, output):
+def soil_organic_carbon(model, aoi_model, output):
     """Calculate soil organic carbon indicator"""
     
-    soc = ee.Image(pm.soc).clip(aoi_io.get_aoi_ee().geometry().bounds())
+    soc = ee.Image(pm.soc).clip(aoi_model.feature_collection.geometry().bounds())
     soc = soc.updateMask(soc.neq(pm.int_16_min))
     
     lc = ee.Image(pm.land_cover) \
-        .clip(aoi_io.get_aoi_ee().geometry().bounds()) \
-        .select(ee.List.sequence(io.start - 1992, pm.land_use_max_year -1992, 1))
+        .clip(aoi_model.feature_collection.geometry().bounds()) \
+        .select(ee.List.sequence(model.start - 1992, pm.land_use_max_year -1992, 1))
     
     lc = lc \
         .where(lc.eq(9999), pm.int_16_min) \
         .updateMask(lc.neq(pm.int_16_min))
     
-    if not io.conversion_coef:
-        ipcc_climate_zones = ee.Image(pm.ipcc_climate_zones).clip(aoi_io.get_aoi_ee().geometry().bounds())
+    if not model.conversion_coef:
+        ipcc_climate_zones = ee.Image(pm.ipcc_climate_zones).clip(aoi_model.feature_collection.geometry().bounds())
         climate_conversion_coef = ipcc_climate_zones.remap(pm.climate_conversion_matrix[0], pm.climate_conversion_matrix[1])
     else: 
-        climate_conversion_coef = io.conversion_coef 
+        climate_conversion_coef = model.conversion_coef 
         
         
     # compute the soc change for the first two years
@@ -73,13 +73,13 @@ def soil_organic_carbon(io, aoi_io, output):
     soc_images = ee.Image(soc).addBands(soc_time1)
     
     # Compute the soc change for the rest of  the years
-    #years = ee.List.sequence(1, io.end - io.start)
+    #years = ee.List.sequence(1, model.end - model.start)
     #soc_images = years.itterate(compute_soc, soc_images)
     
     
     
     
-    for year_index in range(1, pm.land_use_max_year - io.start):
+    for year_index in range(1, pm.land_use_max_year - model.start):
         lc_time0 = lc \
             .select(year_index) \
             .remap(pm.translation_matrix[0],pm.translation_matrix[1])
@@ -139,7 +139,7 @@ def soil_organic_carbon(io, aoi_io, output):
             
     # Compute soc percent change for the analysis period
     soc_percent_change = soc_images \
-        .select(pm.land_use_max_year - io.start) \
+        .select(pm.land_use_max_year - model.start) \
         .subtract(soc_images.select(0)) \
         .divide(soc_images.select(0)) \
         .multiply(100)

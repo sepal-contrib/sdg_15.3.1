@@ -7,10 +7,9 @@ class PickerLine(v.Layout):
     
     YEAR_RANGE = [y for y in range(pm.sensor_max_year, pm.L4_start - 1, -1)]
     
-    def __init__(self, io, output):
+    def __init__(self, model):
         
-        self.io = io
-        self.output = output
+        self.model = model
         
         # create the widgets
         self.start_picker = v.Select(label=ms._15_3_1.start_lbl, items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
@@ -19,10 +18,10 @@ class PickerLine(v.Layout):
         self.end_picker = v.Select(label=ms._15_3_1.end_lbl, items=self.YEAR_RANGE, xs4=True, v_model=None, class_='ml-5 mr-5')
         
         # bind them to the output
-        output \
-            .bind(self.start_picker, io, 'start') \
-            .bind(self.baseline_end_picker, io, 'baseline_end') \
-            .bind(self.target_picker, io, 'target_start') \
-            .bind(self.end_picker, io, 'end')
+        model \
+            .bind(self.start_picker, 'start') \
+            .bind(self.baseline_end_picker, 'baseline_end') \
+            .bind(self.target_picker, 'target_start') \
+            .bind(self.end_picker, 'end')
         
         super().__init__(xs=12, row=True,  children=[self.start_picker, self.baseline_end_picker, self.target_picker, self.end_picker])
