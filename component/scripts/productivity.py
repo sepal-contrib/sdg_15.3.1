@@ -313,7 +313,7 @@ def ndvi_trend(start, end, ndvi_yearly_integration):
         .reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    mk_trend = mann_kendall(ndvi_yearly_integration.select('ndvi'))
+    mk_trend = ndvi_yearly_integration.select('ndvi').reduce(ee.Reducer.kendallsCorrelation(),2).multiply(10).select('ndvi_tau')
 
     return (lf_trend, mk_trend)
 
@@ -349,7 +349,7 @@ def p_restrend(start, end, nvdi_yearly_integration, climate_yearly_integration):
     lf_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    mk_trend = mann_kendall(residual_yearly_ndvi.select('ndvi_res'))
+    mk_trend = residual_yearly_ndvi.select('ndvi_res').reduce(ee.Reducer.kendallsCorrelation(),2).multiply(10).select('ndvi_res_tau')
     
     return (lf_trend, mk_trend)
 
@@ -364,7 +364,7 @@ def ue_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     # TODO: Need to handle scaling for ET for WUE
     
     # Apply function to create image collection of ndvi and climate
-    ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration)
+    ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, ndvi_yearly_integration)
     
     # Apply function to compute ue and store as a collection
     ue_yearly_collection = ndvi_climate_yearly_integration.map(use_efficiency)
@@ -373,40 +373,11 @@ def ue_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     lf_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    mk_trend = mann_kendall(ue_yearly_collection.select('ue'))
+    mk_trend = ue_yearly_collection.select('ue').reduce(ee.Reducer.kendallsCorrelation(),2).multiply(10).select('ue_tau')
     
     return (lf_trend, mk_trend)
 
-###########################
-#   kendall S statistic   #
-###########################
-
-def sign(i, j):
-    return ee.Image(ee.Image(j).subtract(i).clamp(-1,1)).int()
-def after_collection(current):
-    after_collection = ee.ImageCollection.fromImages(current.get('after'))
-    return after_collection.map(lambda image: ee.Image(sign(current, image)).unmask(0))
-
-def mann_kendall(image_collection):
-    """Calculate Mann Kendall's S statistic.
-    This function returns the Mann Kendall's S statistic. The significance of a calculated S statistic is found in
-    table A.30 of Nonparametric Statistical Methods, second edition by
-    Hollander & Wolfe.
-    Args:
-        imageCollection: A Google Earth Engine image collection.
-    Returns:
-        A Google Earth Engine image collection with Mann Kendall statistic for
-            each pixel.
-    """
-    afterFilter = ee.Filter.lessThan(leftField = 'year', rightField = 'year')
-    joined = ee.ImageCollection(ee.Join.saveAll('after').apply(
-      primary = image_collection,
-      secondary = image_collection,
-      condition = afterFilter ))
-    bands = image_collection.first().bandNames()
-    kendall = ee.ImageCollection(joined.map(after_collection).flatten()).reduce('sum', 2).rename(bands)
-    return kendall
-
+ 
 def ndvi_climate_merge(climate_yearly_integration, nvdi_yearly_integration, start=None, end=None):
     """Creat an ImageCollection of annual integral of NDVI and annual inegral of climate data"""
     
@@ -464,23 +435,6 @@ def ndvi_residuals(image, model):
         
     return ndvi_r
 
-#def ndvi_residuals(year, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
-#    """Function to compute residuals (ndvi obs - ndvi pred). part of p_restrend function"""
-#    
-#    ndvi_o = ndvi_climate_yearly_integration \
-#        .filter(ee.Filter.eq('year', year)) \
-#        .select('ndvi') \
-#        .median() # I assume there is only one
-#    
-#    ndvi_p = predicted_yearly_ndvi \
-#        .filter(ee.Filter.eq('year', year)) \
-#        .median() # I assume there is only one
-#    
-#    ndvi_r = ee.Image(year) \
-#        .float() \
-#        .addBands(ndvi_o.subtract(ndvi_p))
-#    
-#    return ndvi_r.rename(['year', 'ndvi_res'])
 
 def image_collection_residuals(start, end, ndvi_climate_yearly_integration, predicted_yearly_ndvi):
     """Function to create image collection of residuals. part of p_restrend function"""
@@ -492,7 +446,7 @@ def image_collection_residuals(start, end, ndvi_climate_yearly_integration, pred
         
         res_list = res_list.add(res_image)
         
-    return ndvi_r
+    return res_list
 
 def use_efficiency(image):
     """Function to creat rain use efficiency and store it as an imageCollection"""
