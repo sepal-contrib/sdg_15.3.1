@@ -151,6 +151,7 @@ def int_yearly_climate(precipitation, start, end):
                 .set('year', year)
         )
     )
+    return img_coll
 
 def CalcNDVI(img):
     """compute the ndvi on renamed bands"""

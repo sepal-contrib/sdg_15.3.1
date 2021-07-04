@@ -25,16 +25,16 @@ The following code runs the selected trend method and produce an output by recla
     # ndvi trend
     if model.trajectory == trajectories[0]:
         lf_trend, mk_trend = ndvi_trend(model.start, model.end, nvdi_yearly_integration)
-    # p restrend
+    # residual trend analysis
     elif model.trajectory == trajectories[1]:
         lf_trend, mk_trend = restrend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
-    # s restrend
+    # Water use efficiency
     elif model.trajectory == trajectories[2]:
         #TODO: 
         raise NameError("this method is under development")
-    # ue trend
+    # rain use efficiency trend
     elif model.trajectory == trajectories[3]:
-        lf_trend, mk_trend = ue_trend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
+        lf_trend, mk_trend = rain_use_efficiency_trend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
 
     # Define Kendall parameter values for a significance of 0.05
     period = model.end - model.start + 1
@@ -384,7 +384,7 @@ def rain_use_efficiency_trend(start, end, ndvi_yearly_integration, climate_yearl
     ndvi_climate_yearly_integration = ndvi_climate_merge(climate_yearly_integration, ndvi_yearly_integration)
     
     # Apply function to compute ue and store as a collection
-    ue_yearly_collection = ndvi_climate_yearly_integration.map(use_efficiency)
+    ue_yearly_collection = ndvi_climate_yearly_integration.map(use_efficiency_ratio)
 
     # Compute linear trend function to predict ndvi based on year (ndvi trend)
     linear_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
@@ -439,16 +439,16 @@ def ndvi_residuals(image, modeled):
     return ndvi_r
 
 
-def use_efficiency(image):
-    """Function to creat rain use efficiency and store it as an imageCollection"""
+def use_efficiency_ratio(image):
+    """Function to map over the ndvi and climate collection to get the rain use efficiency and store it as an imageCollection"""
         
     # extract climate and ndvi median values
-    ndvi_img = image.select('ndvi').median()
-    clim_img = image.select('clim').median().divide(1000)
-    
+    ndvi_img = image.select('ndvi')
+    clim_img = image.select('clim').divide(1000)
+    year = image.get('year')
     divide_img = ndvi_img \
         .divide(clim_img) \
-        .addBands(ee.Image(year)) \
+        .addBands(ee.Image.constant(year).float()) \
         .rename(['ue', 'year']) \
         .set({'year': year})
 
