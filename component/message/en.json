@@ -41,7 +41,8 @@
             "no_start": "Please provide a start date for baseline period",
             "no_target": "please provide a start date of assemsment period",
             "no_end": "Please provide a end date for the assesment period",
-            "no_traj": "Please provide a trajectory for the trend analysis"
+            "no_traj": "Please provide a trajectory for the trend analysis",
+            "no_mix": "You cannot mix sentinel and landsat data"
         },
         "process_text": [
             "This process tile will allow you to compute the value if the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
