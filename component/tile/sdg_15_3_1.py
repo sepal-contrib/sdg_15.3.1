@@ -25,7 +25,7 @@ class Tile_15_3_1(sw.Tile):
         # create the widgets that will be displayed
         markdown = sw.Markdown("""{}""".format('  \n'.join(ms._15_3_1.process_text)))
         pickers = cw.PickerLine(self.model)
-        self.sensor_select = cw.SensorSelect(items=[], label=ms._15_3_1.sensor_lbl, multiple=True, v_model=None, chips=True)
+        self.sensor_select = cw.SensorSelect()
         trajectory = v.Select(label=ms._15_3_1.traj_lbl, items=pm.trajectories, v_model=None)
         transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=[ms._15_3_1.transition_matrix])
         transition_matrix = cw.TransitionMatrix(self.model, alert)
@@ -54,6 +54,7 @@ class Tile_15_3_1(sw.Tile):
         # add links between the widgets
         self.btn.on_event('click', self.start_process)
         pickers.end_picker.observe(self.sensor_select.update_sensors, 'v_model')
+        self.sensor_select.observe(self._check_sensor, 'v_model')
         
     @su.loading_button(debug=False)
     def start_process(self, widget, data, event):
@@ -78,7 +79,35 @@ class Tile_15_3_1(sw.Tile):
         # release the download btn
         self.result_tile.btn.disabled = False
             
-        return 
+        return
+    
+    def _check_sensor(self, change):
+        """
+        prevent users from selecting landsat and sentinel 2 sensors
+        provide a warning message to help understanding
+        """
+
+        # exit if its a removal 
+        if len(change['new']) < len(change['old']):
+            self.alert.reset()
+            return self
+
+        # use positionning in the list as boolean value
+        sensors = ['Landsat', 'Sentinel']
+
+        # guess the new input 
+        new_value = list(set(change['new']) - set(change['old']))[0]
+
+        id_ = next(i for i, s in enumerate(sensors) if s in new_value)
+
+        if sensors[id_] in new_value:
+            if any(sensors[not id_] in s for s in change['old']):
+                change['owner'].v_model = [new_value]
+                self.alert.add_live_msg(ms._15_3_1.error.no_mix, 'warning')
+            else: 
+                self.alert.reset()
+
+        return self
     
 class Result_15_3_1(sw.Tile):
     
