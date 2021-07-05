@@ -16,10 +16,10 @@
             "water": "Water body"
         },
         "trend": {
-            "ndvi": "ndvi trend",
-            "p_res": "p_res trend",
-            "s_res": "s_res trend",
-            "ue": "ue trend"
+            "ndvi": "NDVI trend",
+            "p_res": "Residual (Osereved NDVI - Predicetd NDVI) trend ",
+            "s_res": "Water use efficiency (WUE)",
+            "ue": "Rain use efficiency (RUE)"
         },
         "clim_regim": {
             "temp_dry": "Temperate dry",
