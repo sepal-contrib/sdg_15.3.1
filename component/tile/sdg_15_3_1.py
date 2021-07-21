@@ -26,13 +26,14 @@ class Tile_15_3_1(sw.Tile):
         markdown = sw.Markdown("""{}""".format('  \n'.join(ms._15_3_1.process_text)))
         pickers = cw.PickerLine(self.model)
         self.sensor_select = cw.SensorSelect()
+        vegetation_index = v.Select(label=ms._15_3_1.vi_lbl, items = pm.vegetation_index, v_model =None)
         trajectory = v.Select(label=ms._15_3_1.traj_lbl, items=pm.trajectories, v_model=None)
         transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=[ms._15_3_1.transition_matrix])
         transition_matrix = cw.TransitionMatrix(self.model, alert)
         climate_regime = cw.ClimateRegime(self.model, alert)
         
         # bind the standars widgets to variables 
-        self.model.bind(self.sensor_select, 'sensors').bind(trajectory, 'trajectory') 
+        self.model.bind(self.sensor_select, 'sensors').bind(trajectory, 'trajectory').bind(vegetation_index,'vegetation_index')
         
         # create the actual tile
         super().__init__(
@@ -42,6 +43,7 @@ class Tile_15_3_1(sw.Tile):
                 markdown, 
                 pickers, 
                 self.sensor_select, 
+                vegetation_index,
                 trajectory, 
                 transition_label, 
                 transition_matrix, 
@@ -64,6 +66,7 @@ class Tile_15_3_1(sw.Tile):
         if not self.alert.check_input(self.model.start, ms._15_3_1.error.no_start): return
         if not self.alert.check_input(self.model.target_start, ms._15_3_1.error.no_target): return
         if not self.alert.check_input(self.model.end, ms._15_3_1.error.no_end): return
+        if not self.alert.check_input(self.model.vegetation_index, ms._15_3_1.error.no_vi): return
         if not self.alert.check_input(self.model.trajectory, ms._15_3_1.error.no_traj): return
         if not self.alert.check_input(self.model.sensors, 'no sensors'): return widget.toggle_loading()
         

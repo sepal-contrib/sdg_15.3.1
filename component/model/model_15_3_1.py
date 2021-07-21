@@ -16,7 +16,10 @@ class Model_15_3_1(model.Model):
 
     # sensors
     sensors = Any(None).tag(sync=True)
-
+    
+    #Vegetation indices
+    
+    vegetation_index =Any(None).tag(sync=True)
     # trajectory 
     trajectory = Any(None).tag(sync=True)
 

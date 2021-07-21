@@ -2,6 +2,12 @@ import ipyvuetify as v
 
 from component.message import ms 
 
+vegetation_index = [
+        {'text':ms._15_3_1.vi.ndvi, 'value':'ndvi'},
+        {'text':ms._15_3_1.vi.evi, 'value':'evi'},
+        {'text':ms._15_3_1.vi.msvi, 'value':'msvi'}      
+]
+
 trajectories = [
     {'text': ms._15_3_1.trend.ndvi, 'value': 'ndvi_trend', 'disabled': False},
     {'text': ms._15_3_1.trend.p_res, 'value': 'p_restrend', 'disabled': False},

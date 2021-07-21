@@ -1,4 +1,4 @@
-from functools import partial 
+from functools import partial
 
 import ee 
 import json
@@ -84,7 +84,7 @@ def productivity_performance(aoi_model, model, nvdi_yearly_integration, climate_
         .where(lc.eq(9999), pm.int_16_min) \
         .updateMask(lc.neq(pm.int_16_min))
 
-    # global agroecological zones from IIASA
+    
     soil_tax_usda = ee.Image(pm.soil_tax) \
         .clip(aoi_model.feature_collection.geometry().bounds())
 
@@ -99,13 +99,13 @@ def productivity_performance(aoi_model, model, nvdi_yearly_integration, climate_
     # should not be here it's a hidden parameter
     
     # Handle case of year_start that isn't included in the CCI data
-    lc_year_start = min(max(model.start, pm.lc_first_year), pm.lc_last_year)
+    lc_year_start = min(max(model.start, pm.land_cover_first_year), pm.land_cover_max_year)
     
     #################
     
     # reclassify lc to ipcc classes
     lc_reclass = lc \
-        .select(f'y{lc_year_start}') \
+        .select(f'year_{lc_year_start}') \
         .remap(pm.ESA_lc_classes, pm.reclassification_matrix)
 
     # create a binary mask.

@@ -1,12 +1,11 @@
 # first images year
 L4_start = 1982
 
-# max year for land use 
-land_use_max_year = 2018
+# max year for land cover 
+land_cover_max_year = 2019
 sensor_max_year = 2020
 
-lc_first_year = 1992
-lc_last_year = 2015
+land_cover_first_year = 1992
 
 # name of the sensor, GEE asset
 sensors = {
@@ -19,7 +18,7 @@ sensors = {
 
 precipitation = 'NOAA/PERSIANN-CDR'
 
-land_cover = "users/geflanddegradation/toolbox_datasets/lcov_esacc_1992_2018"
+land_cover = "users/amitghosh/sdg_module/esa_cci_lc_1992_2019"
 soil_tax = "users/geflanddegradation/toolbox_datasets/soil_tax_usda_sgrid"
 soc = "users/geflanddegradation/toolbox_datasets/soc_sgrid_30cm"
 ipcc_climate_zones = "users/geflanddegradation/toolbox_datasets/ipcc_climate_zones"

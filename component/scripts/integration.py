@@ -30,11 +30,17 @@ def integrate_ndvi_climate(aoi_model, model, output):
     # Filtering the img collection  using start year and end year
     i_img_coll = i_img_coll.filterDate(f'{model.start}-01-01', f'{model.end}-12-31')
 
-    # Function to integrate observed NDVI datasets at the annual level
-    ndvi_coll = i_img_coll.map(CalcNDVI).select('ndvi')
+    # Prepare VI collection from the images
+    if model.vegetation_index == 'ndvi':
+        vi_coll = i_img_coll.map(calculate_ndvi).select('ndvi')
+    elif model.vegetation_index == 'evi':
+        vi_coll = i_img_coll.map(calculate_evi).select('evi')
+    elif model.vegetation_index == 'msvi':
+        vi_coll = i_img_coll.map(calculate_msvi).select('msvi')
+    # Integrate observed NDVI datasets at the annual level
+    ndvi_int = int_yearly_ndvi(vi_coll, model.start, model.end)
     
-    ndvi_int = int_yearly_ndvi(ndvi_coll, model.start, model.end)
-
+    #TODO: option to select multiple precipitation datasets.
     # process the climate dataset to use with the pixel restrend, RUE calculation
     precipitation = ee.ImageCollection(pm.precipitation) \
         .filterBounds(aoi_model.feature_collection) \
@@ -48,11 +54,11 @@ def integrate_ndvi_climate(aoi_model, model, output):
 def rename_band(img, sensor):
     
     if sensor in ['Landsat 4', 'Landsat 5', 'Landsat 7']:
-        img = img.select(['B3', 'B4', 'pixel_qa'],['Red', 'NIR',  'pixel_qa'])
+        img = img.select(['B1','B3', 'B4', 'pixel_qa'],['Blue','Red', 'NIR',  'pixel_qa'])
     elif sensor == 'Landsat 8':
-        img = img.select(['B4', 'B5', 'pixel_qa'],['Red', 'NIR', 'pixel_qa']) 
+        img = img.select(['B2', 'B4', 'B5', 'pixel_qa'],['Blue','Red', 'NIR', 'pixel_qa']) 
     elif sensor == 'Sentinel 2':
-        img = img.select(['B4', 'B8', 'QA60'],['Red', 'NIR', 'QA60'])
+        img = img.select(['B2', 'B4', 'B8', 'QA60'],['Blue','Red', 'NIR', 'QA60'])
         
     return img
 
@@ -153,7 +159,7 @@ def int_yearly_climate(precipitation, start, end):
     )
     return img_coll
 
-def CalcNDVI(img):
+def calculate_ndvi(img):
     """compute the ndvi on renamed bands"""
     
     red = img.select('Red')
@@ -166,3 +172,20 @@ def CalcNDVI(img):
         .set('system:time_start', img.get('system:time_start'))
     
     return ndvi
+
+def calculate_evi(img):
+    """compute the enhnce vegetation index on the renamed band"""
+
+    evi = img.expression('2.5*((nir-red)/(nir+6*red -7.5*blue+1))',{
+                    'nir':img.select('NIR'),
+                    'red':img.select('Red'),
+                    'blue':img.select('Blue')}).rename('evi').set('system:time_start', img.get('system:time_start'))
+    return evi
+
+def calculate_msvi(img):
+    
+    msvi2 = img.expression('(2 * nir + 1 - sqrt(pow((2 * nir + 1), 2) - 8 * (nir - red)) ) / 2',{
+            
+            'nir':img.select('NIR'),
+            'red':img.select('Red')}).rename('msvi').set('system:time_start', img.get('system:time_start'))
+    return msvi2

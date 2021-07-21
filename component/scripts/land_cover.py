@@ -13,18 +13,18 @@ def land_cover(model, aoi_model, output):
         .where(landcover.eq(9999), pm.int_16_min) \
         .updateMask(landcover.neq(pm.int_16_min))
 
-    # Remap LC according to input matrix, aggregation of land cover classesclasses to IPCC classes.
-    lc_year_start = min(max(model.start, pm.lc_first_year), pm.land_use_max_year)
-    lc_year_end = min(max(model.end, pm.lc_first_year), pm.land_use_max_year)
+    # Remap LC according to input matrix, aggregation of land cover classes to IPCC classes.
+    lc_year_start = min(max(model.start, pm.land_cover_first_year), pm.land_cover_max_year)
+    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
     
     # baseline land cover map reclassified into IPCC classes
     landcover_bl_remapped = landcover \
-        .select(f'y{lc_year_start}') \
+        .select(f'year_{lc_year_start}') \
         .remap(pm.translation_matrix[0], pm.translation_matrix[1])
     
     # target land cover map reclassified into IPCC classes
     landcover_tg_remapped = landcover \
-            .select(f'y{lc_year_end}') \
+            .select(f'year_{lc_year_end}') \
             .remap(pm.translation_matrix[0],pm.translation_matrix[1])
 
 
