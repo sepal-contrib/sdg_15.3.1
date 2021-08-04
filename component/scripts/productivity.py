@@ -9,12 +9,15 @@ ee.Initialize()
 
 def productivity_trajectory(model, nvdi_yearly_integration, climate_yearly_integration, output):
     """
-    Productivity Trend describes the trajectory of change in productivity over time. Trend is calculated by fitting a robust, non-parametric linear regression model.The significance of trajectory slopes at the P <= 0.05 level should be reported in terms of three classes:
+    Productivity Trend describes the trajectory of change in productivity over time. Trend is calculated by 
+    fitting a robust, non-parametric linear regression model.
+    The significance of trajectory slopes at the P <= 0.05 level should be reported in terms of three classes:
         1) Z score < -1.96 = Potential degradation, as indicated by a significant decreasing trend,
         2) Z score > 1.96 = Potential improvement, as indicated by a significant increasing trend, or
         3) Z score > -1.96 AND < 1.96 = No significant change
 
-In order to correct the effects of climate on productivity, climate adjusted trend analysis can be performed. There such methods are coded for the trajectory analysis. 
+In order to correct the effects of climate on productivity, climate adjusted trend analysis can be performed. 
+There such methods are coded for the trajectory analysis. 
 
 The following code runs the selected trend method and produce an output by reclassifying the trajectory slopes. 
     """
@@ -68,7 +71,8 @@ The following code runs the selected trend method and produce an output by recla
 
 def productivity_performance(aoi_model, model, nvdi_yearly_integration, climate_yearly_integration, output):
     """
-    It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates how a region is performing relative to other regions with similar productivity potential.
+    It measures local productivity relative to other similar vegetation types in similar land cover types and bioclimatic regions. It indicates 
+    how a region is performing relative to other regions with similar productivity potential.
         Steps:
         * Computation of mean NDVI for the analysis period,
         * Creation of ecologically similar regions based on USDA taxonomy and ESA CCI land cover data sets.
@@ -90,9 +94,9 @@ def productivity_performance(aoi_model, model, nvdi_yearly_integration, climate_
 
     # compute mean ndvi for the period
     ndvi_mean = nvdi_yearly_integration \
-        .select('ndvi') \
+        .select('vi') \
         .reduce(ee.Reducer.mean()) \
-        .rename(['ndvi'])
+        .rename(['vi'])
 
     ################
     
@@ -155,15 +159,19 @@ def productivity_performance(aoi_model, model, nvdi_yearly_integration, climate_
 def productivity_state(aoi_model, model, ndvi_yearly_integration, climate_int, output):
     """
     It represents the level of relative productivity in a pixel compred to a historical observations of productivity for that pixel. 
-    For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
+    For more, see Ivits, E., & Cherlet, M. (2016). Land productivity dynamics: towards integrated assessment of land degradation at
+    global scales. In. Luxembourg: Joint Research Centr, https://publications.jrc.ec.europa.eu/repository/bitstream/JRC80541/lb-na-26052-en-n%20.pdf
     It alows for the detection of recent changes in primary productivity as compared to the baseline period.
     
     Steps:
         * Definition of baseline and reporting perod,
-        * Computation of frequency distribution of mean NDVI for baseline period with addition of 5% at the both extremes of the distribution to alow inclusion of some, if an, missed extreme values in NDVI.
+        * Computation of frequency distribution of mean NDVI for baseline period with addition of 5% at the both extremes of the 
+        distribution to alow inclusion of some, if an, missed extreme values in NDVI.
         * Creation of 10 percentile classess using the data from the frequency distribution.
-        * computation of mean NDVI for baseline period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the base line period the number corresponding to that percentile class. 
-        * computation of mean NDVI for reporting period, and determination of the percentile class it belongs to. Assignmentof the mean NDVI for the reporting period the number corresponding to that percentile class. 
+        * computation of mean NDVI for baseline period, and determination of the percentile class it belongs to. Assignmentof 
+        the mean NDVI for the base line period the number corresponding to that percentile class. 
+        * computation of mean NDVI for reporting period, and determination of the percentile class it belongs to. Assignmentof 
+        the mean NDVI for the reporting period the number corresponding to that percentile class. 
         * Determination of the difference in class number between the reporting and baseline period
     """    
     
@@ -173,13 +181,13 @@ def productivity_state(aoi_model, model, ndvi_yearly_integration, climate_int, o
     
     baseline_ndvi_range = ndvi_yearly_integration \
         .filter(baseline_filter) \
-        .select('ndvi') \
+        .select('vi') \
         .reduce(ee.Reducer.percentile([0, 100]))
 
     # convert baseline ndvi imagecollection to bands
     baseline_ndvi_collection = ndvi_yearly_integration \
         .filter(baseline_filter) \
-        .select('ndvi')
+        .select('vi')
 
     baseline_ndvi_images = ee.ImageCollection.toBands(baseline_ndvi_collection)
 
@@ -188,19 +196,19 @@ def productivity_state(aoi_model, model, ndvi_yearly_integration, climate_int, o
     ###############
     
     # this var needs to have an explicit name
-    baseline_ndvi_5p = (baseline_ndvi_range.select('ndvi_p100').subtract(baseline_ndvi_range.select('ndvi_p0'))).multiply(0.05)
+    baseline_ndvi_5p = (baseline_ndvi_range.select('vi_p100').subtract(baseline_ndvi_range.select('vi_p0'))).multiply(0.05)
     
     ###############
     
     baseline_ndvi_extended = baseline_ndvi_images \
         .addBands(
             baseline_ndvi_range \
-            .select('ndvi_p0') \
+            .select('vi_p0') \
             .subtract(baseline_ndvi_5p)
         ) \
         .addBands(
             baseline_ndvi_range \
-            .select('ndvi_p100') \
+            .select('vi_p100') \
             .add(baseline_ndvi_5p)
         )
 
@@ -211,15 +219,15 @@ def productivity_state(aoi_model, model, ndvi_yearly_integration, climate_int, o
     # compute mean ndvi for the baseline and target period period
     baseline_ndvi_mean = ndvi_yearly_integration \
         .filter(baseline_filter) \
-        .select('ndvi') \
+        .select('vi') \
         .reduce(ee.Reducer.mean()) \
-        .rename(['ndvi'])
+        .rename(['vi'])
     
     target_ndvi_mean = ndvi_yearly_integration \
         .filter(target_filter) \
-        .select('ndvi') \
+        .select('vi') \
         .reduce(ee.Reducer.mean()) \
-        .rename(['ndvi'])
+        .rename(['vi'])
 
     # reclassify mean ndvi for baseline period based on the percentiles
     baseline_classes = ee.Image(pm.int_16_min) \
@@ -301,21 +309,22 @@ def productivity_final(trajectory, performance, state, output):
 def ndvi_trend(start, end, ndvi_yearly_integration):
     """Calculate NDVI trend.
     
-    Calculates the trend of temporal NDVI using NDVI data from selected satellite dataset. Areas where changes are not significant
+    Calculates the trend of temporal NDVI using NDVI data from selected satellite dataset. 
+    Areas where changes are not significant
     are masked out using a Mann-Kendall tau.
     """
 
     # Compute linear trend function to predict ndvi based on year (ndvi trend)
     linear_trend = ndvi_yearly_integration \
-        .select(['year', 'ndvi']) \
+        .select(['year', 'vi']) \
         .reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
     kendall_trend = ndvi_yearly_integration \
-        .select('ndvi') \
+        .select('vi') \
         .reduce(ee.Reducer.kendallsCorrelation(),2) \
         .multiply(10) \
-        .select('ndvi_tau')
+        .select('vi_tau')
 
     return (linear_trend, kendall_trend)
 
@@ -323,8 +332,11 @@ def restrend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     """
     Residual trend analysis(RESTREND) predicts NDVI based on the given rainfall.
     It uses linear regression model to predict NDVI for a given rainfall amount. 
-    The residual (Predicted - Obsedved) NDVI trend is considered as productivity change that is indipendent of climatic variation. 
-    For further details, check the reference: Wessels, K.J.; van den Bergh, F.; Scholes, R.J. Limits to detectability of land degradation by trend analysis of vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
+    The residual (Predicted - Obsedved) NDVI trend is considered as productivity 
+    change that is indipendent of climatic variation. 
+    For further details, check the reference: Wessels, K.J.; van den Bergh, F.; 
+    Scholes, R.J. Limits to detectability of land degradation by trend analysis of 
+    vegetation index data. Remote Sens. Environ. 2012, 125, 10–22.
    Inputs: 
     start: Start of the historical period
     end: End of the monitoring period
@@ -338,7 +350,7 @@ def restrend(start, end, ndvi_yearly_integration, climate_yearly_integration):
 
     # Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
     linear_model_climate_ndvi = ndvi_climate_yearly_integration \
-        .select(['clim', 'ndvi']) \
+        .select(['clim', 'vi']) \
         .reduce(ee.Reducer.linearFit())
 
     def ndvi_prediction_climate(image, list):
@@ -367,10 +379,10 @@ def restrend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     residual_yearly_ndvi = ndvi_yearly_integration.map(partial(ndvi_residuals, modeled = predicted_yearly_ndvi))
 
     # Fit a linear regression to the NDVI residuals
-    linear_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
+    linear_trend = residual_yearly_ndvi.select(['year', 'vi_res']).reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    kendall_trend = residual_yearly_ndvi.select('ndvi_res').reduce(ee.Reducer.kendallsCorrelation(),2).multiply(10).select('ndvi_res_tau')
+    kendall_trend = residual_yearly_ndvi.select('vi_res').reduce(ee.Reducer.kendallsCorrelation(),2).multiply(10).select('vi_res_tau')
     
     return (linear_trend, kendall_trend)
 
@@ -404,18 +416,18 @@ def ndvi_climate_merge(climate_yearly_integration, ndvi_yearly_integration, star
         rightField = 'year'
     )
     
-    join = ee.Join.inner('clim', 'ndvi', 'year')
+    join = ee.Join.inner('clim', 'vi', 'year')
     
     # join the 2 collections
     inner_join = join.apply(
         climate_yearly_integration.select('clim'),
-        ndvi_yearly_integration.select('ndvi'),
+        ndvi_yearly_integration.select('vi'),
         join_filter
     )
     
     joined = inner_join.map(lambda feature:
         ee.Image \
-            .cat(feature.get('clim'), feature.get('ndvi')) \
+            .cat(feature.get('clim'), feature.get('vi')) \
             .set('year', ee.Image(feature.get('clim')).get('year')) # both have the same year
     )
     
@@ -427,14 +439,14 @@ def ndvi_residuals(image, modeled):
     # get the year from image props
     year = image.get('year')
     
-    ndvi_o = image.select('ndvi')
+    ndvi_o = image.select('vi')
     
     ndvi_p = modeled.filter(ee.Filter.eq('year', year)).first()
     
     ndvi_r = ee.Image.constant(year) \
         .float() \
         .addBands(ndvi_o.subtract(ndvi_p)) \
-        .rename(['year', 'ndvi_res'])
+        .rename(['year', 'vi_res'])
         
     return ndvi_r
 
@@ -443,7 +455,7 @@ def use_efficiency_ratio(image):
     """Function to map over the ndvi and climate collection to get the rain use efficiency and store it as an imageCollection"""
         
     # extract climate and ndvi median values
-    ndvi_img = image.select('ndvi')
+    ndvi_img = image.select('vi')
     clim_img = image.select('clim').divide(1000)
     year = image.get('year')
     divide_img = ndvi_img \

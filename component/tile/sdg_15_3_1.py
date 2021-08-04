@@ -96,7 +96,7 @@ class Tile_15_3_1(sw.Tile):
             return self
 
         # use positionning in the list as boolean value
-        sensors = ['Landsat', 'Sentinel']
+        sensors = ['Landsat', 'Sentinel', 'MODIS']
 
         # guess the new input 
         new_value = list(set(change['new']) - set(change['old']))[0]
