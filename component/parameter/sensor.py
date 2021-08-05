@@ -1,11 +1,12 @@
 # first images year
 L4_start = 1982
 
-# max year for land cover 
-land_cover_max_year = 2019
+# max year for land use 
+land_use_max_year = 2018
 sensor_max_year = 2020
 
-land_cover_first_year = 1992
+lc_first_year = 1992
+lc_last_year = 2015
 
 # name of the sensor, GEE asset
 sensors = {
@@ -13,18 +14,12 @@ sensors = {
         'Landsat 5': 'LANDSAT/LT05/C01/T1_SR',
         'Landsat 7': 'LANDSAT/LE07/C01/T1_SR', 
         'Landsat 8': 'LANDSAT/LC08/C01/T1_SR', 
-        'Sentinel 2': 'COPERNICUS/S2',
-        'MODIS MOD13Q1': 'MODIS/006/MOD13Q1',
-        'MODIS NPP':'MODIS/006/MOD17A3HGF'
+        'Sentinel 2': 'COPERNICUS/S2'
 }
-
-
 
 precipitation = 'NOAA/PERSIANN-CDR'
 
-land_cover = "users/amitghosh/sdg_module/esa_cci_lc_1992_2019"
-soil_taxonomy = "OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02"
+land_cover = "users/geflanddegradation/toolbox_datasets/lcov_esacc_1992_2018"
+soil_tax = "users/geflanddegradation/toolbox_datasets/soil_tax_usda_sgrid"
 soc = "users/geflanddegradation/toolbox_datasets/soc_sgrid_30cm"
-soc_isric = "projects/soilgrids-isric/soc_mean"
 ipcc_climate_zones = "users/geflanddegradation/toolbox_datasets/ipcc_climate_zones"
-wte = "users/amitghosh/sdg_module/wte_2020"

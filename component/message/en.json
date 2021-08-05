@@ -16,8 +16,8 @@
             "water": "Water body"
         },
         "trend": {
-            "ndvi": "Productivity (VI) trend",
-            "p_res": "Residual (Osereved VI - Predicetd VI) trend ",
+            "ndvi": "NDVI trend",
+            "p_res": "Residual (Osereved NDVI - Predicetd NDVI) trend ",
             "s_res": "Water use efficiency (WUE)",
             "ue": "Rain use efficiency (RUE)"
         },
@@ -31,18 +31,6 @@
             "predifined": "Use predefined climate regime",
             "custom": "Use custom value"
         },
-        "vi":{
-            "ndvi": "Normalised Difference Vegetation Index (NDVI)",
-            "evi": "Enhanced Vegetation Index (EVI)",
-            "msvi": "Modified Soil Adjusted Vegetation Index2 (MSVI2)"    
-        },
-        "lceu":{
-            "calculate": "Calculate based on land cover and soil texture",
-            "wte": "World Ecosystem",
-            "hru":"Global Homogeneous Response Units",
-            "gaes":"Global Agro-Environmental Stratification"
-        },
-        
         "legend": {
             "degraded" : "degraded",
             "stable" : "stable",
@@ -54,9 +42,7 @@
             "no_target": "please provide a start date of assemsment period",
             "no_end": "Please provide a end date for the assesment period",
             "no_traj": "Please provide a trajectory for the trend analysis",
-            "no_mix": "You cannot mix sentinel and landsat data",
-            "no_vi" : "Please provide a vegetation index for the productivity analysis",
-            "no_lceu": "Please provide a land cover ecosystem functional units source"
+            "no_mix": "You cannot mix sentinel and landsat data"
         },
         "process_text": [
             "This process tile will allow you to compute the value if the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
@@ -72,8 +58,6 @@
         ],
         "sensor_lbl": "Select sensor",
         "traj_lbl": "Select trajectory",
-        "vi_lbl":"Select Vegetation Index",
-        "lceu_lbl": "Select Land cover ecosystem functional units",
         "transition_matrix": "Transition matrix",
         "title": "15.3.1 Proportion of degraded land over total land area",
         "process_btn": "Load the indicators",
@@ -88,8 +72,10 @@
         "clim_option_lbl": "Climate regime options",
         "clim_default_lbl": "Climate regime",
         "clim_custom_lbl": "Custom climate regime value",
-        "start_lbl": "Starting year",
-        "end_lbl": "Ending year",
+        "start_lbl": "Start historical period",
+        "baseline_end_lbl": "End historical period",
+        "target_start_lbl": "Start monitoring period",
+        "end_lbl": "End monitoring period",
         "matrix_changed": "You have changed your transition matrix",
         "prod_layer": "Productivity",
         "lc_layer": "Land cover",

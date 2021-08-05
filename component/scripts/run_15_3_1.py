@@ -118,21 +118,21 @@ def display_maps(aoi_model, model, m, output):
 def compute_indicator_maps(aoi_model, model, output):
     
     # raise an error if the years are not in the rigth order 
-    if not (model.start < model.end):
+    if not (model.start <model.baseline_end <= model.target_start < model.end):
         raise Exception(ms._15_3_1.error.wrong_year)
     
     # compute intermediary maps 
     ndvi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
     prod_trajectory = productivity_trajectory(model, ndvi_int, climate_int, output)
     prod_performance = productivity_performance(aoi_model, model, ndvi_int, climate_int, output)
-    prod_state = productivity_state(aoi_model, model, ndvi_int, output) 
+    prod_state = productivity_state(aoi_model, model, ndvi_int, climate_int, output) 
     
     # compute result maps 
     model.land_cover = land_cover(model, aoi_model, output)
     model.soc = soil_organic_carbon(model, aoi_model, output)
     model.productivity = productivity_final(prod_trajectory, prod_performance, prod_state, output)
     
-    # sum up in a map
+    # sump up in a map
     model.indicator_15_3_1 = indicator_15_3_1(model.productivity, model.land_cover, model.soc, output)
 
     return 
