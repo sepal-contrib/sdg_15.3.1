@@ -121,10 +121,10 @@ class gdrive(object):
             
             if files == []:
                 task_config = {
-                    'image':image.clip(aoi_io.get_aoi_ee()),
+                    'image':image.clip(aoi_io.feature_collection),
                     'description':filename,
                     'scale': 30,
-                    'region':aoi_io.get_aoi_ee().geometry(),
+                    'region':aoi_io.feature_collection.geometry(),
                     'maxPixels': 1e13
                 }
                 

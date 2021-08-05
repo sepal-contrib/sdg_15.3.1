@@ -28,12 +28,13 @@ class Tile_15_3_1(sw.Tile):
         self.sensor_select = cw.SensorSelect()
         vegetation_index = v.Select(label=ms._15_3_1.vi_lbl, items = pm.vegetation_index, v_model =None)
         trajectory = v.Select(label=ms._15_3_1.traj_lbl, items=pm.trajectories, v_model=None)
+        lceu = v.Select(label=ms._15_3_1.lceu_lbl, items = pm.lceu, v_model =None)
         transition_label = v.Html(class_='grey--text mt-2', tag='h3', children=[ms._15_3_1.transition_matrix])
         transition_matrix = cw.TransitionMatrix(self.model, alert)
         climate_regime = cw.ClimateRegime(self.model, alert)
         
         # bind the standars widgets to variables 
-        self.model.bind(self.sensor_select, 'sensors').bind(trajectory, 'trajectory').bind(vegetation_index,'vegetation_index')
+        self.model.bind(self.sensor_select, 'sensors').bind(trajectory, 'trajectory').bind(vegetation_index,'vegetation_index').bind(lceu,'lceu')
         
         # create the actual tile
         super().__init__(
@@ -45,6 +46,7 @@ class Tile_15_3_1(sw.Tile):
                 self.sensor_select, 
                 vegetation_index,
                 trajectory, 
+                lceu,
                 transition_label, 
                 transition_matrix, 
                 climate_regime
@@ -64,10 +66,10 @@ class Tile_15_3_1(sw.Tile):
         # check the inputs 
         if not self.alert.check_input(self.aoi_model.name, ms.error.no_aoi): return
         if not self.alert.check_input(self.model.start, ms._15_3_1.error.no_start): return
-        if not self.alert.check_input(self.model.target_start, ms._15_3_1.error.no_target): return
         if not self.alert.check_input(self.model.end, ms._15_3_1.error.no_end): return
         if not self.alert.check_input(self.model.vegetation_index, ms._15_3_1.error.no_vi): return
         if not self.alert.check_input(self.model.trajectory, ms._15_3_1.error.no_traj): return
+        if not self.alert.check_input(self.model.lceu, ms._15_3_1.error.no_lceu): return
         if not self.alert.check_input(self.model.sensors, 'no sensors'): return widget.toggle_loading()
         
         cs.compute_indicator_maps(self.aoi_model, self.model, self.alert)
@@ -96,7 +98,7 @@ class Tile_15_3_1(sw.Tile):
             return self
 
         # use positionning in the list as boolean value
-        sensors = ['Landsat', 'Sentinel']
+        sensors = ['Landsat', 'Sentinel', 'MODIS']
 
         # guess the new input 
         new_value = list(set(change['new']) - set(change['old']))[0]
