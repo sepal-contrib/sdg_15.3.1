@@ -7,33 +7,37 @@ from component import parameter as pm
 
 ee.Initialize()
 
-def integrate_ndvi_climate(aoi_model, model, output):
-    
-    # create the composite image collection
-    i_img_coll = ee.ImageCollection([])
-    
-    for sensor in model.sensors:
-        
-        # get the image collection 
-        # filter its bounds to fit the aoi extends 
-        # rename the bands 
-        # adapt the resolution to meet sentinel 2 native one (10m)
-        # mask the clouds and adapt the scale 
-        sat = ee.ImageCollection(pm.sensors[sensor]) \
-            .filterBounds(aoi_model.feature_collection) \
-            .map(partial(rename_band, sensor=sensor)) \
-            .map(partial(adapt_res, sensor=sensor)) \
-            .map(partial(cloud_mask, sensor=sensor)) 
-    
-        i_img_coll = i_img_coll.merge(sat)
-    
-    # Filtering the img collection  using start year and end year
-    i_img_coll = i_img_coll.filterDate(f'{model.start}-01-01', f'{model.end}-12-31')
 
-    # Function to integrate observed NDVI datasets at the annual level
-    ndvi_coll = i_img_coll.map(CalcNDVI).select('ndvi')
+def integrate_ndvi_climate(aoi_model, model, output):
+    if 'MODIS NDVI' in model.sensors:
+        modis_vi = ee.ImageCollection(pm.sensors['MODIS NDVI']).filterDate(f'{model.start}-01-01', f'{model.end}-12-31')
+        ndvi_int =  annual_modis_ndvi(modis_vi.select('NDVI'),model.start, model.end)
+    else:
+        # create the composite image collection
+        i_img_coll = ee.ImageCollection([])
+        
+        for sensor in model.sensors:
+            
+            # get the image collection 
+            # filter its bounds to fit the aoi extends 
+            # rename the bands 
+            # adapt the resolution to meet sentinel 2 native one (10m)
+            # mask the clouds and adapt the scale 
+            sat = ee.ImageCollection(pm.sensors[sensor]) \
+                .filterBounds(aoi_model.feature_collection) \
+                .map(partial(rename_band, sensor=sensor)) \
+                .map(partial(adapt_res, sensor=sensor)) \
+                .map(partial(cloud_mask, sensor=sensor)) 
+        
+            i_img_coll = i_img_coll.merge(sat)
+        
+        # Filtering the img collection  using start year and end year
+        i_img_coll = i_img_coll.filterDate(f'{model.start}-01-01', f'{model.end}-12-31')
     
-    ndvi_int = int_yearly_ndvi(ndvi_coll, model.start, model.end)
+        # Function to integrate observed NDVI datasets at the annual level
+        ndvi_coll = i_img_coll.map(CalcNDVI).select('ndvi')
+        
+        ndvi_int = int_yearly_ndvi(ndvi_coll, model.start, model.end)
 
     # process the climate dataset to use with the pixel restrend, RUE calculation
     precipitation = ee.ImageCollection(pm.precipitation) \
@@ -161,8 +165,23 @@ def CalcNDVI(img):
     
     ndvi = nir.subtract(red) \
         .divide(nir.add(red)) \
-        .multiply(10000) \
         .rename('ndvi') \
         .set('system:time_start', img.get('system:time_start'))
     
     return ndvi
+def annual_modis_ndvi(modis_img,start, end):
+    """Function to integrate observed precipitation datasets at the annual level"""
+    
+    years = ee.List.sequence(start, end)
+    
+    img_coll = ee.ImageCollection.fromImages(
+        years.map(lambda year:
+            modis_img \
+                .filter(ee.Filter.calendarRange(year, field = 'year')) \
+                .reduce(ee.Reducer.mean()) \
+                .rename('ndvi') \
+                .addBands(ee.Image().constant(year).float().rename('year')) \
+                .set('year', year)
+        )
+    )
+    return img_coll

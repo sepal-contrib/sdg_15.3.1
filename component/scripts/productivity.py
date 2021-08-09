@@ -24,43 +24,19 @@ The following code runs the selected trend method and produce an output by recla
     
     # ndvi trend
     if model.trajectory == trajectories[0]:
-        lf_trend, mk_trend = ndvi_trend(model.start, model.end, nvdi_yearly_integration)
+        z_score = ndvi_trend(model.start, model.end, nvdi_yearly_integration)
     # residual trend analysis
     elif model.trajectory == trajectories[1]:
-        lf_trend, mk_trend = restrend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
-    # Water use efficiency
-    elif model.trajectory == trajectories[2]:
-        #TODO: 
-        raise NameError("this method is under development")
+        z_score = restrend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
     # rain use efficiency trend
     elif model.trajectory == trajectories[3]:
-        lf_trend, mk_trend = rain_use_efficiency_trend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
+        z_score = rain_use_efficiency_trend(model.start, model.end, nvdi_yearly_integration, climate_yearly_integration)
 
-    # Define Kendall parameter values for a significance of 0.05
-    period = model.end - model.start + 1
-    kendall90 = pm.get_kendall_coef(period, 90)
-    kendall95 = pm.get_kendall_coef(period, 95)
-    kendall99 = pm.get_kendall_coef(period, 99)
-
-    # Create final productivity trajectory output layer. Positive values are 
-    # significant increase, negative values are significant decrease.
-    signif = ee.Image(pm.int_16_min) \
-        .where(lf_trend.select('scale').gt(0).And(mk_trend.abs().gte(kendall90)), 1) \
-        .where(lf_trend.select('scale').gt(0).And(mk_trend.abs().gte(kendall95)), 2) \
-        .where(lf_trend.select('scale').gt(0).And(mk_trend.abs().gte(kendall99)), 3) \
-        .where(lf_trend.select('scale').lt(0).And(mk_trend.abs().gte(kendall90)), -1) \
-        .where(lf_trend.select('scale').lt(0).And(mk_trend.abs().gte(kendall95)), -2) \
-        .where(lf_trend.select('scale').lt(0).And(mk_trend.abs().gte(kendall99)), -3) \
-        .where(mk_trend.abs().lte(kendall90), 0) \
-        .where(lf_trend.select('scale').abs().lte(10), 0) \
-        .rename('signif')
-
-    # use the bytes convention 
-    # 1 degraded - 2 stable - 3 improved
+    # 1 degraded - 2 stable - 3 improved        
     trajectory = ee.Image(0) \
-        .where(signif.gt(0),3) \
-        .where(signif.eq(0),2) \
-        .where(signif.lt(0).And(signif.neq(pm.int_16_min)),1) \
+        .where(z_score.lt(-1.96),1) \
+        .where(z_score.gt(1.96),3) \
+        .where(z_score.gt(-1.96).And(z_score.lt(1.96)),2) \
         .rename('trajectory') \
         .uint8()
     
@@ -298,26 +274,24 @@ def productivity_final(trajectory, performance, state, output):
     
     return productivity.uint8()
 
-def ndvi_trend(start, end, ndvi_yearly_integration):
-    """Calculate NDVI trend.
+def ndvi_trend(start, end, integrated_annual_vi):
+    """Calculate VI trend.
     
-    Calculates the trend of temporal NDVI using NDVI data from selected satellite dataset. Areas where changes are not significant
+    Calculates the trend of temporal VI using VI data from selected satellite dataset. 
+    Areas where changes are not significant
     are masked out using a Mann-Kendall tau.
     """
 
-    # Compute linear trend function to predict ndvi based on year (ndvi trend)
-    linear_trend = ndvi_yearly_integration \
-        .select(['year', 'ndvi']) \
-        .reduce(ee.Reducer.linearFit())
-
     # Compute Kendall statistics
-    kendall_trend = ndvi_yearly_integration \
+    n = end-start+1
+    z_coefficient = pm.z_coefficient(n)
+    kendall_trend = integrated_annual_vi \
         .select('ndvi') \
         .reduce(ee.Reducer.kendallsCorrelation(),2) \
-        .multiply(10) \
-        .select('ndvi_tau')
+        .select('ndvi_tau')\
+        .multiply(z_coefficient)
 
-    return (linear_trend, kendall_trend)
+    return kendall_trend
 
 def restrend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     """
@@ -367,12 +341,15 @@ def restrend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     residual_yearly_ndvi = ndvi_yearly_integration.map(partial(ndvi_residuals, modeled = predicted_yearly_ndvi))
 
     # Fit a linear regression to the NDVI residuals
-    linear_trend = residual_yearly_ndvi.select(['year', 'ndvi_res']).reduce(ee.Reducer.linearFit())
-
     # Compute Kendall statistics
-    kendall_trend = residual_yearly_ndvi.select('ndvi_res').reduce(ee.Reducer.kendallsCorrelation(),2).multiply(10).select('ndvi_res_tau')
+    n = end-start+1
+    z_coefficient = pm.z_coefficient(n)
+    kendall_trend = residual_yearly_ndvi.select('ndvi_res')\
+            .reduce(ee.Reducer.kendallsCorrelation(),2)\
+            .select('ndvi_res_tau')\
+            .multiply(z_coefficient)
     
-    return (linear_trend, kendall_trend)
+    return kendall_trend
 
 def rain_use_efficiency_trend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     """
@@ -386,13 +363,16 @@ def rain_use_efficiency_trend(start, end, ndvi_yearly_integration, climate_yearl
     # Apply function to compute ue and store as a collection
     ue_yearly_collection = ndvi_climate_yearly_integration.map(use_efficiency_ratio)
 
-    # Compute linear trend function to predict ndvi based on year (ndvi trend)
-    linear_trend = ue_yearly_collection.select(['year', 'ue']).reduce(ee.Reducer.linearFit())
 
     # Compute Kendall statistics
-    kendall_trend = ue_yearly_collection.select('ue').reduce(ee.Reducer.kendallsCorrelation(),2).multiply(10).select('ue_tau')
+    n = end-start+1
+    z_coefficient = pm.z_coefficient(n)
+    kendall_trend = ue_yearly_collection.select('ue')\
+        .reduce(ee.Reducer.kendallsCorrelation(),2)\
+        .select('ue_tau')\
+        .multiply(z_coefficient)
     
-    return (linear_trend, kendall_trend)
+    return kendall_trend
 
  
 def ndvi_climate_merge(climate_yearly_integration, ndvi_yearly_integration, start=None, end=None):
