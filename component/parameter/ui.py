@@ -3,10 +3,9 @@ import ipyvuetify as v
 from component.message import ms 
 
 trajectories = [
-    {'text': ms._15_3_1.trend.ndvi, 'value': 'ndvi_trend', 'disabled': False},
-    {'text': ms._15_3_1.trend.p_res, 'value': 'p_restrend', 'disabled': False},
-    {'text': ms._15_3_1.trend.s_res, 'value': 's_restrend', 'disabled': True},
-    {'text': ms._15_3_1.trend.ue, 'value': 'ue_trend',   'disabled': False}
+    {'text': ms._15_3_1.trend.ndvi, 'value': 'ndvi_trend'},
+    {'text': ms._15_3_1.trend.p_res, 'value': 'p_restrend'},
+    {'text': ms._15_3_1.trend.ue, 'value': 'ue_trend'}
 ]
 
 climate_regimes = [

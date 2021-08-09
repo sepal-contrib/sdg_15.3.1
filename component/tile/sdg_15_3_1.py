@@ -93,22 +93,22 @@ class Tile_15_3_1(sw.Tile):
             return self
 
         # use positionning in the list as boolean value
-        sensors = ['Landsat', 'Sentinel']
+        sensors = ['Landsat', 'Sentinel','MODIS']
 
         # guess the new input 
         new_value = list(set(change['new']) - set(change['old']))[0]
 
         id_ = next(i for i, s in enumerate(sensors) if s in new_value)
-
-        if sensors[id_] in new_value:
-            if any(sensors[not id_] in s for s in change['old']):
+        other_sensors = [x for x in sensors if x not in new_value]
+        if any(i not in new_value for i in other_sensors):
+            if any(i in s for s in change['old'] for i in other_sensors):
                 change['owner'].v_model = [new_value]
                 self.alert.add_live_msg(ms._15_3_1.error.no_mix, 'warning')
             else: 
                 self.alert.reset()
 
         return self
-    
+
 class Result_15_3_1(sw.Tile):
     
     def __init__(self, aoi_model, model, **kwargs):
