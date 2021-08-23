@@ -22,18 +22,16 @@ class SensorSelect(v.Select):
         self.v_model = []
         
         # define the offset that should be used based on the year in the sensors list
-        if change['new'] >= 2016:
+        if change['new'] >= 2015: #launch of Sentinel 2
             last_sat = 6
-        elif change['new'] >= 2015: # launch of Sentinel 2
-            last_sat = 5
         elif change['new'] >= 2013: # launch of Landsat 8
-            last_sat = 4
+            last_sat = 5
         elif change['new'] >= 1999: #launch of landsat 7
-            last_sat = 3
+            last_sat = 4
         elif change['new'] >= 1984: #launch of landsat 5
-            last_sat = 2
+            last_sat = 3
         else:
-            last_sat = 1
+            last_sat = 2
             
         # get the availabel sats 
         items = [*pm.sensors][:last_sat]
