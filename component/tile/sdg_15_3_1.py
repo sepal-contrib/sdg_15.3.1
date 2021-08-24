@@ -77,7 +77,8 @@ class Tile_15_3_1(sw.Tile):
         # get the result map        
         cs.display_maps(self.aoi_model, self.model, self.result_tile.m, self.alert)
 
-        # create the csv result
+        # create the csv result 
+        #TODO: make it optional
         stats = cs.compute_zonal_analysis(self.aoi_model, self.model, self.alert)
         self.result_tile.shp_btn.set_url(str(stats))
 
@@ -103,7 +104,6 @@ class Tile_15_3_1(sw.Tile):
         # guess the new input 
         new_value = list(set(change['new']) - set(change['old']))[0]
 
-        id_ = next(i for i, s in enumerate(sensors) if s in new_value)
         other_sensors = [x for x in sensors if x not in new_value]
         if any(i not in new_value for i in other_sensors):
             if any(i in s for s in change['old'] for i in other_sensors):
@@ -140,7 +140,7 @@ class Result_15_3_1(sw.Tile):
         self.soc_btn = sw.DownloadBtn(ms._15_3_1.down_soc)
         self.indicator_btn = sw.DownloadBtn(ms._15_3_1.down_ind)
         
-        # aggregate the btn as a line 
+        # aggregate the btn as a line
         btn_line =  v.Layout(Row=True, children=[
             self.shp_btn, 
             self.prod_btn,
@@ -170,8 +170,8 @@ class Result_15_3_1(sw.Tile):
         # update the btns
         self.land_cover_btn.set_url(str(links[0]))
         self.soc_btn.set_url(str(links[1]))
-        self.prod_btn.set_url(str(links[2]))
-        self.indicator_btn.set_url(str(links[3]))
+        self.prod_btn.set_url(str(links[5]))
+        self.indicator_btn.set_url(str(links[6]))
             
         return
         

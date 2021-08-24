@@ -31,6 +31,9 @@ def download_maps(aoi_model, model, output):
     # create the export path
     land_cover_desc = f'{aoi_model.name}_land_cover'
     soc_desc = f'{aoi_model.name}_soc'
+    trend_desc = f'{aoi_model.name}_productivity_trend'
+    performance_desc = f'{aoi_model.name}_productivity_performance'
+    state_desc = f'{aoi_model.name}_productivity_state'
     productivity_desc = f'{aoi_model.name}_productivity'
     indicator_desc = f'{aoi_model.name}_indicator_15_3_1'
         
@@ -42,35 +45,50 @@ def download_maps(aoi_model, model, output):
         geom = aoi_model.feature_collection.geometry()
         land_cover = model.land_cover.clip(geom)
         soc = model.soc.clip(geom)
+        trend = model.productivity_trend.clip(geom)
+        state = model.productivity_state.clip(geom)
+        performance = model.productivity_performance.clip(geom)
         productivity = model.productivity.clip(geom)
         indicator = model.indicator_15_3_1.clip(geom)
     else:
         land_cover = model.land_cover
         soc = model.soc
+        trend = model.productivity_trend
+        state = model.productivity_state
+        performance = model.productivity_performance
         productivity = model.productivity
         indicator = model.indicator_15_3_1
         
     # download all files
     downloads = drive_handler.download_to_disk(land_cover_desc, land_cover, aoi_model, output)
     downloads = drive_handler.download_to_disk(soc_desc, soc, aoi_model, output)
+    downloads = drive_handler.download_to_disk(trend_desc, trend, aoi_model, output)
+    downloads = drive_handler.download_to_disk(performance_desc, performance, aoi_model, output)    
+    downloads = drive_handler.download_to_disk(state_desc, state, aoi_model, output)
     downloads = drive_handler.download_to_disk(productivity_desc, productivity, aoi_model, output)
     downloads = drive_handler.download_to_disk(indicator_desc, indicator, aoi_model, output)
         
     # I assume that they are always launch at the same time 
     # If not it's going to crash
     if downloads:
-        wait_for_completion([land_cover_desc, soc_desc, productivity_desc, indicator_desc], output)
+        wait_for_completion([land_cover_desc, soc_desc, trend_desc, performance_desc, productivity_desc, state_desc, indicator_desc], output)
     output.add_live_msg(ms.gee.tasks_completed, 'success') 
     
     # create merge names 
     land_cover_merge = pm.result_dir.joinpath(f'{land_cover_desc}_merge.tif')
     soc_merge = pm.result_dir.joinpath(f'{soc_desc}_merge.tif')
+    trend_merge = pm.result_dir.joinpath(f'{trend_desc}_merge.tif')
+    performance_merge = pm.result_dir.joinpath(f'{state_desc}_merge.tif')
+    state_merge = pm.result_dir.joinpath(f'{performance_desc}_merge.tif')
     productivity_merge = pm.result_dir.joinpath(f'{productivity_desc}_merge.tif')
     indicator_merge = pm.result_dir.joinpath(f'{indicator_desc}_merge.tif')
     
     # digest the tiles
     digest_tiles(land_cover_desc, pm.result_dir, output, land_cover_merge)
     digest_tiles(soc_desc, pm.result_dir, output, soc_merge)
+    digest_tiles(trend_desc, pm.result_dir, output, trend_merge)
+    digest_tiles(performance_desc, pm.result_dir, output, performance_merge)
+    digest_tiles(state_desc, pm.result_dir, output, state_merge)    
     digest_tiles(productivity_desc, pm.result_dir, output, productivity_merge)
     digest_tiles(indicator_desc, pm.result_dir, output, indicator_merge)
         
@@ -78,13 +96,16 @@ def download_maps(aoi_model, model, output):
     # remove the files from drive
     drive_handler.delete_files(drive_handler.get_files(land_cover_desc))
     drive_handler.delete_files(drive_handler.get_files(soc_desc))
+    drive_handler.delete_files(drive_handler.get_files(trend_desc))
+    drive_handler.delete_files(drive_handler.get_files(performance_desc))
+    drive_handler.delete_files(drive_handler.get_files(state_desc))    
     drive_handler.delete_files(drive_handler.get_files(productivity_desc))
     drive_handler.delete_files(drive_handler.get_files(indicator_desc))
         
     #display msg 
     output.add_live_msg(ms.download.completed, 'success')
 
-    return (land_cover_merge, soc_merge, productivity_merge, indicator_merge)
+    return (land_cover_merge, soc_merge, trend_merge, performance_merge, state_merge, productivity_merge, indicator_merge)
 
 def display_maps(aoi_model, model, m, output):
     
@@ -117,20 +138,20 @@ def display_maps(aoi_model, model, m, output):
 
 def compute_indicator_maps(aoi_model, model, output):
     
-    # raise an error if the years are not in the rigth order 
+    # raise an error if the years are not in the right order 
     if not (model.start < model.end):
         raise Exception(ms._15_3_1.error.wrong_year)
     
     # compute intermediary maps 
-    ndvi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
-    prod_trajectory = productivity_trajectory(model, ndvi_int, climate_int, output)
-    prod_performance = productivity_performance(aoi_model, model, ndvi_int, climate_int, output)
-    prod_state = productivity_state(aoi_model, model, ndvi_int, output) 
+    vi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
+    model.productivity_trend = productivity_trajectory(model, vi_int, climate_int, output)
+    model.productivity_performance = productivity_performance(aoi_model, model, vi_int, climate_int, output)
+    model.productivity_state = productivity_state(aoi_model, model, vi_int, output) 
     
     # compute result maps 
     model.land_cover = land_cover(model, aoi_model, output)
     model.soc = soil_organic_carbon(model, aoi_model, output)
-    model.productivity = productivity_final(prod_trajectory, prod_performance, prod_state, output)
+    model.productivity = productivity_final(model.productivity_trend, model.productivity_performance, model.productivity_state, output)
     
     # sum up in a map
     model.indicator_15_3_1 = indicator_15_3_1(model.productivity, model.land_cover, model.soc, output)
@@ -237,3 +258,6 @@ def indicator_15_3_1(productivity, landcover, soc, output):
     .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3)
     
     return indicator.uint8()
+
+#def stats_by_land_cover(model):
+    

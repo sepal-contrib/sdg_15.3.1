@@ -8,8 +8,7 @@ sensor_max_year = 2020
 land_cover_first_year = 1992
 
 # name of the sensor, GEE asset
-sensors = u
-
+sensors = {
         'MODIS MOD13Q1': 'MODIS/006/MOD13Q1',
         'Landsat 4': 'LANDSAT/LT04/C01/T1_SR',
         'Landsat 5': 'LANDSAT/LT05/C01/T1_SR',

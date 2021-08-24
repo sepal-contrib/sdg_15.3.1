@@ -35,5 +35,8 @@ class Model_15_3_1(model.Model):
     land_cover = Any(None).tag(sync=True)
     soc = Any(None).tag(sync=True)
     productivity = Any(None).tag(sync=True)
+    productivity_trend = Any(None).tag(sync=True)
+    productivity_state = Any(None).tag(sync=True)
+    productivity_performance = Any(None).tag(sync=True)
     indicator_15_3_1 = Any(None).tag(sync=True)
         
