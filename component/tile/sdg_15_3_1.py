@@ -136,6 +136,9 @@ class Result_15_3_1(sw.Tile):
         # add a download btn for csv and a download btn for the sepal
         self.shp_btn = sw.DownloadBtn(ms._15_3_1.down_zonal)
         self.prod_btn = sw.DownloadBtn(ms._15_3_1.down_prod)
+        self.trend_btn = sw.DownloadBtn(ms._15_3_1.down_trend)
+        self.state_btn = sw.DownloadBtn(ms._15_3_1.down_state)
+        self.performance_btn = sw.DownloadBtn(ms._15_3_1.down_performance)
         self.land_cover_btn = sw.DownloadBtn(ms._15_3_1.down_lc)
         self.soc_btn = sw.DownloadBtn(ms._15_3_1.down_soc)
         self.indicator_btn = sw.DownloadBtn(ms._15_3_1.down_ind)
@@ -143,6 +146,9 @@ class Result_15_3_1(sw.Tile):
         # aggregate the btn as a line
         btn_line =  v.Layout(Row=True, children=[
             self.shp_btn, 
+            self.trend_btn,
+            self.state_btn,
+            self.performance_btn,
             self.prod_btn,
             self.land_cover_btn,
             self.soc_btn,
@@ -170,8 +176,10 @@ class Result_15_3_1(sw.Tile):
         # update the btns
         self.land_cover_btn.set_url(str(links[0]))
         self.soc_btn.set_url(str(links[1]))
+        self.trend_btn.set_url(str(links[2]))
+        self.performance_btn.set_url(str(links[2]))
+        self.state_btn.set_url(str(links[1]))
         self.prod_btn.set_url(str(links[5]))
         self.indicator_btn.set_url(str(links[6]))
             
         return
-        
