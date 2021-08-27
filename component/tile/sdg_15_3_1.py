@@ -10,7 +10,7 @@ from component.message import ms
 
 class Tile_15_3_1(sw.Tile):
     
-    def __init__(self, aoi_model, model, result_tile):
+    def __init__(self, aoi_model, model, result_tile, zonal_stats_tile):
         
         # use model 
         self.aoi_model = aoi_model
@@ -21,6 +21,9 @@ class Tile_15_3_1(sw.Tile):
         
         #result tile
         self.result_tile = result_tile
+        
+        #Zonal stats tile
+        self.zonal_stats_tile = zonal_stats_tile
         
         # create the widgets that will be displayed
         markdown = sw.Markdown("""{}""".format('  \n'.join(ms._15_3_1.process_text)))
@@ -77,13 +80,9 @@ class Tile_15_3_1(sw.Tile):
         # get the result map        
         cs.display_maps(self.aoi_model, self.model, self.result_tile.m, self.alert)
 
-        # create the csv result 
-        #TODO: make it optional
-        stats = cs.compute_zonal_analysis(self.aoi_model, self.model, self.alert)
-        self.result_tile.shp_btn.set_url(str(stats))
-
         # release the download btn
         self.result_tile.btn.disabled = False
+        self.zonal_stats_tile.btn.disabled = False
             
         return
     
@@ -134,7 +133,7 @@ class Result_15_3_1(sw.Tile):
         )
         
         # add a download btn for csv and a download btn for the sepal
-        self.shp_btn = sw.DownloadBtn(ms._15_3_1.down_zonal)
+        
         self.prod_btn = sw.DownloadBtn(ms._15_3_1.down_prod)
         self.trend_btn = sw.DownloadBtn(ms._15_3_1.down_trend)
         self.state_btn = sw.DownloadBtn(ms._15_3_1.down_state)
@@ -144,8 +143,7 @@ class Result_15_3_1(sw.Tile):
         self.indicator_btn = sw.DownloadBtn(ms._15_3_1.down_ind)
         
         # aggregate the btn as a line
-        btn_line =  v.Layout(Row=True, children=[
-            self.shp_btn, 
+        btn_line =  v.Layout(Row=True, children=[ 
             self.trend_btn,
             self.state_btn,
             self.performance_btn,
@@ -159,7 +157,7 @@ class Result_15_3_1(sw.Tile):
         super().__init__(
             '15_3_1_widgets', 
             ms._15_3_1.results, 
-            [markdown, btn_line, self.m],
+            [markdown, self.m, btn_line],
             alert = sw.Alert(), 
             btn = sw.Btn(text = ms._15_3_1.result_btn, icon = 'mdi-download', class_='ma-5', disabled=True)
         )
@@ -181,5 +179,44 @@ class Result_15_3_1(sw.Tile):
         self.state_btn.set_url(str(links[1]))
         self.prod_btn.set_url(str(links[5]))
         self.indicator_btn.set_url(str(links[6]))
+            
+        return
+    
+class Zonal_Stats(sw.Tile):
+    
+    def __init__(self, aoi_model, model, **kwargs):
+        
+        # get model for the downloading 
+        self.aoi_model = aoi_model
+        self.model = model
+        
+        markdown = sw.Markdown("""{}""".format('  \n'.join(ms._15_3_1.result_text_zonalstats)))
+        
+        # create the result map
+
+        # add a download btn for csv and a download btn for the sepal
+        self.shp_btn = sw.DownloadBtn(ms._15_3_1.down_zonal)
+    
+
+        # init the tile 
+        super().__init__(
+            '15_3_1_widgets', 
+            ms._15_3_1.results, 
+            [markdown, self.shp_btn],
+            alert = sw.Alert(),
+            btn = sw.Btn(text = ms._15_3_1.result_btn_zonalstats, icon = 'mdi-download', class_='ma-5', disabled=True)
+            
+        )
+        
+        # link the downlad as tif to a function
+        self.btn.on_event('click', self.compute_stats)
+        
+    @su.loading_button(debug=False)
+    def compute_stats(self, widget, event, data):
+        
+        # download the files
+        stats = cs.compute_zonal_analysis(self.aoi_model, self.model, self.alert)
+        #update the button 
+        self.shp_btn.set_url(str(stats))
             
         return

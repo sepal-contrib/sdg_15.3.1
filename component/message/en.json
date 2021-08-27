@@ -70,6 +70,10 @@
             "Once the layers are loaded on the map, click on the \"download\" button to download the indicators .tif in your sepal folder",
             "The green buttons will be released once the files are retrieved from Gdrive and they will allow you to download them on your local computer."
         ],
+        "result_text_zonalstats": [
+            "Once the result is ready, click on the \"download\" button to download the statistics (Shapefile) on your computer)",
+            "The green button shall be released once the files are ready to download on your local computer."
+        ],
         "sensor_lbl": "Select sensor",
         "traj_lbl": "Select trajectory",
         "vi_lbl":"Select Vegetation Index",
@@ -87,6 +91,7 @@
         "down_performance": "Productivity performance", 
         "down_soc": "Soil Organic Carbon",
         "down_ind": "Indicator 15.3.1",
+        "result_btn_zonalstats": "Calculate Zonal Statistics",
         "result_btn": "Download maps as .tif in sepal",
         "clim_option_lbl": "Climate regime options",
         "clim_default_lbl": "Climate regime",
