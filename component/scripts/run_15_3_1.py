@@ -25,7 +25,7 @@ ee.Initialize()
 def download_maps(aoi_model, model, output):
     
     # get the export scale 
-    scale = 10 if 'Sentinel 2' in model.sensors else 30
+    #scale = 10 if 'Sentinel 2' in model.sensors else 30
     
     output.add_live_msg(ms.download.start_download)
         
@@ -79,8 +79,8 @@ def download_maps(aoi_model, model, output):
     land_cover_merge = pm.result_dir.joinpath(f'{land_cover_desc}_merge.tif')
     soc_merge = pm.result_dir.joinpath(f'{soc_desc}_merge.tif')
     trend_merge = pm.result_dir.joinpath(f'{trend_desc}_merge.tif')
-    performance_merge = pm.result_dir.joinpath(f'{state_desc}_merge.tif')
-    state_merge = pm.result_dir.joinpath(f'{performance_desc}_merge.tif')
+    performance_merge = pm.result_dir.joinpath(f'{performance_desc}_merge.tif')
+    state_merge = pm.result_dir.joinpath(f'{state_desc}_merge.tif')
     productivity_merge = pm.result_dir.joinpath(f'{productivity_desc}_merge.tif')
     indicator_merge = pm.result_dir.joinpath(f'{indicator_desc}_merge.tif')
     

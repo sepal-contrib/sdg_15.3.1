@@ -217,8 +217,8 @@ class Result_15_3_1(sw.Tile):
         self.land_cover_btn.set_url(str(links[0]))
         self.soc_btn.set_url(str(links[1]))
         self.trend_btn.set_url(str(links[2]))
-        self.performance_btn.set_url(str(links[2]))
-        self.state_btn.set_url(str(links[1]))
+        self.performance_btn.set_url(str(links[3]))
+        self.state_btn.set_url(str(links[4]))
         self.prod_btn.set_url(str(links[5]))
         self.indicator_btn.set_url(str(links[6]))
             
