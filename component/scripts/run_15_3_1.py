@@ -129,16 +129,16 @@ def display_maps(aoi_model, model, m, output):
     m.addLayer(model.land_cover.select('end').clip(geom), pm.viz_lc, ms._15_3_1.lc_end.format(lc_year_end))
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.prod_layer))
-    m.addLayer(model.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
+    m.addLayer(model.productivity.clip(geom).selfMask(), pm.viz_prod, ms._15_3_1.prod_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
-    m.addLayer(model.land_cover.select('degradation').clip(geom), pm.viz_lc_sub, ms._15_3_1.lc_layer)
+    m.addLayer(model.land_cover.select('degradation').clip(geom).selfMask(), pm.viz_lc_sub, ms._15_3_1.lc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
-    m.addLayer(model.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
+    m.addLayer(model.soc.clip(geom).selfMask(), pm.viz_soc, ms._15_3_1.soc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.ind_layer))
-    m.addLayer(model.indicator_15_3_1.clip(geom), pm.viz_indicator, ms._15_3_1.ind_layer)
+    m.addLayer(model.indicator_15_3_1.clip(geom).selfMask(), pm.viz_indicator, ms._15_3_1.ind_layer)
         
     # add the aoi on the map
     empty = ee.Image().byte()
@@ -328,13 +328,4 @@ def indicator_15_3_1(productivity, landcover, soc, output):
     .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3)
     
     return indicator.uint8()
-
-#def stats_by_land_cover(landcover, indicator_15_3_1):
-#    landcover = landcover.select('end')
-#    lc_name = pm.lancover_name
-#    return 
-#    sankey_png_link = pm.result_dir.joinpath(f'{aoi_model.name}_sankey.png')
-#    fig.savefig(sankey_png_link)
-#    plt.close()
-#    sankey_btn = sw.DownloadBtn('', sankey_png_link)
 
