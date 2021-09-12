@@ -99,10 +99,13 @@
         "start_lbl": "Starting year",
         "end_lbl": "Ending year",
         "matrix_changed": "You have changed your transition matrix",
-        "prod_layer": "Productivity",
-        "lc_layer": "Land cover",
-        "soc_layer": "Soil organic carbon",
+        "prod_layer": "Productivity sub-indicator",
+        "lc_layer": "Land cover sub indicator",
+        "lc_start": "Land cover {}",
+        "lc_end": "Land cover {}",
+        "soc_layer": "SOC sub-indicator",
         "ind_layer": "Indicator 15.3.1",
+        "map_loading_complete":"All the layers are loaded on the Map ",
         "stats_complete": "The statistics are now avaliable in the {} file of your computer or downloadable with the result tile link"
         
     },

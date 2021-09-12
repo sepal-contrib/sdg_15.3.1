@@ -31,15 +31,20 @@ climate_regimes = [
     {'text': ms._15_3_1.clim_regim.trop_moist,  'value': 0.48},
     {'text': ms._15_3_1.clim_regim.trop_mont,'value': 0.64}
 ]
-
+# v.theme.themes.dark.error
+# v.theme.themes.dark.primary
+# v.theme.themes.dark.success
 legend = {
-    ms._15_3_1.legend.degraded : v.theme.themes.dark.error,
-    ms._15_3_1.legend.stable : v.theme.themes.dark.primary,
-    ms._15_3_1.legend.improved : v.theme.themes.dark.success
+    ms._15_3_1.legend.degraded :'#F28482',
+    ms._15_3_1.legend.stable :'#D5B9B2',
+    ms._15_3_1.legend.improved : '#4F772D' 
 }
 
+lc_color = {'Tree-covered':'yellowgreen', 'Grassland':'palegreen', 'Cropland':'gold', 'Wetland':'turquoise', 'Artificial':'gainsboro', 'Other land':'floralwhite', 'Water body':'dodgerblue'}
+
+viz_lc        = {"max": 7, "min":1, "palette": list(lc_color.values())}
 viz_prod      = {"max": 3, "min":1, "palette": list(legend.values())}
-viz_lc        = {"max": 3, "min":1, "palette": list(legend.values())}
+viz_lc_sub    = {"max": 3, "min":1, "palette": list(legend.values())}
 viz_soc       = {"max": 3, "min":1, "palette": list(legend.values())}
 viz_indicator = {"max": 3, "min":1, "palette": list(legend.values())}
 

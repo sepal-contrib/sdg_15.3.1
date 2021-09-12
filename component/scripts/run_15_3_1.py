@@ -9,6 +9,7 @@ import geopandas as gpd
 import pandas as pd
 
 from component import parameter as pm
+
 from component.message import ms 
 
 from .gdrive import gdrive
@@ -117,13 +118,21 @@ def display_maps(aoi_model, model, m, output):
     # clip on the bounding box when we use a custom aoi
     if not ('ADMIN' in aoi_model.method): 
         geom = geom.bounds()
-        
+     
+    lc_year_start = min(max(model.start, pm.land_cover_first_year), pm.land_cover_max_year)
+    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
     # add the layers
+    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
+    m.addLayer(model.land_cover.select('start').clip(geom), pm.viz_lc, ms._15_3_1.lc_start.format(lc_year_start))
+    
+    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
+    m.addLayer(model.land_cover.select('end').clip(geom), pm.viz_lc, ms._15_3_1.lc_end.format(lc_year_end))
+    
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.prod_layer))
     m.addLayer(model.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
-    m.addLayer(model.land_cover.clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
+    m.addLayer(model.land_cover.select('degradation').clip(geom), pm.viz_lc_sub, ms._15_3_1.lc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
     m.addLayer(model.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
@@ -132,7 +141,14 @@ def display_maps(aoi_model, model, m, output):
     m.addLayer(model.indicator_15_3_1.clip(geom), pm.viz_indicator, ms._15_3_1.ind_layer)
         
     # add the aoi on the map
-    m.addLayer(aoi_model.feature_collection, {'color': v.theme.themes.dark.info}, 'aoi')
+    empty = ee.Image().byte()
+    
+    aoi_line = empty.paint(**{
+            'featureCollection': aoi_model.feature_collection,
+            'color': 1,
+            'width': 1 })
+    m.addLayer(aoi_line, {'palette': v.theme.themes.dark.info}, 'aoi')
+    output.add_live_msg(ms._15_3_1.map_loading_complete, 'success')
     
     return 
 
@@ -156,7 +172,59 @@ def compute_indicator_maps(aoi_model, model, output):
     # sum up in a map
     model.indicator_15_3_1 = indicator_15_3_1(model.productivity, model.land_cover, model.soc, output)
 
-    return 
+    return
+
+def compute_lc_transition_stats(aoi_model, model):
+    landcover = model.land_cover.select('transition')
+    scale = 300
+    aoi = aoi_model.feature_collection.geometry().bounds()
+    lc_year_start = min(max(model.start, pm.land_cover_first_year), pm.land_cover_max_year)
+    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
+    lc_name = pm.lancover_name
+    class_value = [x*10+y for x in range(1,8)for y in range(1,8)]
+    class_name = [x+'_'+y for x in lc_name for y in lc_name] 
+    multiband_class = landcover.eq(class_value).rename(class_name)
+    pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000)) 
+    area_per_class = pixel_area.reduceRegion(**{ 
+            'reducer':ee.Reducer.sum(),
+            'geometry':aoi,
+            'scale':scale,
+            'maxPixels': 1e13,
+            'bestEffort':True,
+            'tileScale':2 
+            })
+    data = area_per_class.getInfo()
+    df = [[*[i for i in x.split('_')],y] for x, y in data.items()]
+    df = pd.DataFrame(data=df, columns=[lc_year_start, lc_year_end, 'Area'])
+    
+    return df
+
+def compute_stats_by_lc(aoi_model, model):
+    landcover = model.land_cover.select('end')
+    indicator = model.indicator_15_3_1
+    aoi = aoi_model.feature_collection.geometry().bounds()
+    lc_name = pm.lancover_name
+    deg_name = pm.deg_3_class
+    lc_deg_combine = indicator.multiply(10).add(landcover)
+    class_value = [x*10+y for x in range(1,4)for y in range(1,8)]
+    class_name = [x+'_'+y for x in deg_name for y in lc_name]
+    multiband_class = lc_deg_combine.eq(class_value).rename(class_name)
+    pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
+    area_per_class = pixel_area.reduceRegion(**{
+            'reducer':ee.Reducer.sum(),
+            'geometry':aoi,'scale':300,
+            'maxPixels': 1e13,
+            'bestEffort':True,
+            'tileScale':8
+            })
+    data = area_per_class.getInfo()
+    df = [[*[i for i in x.split('_')],y] for x, y in data.items()]
+    df =  pd.DataFrame(data=df, columns=['Indicator', 'Landcover', 'Area'])
+    
+    return df
+    
+    
+
 
 def compute_zonal_analysis(aoi_model, model, output):
     
@@ -218,6 +286,8 @@ def compute_zonal_analysis(aoi_model, model, output):
     
 def indicator_15_3_1(productivity, landcover, soc, output):
     
+    landcover = landcover.select('degradation')
+    
 
     indicator = ee.Image(0) \
     .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(3)),3) \
@@ -259,5 +329,12 @@ def indicator_15_3_1(productivity, landcover, soc, output):
     
     return indicator.uint8()
 
-#def stats_by_land_cover(model):
-    
+#def stats_by_land_cover(landcover, indicator_15_3_1):
+#    landcover = landcover.select('end')
+#    lc_name = pm.lancover_name
+#    return 
+#    sankey_png_link = pm.result_dir.joinpath(f'{aoi_model.name}_sankey.png')
+#    fig.savefig(sankey_png_link)
+#    plt.close()
+#    sankey_btn = sw.DownloadBtn('', sankey_png_link)
+

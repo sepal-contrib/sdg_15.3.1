@@ -2,6 +2,12 @@ import ipyvuetify as v
 from sepal_ui import sepalwidgets as sw
 from sepal_ui import mapping as sm
 from sepal_ui.scripts import utils as su
+from ipywidgets import Output
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from component.scripts.sankey import sankey
+plt.style.use('dark_background')
 
 from component import widget as cw 
 from component import scripts as cs
@@ -79,6 +85,33 @@ class Tile_15_3_1(sw.Tile):
 
         # get the result map        
         cs.display_maps(self.aoi_model, self.model, self.result_tile.m, self.alert)
+        
+        #get the land transition data
+        df = cs.compute_lc_transition_stats(self.aoi_model, self.model)
+        #get the sankey plot
+        self.result_tile.sankey_plot.clear_output()
+        with self.result_tile.sankey_plot:
+            fig, ax = sankey(df = df, colorDict = pm.lc_color, aspect = 4, fontsize = 12)
+            fig.set_facecolor((0, 0, 0, 0))
+            plt.show()
+            
+        dflc = cs.compute_stats_by_lc(self.aoi_model, self.model)
+        pivot_dflc = dflc.pivot(index='Landcover', columns='Indicator')['Area']
+        self.result_tile.bar_plot.clear_output()
+        #Get the bar diagram
+        with self.result_tile.bar_plot:
+            fig, ax = plt.subplots(figsize = (10,9))
+            pivot_dflc.plot.bar(rot=0,color={'Stable': '#D5B9B2', 'Degraded': '#F28482','Improved':'#4F772D'},ax=ax, fontsize=12)
+            ax.set_xlabel('Land cover')
+            ax.set_yscale('log')
+            ax.set_ylabel('Area in ha')
+            ax.set_title('Distribution of area by land cover type')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.set_facecolor((0, 0, 0, 0))
+            fig.set_facecolor((0, 0, 0, 0))
+            plt.show()
 
         # release the download btn
         self.result_tile.btn.disabled = False
@@ -119,7 +152,7 @@ class Result_15_3_1(sw.Tile):
         
         # get model for the downloading 
         self.aoi_model = aoi_model
-        self.model = model
+        self.model = model        
         
         markdown = sw.Markdown("""{}""".format('  \n'.join(ms._15_3_1.result_text)))
         
@@ -131,7 +164,16 @@ class Result_15_3_1(sw.Tile):
             legend_dict=pm.legend, 
             position='topleft'
         )
+
+        self.sankey_plot = Output()
+        self.bar_plot = Output()
         
+        plot_line =v.Layout(children=[
+                self.sankey_plot,
+                self.bar_plot
+                ], wrap = True)
+
+
         # add a download btn for csv and a download btn for the sepal
         
         self.prod_btn = sw.DownloadBtn(ms._15_3_1.down_prod)
@@ -143,7 +185,7 @@ class Result_15_3_1(sw.Tile):
         self.indicator_btn = sw.DownloadBtn(ms._15_3_1.down_ind)
         
         # aggregate the btn as a line
-        btn_line =  v.Layout(Row=True, children=[ 
+        btn_line =  v.Layout(children=[ 
             self.trend_btn,
             self.state_btn,
             self.performance_btn,
@@ -151,13 +193,13 @@ class Result_15_3_1(sw.Tile):
             self.land_cover_btn,
             self.soc_btn,
             self.indicator_btn
-        ])
+        ], wrap = True)
         
         # init the tile 
         super().__init__(
             '15_3_1_widgets', 
             ms._15_3_1.results, 
-            [markdown, self.m, btn_line],
+            [markdown, self.m, plot_line, btn_line],
             alert = sw.Alert(), 
             btn = sw.Btn(text = ms._15_3_1.result_btn, icon = 'mdi-download', class_='ma-5', disabled=True)
         )
