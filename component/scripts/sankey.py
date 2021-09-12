@@ -10,7 +10,6 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
     '''
@@ -54,7 +53,6 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
         raise ValueError('Sankey graph does not support null values.')
 
     # Identify all labels that appear 'left' or 'right'
-    allLabels = pd.Series(np.r_[dataFrame.left.unique(), dataFrame.right.unique()]).unique()
 
     # Identify left labels
     if len(leftLabels) == 0:
@@ -67,17 +65,7 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
 
     # If no colorDict given, make one
     if colorDict is None:
-        colorDict = {}
-        palette = "hls"
-        colorPalette = sns.color_palette(palette, len(allLabels))
-        for i, label in enumerate(allLabels):
-            colorDict[label] = colorPalette[i]
-    else:
-        missing = [label for label in allLabels if label not in colorDict.keys()]
-        if missing:
-            msg = "The colorDict parameter is missing values for the following labels : "
-            msg += '{}'.format(', '.join(missing))
-            raise ValueError(msg)
+        raise ValueError('specify a colour palette')
 
     # Determine widths of individual strips
     ns_l = defaultdict()
