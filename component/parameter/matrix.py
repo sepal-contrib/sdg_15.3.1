@@ -8,6 +8,9 @@ default_trans_matrix = [
     [0, 0, 0, 0, 0, 0, 0] # water body 
 ]
 
+
+lancover_name = ['Tree-covered', 'Grassland', 'Cropland', 'Wetland', 'Artificial', 'Other land', 'Water body']
+deg_3_class = ['Degraded', 'Stable', 'Improved']
 IPCC_lc_change_matrix = [
     11, 12, 13, 14, 15, 16, 17,
     21, 22, 23, 24, 25, 26, 27,

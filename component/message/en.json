@@ -55,6 +55,10 @@
             "Once the layers are loaded on the map, click on the \"download\" button to download the indicators .tif in your sepal folder",
             "The green buttons will be released once the files are retrieved from Gdrive and they will allow you to download them on your local computer."
         ],
+        "result_text_zonalstats": [
+            "Once the result is ready, click on the \"download\" button to download the statistics (Shapefile) on your computer)",
+            "The green button shall be released once the files are ready to download on your local computer."
+        ],
         "sensor_lbl": "Select sensor",
         "traj_lbl": "Select trajectory",
         "transition_matrix": "Transition matrix",
@@ -65,8 +69,12 @@
         "down_zonal": "Zonal statistics",
         "down_lc": "Land Cover",
         "down_prod": "Productivity",
+        "down_trend": "Productivity trend", 
+        "down_state": "Productivity state",
+        "down_performance": "Productivity performance", 
         "down_soc": "Soil Organic Carbon",
         "down_ind": "Indicator 15.3.1",
+        "result_btn_zonalstats": "Calculate Zonal Statistics",
         "result_btn": "Download maps as .tif in sepal",
         "clim_option_lbl": "Climate regime options",
         "clim_default_lbl": "Climate regime",
@@ -76,10 +84,13 @@
         "target_start_lbl": "Start monitoring period",
         "end_lbl": "End monitoring period",
         "matrix_changed": "You have changed your transition matrix",
-        "prod_layer": "Productivity",
-        "lc_layer": "Land cover",
-        "soc_layer": "Soil organic carbon",
+        "prod_layer": "Productivity sub-indicator",
+        "lc_layer": "Land cover sub indicator",
+        "lc_start": "Land cover {}",
+        "lc_end": "Land cover {}",
+        "soc_layer": "SOC sub-indicator",
         "ind_layer": "Indicator 15.3.1",
+        "map_loading_complete":"All the layers are loaded on the Map ",
         "stats_complete": "The statistics are now avaliable in the {} file of your computer or downloadable with the result tile link"
         
     },

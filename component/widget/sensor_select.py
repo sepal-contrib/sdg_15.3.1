@@ -22,6 +22,7 @@ class SensorSelect(v.Select):
         self.v_model = []
         
         # define the offset that should be used based on the year in the sensors list
+
         if change['new'] >= 2015: # launch of Sentinel 2
             last_sat = 6
         elif change['new'] >= 2013: # launch of Landsat 8

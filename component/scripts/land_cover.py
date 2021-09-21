@@ -18,20 +18,22 @@ def land_cover(model, aoi_model, output):
     lc_year_end = min(max(model.end, pm.lc_first_year), pm.land_use_max_year)
     
     # baseline land cover map reclassified into IPCC classes
-    landcover_bl_remapped = landcover \
-        .select(f'y{lc_year_start}') \
-        .remap(pm.translation_matrix[0], pm.translation_matrix[1])
+    landcover_start_remapped = landcover \
+        .select(f'year_{lc_year_start}') \
+        .remap(pm.translation_matrix[0], pm.translation_matrix[1]) \
+        .rename('start')
     
     # target land cover map reclassified into IPCC classes
-    landcover_tg_remapped = landcover \
-            .select(f'y{lc_year_end}') \
-            .remap(pm.translation_matrix[0],pm.translation_matrix[1])
+    landcover_end_remapped = landcover \
+            .select(f'year_{lc_year_end}') \
+            .remap(pm.translation_matrix[0],pm.translation_matrix[1]) \
+            .rename('end')
 
-
-    # compute transition map (first digit for baseline land cover, and second digit for target year land cover)
-    landcover_transition = landcover_bl_remapped \
+    # compute transition map (first digit for historical land cover, and second digit for monitoring year land cover)
+    landcover_transition = landcover_start_remapped \
             .multiply(10) \
-            .add(landcover_tg_remapped)
+            .add(landcover_end_remapped) \
+            .rename('transition')
 
     # definition of land cover transitions as degradation (-1), improvement (1), or no relevant change (0)
     trans_matrix_flatten = [item for sublist in model.transition_matrix for item in sublist]
@@ -43,6 +45,11 @@ def land_cover(model, aoi_model, output):
     landcover_degredation = landcover_degredation \
         .remap([1,0,-1,pm.int_16_min],[3,2,1,0]) \
         .uint8() \
-        .rename("degradation")
+        .rename('degradation')
+        
+    land_cover_out = landcover_degredation \
+        .addBands(landcover_start_remapped) \
+        .addBands(landcover_end_remapped) \
+        .addBands(landcover_transition)
 
-    return landcover_degredation
+    return land_cover_out
