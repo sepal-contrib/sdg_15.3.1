@@ -169,7 +169,7 @@ def compute_indicator_maps(aoi_model, model, output):
     model.soc = soil_organic_carbon(model, aoi_model, output)
     model.productivity = productivity_final(model.productivity_trend, model.productivity_performance, model.productivity_state, output)
     
-    # sum up in a map
+    # sump up in a map
     model.indicator_15_3_1 = indicator_15_3_1(model.productivity, model.land_cover, model.soc, output)
 
     return

@@ -2,26 +2,10 @@ import ipyvuetify as v
 
 from component.message import ms 
 
-vegetation_index = [
-        {'text':ms._15_3_1.vi.ndvi, 'value':'ndvi'},
-        {'text':ms._15_3_1.vi.evi, 'value':'evi'},
-        {'text':ms._15_3_1.vi.msvi, 'value':'msvi'}      
-]
-
-
-lceu = [
-        {'text':ms._15_3_1.lceu.calculate, 'value':'calculate', 'disabled': False},
-        {'text':ms._15_3_1.lceu.wte, 'value':'World Ecosystems', 'disabled': False},
-        {'text':ms._15_3_1.lceu.hru, 'value':'Global Homogeneous Response Units', 'disabled': True},
-        {'text':ms._15_3_1.lceu.gaes, 'value':'Global Agro-Environmental Stratification', 'disabled': True}
-]
-
-
 trajectories = [
-    {'text': ms._15_3_1.trend.ndvi, 'value': 'ndvi_trend', 'disabled': False},
-    {'text': ms._15_3_1.trend.p_res, 'value': 'p_restrend', 'disabled': False},
-    {'text': ms._15_3_1.trend.s_res, 'value': 's_restrend', 'disabled': True},
-    {'text': ms._15_3_1.trend.ue, 'value': 'ue_trend',   'disabled': False}
+    {'text': ms._15_3_1.trend.ndvi, 'value': 'ndvi_trend'},
+    {'text': ms._15_3_1.trend.p_res, 'value': 'p_restrend'},
+    {'text': ms._15_3_1.trend.ue, 'value': 'ue_trend'}
 ]
 
 climate_regimes = [
