@@ -18,7 +18,6 @@
         "trend": {
             "ndvi": "NDVI trend",
             "p_res": "Residual (Osereved NDVI - Predicetd NDVI) trend ",
-            "s_res": "Water use efficiency (WUE)",
             "ue": "Rain use efficiency (RUE)"
         },
         "clim_regim": {
@@ -42,19 +41,23 @@
             "no_target": "please provide a start date of assemsment period",
             "no_end": "Please provide a end date for the assesment period",
             "no_traj": "Please provide a trajectory for the trend analysis",
-            "no_mix": "You cannot mix sentinel and landsat data"
+            "no_mix": "You cannot mix Sentinel, Landsat and MODIS data"
         },
         "process_text": [
-            "This process tile will allow you to compute the value if the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
+            "This process tile will allow you to compute the value of the SDG indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
             "By clicking on the process button, you will:",
             "",
-            "- start the computation of the layers in GEE and display them on the map",
-            "- Download to ypur sepal folder the zonal statistics of the indicators perform on your AOI (you can click on the green btn to download it)",
-            "- release the result tile button to download your indicators map locally"
+            "- Start the computation of the layers in GEE and display them on the map",
+            "- Download to your sepal folder, the zonal statistics of the indicators perform on your AOI (you can click on the green button to download it)",
+            "- Release the result tile button to download your indicators map locally"
         ],
         "result_text": [
             "Once the layers are loaded on the map, click on the \"download\" button to download the indicators .tif in your sepal folder",
             "The green buttons will be released once the files are retrieved from Gdrive and they will allow you to download them on your local computer."
+        ],
+        "result_text_zonalstats": [
+            "Once the result is ready, click on the \"download\" button to download the statistics (Shapefile) on your computer)",
+            "The green button shall be released once the files are ready to download on your local computer."
         ],
         "sensor_lbl": "Select sensor",
         "traj_lbl": "Select trajectory",
@@ -66,8 +69,12 @@
         "down_zonal": "Zonal statistics",
         "down_lc": "Land Cover",
         "down_prod": "Productivity",
+        "down_trend": "Productivity trend", 
+        "down_state": "Productivity state",
+        "down_performance": "Productivity performance", 
         "down_soc": "Soil Organic Carbon",
         "down_ind": "Indicator 15.3.1",
+        "result_btn_zonalstats": "Calculate Zonal Statistics",
         "result_btn": "Download maps as .tif in sepal",
         "clim_option_lbl": "Climate regime options",
         "clim_default_lbl": "Climate regime",
@@ -77,10 +84,13 @@
         "target_start_lbl": "Start monitoring period",
         "end_lbl": "End monitoring period",
         "matrix_changed": "You have changed your transition matrix",
-        "prod_layer": "Productivity",
-        "lc_layer": "Land cover",
-        "soc_layer": "Soil organic carbon",
+        "prod_layer": "Productivity sub-indicator",
+        "lc_layer": "Land cover sub indicator",
+        "lc_start": "Land cover {}",
+        "lc_end": "Land cover {}",
+        "soc_layer": "SOC sub-indicator",
         "ind_layer": "Indicator 15.3.1",
+        "map_loading_complete":"All the layers are loaded on the Map ",
         "stats_complete": "The statistics are now avaliable in the {} file of your computer or downloadable with the result tile link"
         
     },
