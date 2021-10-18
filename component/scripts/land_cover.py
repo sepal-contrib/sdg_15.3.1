@@ -19,7 +19,7 @@ def land_cover(model, aoi_model, output):
 
 
     landcover_start = landcover \
-            .selectf('year_{lc_year_start}') \
+            .select(f'year_{lc_year_start}') \
             .rename('landcover_start')
 
     landcover_end = landcover \
@@ -36,8 +36,8 @@ def land_cover(model, aoi_model, output):
             .remap(pm.translation_matrix[0],pm.translation_matrix[1]) \
             .rename('end')
     water_mask = landcover_end \
-            .where(land_cover.eq(210), 0) \
-            .rename('water_mask')
+            .where(landcover_end.eq(210), 0) \
+            .rename('water')
 
 
     # compute transition map (first digit for historical land cover, and second digit for monitoring year land cover)

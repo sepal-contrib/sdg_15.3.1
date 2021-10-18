@@ -286,8 +286,8 @@ def compute_zonal_analysis(aoi_model, model, output):
     
 def indicator_15_3_1(productivity, landcover, soc, output):
     
+    water = landcover.select('water')
     landcover = landcover.select('degradation')
-    water_mask = landcover.select('water_mask')
     
 
     indicator = ee.Image(0) \
@@ -326,8 +326,8 @@ def indicator_15_3_1(productivity, landcover, soc, output):
     .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(2)),2) \
     .where(productivity.eq(3).And(landcover.lt(1)).And(soc.lt(1)),3) \
     .where(productivity.lt(1).And(landcover.eq(3)).And(soc.lt(1)),3) \
-    .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3) \ 
-    .updateMask(water_mask)
+    .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3) \
+    .updateMask(water)
     
     return indicator.uint8()
 
