@@ -16,18 +16,28 @@ def land_cover(model, aoi_model, output):
     # Remap LC according to input matrix, aggregation of land cover classes to IPCC classes.
     lc_year_start = min(max(model.start, pm.land_cover_first_year), pm.land_cover_max_year)
     lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
+
+
+    landcover_start = landcover \
+            .selectf('year_{lc_year_start}') \
+            .rename('landcover_start')
+
+    landcover_end = landcover \
+            .select(f'year_{lc_year_end}') \
+            .rename('landcover_end')
     
     # baseline land cover map reclassified into IPCC classes
-    landcover_start_remapped = landcover \
-        .select(f'year_{lc_year_start}') \
+    landcover_start_remapped = landcover_start \
         .remap(pm.translation_matrix[0], pm.translation_matrix[1]) \
         .rename('start')
     
     # target land cover map reclassified into IPCC classes
-    landcover_end_remapped = landcover \
-            .select(f'year_{lc_year_end}') \
+    landcover_end_remapped = landcover_end \
             .remap(pm.translation_matrix[0],pm.translation_matrix[1]) \
             .rename('end')
+    water_mask = landcover_end \
+            .where(land_cover.eq(210), 0) \
+            .rename('water_mask')
 
 
     # compute transition map (first digit for historical land cover, and second digit for monitoring year land cover)
@@ -49,8 +59,11 @@ def land_cover(model, aoi_model, output):
         .rename('degradation')
         
     land_cover_out = landcover_degredation \
+        .addBands(landcover_transition) \
         .addBands(landcover_start_remapped) \
+        .addBands(landcover_end) \
         .addBands(landcover_end_remapped) \
-        .addBands(landcover_transition)
+        .addBands(landcover_transition) \
+        .addBands(water_mask)
 
     return land_cover_out
