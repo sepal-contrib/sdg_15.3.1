@@ -59,11 +59,11 @@ def land_cover(model, aoi_model, output):
         .rename('degradation')
         
     land_cover_out = landcover_degredation \
-        .addBands(landcover_transition) \
-        .addBands(landcover_start_remapped) \
-        .addBands(landcover_end) \
-        .addBands(landcover_end_remapped) \
-        .addBands(landcover_transition) \
-        .addBands(water_mask)
+        .addBands(landcover_transition.uint8()) \
+        .addBands(landcover_start_remapped.uint8()) \
+        .addBands(landcover_end.uint8()) \
+        .addBands(landcover_end_remapped.uint8()) \
+        .addBands(landcover_transition.uint8()) \
+        .addBands(water_mask.uint8())
 
     return land_cover_out
