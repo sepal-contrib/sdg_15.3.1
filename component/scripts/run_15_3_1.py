@@ -52,7 +52,7 @@ def download_maps(aoi_model, model, output):
         layers = {name: layer.clip(geom) for name, layer in layers.items()}
 
     # download all files
-    downloads = Any(
+    downloads = any(
         [
             drive_handler.download_to_disk(name, layer, aoi_model, output, scale)
             for name, layer in layers.items()

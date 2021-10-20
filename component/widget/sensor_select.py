@@ -1,4 +1,5 @@
 import ipyvuetify as v
+from traitlets import observe
 
 from component import parameter as pm
 from component.message import ms
@@ -44,3 +45,26 @@ class SensorSelect(v.Select):
         self.v_model = [i for i in items if i not in no_default_list]
 
         return
+
+    @observe("v_model")
+    def _check_sensor(self, change):
+        """
+        prevent users from mixing landsat, sentinel 2 and  MODIS sensors together
+        """
+
+        # exit if its a removal
+        if len(change["new"]) < len(change["old"]):
+            return self
+
+        # use positionning in the list as boolean value
+        sensors = ["Landsat", "Sentinel", "MODIS"]
+
+        # guess the new input
+        new_value = list(set(change["new"]) - set(change["old"]))[0]
+
+        other_sensors = [x for x in sensors if x not in new_value]
+        if any(i not in new_value for i in other_sensors):
+            if any(i in s for s in change["old"] for i in other_sensors):
+                change["owner"].v_model = [new_value]
+
+        return self

@@ -4,7 +4,7 @@ from traitlets import Any
 from component import parameter as pm
 
 
-class Model_15_3_1(model.Model):
+class IndicatorModel(model.Model):
 
     #####################
     ##      input      ##

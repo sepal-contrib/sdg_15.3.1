@@ -1,8 +1,9 @@
 {
     "app": {
-        "title": "SDG indicator module",
+        "title": "SDG 15.3.1: Proportion of land that is degraded over total land area",
         "aoi_drawer": "Aoi selector",
-        "_15_3_1_drawer": "Indicator 15.3.1",
+        "input_drawer": "Parameters",
+        "result_drawer": "Results",
         "about_drawer": "About"
     },
     "_15_3_1": {
@@ -63,7 +64,7 @@
             "By clicking on the process button, you will:",
             "",
             "- start the computation of the layers in GEE and display them on the map",
-            "- Download to ypur sepal folder the zonal statistics of the indicators perform on your AOI (you can click on the green btn to download it)",
+            "- Download to your sepal folder the zonal statistics of the indicators perform on your AOI",
             "- release the result tile button to download your indicators map locally"
         ],
         "result_text": [
@@ -79,9 +80,12 @@
         "vi_lbl":"Select Vegetation Index",
         "lceu_lbl": "Select Land cover ecosystem functional units",
         "transition_matrix": "Transition matrix",
-        "title": "15.3.1 Proportion of degraded land over total land area",
-        "process_btn": "Load the indicators",
-        "results": "Results",
+        "titles": {
+            "inputs": "Computation parameters",
+            "results": "Spatial results",
+            "zonal": "Zonal statistics"
+        },
+        "process_btn": "Load the indicators",        
         "map_legend": "Indicator state",
         "down_zonal": "Zonal statistics",
         "down_lc": "Land Cover",
