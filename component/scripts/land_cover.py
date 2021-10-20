@@ -49,6 +49,7 @@ def land_cover(model, aoi_model, output):
     # 1 degraded - 2 stable - 3 improved
     landcover_degredation = landcover_degredation \
         .remap([1,0,-1,pm.int_16_min],[3,2,1,0]) \
+        .updateMask(water_mask) \
         .uint8() \
         .rename("degradation")
 

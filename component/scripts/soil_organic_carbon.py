@@ -143,6 +143,8 @@ def soil_organic_carbon(model, aoi_model, output):
         .subtract(soc_images.select(0)) \
         .divide(soc_images.select(0)) \
         .multiply(100)
+    #water mask
+    mask = model.land_cover.select('water')
     
     # use the bytes convention 
     # 1 degraded - 2 stable - 3 improved
@@ -151,6 +153,7 @@ def soil_organic_carbon(model, aoi_model, output):
         .where(soc_percent_change.lt(10).And(soc_percent_change.gt(-10)),2) \
         .where(soc_percent_change.lt(-10),1)\
         .rename('soc') \
+        .updateMask(mask) \
         .uint8()
     
     return soc_class

@@ -246,10 +246,11 @@ def productivity_state(aoi_model, model, ndvi_yearly_integration, climate_int, o
 
     return degredation
 
-def productivity_final(trajectory, performance, state, output):
+def productivity_final(trajectory, performance, state, landcover, output):
     trajectory_class = trajectory.select('trajectory')
     performance_class = performance.select('performance')
     state_class = state.select('state')
+    mask = landcover.select('water')
 
     productivity = ee.Image(0)\
         .where(trajectory_class.eq(3).And(state_class.eq(3)).And(performance_class.eq(2)),3) \
@@ -272,7 +273,9 @@ def productivity_final(trajectory, performance, state, output):
         .where(trajectory_class.eq(1).And(state_class.eq(1)).And(performance_class.eq(1)),1) \
         .rename('productivity')
     
-    return productivity.uint8()
+    return productivity \
+                .updateMask(mask) \
+                .uint8()
 
 def ndvi_trend(start, end, integrated_annual_vi):
     """Calculate VI trend.
