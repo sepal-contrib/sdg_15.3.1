@@ -12,10 +12,10 @@ sensors = {
     "Landsat 4": ["LANDSAT/LT04/C01/T1_SR", 30],
     "Landsat 5": ["LANDSAT/LT05/C01/T1_SR", 30],
     "Landsat 7": ["LANDSAT/LE07/C01/T1_SR", 30],
-    "Landsat 8": ["LANDSAT/LC08/C01/T1_SR", 30],
-    "Sentinel 2": ["COPERNICUS/S2", 10],
     "MODIS MOD13Q1": ["MODIS/006/MOD13Q1", 250],
     "MODIS NPP": ["MODIS/006/MOD17A3HGF", 250],
+    "Landsat 8": ["LANDSAT/LC08/C01/T1_SR", 30],
+    "Sentinel 2": ["COPERNICUS/S2", 10],
 }
 
 precipitation = "NOAA/PERSIANN-CDR"

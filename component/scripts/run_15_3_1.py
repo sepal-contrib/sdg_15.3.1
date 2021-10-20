@@ -29,8 +29,6 @@ def download_maps(aoi_model, model, output):
     # from the first sensor (we only combine compatible one)
     scale = pm.sensors[model.sensors[0]][1]
 
-    raise Exception(f"the scale is {scale}.")
-
     output.add_live_msg(ms.download.start_download)
 
     # create the export path
