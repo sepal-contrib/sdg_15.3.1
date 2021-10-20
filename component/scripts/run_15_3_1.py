@@ -35,7 +35,7 @@ def download_maps(aoi_model, model, output):
     trend_desc = f'{aoi_model.name}_productivity_trend'
     performance_desc = f'{aoi_model.name}_productivity_performance'
     state_desc = f'{aoi_model.name}_productivity_state'
-    productivity_desc = f'{aoi_model.name}_productivity'
+    productivity_desc = f'{aoi_model.name}_productivity_indicator'
     indicator_desc = f'{aoi_model.name}_indicator_15_3_1'
         
     # load the drive_handler
@@ -103,7 +103,7 @@ def download_maps(aoi_model, model, output):
     drive_handler.delete_files(drive_handler.get_files(productivity_desc))
     drive_handler.delete_files(drive_handler.get_files(indicator_desc))
         
-    #display msg 
+    # display msg 
     output.add_live_msg(ms.download.completed, 'success')
 
     return (land_cover_merge, soc_merge, trend_merge, performance_merge, state_merge, productivity_merge, indicator_merge)

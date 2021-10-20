@@ -60,6 +60,8 @@ def digest_tiles(filename, result_dir, output, tmp_file):
     # manually close the files
     [src.close() for src in sources]
     
+    [print(f) for f in files]
+    
     # delete local files
     [file.unlink() for file in files]
     
