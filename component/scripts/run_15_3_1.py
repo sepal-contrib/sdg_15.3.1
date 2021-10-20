@@ -193,7 +193,7 @@ def display_maps(aoi_model, model, m, output):
     empty = ee.Image().byte()
 
     aoi_line = empty.paint(
-        **{"featureCollection": aoi_model.feature_collection, "color": 1, "width": 1}
+        **{"featureCollection": aoi_model.feature_collection, "color": 1, "width": 2}
     )
     m.addLayer(aoi_line, {"palette": v.theme.themes.dark.info}, "aoi")
     output.add_live_msg(ms._15_3_1.map_loading_complete, "success")
