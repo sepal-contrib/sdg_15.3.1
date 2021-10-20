@@ -102,7 +102,7 @@ def display_maps(aoi_model, model, m, output):
     m.addLayer(model.productivity.clip(geom), pm.viz_prod, ms._15_3_1.prod_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
-    m.addLayer(model.land_cover.clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
+    m.addLayer(model.land_cover.select('degradation').clip(geom), pm.viz_lc, ms._15_3_1.lc_layer)
     
     output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
     m.addLayer(model.soc.clip(geom), pm.viz_soc, ms._15_3_1.soc_layer)
@@ -197,6 +197,8 @@ def compute_zonal_analysis(aoi_model, model, output):
     
 def indicator_15_3_1(productivity, landcover, soc, output):
     
+    water = landcover.select('water')
+    landcover = landcover.select('degradation')
 
     indicator = ee.Image(0) \
     .where(productivity.eq(3).And(landcover.eq(3)).And(soc.eq(3)),3) \
@@ -234,6 +236,7 @@ def indicator_15_3_1(productivity, landcover, soc, output):
     .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(2)),2) \
     .where(productivity.eq(3).And(landcover.lt(1)).And(soc.lt(1)),3) \
     .where(productivity.lt(1).And(landcover.eq(3)).And(soc.lt(1)),3) \
-    .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3)
+    .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)),3) \
+    .updateMask(water)
     
     return indicator.uint8()

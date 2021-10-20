@@ -26,6 +26,13 @@ def land_cover(model, aoi_model, output):
     landcover_tg_remapped = landcover \
             .select(f'y{lc_year_end}') \
             .remap(pm.translation_matrix[0],pm.translation_matrix[1])
+    
+    landcover_end = landcover \
+            .select(f'y{lc_year_end}') \
+            .rename('landcover_end')
+    water_mask = landcover_end \
+            .where(landcover_end.eq(210), 0) \
+            .rename('water')
 
 
     # compute transition map (first digit for baseline land cover, and second digit for target year land cover)
@@ -45,4 +52,4 @@ def land_cover(model, aoi_model, output):
         .uint8() \
         .rename("degradation")
 
-    return landcover_degredation
+    return landcover_degredation.addBands(water_mask.uint8())
