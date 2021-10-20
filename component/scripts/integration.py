@@ -12,7 +12,7 @@ ee.Initialize()
 def integrate_ndvi_climate(aoi_model, model, output):
 
     if "MODIS MOD13Q1" in model.sensors:
-        modis_vi = ee.ImageCollection(pm.sensors["MODIS MOD13Q1"]).filterDate(
+        modis_vi = ee.ImageCollection(pm.sensors["MODIS MOD13Q1"][0]).filterDate(
             f"{model.start}-01-01", f"{model.end}-12-31"
         )
         if model.vegetation_index == "ndvi":
@@ -28,7 +28,7 @@ def integrate_ndvi_climate(aoi_model, model, output):
             integrated_vi_coll = annual_modis_vi(msvi_coll, model.start, model.end)
 
     elif "MODIS NPP" in model.sensors:
-        integrated_vi_coll = ee.ImageCollection(pm.sensors["MODIS NPP"]).filterDate(
+        integrated_vi_coll = ee.ImageCollection(pm.sensors["MODIS NPP"][0]).filterDate(
             f"{model.start}-01-01", f"{model.end}-12-31"
         )
     else:
@@ -44,7 +44,7 @@ def integrate_ndvi_climate(aoi_model, model, output):
             # mask the clouds and adapt the scale
             # TODO: filter the images before applying the other functions!
             sat = (
-                ee.ImageCollection(pm.sensors[sensor])
+                ee.ImageCollection(pm.sensors[sensor][0])
                 .filterBounds(aoi_model.feature_collection)
                 .map(partial(rename_band, sensor=sensor))
                 .map(partial(adapt_res, sensor=sensor))

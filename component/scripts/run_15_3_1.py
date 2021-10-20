@@ -26,18 +26,24 @@ ee.Initialize()
 def download_maps(aoi_model, model, output):
 
     # get the export scale
-    # scale = 10 if 'Sentinel 2' in model.sensors else 30
+    # from the first sensor (we only combine compatible one)
+    scale = pm.sensors[model.sensors[0]][1]
+
+    raise Exception(f"the scale is {scale}.")
 
     output.add_live_msg(ms.download.start_download)
 
     # create the export path
-    land_cover_desc = f"{aoi_model.name}_land_cover"
-    soc_desc = f"{aoi_model.name}_soc"
-    trend_desc = f"{aoi_model.name}_productivity_trend"
-    performance_desc = f"{aoi_model.name}_productivity_performance"
-    state_desc = f"{aoi_model.name}_productivity_state"
-    productivity_desc = f"{aoi_model.name}_productivity_indicator"
-    indicator_desc = f"{aoi_model.name}_indicator_15_3_1"
+    # they are in correct order don't change it
+    layers = {
+        f"{aoi_model.name}_land_cover": model.land_cover,
+        f"{aoi_model.name}_soc": model.soc,
+        f"{aoi_model.name}_productivity_trend": model.productivity_trend,
+        f"{aoi_model.name}_productivity_performance": model.productivity_state,
+        f"{aoi_model.name}_productivity_state": model.productivity_state,
+        f"{aoi_model.name}_productivity_indicator": model.productivity,
+        f"{aoi_model.name}_indicator_15_3_1": model.indicator_15_3_1,
+    }
 
     # load the drive_handler
     drive_handler = gdrive()
@@ -45,96 +51,36 @@ def download_maps(aoi_model, model, output):
     # clip the images if it's an administrative layer and keep the bounding box if not
     if aoi_model.feature_collection:
         geom = aoi_model.feature_collection.geometry()
-        land_cover = model.land_cover.clip(geom)
-        soc = model.soc.clip(geom)
-        trend = model.productivity_trend.clip(geom)
-        state = model.productivity_state.clip(geom)
-        performance = model.productivity_performance.clip(geom)
-        productivity = model.productivity.clip(geom)
-        indicator = model.indicator_15_3_1.clip(geom)
-    else:
-        land_cover = model.land_cover
-        soc = model.soc
-        trend = model.productivity_trend
-        state = model.productivity_state
-        performance = model.productivity_performance
-        productivity = model.productivity
-        indicator = model.indicator_15_3_1
+        layers = {name: layer.clip(geom) for name, layer in layers.items()}
 
     # download all files
-    downloads = drive_handler.download_to_disk(
-        land_cover_desc, land_cover, aoi_model, output
-    )
-    downloads = drive_handler.download_to_disk(soc_desc, soc, aoi_model, output)
-    downloads = drive_handler.download_to_disk(trend_desc, trend, aoi_model, output)
-    downloads = drive_handler.download_to_disk(
-        performance_desc, performance, aoi_model, output
-    )
-    downloads = drive_handler.download_to_disk(state_desc, state, aoi_model, output)
-    downloads = drive_handler.download_to_disk(
-        productivity_desc, productivity, aoi_model, output
-    )
-    downloads = drive_handler.download_to_disk(
-        indicator_desc, indicator, aoi_model, output
+    downloads = Any(
+        [
+            drive_handler.download_to_disk(name, layer, aoi_model, output, scale)
+            for name, layer in layers.items()
+        ]
     )
 
     # I assume that they are always launch at the same time
     # If not it's going to crash
     if downloads:
-        wait_for_completion(
-            [
-                land_cover_desc,
-                soc_desc,
-                trend_desc,
-                performance_desc,
-                productivity_desc,
-                state_desc,
-                indicator_desc,
-            ],
-            output,
-        )
+        wait_for_completion([name for name in layers], output)
     output.add_live_msg(ms.gee.tasks_completed, "success")
 
-    # create merge names
-    land_cover_merge = pm.result_dir.joinpath(f"{land_cover_desc}_merge.tif")
-    soc_merge = pm.result_dir.joinpath(f"{soc_desc}_merge.tif")
-    trend_merge = pm.result_dir.joinpath(f"{trend_desc}_merge.tif")
-    performance_merge = pm.result_dir.joinpath(f"{performance_desc}_merge.tif")
-    state_merge = pm.result_dir.joinpath(f"{state_desc}_merge.tif")
-    productivity_merge = pm.result_dir.joinpath(f"{productivity_desc}_merge.tif")
-    indicator_merge = pm.result_dir.joinpath(f"{indicator_desc}_merge.tif")
-
     # digest the tiles
-    digest_tiles(land_cover_desc, pm.result_dir, output, land_cover_merge)
-    digest_tiles(soc_desc, pm.result_dir, output, soc_merge)
-    digest_tiles(trend_desc, pm.result_dir, output, trend_merge)
-    digest_tiles(performance_desc, pm.result_dir, output, performance_merge)
-    digest_tiles(state_desc, pm.result_dir, output, state_merge)
-    digest_tiles(productivity_desc, pm.result_dir, output, productivity_merge)
-    digest_tiles(indicator_desc, pm.result_dir, output, indicator_merge)
+    for name in layers:
+        digest_tiles(name, pm.result_dir, output, pm.result_dir / f"{name}_merge.tif")
 
     output.add_live_msg(ms.download.remove_gdrive)
+
     # remove the files from drive
-    drive_handler.delete_files(drive_handler.get_files(land_cover_desc))
-    drive_handler.delete_files(drive_handler.get_files(soc_desc))
-    drive_handler.delete_files(drive_handler.get_files(trend_desc))
-    drive_handler.delete_files(drive_handler.get_files(performance_desc))
-    drive_handler.delete_files(drive_handler.get_files(state_desc))
-    drive_handler.delete_files(drive_handler.get_files(productivity_desc))
-    drive_handler.delete_files(drive_handler.get_files(indicator_desc))
+    for name in layers:
+        drive_handler.delete_files(drive_handler.get_files(name))
 
     # display msg
     output.add_live_msg(ms.download.completed, "success")
 
-    return (
-        land_cover_merge,
-        soc_merge,
-        trend_merge,
-        performance_merge,
-        state_merge,
-        productivity_merge,
-        indicator_merge,
-    )
+    return tuple([pm.result_dir / f"{name}_merge.tif" for name in layers])
 
 
 def display_maps(aoi_model, model, m, output):

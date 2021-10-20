@@ -78,7 +78,7 @@ class Tile_15_3_1(sw.Tile):
         pickers.end_picker.observe(self.sensor_select.update_sensors, "v_model")
         self.sensor_select.observe(self._check_sensor, "v_model")
 
-    @su.loading_button(debug=False)
+    @su.loading_button(debug=True)
     def start_process(self, widget, data, event):
 
         # check the inputs
