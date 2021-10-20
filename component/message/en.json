@@ -54,7 +54,7 @@
             "no_target": "please provide a start date of assemsment period",
             "no_end": "Please provide a end date for the assesment period",
             "no_traj": "Please provide a trajectory for the trend analysis",
-            "no_mix": "You cannot mix sentinel and landsat data",
+            "no_mix": "You cannot mix sentinel, modis and landsat data",
             "no_vi" : "Please provide a vegetation index for the productivity analysis",
             "no_lceu": "Please provide a land cover ecosystem functional units source"
         },

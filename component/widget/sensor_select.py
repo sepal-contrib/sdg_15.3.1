@@ -41,7 +41,7 @@ class SensorSelect(v.Select):
         
         # change sensor v_model
         items.remove('Sentinel 2')
-        items.remove('MODIS VI')
+        items.remove('MODIS MOD13Q1')
         self.v_model = items
         
         return
