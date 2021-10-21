@@ -55,15 +55,7 @@ class MatrixInput(v.Html):
 
 class TransitionMatrix(v.SimpleTable):
 
-    CLASSES = [
-        ms._15_3_1.classes.forest,
-        ms._15_3_1.classes.grassland,
-        ms._15_3_1.classes.cropland,
-        ms._15_3_1.classes.wetland,
-        ms._15_3_1.classes.artificial,
-        ms._15_3_1.classes.bareland,
-        ms._15_3_1.classes.water,
-    ]
+    CLASSES = [*pm.lc_color]
 
     DECODE = {1: "+", 0: "", -1: "-"}
 

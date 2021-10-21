@@ -1,5 +1,6 @@
 from zipfile import ZipFile
 import time
+from itertools import product
 
 import ee
 import geemap
@@ -139,7 +140,7 @@ def display_maps(aoi_model, model, m, output):
     aoi_line = empty.paint(
         **{"featureCollection": aoi_model.feature_collection, "color": 1, "width": 2}
     )
-    m.addLayer(aoi_line, {"palette": v.theme.themes.dark.info}, "aoi")
+    m.addLayer(aoi_line, {"palette": v.theme.themes.dark.accent}, "aoi")
     output.add_live_msg(ms._15_3_1.map_loading_complete, "success")
 
     return
@@ -180,6 +181,7 @@ def compute_indicator_maps(aoi_model, model, output):
 
 
 def compute_lc_transition_stats(aoi_model, model):
+
     landcover = model.land_cover.select("transition")
     scale = 300
     aoi = aoi_model.feature_collection.geometry().bounds()
@@ -187,9 +189,9 @@ def compute_lc_transition_stats(aoi_model, model):
         max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
     )
     lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
-    lc_name = pm.lancover_name
-    class_value = [x * 10 + y for x in range(1, 8) for y in range(1, 8)]
-    class_name = [x + "_" + y for x in lc_name for y in lc_name]
+    lc_name = [*pm.lc_color]
+    class_value = [x * 10 + y for x, y in product(range(1, 8), repeat=2)]
+    class_name = [x + "_" + y for x, y in product(lc_name, repeat=2)]
     multiband_class = landcover.eq(class_value).rename(class_name)
     pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
     area_per_class = pixel_area.reduceRegion(
@@ -210,14 +212,15 @@ def compute_lc_transition_stats(aoi_model, model):
 
 
 def compute_stats_by_lc(aoi_model, model):
+
     landcover = model.land_cover.select("end")
     indicator = model.indicator_15_3_1
     aoi = aoi_model.feature_collection.geometry().bounds()
-    lc_name = pm.lancover_name
-    deg_name = pm.deg_3_class
+    lc_name = [*pm.lc_color]
+    deg_name = [*pm.legend]
     lc_deg_combine = indicator.multiply(10).add(landcover)
-    class_value = [x * 10 + y for x in range(1, 4) for y in range(1, 8)]
-    class_name = [x + "_" + y for x in deg_name for y in lc_name]
+    class_value = [x * 10 + y for x, y in product(range(1, 4), range(1, 8))]
+    class_name = [x + "_" + y for x, y in product(deg_name, lc_name)]
     multiband_class = lc_deg_combine.eq(class_value).rename(class_name)
     pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
     area_per_class = pixel_area.reduceRegion(

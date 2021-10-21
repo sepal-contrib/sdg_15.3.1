@@ -101,6 +101,9 @@ class InputTile(sw.Tile):
         # get the land transition data
         df = cs.compute_lc_transition_stats(self.aoi_model, self.model)
 
+        # get the stats by lc
+        dflc = cs.compute_stats_by_lc(self.aoi_model, self.model)
+
         # get the sankey plot
         self.result_tile.sankey_plot.clear_output()
         with self.result_tile.sankey_plot:
@@ -108,7 +111,6 @@ class InputTile(sw.Tile):
             fig.set_facecolor((0, 0, 0, 0))
             plt.show()
 
-        dflc = cs.compute_stats_by_lc(self.aoi_model, self.model)
         pivot_dflc = dflc.pivot(index="Landcover", columns="Indicator")["Area"]
         self.result_tile.bar_plot.clear_output()
         # Get the bar diagram
@@ -116,11 +118,7 @@ class InputTile(sw.Tile):
             fig, ax = plt.subplots(figsize=(10, 9))
             pivot_dflc.plot.bar(
                 rot=0,
-                color={
-                    "Stable": "#D5B9B2",
-                    "Degraded": "#F28482",
-                    "Improved": "#4F772D",
-                },
+                color=cp.legend,
                 ax=ax,
                 fontsize=12,
             )

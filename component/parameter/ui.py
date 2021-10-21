@@ -39,23 +39,21 @@ climate_regimes = [
     {"text": ms._15_3_1.clim_regim.trop_moist, "value": 0.48},
     {"text": ms._15_3_1.clim_regim.trop_mont, "value": 0.64},
 ]
-# v.theme.themes.dark.error
-# v.theme.themes.dark.primary
-# v.theme.themes.dark.success
+
 legend = {
-    ms._15_3_1.legend.degraded: "#F28482",
-    ms._15_3_1.legend.stable: "#D5B9B2",
-    ms._15_3_1.legend.improved: "#4F772D",
+    ms._15_3_1.legend.degraded: "#d7191c",
+    ms._15_3_1.legend.stable: "#ffffbf",
+    ms._15_3_1.legend.improved: "#2c7bb6",
 }
 
 lc_color = {
-    "Tree-covered": "yellowgreen",
-    "Grassland": "palegreen",
-    "Cropland": "gold",
-    "Wetland": "turquoise",
-    "Artificial": "gainsboro",
-    "Other land": "floralwhite",
-    "Water body": "dodgerblue",
+    ms._15_3_1.classes.forest: "yellowgreen",
+    ms._15_3_1.classes.grassland: "palegreen",
+    ms._15_3_1.classes.cropland: "gold",
+    ms._15_3_1.classes.wetland: "turquoise",
+    ms._15_3_1.classes.artificial: "gainsboro",
+    ms._15_3_1.classes.bareland: "floralwhite",
+    ms._15_3_1.classes.water: "dodgerblue",
 }
 
 viz_lc = {"max": 7, "min": 1, "palette": list(lc_color.values())}
