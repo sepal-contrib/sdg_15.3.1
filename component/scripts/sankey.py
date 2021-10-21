@@ -39,7 +39,7 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
     if len(rightWeight) == 0:
         rightWeight = leftWeight
 
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(9, 11))
 
     # Create Dataframe
     if isinstance(left, pd.Series):
@@ -198,7 +198,10 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
                     color=colorDict[labelColor],
                 )
     ax.axis("off")
-    ax.set_title(f"Land cover transitions from {df.columns[0]} to {df.columns[1]}")
+    ax.set_title(
+        f"Land cover transitions from {df.columns[0]} to {df.columns[1]}",
+        fontweight="bold",
+    )
     left, width = -0.001, 0.5
     bottom, height = 0.25, 0.5
     right = left + width
@@ -226,6 +229,5 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
         fontsize=50,
         transform=ax.transAxes,
     )
-    # plt.show()
-    # plt.savefig("{}.svg".format('sankey'), bbox_inches='tight', dpi=150)
+
     return (fig, ax)

@@ -76,23 +76,22 @@ class InputTile(sw.Tile):
     def start_process(self, widget, data, event):
 
         # check the inputs
-        if not self.alert.check_input(self.aoi_model.name, ms.error.no_aoi):
-            return
-        if not self.alert.check_input(self.model.start, ms._15_3_1.error.no_start):
-            return
-        if not self.alert.check_input(self.model.end, ms._15_3_1.error.no_end):
-            return
-        if not self.alert.check_input(
-            self.model.vegetation_index, ms._15_3_1.error.no_vi
+        if not all(
+            [
+                self.alert.check_input(self.aoi_model.name, ms.error.no_aoi),
+                self.alert.check_input(self.model.start, ms._15_3_1.error.no_start),
+                self.alert.check_input(self.model.end, ms._15_3_1.error.no_end),
+                self.alert.check_input(
+                    self.model.vegetation_index, ms._15_3_1.error.no_vi
+                ),
+                self.alert.check_input(self.model.trajectory, ms._15_3_1.error.no_traj),
+                self.alert.check_input(self.model.lceu, ms._15_3_1.error.no_lceu),
+                self.alert.check_input(self.model.sensors, "no sensors"),
+            ]
         ):
             return
-        if not self.alert.check_input(self.model.trajectory, ms._15_3_1.error.no_traj):
-            return
-        if not self.alert.check_input(self.model.lceu, ms._15_3_1.error.no_lceu):
-            return
-        if not self.alert.check_input(self.model.sensors, "no sensors"):
-            return widget.toggle_loading()
 
+        # compute the indicators maps
         cs.compute_indicator_maps(self.aoi_model, self.model, self.alert)
 
         # get the result map
@@ -104,7 +103,7 @@ class InputTile(sw.Tile):
         # get the stats by lc
         dflc = cs.compute_stats_by_lc(self.aoi_model, self.model)
 
-        # get the sankey plot
+        # create the sankey plot
         self.result_tile.sankey_plot.clear_output()
         with self.result_tile.sankey_plot:
             fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
@@ -115,20 +114,7 @@ class InputTile(sw.Tile):
         self.result_tile.bar_plot.clear_output()
         # Get the bar diagram
         with self.result_tile.bar_plot:
-            fig, ax = plt.subplots(figsize=(10, 9))
-            pivot_dflc.plot.bar(
-                rot=0,
-                color=cp.legend,
-                ax=ax,
-                fontsize=12,
-            )
-            ax.set_xlabel("Land cover")
-            ax.set_yscale("log")
-            ax.set_ylabel("Area in ha")
-            ax.set_title("Distribution of area by land cover type")
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
-            ax.spines["left"].set_visible(False)
+            fig, ax = cs.bar_plot(pivot_dflc)
             ax.set_facecolor((0, 0, 0, 0))
             fig.set_facecolor((0, 0, 0, 0))
             plt.show()
