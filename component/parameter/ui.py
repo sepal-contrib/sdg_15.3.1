@@ -8,7 +8,6 @@ vegetation_index = [
     {"text": ms._15_3_1.vi.msvi, "value": "msvi"},
 ]
 
-
 lceu = [
     {"text": ms._15_3_1.lceu.calculate, "value": "calculate", "disabled": False},
     {"text": ms._15_3_1.lceu.wte, "value": "wte", "disabled": False},
@@ -23,7 +22,6 @@ lceu = [
         "disabled": True,
     },
 ]
-
 
 trajectories = [
     {"text": ms._15_3_1.trend.ndvi, "value": "ndvi_trend", "disabled": False},

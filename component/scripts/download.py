@@ -31,7 +31,6 @@ def digest_tiles(filename, result_dir, output, tmp_file):
 
     # run the merge process
     output.add_live_msg(ms.download.merge_tile)
-    time.sleep(2)
 
     # manual open and close because I don't know how many file there are
     sources = [rio.open(file) for file in files]

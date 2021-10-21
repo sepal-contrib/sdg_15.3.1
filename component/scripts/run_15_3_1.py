@@ -40,14 +40,15 @@ def download_maps(aoi_model, model, output):
 
     # create the export path
     # they are in correct order don't change it
+    pattern = f"{aoi_model.name}_{model.folder_name()}"
     layers = {
-        f"{aoi_dir}_{model.folder_name()}_land_cover": model.land_cover,
-        f"{aoi_dir}_{model.folder_name()}_soc": model.soc,
-        f"{aoi_dir}_{model.folder_name()}_productivity_trend": model.productivity_trend,
-        f"{aoi_dir}_{model.folder_name()}_productivity_performance": model.productivity_state,
-        f"{aoi_dir}_{model.folder_name()}_productivity_state": model.productivity_state,
-        f"{aoi_dir}_{model.folder_name()}_productivity_indicator": model.productivity,
-        f"{aoi_dir}_{model.folder_name()}_indicator_15_3_1": model.indicator_15_3_1,
+        f"land_cover": model.land_cover,
+        f"soc": model.soc,
+        f"productivity_trend": model.productivity_trend,
+        f"productivity_performance": model.productivity_state,
+        f"productivity_state": model.productivity_state,
+        f"productivity_indicator": model.productivity,
+        f"indicator_15_3_1": model.indicator_15_3_1,
     }
 
     # load the drive_handler
@@ -74,7 +75,9 @@ def download_maps(aoi_model, model, output):
 
     # digest the tiles
     for name in layers:
-        digest_tiles(name, result_dir, output, result_dir / f"{name}_merge.tif")
+        digest_tiles(
+            name, result_dir, output, result_dir / f"{pattern}_{name}_merge.tif"
+        )
 
     output.add_live_msg(ms.download.remove_gdrive)
 
@@ -85,7 +88,7 @@ def download_maps(aoi_model, model, output):
     # display msg
     output.add_live_msg(ms.download.completed, "success")
 
-    return tuple([result_dir / f"{name}_merge.tif" for name in layers])
+    return tuple([result_dir / f"{pattern}_{name}_merge.tif" for name in layers])
 
 
 def display_maps(aoi_model, model, m, output):
@@ -248,21 +251,27 @@ def compute_stats_by_lc(aoi_model, model):
 
 def compute_zonal_analysis(aoi_model, model, output):
 
-    indicator_stats = pm.result_dir.joinpath(f"{aoi_model.name}_indicator_15_3_1")
+    # create a result folder including the data parameters
+    # create the aoi and parameter folder if not existing
+    aoi_dir = pm.result_dir / su.normalize_str(aoi_model.name)
+    result_dir = aoi_dir / model.folder_name()
+    result_dir.mkdir(parents=True, exist_ok=True)
+
+    indicator_stats = (
+        result_dir / f"{aoi_model.name}_{model.folder_name()}_indicator_15_3_1"
+    )
 
     # check if the file already exist
     indicator_zip = indicator_stats.with_suffix(".zip")
     if indicator_zip.is_file():
         output.add_live_msg(ms.download.already_exist.format(indicator_zip), "warning")
-        time.sleep(2)
         return indicator_zip
 
     output_widget = Output()
     output.add_msg(output_widget)
 
-    indicator_csv = indicator_stats.with_suffix(
-        ".csv"
-    )  # to be removed when moving to shp
+    # to be removed when moving to shp
+    indicator_csv = indicator_stats.with_suffix(".csv")
     scale = 100 if "Sentinel 2" in model.sensors else 300
     with output_widget:
         geemap.zonal_statistics_by_group(

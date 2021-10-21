@@ -71,6 +71,6 @@ class IndicatorModel(model.Model):
         )
 
         # get the climate regime
-        climate = f"cr{rint(self.conversion_coef*100)}"
+        climate = f"cr{int(self.conversion_coef*100)}"
 
         return f"{start}_{end}_{sensor}_{vegetation_index}_{lceu}_{matrix}_{climate}"
