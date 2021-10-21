@@ -85,16 +85,13 @@
             "results": "Spatial results",
             "zonal": "Zonal statistics"
         },
-        "process_btn": "Load the indicators",        
-        "map_legend": "Indicator state",
-        "down_zonal": "Zonal statistics",
-        "down_lc": "Land Cover",
-        "down_prod": "Productivity",
-        "down_trend": "Productivity trend", 
-        "down_state": "Productivity state",
-        "down_performance": "Productivity performance", 
-        "down_soc": "Soil Organic Carbon",
-        "down_ind": "Indicator 15.3.1",
+        "process_btn": "Load the indicators",  
+        "map": {
+            "legend": {
+                "state": "Indicator state",
+                "lc": "LC classes"
+            }
+        },
         "result_btn_zonalstats": "Calculate Zonal Statistics",
         "result_btn": "Download maps as .tif in sepal",
         "clim_option_lbl": "Climate regime options",

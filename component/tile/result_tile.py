@@ -3,10 +3,12 @@ from sepal_ui import sepalwidgets as sw
 from sepal_ui.scripts import utils as su
 from sepal_ui import mapping as sm
 from ipywidgets import Output, link
+from ipyleaflet import LegendControl
 
 from component.message import ms
 from component import parameter as cp
 from component import scripts as cs
+from component import widget as cw
 
 
 class ResultTile(sw.Tile):
@@ -18,11 +20,18 @@ class ResultTile(sw.Tile):
 
         markdown = sw.Markdown("""{}""".format("  \n".join(ms._15_3_1.result_text)))
 
+        #
+
         # create the result map
         # with its legend
-        self.m = sm.SepalMap()
+        self.m = cw.ResultMap()
         self.m.add_legend(
-            legend_title=ms._15_3_1.map_legend,
+            legend_title=ms._15_3_1.map.legend.lc,
+            legend_dict=cp.lc_color,
+            position="topleft",
+        )
+        self.m.add_legend(
+            legend_title=ms._15_3_1.map.legend.state,
             legend_dict=cp.legend,
             position="topleft",
         )

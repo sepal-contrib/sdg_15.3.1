@@ -47,13 +47,13 @@ legend = {
 }
 
 lc_color = {
-    ms._15_3_1.classes.forest: "yellowgreen",
-    ms._15_3_1.classes.grassland: "palegreen",
-    ms._15_3_1.classes.cropland: "gold",
-    ms._15_3_1.classes.wetland: "turquoise",
-    ms._15_3_1.classes.artificial: "gainsboro",
-    ms._15_3_1.classes.bareland: "floralwhite",
-    ms._15_3_1.classes.water: "dodgerblue",
+    ms._15_3_1.classes.forest: "#02A000",
+    ms._15_3_1.classes.grassland: "#FFB432",
+    ms._15_3_1.classes.cropland: "#FFFF64",
+    ms._15_3_1.classes.wetland: "#04DC83",
+    ms._15_3_1.classes.artificial: "#C31400",
+    ms._15_3_1.classes.bareland: "#FFF5D7",
+    ms._15_3_1.classes.water: "#0046C8",
 }
 
 viz_lc = {"max": 7, "min": 1, "palette": list(lc_color.values())}
