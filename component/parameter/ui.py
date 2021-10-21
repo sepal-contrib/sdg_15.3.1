@@ -11,15 +11,15 @@ vegetation_index = [
 
 lceu = [
     {"text": ms._15_3_1.lceu.calculate, "value": "calculate", "disabled": False},
-    {"text": ms._15_3_1.lceu.wte, "value": "World Ecosystems", "disabled": False},
+    {"text": ms._15_3_1.lceu.wte, "value": "wte", "disabled": False},
     {
         "text": ms._15_3_1.lceu.hru,
-        "value": "Global Homogeneous Response Units",
+        "value": "hru",
         "disabled": True,
     },
     {
         "text": ms._15_3_1.lceu.gaes,
-        "value": "Global Agro-Environmental Stratification",
+        "value": "gaes",
         "disabled": True,
     },
 ]
@@ -27,8 +27,8 @@ lceu = [
 
 trajectories = [
     {"text": ms._15_3_1.trend.ndvi, "value": "ndvi_trend", "disabled": False},
-    {"text": ms._15_3_1.trend.p_res, "value": "p_restrend", "disabled": False},
-    {"text": ms._15_3_1.trend.s_res, "value": "s_restrend", "disabled": True},
+    {"text": ms._15_3_1.trend.p_res, "value": "p_res_trend", "disabled": False},
+    {"text": ms._15_3_1.trend.s_res, "value": "s_res_trend", "disabled": True},
     {"text": ms._15_3_1.trend.ue, "value": "ue_trend", "disabled": False},
 ]
 

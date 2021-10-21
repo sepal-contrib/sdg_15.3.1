@@ -8,9 +8,9 @@ from ipywidgets import Output
 import ipyvuetify as v
 import geopandas as gpd
 import pandas as pd
+from sepal_ui.scripts import utils as su
 
 from component import parameter as pm
-
 from component.message import ms
 
 from .gdrive import gdrive
@@ -26,6 +26,12 @@ ee.Initialize()
 
 def download_maps(aoi_model, model, output):
 
+    # create a result folder including the data parameters
+    # create the aoi and parameter folder if not existing
+    aoi_dir = pm.result_dir / su.normalize_str(aoi_model.name)
+    result_dir = aoi_dir / model.folder_name()
+    result_dir.mkdir(parents=True, exist_ok=True)
+
     # get the export scale
     # from the first sensor (we only combine compatible one)
     scale = pm.sensors[model.sensors[0]][1]
@@ -35,13 +41,13 @@ def download_maps(aoi_model, model, output):
     # create the export path
     # they are in correct order don't change it
     layers = {
-        f"{aoi_model.name}_land_cover": model.land_cover,
-        f"{aoi_model.name}_soc": model.soc,
-        f"{aoi_model.name}_productivity_trend": model.productivity_trend,
-        f"{aoi_model.name}_productivity_performance": model.productivity_state,
-        f"{aoi_model.name}_productivity_state": model.productivity_state,
-        f"{aoi_model.name}_productivity_indicator": model.productivity,
-        f"{aoi_model.name}_indicator_15_3_1": model.indicator_15_3_1,
+        f"{aoi_dir}_{model.folder_name()}_land_cover": model.land_cover,
+        f"{aoi_dir}_{model.folder_name()}_soc": model.soc,
+        f"{aoi_dir}_{model.folder_name()}_productivity_trend": model.productivity_trend,
+        f"{aoi_dir}_{model.folder_name()}_productivity_performance": model.productivity_state,
+        f"{aoi_dir}_{model.folder_name()}_productivity_state": model.productivity_state,
+        f"{aoi_dir}_{model.folder_name()}_productivity_indicator": model.productivity,
+        f"{aoi_dir}_{model.folder_name()}_indicator_15_3_1": model.indicator_15_3_1,
     }
 
     # load the drive_handler
@@ -68,7 +74,7 @@ def download_maps(aoi_model, model, output):
 
     # digest the tiles
     for name in layers:
-        digest_tiles(name, pm.result_dir, output, pm.result_dir / f"{name}_merge.tif")
+        digest_tiles(name, result_dir, output, result_dir / f"{name}_merge.tif")
 
     output.add_live_msg(ms.download.remove_gdrive)
 
@@ -79,7 +85,7 @@ def download_maps(aoi_model, model, output):
     # display msg
     output.add_live_msg(ms.download.completed, "success")
 
-    return tuple([pm.result_dir / f"{name}_merge.tif" for name in layers])
+    return tuple([result_dir / f"{name}_merge.tif" for name in layers])
 
 
 def display_maps(aoi_model, model, m, output):

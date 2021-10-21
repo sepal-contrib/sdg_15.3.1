@@ -8,8 +8,6 @@ from component import widget as cw
 from component import parameter as cp
 from component import scripts as cs
 
-plt.style.use("dark_background")
-
 
 class InputTile(sw.Tile):
     def __init__(self, aoi_model, model, result_tile, zonal_stats_tile):
@@ -91,6 +89,12 @@ class InputTile(sw.Tile):
         ):
             return
 
+        # create a result folder including the data parameters
+        # create the aoi and parameter folder if not existing
+        aoi_dir = cp.result_dir / su.normalize_str(self.aoi_model.name)
+        result_dir = aoi_dir / self.model.folder_name()
+        result_dir.mkdir(parents=True, exist_ok=True)
+
         # compute the indicators maps
         cs.compute_indicator_maps(self.aoi_model, self.model, self.alert)
 
@@ -102,22 +106,32 @@ class InputTile(sw.Tile):
 
         # get the stats by lc
         dflc = cs.compute_stats_by_lc(self.aoi_model, self.model)
-
-        # create the sankey plot
-        self.result_tile.sankey_plot.clear_output()
-        with self.result_tile.sankey_plot:
-            fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
-            fig.set_facecolor((0, 0, 0, 0))
-            plt.show()
-
         pivot_dflc = dflc.pivot(index="Landcover", columns="Indicator")["Area"]
+
+        # create the diagrams
+        self.result_tile.sankey_plot.clear_output()
         self.result_tile.bar_plot.clear_output()
-        # Get the bar diagram
-        with self.result_tile.bar_plot:
-            fig, ax = cs.bar_plot(pivot_dflc)
-            ax.set_facecolor((0, 0, 0, 0))
-            fig.set_facecolor((0, 0, 0, 0))
-            plt.show()
+
+        with plt.style.context("dark_background"):
+            with self.result_tile.sankey_plot:
+                fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
+                fig.set_facecolor((0, 0, 0, 0))
+                plt.show()
+
+            with self.result_tile.bar_plot:
+                fig, ax = cs.bar_plot(pivot_dflc)
+                ax.set_facecolor((0, 0, 0, 0))
+                fig.set_facecolor((0, 0, 0, 0))
+                plt.show()
+
+        # save the figures by default
+        pattern = str(result_dir / f"{self.aoi_model.name}_{self.model.folder_name()}")
+        fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
+        fig.savefig(f"{pattern}_lc_transition.png", dpi=200)
+        plt.close()
+        fig, ax = cs.bar_plot(pivot_dflc)
+        fig.savefig(f"{pattern}_area_distribution.png")
+        plt.close()
 
         # release the download btn
         self.result_tile.btn.disabled = False

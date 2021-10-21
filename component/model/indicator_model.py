@@ -17,8 +17,8 @@ class IndicatorModel(model.Model):
     sensors = Any(None).tag(sync=True)
 
     # Vegetation indices
-
     vegetation_index = Any(None).tag(sync=True)
+
     # trajectory
     trajectory = Any(None).tag(sync=True)
     lceu = Any(None).tag(sync=True)
@@ -40,3 +40,37 @@ class IndicatorModel(model.Model):
     productivity_state = Any(None).tag(sync=True)
     productivity_performance = Any(None).tag(sync=True)
     indicator_15_3_1 = Any(None).tag(sync=True)
+
+    def folder_name(self):
+        """Return all the parameter formated as a string"""
+
+        # get the dates
+        start = self.start
+        end = self.end
+
+        # create the sensor list
+        if "l" in self.sensors[0]:
+            # get only the number of the landsat satelites
+            names = [pm.sensors[s][2][1] for s in self.sensors]
+            sensor = f"l{''.join(names)}"
+        else:
+            sensor = pm.sensors[self.sensors[0]][2]
+
+        # get the vegetation index
+        vegetation_index = self.vegetation_index
+
+        # get the trajectory
+        trajectory = self.trajectory.replace("_trend", "")
+
+        # get land cover ecosystem unit
+        lceu = self.lceu
+
+        # get info on the transition matrix
+        matrix = (
+            "default" if self.transition_matrix == pm.default_trans_matrix else "custom"
+        )
+
+        # get the climate regime
+        climate = f"cr{rint(self.conversion_coef*100)}"
+
+        return f"{start}_{end}_{sensor}_{vegetation_index}_{lceu}_{matrix}_{climate}"

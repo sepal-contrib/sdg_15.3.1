@@ -13,6 +13,7 @@ def bar_plot(df):
         rot=0,
         color=cp.legend,
         ax=ax,
+        edgecolor="black",
         fontsize=12,
     )
 
