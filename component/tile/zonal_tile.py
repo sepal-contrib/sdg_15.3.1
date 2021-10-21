@@ -16,16 +16,11 @@ class ZonalTile(sw.Tile):
             """{}""".format("  \n".join(ms._15_3_1.result_text_zonalstats))
         )
 
-        # create the result map
-
-        # add a download btn for csv and a download btn for the sepal
-        self.shp_btn = sw.DownloadBtn(ms._15_3_1.down_zonal)
-
         # init the tile
         super().__init__(
             "result_tile",
             ms._15_3_1.titles.zonal,
-            [markdown, self.shp_btn],
+            [markdown],
             alert=sw.Alert(),
             btn=sw.Btn(
                 text=ms._15_3_1.result_btn_zonalstats,
@@ -43,7 +38,5 @@ class ZonalTile(sw.Tile):
 
         # download the files
         stats = cs.compute_zonal_analysis(self.aoi_model, self.model, self.alert)
-        # update the button
-        self.shp_btn.set_url(str(stats))
 
         return
