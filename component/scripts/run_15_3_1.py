@@ -190,18 +190,29 @@ def compute_indicator_maps(aoi_model, model, output):
 
 
 def compute_lc_transition_stats(aoi_model, model):
-
+    """function to calculate the statistics of land cover transitions between two years to be used as input for the sankey diagram.
+    input: ee.Image(land cover transition)
+    retun: DataFrame.
+    """
     landcover = model.land_cover.select("transition")
-    scale = 300
+    scale = pm.sensors[model.sensors[0]][1]
     aoi = aoi_model.feature_collection.geometry().bounds()
     lc_year_start = min(
         max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
     )
     lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
     lc_name = [*pm.lc_color]
+
+    # make a list of all the possible transitions values
     class_value = [x * 10 + y for x, y in product(range(1, 8), repeat=2)]
+
+    # make a list of all the possible transitions classes
     class_name = [x + "_" + y for x, y in product(lc_name, repeat=2)]
+
+    # creat a multi band image with all the classes as bands
     multiband_class = landcover.eq(class_value).rename(class_name)
+
+    # calculate the area
     pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
     area_per_class = pixel_area.reduceRegion(
         **{
@@ -214,23 +225,47 @@ def compute_lc_transition_stats(aoi_model, model):
         }
     )
     data = area_per_class.getInfo()
+
+    # split the transition names and organise the data
     df = [[*[i for i in x.split("_")], y] for x, y in data.items()]
+
+    # convert to a DataFrame
     df = pd.DataFrame(data=df, columns=[lc_year_start, lc_year_end, "Area"])
 
     return df
 
 
 def compute_stats_by_lc(aoi_model, model):
+    """
+    tabulate the area by land cover categories.
+    input: ee.Image(ending land cover, final indicator)
+    return: DataFrame
 
+    """
+
+    # land cover
     landcover = model.land_cover.select("end")
+
+    # final indicator
     indicator = model.indicator_15_3_1
     aoi = aoi_model.feature_collection.geometry().bounds()
     lc_name = [*pm.lc_color]
     deg_name = [*pm.legend]
+
+    # combine indicator and land cover together.
+    # first digit represents the indicator, second digit represents land cover categories
     lc_deg_combine = indicator.multiply(10).add(landcover)
+
+    # all possible combined values
     class_value = [x * 10 + y for x, y in product(range(1, 4), range(1, 8))]
+
+    # all possible combined categories
     class_name = [x + "_" + y for x, y in product(deg_name, lc_name)]
+
+    # creat a multi band image with all the categories as bands
     multiband_class = lc_deg_combine.eq(class_value).rename(class_name)
+
+    # calculate the area
     pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
     area_per_class = pixel_area.reduceRegion(
         **{
@@ -243,7 +278,11 @@ def compute_stats_by_lc(aoi_model, model):
         }
     )
     data = area_per_class.getInfo()
+
+    # split and organise the data
     df = [[*[i for i in x.split("_")], y] for x, y in data.items()]
+
+    # convert to a DataFrame
     df = pd.DataFrame(data=df, columns=["Indicator", "Landcover", "Area"])
 
     return df
