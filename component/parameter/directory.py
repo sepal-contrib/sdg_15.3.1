@@ -8,3 +8,5 @@ module_dir.mkdir(exist_ok=True)
 
 result_dir = module_dir / "sdg_indicators"
 result_dir.mkdir(exist_ok=True)
+
+utils_dir = Path(__file__).parents[2] / "utils"
