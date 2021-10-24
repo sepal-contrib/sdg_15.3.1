@@ -11,7 +11,7 @@ ee.Initialize()
 class SelectLC(sw.AssetSelect):
     def __init__(self, **kwargs):
 
-        super().__init__(**kwargs)
+        super().__init__(types=["IMAGE"], **kwargs)
 
     @su.switch("loading")
     def _validate(self, change):

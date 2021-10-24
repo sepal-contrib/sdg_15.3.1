@@ -81,6 +81,9 @@
         "vi_lbl":"Select Vegetation Index",
         "lceu_lbl": "Select Land cover ecosystem functional units",
         "transition_matrix": "Transition matrix",
+        "advance_params": "advance parameters",
+        "start_lc": "Land Cover Image corresponding to start year",
+        "end_lc": "Land Cover Image corresponding to end year",
         "titles": {
             "inputs": "Computation parameters",
             "results": "Spatial results",

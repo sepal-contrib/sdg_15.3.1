@@ -36,11 +36,37 @@ class InputTile(sw.Tile):
             label=ms._15_3_1.traj_lbl, items=cp.trajectories, v_model=None
         )
         lceu = v.Select(label=ms._15_3_1.lceu_lbl, items=cp.lceu, v_model=None)
+
+        climate_regime = cw.ClimateRegime(self.model, alert)
+
+        # create advanced parameters
         transition_label = v.Html(
             class_="grey--text mt-2", tag="h3", children=[ms._15_3_1.transition_matrix]
         )
         transition_matrix = cw.TransitionMatrix(self.model, alert)
-        climate_regime = cw.ClimateRegime(self.model, alert)
+        start_lc = cw.SelectLC(label=ms._15_3_1.start_lc)
+        end_lc = cw.SelectLC(label=ms._15_3_1.end_lc)
+
+        # stack the advance parameters in a expandpanel
+        advance_params = v.ExpansionPanels(
+            class_="mb-5",
+            popout=True,
+            children=[
+                v.ExpansionPanel(
+                    children=[
+                        v.ExpansionPanelHeader(children=[ms._15_3_1.advance_params]),
+                        v.ExpansionPanelContent(
+                            children=[
+                                v.Flex(xs12=True, children=[start_lc]),
+                                v.Flex(xs12=True, children=[end_lc]),
+                                v.Flex(xs12=True, children=[transition_label]),
+                                v.Flex(xs12=True, children=[transition_matrix]),
+                            ]
+                        ),
+                    ]
+                )
+            ],
+        )
 
         # bind the standars widgets to variables
         self.model.bind(self.sensor_select, "sensors").bind(
@@ -58,9 +84,8 @@ class InputTile(sw.Tile):
                 vegetation_index,
                 trajectory,
                 lceu,
-                transition_label,
-                transition_matrix,
                 climate_regime,
+                advance_params,
             ],
             btn=sw.Btn(ms._15_3_1.process_btn, class_="mt-5"),
             alert=alert,
