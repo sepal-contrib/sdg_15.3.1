@@ -4,6 +4,7 @@
         "aoi_drawer": "Aoi selector",
         "input_drawer": "Parameters",
         "result_drawer": "Results",
+        "reclassify_drawer": "Customize LC",
         "about_drawer": "About"
     },
     "_15_3_1": {
@@ -122,7 +123,7 @@
         "file_exist": "The file {} is already available on your computer",
         "start_download": "Start the exportation of your maps",
         "remove_gdrive": "Remove the files from your Gdrive folder",
-	"already_exist": "Folder {} already exist"
+        "already_exist": "Folder {} already exist"
     }, 
     "gee": {
         "status": "Status: {}",
@@ -131,5 +132,9 @@
     },
     "error": {
         "no_aoi": "No aoi have been provided"
+    },
+    "select_lc": {
+        "not_image": "The asset need to be a valid GEE ee.Image",
+        "not_unccd": "the image is not reclassified using the UNCCD classfication. Please use the customize panel to reclassify your Image"
     }
 }
