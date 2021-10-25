@@ -29,6 +29,10 @@ class IndicatorModel(model.Model):
     # Climate regime
     conversion_coef = Any(None).tag(sync=True)
 
+    # custom lc
+    start_lc = Any(None).tag(sync=True)
+    end_lc = Any(None).tag(sync=True)
+
     ######################
     ##      output      ##
     ######################
@@ -66,11 +70,11 @@ class IndicatorModel(model.Model):
         lceu = self.lceu
 
         # get info on the transition matrix
-        matrix = (
-            "default" if self.transition_matrix == pm.default_trans_matrix else "custom"
-        )
+        custom_matrix = self.transition_matrix != pm.default_trans_matrix
+        custom_lc = self.start_lc is not None
+        lc_matrix = "custom" if matrix or custom_lc else "default"
 
         # get the climate regime
         climate = f"cr{int(self.conversion_coef*100)}"
 
-        return f"{start}_{end}_{sensor}_{vegetation_index}_{lceu}_{matrix}_{climate}"
+        return f"{start}_{end}_{sensor}_{vegetation_index}_{lceu}_{lc_matrix}_{climate}"

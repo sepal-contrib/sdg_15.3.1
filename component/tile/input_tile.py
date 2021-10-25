@@ -69,9 +69,14 @@ class InputTile(sw.Tile):
         )
 
         # bind the standars widgets to variables
-        self.model.bind(self.sensor_select, "sensors").bind(
-            trajectory, "trajectory"
-        ).bind(vegetation_index, "vegetation_index").bind(lceu, "lceu")
+        (
+            self.model.bind(self.sensor_select, "sensors")
+            .bind(trajectory, "trajectory")
+            .bind(vegetation_index, "vegetation_index")
+            .bind(lceu, "lceu")
+            .bind(start_lc, "start_lc")
+            .bind(end_lc, "end_lc")
+        )
 
         # create the actual tile
         super().__init__(
@@ -113,6 +118,12 @@ class InputTile(sw.Tile):
             ]
         ):
             return
+        if self.model.start_lc or self.model.end_lc:
+            if not self.alert.check_input(
+                self.model.start_lc == self.model.end_lc,
+                "the lc custom class need to be all set. If two Images have been set, they need to be different.",
+            ):
+                return
 
         # create a result folder including the data parameters
         # create the aoi and parameter folder if not existing
