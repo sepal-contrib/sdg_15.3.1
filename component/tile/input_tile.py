@@ -133,6 +133,12 @@ class InputTile(sw.Tile):
         fig.savefig(f"{pattern}_area_distribution.png")
         plt.close()
 
+        # export the legend by default
+        cs.export_legend(
+            f"{pattern}_indicator_legend.png", cp.legend, "Indicator Status"
+        )
+        cs.export_legend(f"{pattern}_lc_legend.png", cp.lc_color, "Land Cover class")
+
         # release the download btn
         self.result_tile.btn.disabled = False
         self.zonal_stats_tile.btn.disabled = False

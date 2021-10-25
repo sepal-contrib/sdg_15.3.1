@@ -3,6 +3,7 @@ import time
 import rasterio as rio
 from rasterio.merge import merge
 from matplotlib.colors import to_rgba
+from matplotlib import pyplot as plt
 
 from component.message import ms
 from component import parameter as pm
@@ -62,5 +63,52 @@ def digest_tiles(filename, result_dir, output, tmp_file):
 
     # delete local files
     [file.unlink() for file in files]
+
+    return
+
+
+def export_legend(filename, colors, title):
+    """
+    Create a color list and display it in a png image.
+
+    Args:
+        filename (pathlib.Path); the path where to save the file
+        colors (dict): the color palette to create. It should use the following format: {classname: hex_color, ...}
+
+    Return:
+        (pathlib.Path) the filename
+    """
+
+    # create a color list
+    color_map = [*colors.values()]
+
+    columns = ["entry"]
+    rows = [" " * 10 for i in range(len(colors))]  # trick to see the first column
+    cell_text = [[name] for name in colors]
+
+    fig, ax = plt.subplots(1, 1, figsize=[6.4, 8.6])
+
+    # remove the graph box
+    ax.axis("tight")
+    ax.axis("off")
+
+    # set the tab title
+    ax.set_title(title)
+
+    # create the table
+    the_table = ax.table(
+        colColours=[to_rgba("lightgrey")],
+        cellText=cell_text,
+        rowLabels=rows,
+        colWidths=[0.4],
+        rowColours=color_map,
+        colLabels=columns,
+        loc="center",
+    )
+    the_table.scale(1, 1.5)
+
+    # save & close
+    plt.savefig(filename)
+    plt.close()
 
     return
