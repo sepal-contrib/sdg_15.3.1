@@ -31,7 +31,9 @@ class IndicatorModel(model.Model):
 
     # custom lc
     start_lc = Any(None).tag(sync=True)
+    start_lc_band = Any(None).tag(sync=True)
     end_lc = Any(None).tag(sync=True)
+    end_lc_band = Any(None).tag(sync=True)
 
     ######################
     ##      output      ##
@@ -72,7 +74,7 @@ class IndicatorModel(model.Model):
         # get info on the transition matrix
         custom_matrix = self.transition_matrix != pm.default_trans_matrix
         custom_lc = self.start_lc is not None
-        lc_matrix = "custom" if matrix or custom_lc else "default"
+        lc_matrix = "custom" if custom_matrix or custom_lc else "default"
 
         # get the climate regime
         climate = f"cr{int(self.conversion_coef*100)}"

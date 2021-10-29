@@ -74,8 +74,10 @@ class InputTile(sw.Tile):
             .bind(trajectory, "trajectory")
             .bind(vegetation_index, "vegetation_index")
             .bind(lceu, "lceu")
-            .bind(start_lc, "start_lc")
-            .bind(end_lc, "end_lc")
+            .bind(start_lc.w_image, "start_lc")
+            .bind(start_lc.w_band, "start_lc_band")
+            .bind(end_lc.w_image, "end_lc")
+            .bind(end_lc.w_band, "end_lc_band")
         )
 
         # create the actual tile

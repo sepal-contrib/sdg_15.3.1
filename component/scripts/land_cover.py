@@ -32,8 +32,8 @@ def land_cover(model, aoi_model, output):
     # create the landcover maps based on the custom one or based on CCI
     if model.start_lc and model.end_lc:
 
-        landcover_start_remapped = ee.Image(model.start_lc).clip(geom)
-        landcover_end_remapped = ee.Image(model.end_lc).clip(geom)
+        landcover_start_remapped = ee.Image(model.start_lc).clip(geom).rename("start")
+        landcover_end_remapped = ee.Image(model.end_lc).clip(geom).rename("end")
 
     else:
 

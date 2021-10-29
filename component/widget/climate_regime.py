@@ -42,7 +42,7 @@ class ClimateRegime(v.Col):
         # create the layout
         super().__init__(
             xs12=True,
-            class_="mt-5",
+            class_="mt-5, pa-0",
             children=[self.type_select, self.climate_regimes, self.custom_regime],
         )
 
