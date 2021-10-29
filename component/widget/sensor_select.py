@@ -1,11 +1,14 @@
 import ipyvuetify as v
-from traitlets import observe
+from traitlets import observe, Int
 
 from component import parameter as pm
 from component.message import ms
 
 
 class SensorSelect(v.Select):
+
+    update = Int(0).tag(sync=True)
+
     def __init__(self):
 
         super().__init__(
@@ -53,7 +56,7 @@ class SensorSelect(v.Select):
         """
 
         # exit if its a removal
-        if len(change["new"]) < len(change["old"]):
+        if len(change["new"]) <= len(change["old"]):
             return self
 
         # use positionning in the list as boolean value
@@ -65,6 +68,10 @@ class SensorSelect(v.Select):
         other_sensors = [x for x in sensors if x not in new_value]
         if any(i not in new_value for i in other_sensors):
             if any(i in s for s in change["old"] for i in other_sensors):
-                change["owner"].v_model = [new_value]
+                self.v_model = [new_value]
+
+        # as we are in a callback the modification we make to the v_model are not triggering
+        # the binding. need to be done afterward and/or elsewhere
+        self.update += 1
 
         return self

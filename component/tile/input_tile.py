@@ -74,8 +74,7 @@ class InputTile(sw.Tile):
 
         # bind the standars widgets to variables
         (
-            self.model.bind(self.sensor_select, "sensors")
-            .bind(trajectory, "trajectory")
+            self.model.bind(trajectory, "trajectory")
             .bind(vegetation_index, "vegetation_index")
             .bind(lceu, "lceu")
             .bind(start_lc.w_image, "start_lc")
@@ -105,6 +104,7 @@ class InputTile(sw.Tile):
         # add links between the widgets
         self.btn.on_event("click", self.start_process)
         pickers.end_picker.observe(self.sensor_select.update_sensors, "v_model")
+        self.sensor_select.observe(self._sensor_bind, "update")
 
     @su.loading_button(debug=True)
     def start_process(self, widget, data, event):
@@ -182,5 +182,12 @@ class InputTile(sw.Tile):
         # release the download btn
         self.result_tile.btn.disabled = False
         self.zonal_stats_tile.btn.disabled = False
+
+        return
+
+    def _sensor_bind(self, change):
+        """manually update the value of themodel as the observe is not triggered"""
+
+        self.model.sensors = self.sensor_select.v_model.copy()
 
         return
