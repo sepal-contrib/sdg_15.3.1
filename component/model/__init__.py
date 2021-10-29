@@ -1,1 +1,1 @@
-from .model_15_3_1 import *
+from .indicator_model import *

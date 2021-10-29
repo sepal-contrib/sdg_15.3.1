@@ -1,8 +1,10 @@
 {
     "app": {
-        "title": "SDG indicator module",
+        "title": "SDG 15.3.1: Proportion of land that is degraded over total land area",
         "aoi_drawer": "Aoi selector",
-        "_15_3_1_drawer": "Indicator 15.3.1",
+        "input_drawer": "Parameters",
+        "result_drawer": "Results",
+        "reclassify_drawer": "Customize LC",
         "about_drawer": "About"
     },
     "_15_3_1": {
@@ -54,7 +56,7 @@
             "no_target": "please provide a start date of assemsment period",
             "no_end": "Please provide a end date for the assesment period",
             "no_traj": "Please provide a trajectory for the trend analysis",
-            "no_mix": "You cannot mix sentinel and landsat data",
+            "no_mix": "You cannot mix sentinel, modis and landsat data",
             "no_vi" : "Please provide a vegetation index for the productivity analysis",
             "no_lceu": "Please provide a land cover ecosystem functional units source"
         },
@@ -63,7 +65,7 @@
             "By clicking on the process button, you will:",
             "",
             "- start the computation of the layers in GEE and display them on the map",
-            "- Download to ypur sepal folder the zonal statistics of the indicators perform on your AOI (you can click on the green btn to download it)",
+            "- Download to your sepal folder the zonal statistics of the indicators perform on your AOI",
             "- release the result tile button to download your indicators map locally"
         ],
         "result_text": [
@@ -79,18 +81,21 @@
         "vi_lbl":"Select Vegetation Index",
         "lceu_lbl": "Select Land cover ecosystem functional units",
         "transition_matrix": "Transition matrix",
-        "title": "15.3.1 Proportion of degraded land over total land area",
-        "process_btn": "Load the indicators",
-        "results": "Results",
-        "map_legend": "Indicator state",
-        "down_zonal": "Zonal statistics",
-        "down_lc": "Land Cover",
-        "down_prod": "Productivity",
-        "down_trend": "Productivity trend", 
-        "down_state": "Productivity state",
-        "down_performance": "Productivity performance", 
-        "down_soc": "Soil Organic Carbon",
-        "down_ind": "Indicator 15.3.1",
+        "advance_params": "advance parameters",
+        "start_lc": "Land Cover Image corresponding to start year",
+        "end_lc": "Land Cover Image corresponding to end year",
+        "titles": {
+            "inputs": "Computation parameters",
+            "results": "Spatial results",
+            "zonal": "Zonal statistics"
+        },
+        "process_btn": "Load the indicators",  
+        "map": {
+            "legend": {
+                "state": "Indicator state",
+                "lc": "LC classes"
+            }
+        },
         "result_btn_zonalstats": "Calculate Zonal Statistics",
         "result_btn": "Download maps as .tif in sepal",
         "clim_option_lbl": "Climate regime options",
@@ -121,7 +126,7 @@
         "file_exist": "The file {} is already available on your computer",
         "start_download": "Start the exportation of your maps",
         "remove_gdrive": "Remove the files from your Gdrive folder",
-	"already_exist": "Folder {} already exist"
+        "already_exist": "Folder {} already exist"
     }, 
     "gee": {
         "status": "Status: {}",
@@ -130,5 +135,9 @@
     },
     "error": {
         "no_aoi": "No aoi have been provided"
+    },
+    "select_lc": {
+        "not_image": "The asset need to be a valid GEE ee.Image",
+        "not_unccd": "the image is not reclassified using the UNCCD classfication. Please use the customize panel to reclassify your Image"
     }
 }
