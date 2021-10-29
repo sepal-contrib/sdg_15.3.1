@@ -61,20 +61,13 @@
             "no_lceu": "Please provide a land cover ecosystem functional units source"
         },
         "process_text": [
-            "This process tile will allow you to compute the value if the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
-            "By clicking on the process button, you will:",
-            "",
-            "- start the computation of the layers in GEE and display them on the map",
-            "- Download to your sepal folder the zonal statistics of the indicators perform on your AOI",
-            "- release the result tile button to download your indicators map locally"
+            "This process tile will allow you to compute the value of the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)"
         ],
         "result_text": [
-            "Once the layers are loaded on the map, click on the \"download\" button to download the indicators .tif in your sepal folder",
-            "The green buttons will be released once the files are retrieved from Gdrive and they will allow you to download them on your local computer."
+            "Once the layers are loaded on the map, click on the \"download\" button to download the indicators `.tif` files to your SEPAL folders"
         ],
         "result_text_zonalstats": [
-            "Once the result is ready, click on the \"download\" button to download the statistics (Shapefile) on your computer)",
-            "The green button shall be released once the files are ready to download on your local computer."
+            "Once the result is ready, click on the \"download\" button to download the statistics (`.shp`) to your SEPAL folder."
         ],
         "sensor_lbl": "Select sensor",
         "traj_lbl": "Select trajectory",
