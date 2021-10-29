@@ -107,40 +107,38 @@ def display_maps(aoi_model, model, m, output):
     )
     lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
     # add the layers
-    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
+    output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
     m.addLayer(
         model.land_cover.select("start").clip(geom),
         pm.viz_lc,
-        ms._15_3_1.lc_start.format(lc_year_start),
+        ms.lc_start.format(lc_year_start),
     )
 
-    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
+    output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
     m.addLayer(
         model.land_cover.select("end").clip(geom),
         pm.viz_lc,
-        ms._15_3_1.lc_end.format(lc_year_end),
+        ms.lc_end.format(lc_year_end),
     )
 
-    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.prod_layer))
-    m.addLayer(
-        model.productivity.clip(geom).selfMask(), pm.viz_prod, ms._15_3_1.prod_layer
-    )
+    output.add_live_msg(ms.gee.add_layer.format(ms.prod_layer))
+    m.addLayer(model.productivity.clip(geom).selfMask(), pm.viz_prod, ms.prod_layer)
 
-    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.lc_layer))
+    output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
     m.addLayer(
         model.land_cover.select("degradation").clip(geom).selfMask(),
         pm.viz_lc_sub,
-        ms._15_3_1.lc_layer,
+        ms.lc_layer,
     )
 
-    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.soc_layer))
-    m.addLayer(model.soc.clip(geom).selfMask(), pm.viz_soc, ms._15_3_1.soc_layer)
+    output.add_live_msg(ms.gee.add_layer.format(ms.soc_layer))
+    m.addLayer(model.soc.clip(geom).selfMask(), pm.viz_soc, ms.soc_layer)
 
-    output.add_live_msg(ms.gee.add_layer.format(ms._15_3_1.ind_layer))
+    output.add_live_msg(ms.gee.add_layer.format(ms.ind_layer))
     m.addLayer(
         model.indicator_15_3_1.clip(geom).selfMask(),
         pm.viz_indicator,
-        ms._15_3_1.ind_layer,
+        ms.ind_layer,
     )
 
     # add the aoi on the map
@@ -150,7 +148,7 @@ def display_maps(aoi_model, model, m, output):
         **{"featureCollection": aoi_model.feature_collection, "color": 1, "width": 2}
     )
     m.addLayer(aoi_line, {"palette": v.theme.themes.dark.accent}, "aoi")
-    output.add_live_msg(ms._15_3_1.map_loading_complete, "success")
+    output.add_live_msg(ms.map_loading_complete, "success")
 
     return
 
@@ -159,7 +157,7 @@ def compute_indicator_maps(aoi_model, model, output):
 
     # raise an error if the years are not in the right order
     if not (model.start < model.end):
-        raise Exception(ms._15_3_1.error.wrong_year)
+        raise Exception(ms.error.wrong_year)
 
     # compute intermediary maps
     vi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
@@ -350,7 +348,7 @@ def compute_zonal_analysis(aoi_model, model, output):
             file = indicator_stats.with_suffix(suffix)
             myzip.write(file, file.name)
 
-    output.add_live_msg(ms._15_3_1.stats_complete.format(indicator_zip), "success")
+    output.add_live_msg(ms.stats_complete.format(indicator_zip), "success")
 
     return indicator_zip
 

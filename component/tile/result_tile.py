@@ -18,20 +18,18 @@ class ResultTile(sw.Tile):
         self.aoi_model = aoi_model
         self.model = model
 
-        markdown = sw.Markdown("""{}""".format("  \n".join(ms._15_3_1.result_text)))
-
-        #
+        markdown = sw.Markdown("""{}""".format("  \n".join(ms.result_text)))
 
         # create the result map
         # with its legend
         self.m = cw.ResultMap()
         self.m.add_legend(
-            legend_title=ms._15_3_1.map.legend.lc,
+            legend_title=ms.map.legend.lc,
             legend_dict=cp.lc_color,
             position="topleft",
         )
         self.m.add_legend(
-            legend_title=ms._15_3_1.map.legend.state,
+            legend_title=ms.map.legend.state,
             legend_dict=cp.legend,
             position="topleft",
         )
@@ -75,11 +73,11 @@ class ResultTile(sw.Tile):
         # init the tile
         super().__init__(
             "result_tile",
-            ms._15_3_1.titles.results,
+            ms.titles.results,
             [markdown, plot_line],
             alert=sw.Alert(),
             btn=sw.Btn(
-                text=ms._15_3_1.result_btn,
+                text=ms.result_btn,
                 icon="mdi-download",
                 class_="ma-5",
                 disabled=True,

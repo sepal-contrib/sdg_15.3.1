@@ -10,7 +10,7 @@ class SensorSelect(v.Select):
 
         super().__init__(
             items=[],
-            label=ms._15_3_1.sensor_lbl,
+            label=ms.sensor_lbl,
             multiple=True,
             v_model=[],
             chips=True,

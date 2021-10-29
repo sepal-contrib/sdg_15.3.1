@@ -14,14 +14,14 @@ class PickerLine(v.Layout):
 
         # create the widgets
         self.start_picker = v.Select(
-            label=ms._15_3_1.start_lbl,
+            label=ms.start_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,
             class_="ml-5 mr-5",
         )
         self.end_picker = v.Select(
-            label=ms._15_3_1.end_lbl,
+            label=ms.end_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,

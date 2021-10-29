@@ -48,7 +48,7 @@ class MatrixInput(v.Html):
         self.style_ = f"background-color: {color}"
         self.model.transition_matrix[self.line][self.column] = val
 
-        self.output.add_msg(ms._15_3_1.matrix_changed)
+        self.output.add_msg(ms.matrix_changed)
 
         return
 
