@@ -7,17 +7,17 @@ For a complete description of the workflow use our [documentation](https://docs.
 <div style="inline-block">
     <a href="https://www.conservation.org">
         <img 
-            src="https://raw.githubusercontent.com/12rambau/sdg_indicator_module/master/utils/conservation_international.png" 
+            src="https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/utils/conservation_international.png" 
             alt="CI_logo" 
-            height="100" 
+            height="120" 
             class="ma-3"
         />
     </a>
     <a href="https://trends.earth/docs/en/index.html">
         <img 
-            src="https://raw.githubusercontent.com/12rambau/sdg_indicator_module/master/utils/trends_earth.png" 
+            src="https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/utils/trends_earth.png" 
             alt="Trends_earth_logo" 
-            height="100" 
+            height="40" 
             class="ma-3"
         />
     </a>
