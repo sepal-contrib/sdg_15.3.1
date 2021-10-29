@@ -23,4 +23,5 @@ rasterio==1.1.5
 ipywidgets==7.6.5
 ipyvuetify==1.8.1
 traitlets==5.1.0
-google_api_python_client==2.27.0
+natsort==7.1.1
+

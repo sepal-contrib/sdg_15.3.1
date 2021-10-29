@@ -8,15 +8,16 @@ ee.Initialize()
 def land_cover(model, aoi_model, output):
     """Calculate land cover indicator"""
 
+    # load the aoi extends
+    geom = aoi_model.feature_collection.geometry().bounds()
+
     # load the land cover map
-    landcover = ee.Image(pm.land_cover).clip(
-        aoi_model.feature_collection.geometry().bounds()
-    )
+    landcover = ee.Image(pm.land_cover).clip(geom)
     landcover = landcover.where(landcover.eq(9999), pm.int_16_min).updateMask(
         landcover.neq(pm.int_16_min)
     )
 
-    # Remap LC according to input matrix, aggregation of land cover classes to IPCC classes.
+    # Remap LC according to input matrix, aggregation of land cover classes to UNCCD classes.
     lc_year_start = min(
         max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
     )
@@ -28,15 +29,24 @@ def land_cover(model, aoi_model, output):
 
     landcover_end = landcover.select(f"year_{lc_year_end}").rename("landcover_end")
 
-    # baseline land cover map reclassified into IPCC classes
-    landcover_start_remapped = landcover_start.remap(
-        pm.translation_matrix[0], pm.translation_matrix[1]
-    ).rename("start")
+    # create the landcover maps based on the custom one or based on CCI
+    if model.start_lc and model.end_lc:
 
-    # target land cover map reclassified into IPCC classes
-    landcover_end_remapped = landcover_end.remap(
-        pm.translation_matrix[0], pm.translation_matrix[1]
-    ).rename("end")
+        landcover_start_remapped = ee.Image(model.start_lc).clip(geom).rename("start")
+        landcover_end_remapped = ee.Image(model.end_lc).clip(geom).rename("end")
+
+    else:
+
+        # baseline land cover map reclassified into UNCCD classes
+        landcover_start_remapped = landcover_start.remap(
+            pm.translation_matrix[0], pm.translation_matrix[1]
+        ).rename("start")
+
+        # target land cover map reclassified into UNCCD classes
+        landcover_end_remapped = landcover_end.remap(
+            pm.translation_matrix[0], pm.translation_matrix[1]
+        ).rename("end")
+
     water_mask = landcover_end.where(landcover_end.eq(210), 0).rename("water")
 
     # compute transition map (first digit for historical land cover, and second digit for monitoring year land cover)
