@@ -30,12 +30,18 @@ class InputTile(sw.Tile):
         pickers = cw.PickerLine(self.model)
         self.sensor_select = cw.SensorSelect()
         vegetation_index = v.Select(
-            label=ms._15_3_1.vi_lbl, items=cp.vegetation_index, v_model=None
+            label=ms._15_3_1.vi_lbl,
+            items=cp.vegetation_index,
+            v_model=cp.vegetation_index[0]["value"],
         )
         trajectory = v.Select(
-            label=ms._15_3_1.traj_lbl, items=cp.trajectories, v_model=None
+            label=ms._15_3_1.traj_lbl,
+            items=cp.trajectories,
+            v_model=cp.trajectories[0]["value"],
         )
-        lceu = v.Select(label=ms._15_3_1.lceu_lbl, items=cp.lceu, v_model=None)
+        lceu = v.Select(
+            label=ms._15_3_1.lceu_lbl, items=cp.lceu, v_model=cp.lceu[0]["value"]
+        )
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
