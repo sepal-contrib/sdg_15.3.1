@@ -1,11 +1,9 @@
 SDG 15.3.1
 ==========
+Proportion of land that is degraded over total land area
+========================================================
 
-.. note::
-
-    Proportion of land that is degraded over total land area
-
-This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG best practice guidance, such as the [best practice guidance from UNCCD on SDG 15.3.1.](https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf) The methodology for SDG 15.3.1 was implemented in consultation with the trends.earth team at Conservation International.
+This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG best practice guidance, such as the `best practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__. The methodology for SDG 15.3.1 was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/utils/conservation_international.png
     :target: https://www.conservation.org
@@ -20,7 +18,7 @@ This module allows to generate data for reporting on SDG indicators. The SEPAL S
 Select AOI
 ^^^^^^^^^^
 
-The *restoration suitability index* will be calculated based on the user inputs. The first mandatory input is the Area Of Interest (AOI). In this step you’ll have the possibility to choose from a predefined list of administrative layers or use your own datasets, the available options are:
+The SDG 15.3.1 will be calculated based on the user inputs. The first mandatory input is the Area Of Interest (AOI). In this step you’ll have the possibility to choose from a predefined list of administrative layers or use your own datasets, the available options are:
 
 **Predefined layers**
 
@@ -34,7 +32,7 @@ The *restoration suitability index* will be calculated based on the user inputs.
 -   Drawn shapes on map
 -   Google Earth Engine Asset
 
-After selecting the desired area, click over the :code:`Select these inputs` button and the map shows up your selection.
+After selecting the desired area, click over :guilabel:`Select these inputs` and the map shows up your selection.
 
 .. note::
 
@@ -46,7 +44,7 @@ After selecting the desired area, click over the :code:`Select these inputs` but
 Parameters
 ----------
 
-To run the computation of SDG 15.3.1 several parameters need to be set. Please read the `trends.earth <https://trends.earth/docs/en/background/understanding_indicators15.html>`__ documentation page to better understand what influence each one of them will have on the computation of the SDG 15.3.1 indicator and it's subindicators.
+To run the computation of SDG 15.3.1, several parameters need to be set. Please read the `trends.earth documentation page <https://trends.earth/docs/en/background/understanding_indicators15.html>`__ to better understand what influence each one of them will have on the computation of the SDG 15.3.1 indicator and it's sub-indicators.
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/parameters.png
     :alt: parameters
@@ -54,34 +52,34 @@ To run the computation of SDG 15.3.1 several parameters need to be set. Please r
 Mandatory parameters
 ********************
 
--   **Dates**: They are set in years and need to be in correct order. The end date that you select will change the list of available sensors. You won't be able to choose sensors that were not launch by the **end date**
+-   **Dates**: They are set in years and need to be in correct order. The **end date** that you select will change the list of available sensors. You won't be able to choose sensors that were not launch by the **end date**
 
--   **Sensors**: After selecting the dates, all the available sensors within the timeframe will be available. You can deselect or re-select any sensor you want. The default value is set to all the landsat sattelites available within the selected timeframe.
+-   **Sensors**: After selecting the dates, all the available sensors within the timeframe will be available. You can deselect or re-select any sensor you want. The default value is set to all the landsat satellites available within the selected timeframe.
 
     .. note:: 
    
         Some of the sensors are incompatible with each other. Thus selecting Landsat, MODIS or Sentinel dataset in the **sensors** dropdown will deselect the others. 
         
---   **Vegetation index**: THe vegetattion index will be used to compute the trend trajectory. default to NDVI
+-   **Vegetation index**: THe vegetation index will be used to compute the trend trajectory, default to *NDVI*.
 
--   **trajectory**: There are 3 options available to calculate the productivity trend that describe trajectry of change. default to **NDVI**.
+-   **trajectory**: There are 3 options available to calculate the productivity trend that describe trajectry of change. default to *productivity*.
 
-- **land ecosystem functional unit**: default to "Calculate based on land cover and soil texture" but you can also use "world ecosystem"
+-   **land ecosystem functional unit**: default to *Calculate based on land cover and soil texture* but you can also use *world ecosystem*.
 
-- **climate regime**: default to "Per pixel based on global climate data" but you can also use a fix value everywhere using a predefined climate regime in the dropdown menu or select a custom value on the slider
+-   **climate regime**: default to *Per pixel based on global climate data* but you can also use a fix value everywhere using a predefined climate regime in the dropdown menu or select a custom value on the slider
 
 Advanced parameters
 *******************
 
-To compute the land-cover subindicator the tool will use the CCI land cover system of the **start date** and the **end date**. these land cover Image will be reclassified in the UNCCD classification system and use to compute the land_cover subindicator. Instead users can specify custom values for the start and end land cover map using custom dataset. Provide the :code:`ee.Image` asset name and the band that need to be used and the CCI dataset will be replaced in the computation by your custom data. 
+To compute the land-cover subindicator the tool will use the CCI land cover system of the **start date** and the **end date**. these land cover Image will be reclassified in the UNCCD classification system and use to compute the land cover sub-indicator. Instead, users can specify custom values for the start and end land cover map using custom dataset. Provide the :code:`ee.Image` asset name and the band that need to be used and the CCI dataset will be replaced in the computation by your custom data. 
 
 .. note::
 
-    the custom dataset need to be classified in the UNCCD clasification system. PLease refer to :ref:`sdg_reclassif` to know how to reclassify your local dataset into this classification system
+    the custom dataset need to be classified in the UNCCD clasification system. PLease refer to :ref:`sdg_reclassiffy` to know how to reclassify your local dataset into this classification system.
     
-To compute the land_cover sub-indicator, the user can modify the transition matrix. Based on the user local knowledge of the conditions in the study area and the land degradation processed occurring there, use the table below to identify which transitions correspond to degradation (D), improvement (I), or no change in terms of land condition (S).
+To compute the land cover sub-indicator, the user can modify the transition matrix. Based on the user local knowledge of the conditions in the study area and the land degradation processed occurring there, use the table below to identify which transitions correspond to degradation (D), improvement (I), or no change in terms of land condition (S).
 
-The lines stands for the baseline indicator and the columns for the target. 
+The lines stands for the baseline class and the columns for the target. 
 
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/advanced_parameters.png
@@ -90,7 +88,7 @@ The lines stands for the baseline indicator and the columns for the target.
 launch computation
 ******************
 
-Once all the parameters are set you can run the analysis by clicking on the **Load the indicators** button.
+Once all the parameters are set you can run the analysis by clicking on :guilabel:`Load the indicators`.
 It takes time to calulate all the sub-indicator. Look at the Alert at the bottom of the panel hat display the current state of analysis.
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/validate_data.png
@@ -100,11 +98,15 @@ It takes time to calulate all the sub-indicator. Look at the Alert at the bottom
 Results
 -------
 
-The results are display to the end user in the next panel. On the left the user will find the transition and the distribution charts and on the right, an interactive map where every indicator and subindicator layers are displayed.
+The results are displayed to the end user in the next panel. On the left the user will find the transition and the distribution charts and on the right, an interactive map where every indicator and sub-indicators layers are displayed.
 
 click on the :guilabel:`donwload` button to exort all the layers, charts and tables to your SEPAL folder. 
 
-The results are gathered in the :code:`module_results/sdg_indicators/` folder. In this folder a folder is set for each AOI (e.g. :code:`SGP/` for Singapore) and within this folder results are grouped by run computation. the title of the folder reflect the parameters following this symbology: :code:`<start_year>_<end_year>_<satellites>_<vegetation index>_<lc units>_<custom LC>_<climate>`
+The results are gathered in the :code:`module_results/sdg_indicators/` folder. In this folder a folder is set for each AOI (e.g. :code:`SGP/` for Singapore) and within this folder results are grouped by run computation. the title of the folder reflect the parameters following this symbology: :code:`<start_year>_<end_year>_<satellites>_<vegetation index>_<lc units>_<custom LC>_<climate>`.
+
+.. note:: 
+
+    As an example for computation used in this documentation, the results were saved in : :code:`module_results/sdg_indicator/SGP/2015_2019_modis_ndvi_calculate_default_cr0/
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/results.png
     :alt: validate data
@@ -120,11 +122,12 @@ The results are gathered in the :code:`module_results/sdg_indicators/` folder. I
 Transition graph 
 ^^^^^^^^^^^^^^^^
 
-This chart is the `sankey's diagra`<https://en.wikipedia.org/wiki/Sankey_diagram>`__ of the land cover evolution between baseline and target year. THe color is corresponding to the initial class.
+This chart is the `sankey's diagram <https://en.wikipedia.org/wiki/Sankey_diagram>`__ of the land cover transition between baseline and target year. The color is corresponding to the initial class.
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/transition_graph.png
-
-        :alt: transiton graph
+    :alt: transiton graph
+    :width: 40%
+    :align: center
 
 Distribution graph 
 ^^^^^^^^^^^^^^^^^^
@@ -133,6 +136,8 @@ This chart displays the distribution of the SDG 15.3.1 indicator on each class o
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/distribution_graph.png
     :alt: distribution chart
+    :width: 40%
+    :align: center
 
 Interactive map
 ^^^^^^^^^^^^^^^
@@ -150,6 +155,8 @@ The tool also display the land cover maps from baseline and target years using t
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/lc_map.png
     :alt: lc_map
+    :width: 80%
+    :align: center
 
 
 .. sdg_reclassify:
@@ -159,13 +166,13 @@ Reclassify
 
 .. warning:: 
 
-    To reclassify a land_cover map, this map need to be available to the user as a `ee.Image` in GEE.
+    To reclassify a land_cover map, this map need to be available to the user as a :code:`ee.Image` in GEE.
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/reclassification.png
     :alt: reclassification
 
 
-In order to use a custom land cover map, the user need to first reclassify to the UNCCD classification system. this classification set values between 1 to 7 to describe the following land cover classes: 
+In order to use a custom land cover map, the user needs to first reclassify to the UNCCD classification system. This classification set values between 1 to 7 to describe the following land cover classes: 
 
 #. forest
 #. grassland
@@ -187,13 +194,12 @@ Click on :guilabel:`get table`. This will generate a table with all the categori
 
 .. tip::
 
-    - If the destination class is not set, the class will be interpreded as no_ata i.e. 0
-    - click on :guilabel:`save` to save the reclassification matrix. It's useful when the baseline and target map are in the same classification as the same matrix can be applied. 
-    - click on :guilabel:`import` to import a previously saved reclassification matrix
+    - If the destination class is not set, the class will be interpreded as no_ata i.e. 0;
+    - click on :guilabel:`save` to save the reclassification matrix. It's useful when the baseline and target map are in the same classification system;
+    - click on :guilabel:`import` to import a previously saved reclassification matrix.
     
     
 Click on :guilabel:`reclassify`to export the map in GEE using the UNCCD classification ystem. The export can be monitored in GEE. 
-
 
 The following GIF will show you the full reclassification process with an simple example.
 
