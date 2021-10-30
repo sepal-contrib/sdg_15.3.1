@@ -1,7 +1,9 @@
 SDG 15.3.1
 ==========
-Proportion of land that is degraded over total land area
-========================================================
+
+.. note:: 
+    
+    Proportion of land that is degraded over total land area
 
 This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG best practice guidance, such as the `best practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__. The methodology for SDG 15.3.1 was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
