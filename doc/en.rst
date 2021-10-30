@@ -108,7 +108,7 @@ The results are gathered in the :code:`module_results/sdg_indicators/` folder. I
 
 .. note:: 
 
-    As an example for computation used in this documentation, the results were saved in : :code:`module_results/sdg_indicator/SGP/2015_2019_modis_ndvi_calculate_default_cr0/
+    As an example for computation used in this documentation, the results were saved in : :code:`module_results/sdg_indicator/SGP/2015_2019_modis_ndvi_calculate_default_cr0/`
 
 .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/results.png
     :alt: validate data
@@ -200,7 +200,7 @@ Click on :guilabel:`get table`. This will generate a table with all the categori
     - click on :guilabel:`import` to import a previously saved reclassification matrix.
     
     
-Click on :guilabel:`reclassify`to export the map in GEE using the UNCCD classification ystem. The export can be monitored in GEE. 
+Click on :guilabel:`reclassify` to export the map in GEE using the UNCCD classification ystem. The export can be monitored in GEE. 
 
 The following GIF will show you the full reclassification process with an simple example.
 
