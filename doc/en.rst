@@ -117,8 +117,7 @@ The results are gathered in the :code:`module_results/sdg_indicators/` folder. I
 
     the results are interactive, don't hesitate to interact with both the charts and the map layers using the widgets.
     
-    .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/results_interaction.png
-
+    .. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/doc/img/results_interaction.gif
         :alt: result interaction
         
 Transition graph 
