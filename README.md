@@ -18,24 +18,5 @@ to install the project on your SEPAL account
 $ git clone https://github.com/12rambau/sdg_indicators_module
 ```
 
-<div style="inline-block">
-    <a href="https://www.conservation.org">
-        <img 
-            src="https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/utils/conservation_international.png" 
-            alt="CI_logo" 
-            height="120" 
-            class="ma-3"
-        />
-    </a>
-    <a href="https://trends.earth/docs/en/index.html">
-        <img 
-            src="https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/utils/trends_earth.png" 
-            alt="Trends_earth_logo" 
-            height="40" 
-            class="ma-3"
-        />
-    </a>
-</div>
-
 
 
