@@ -6,7 +6,7 @@ from pathlib import Path
 module_dir = Path.home() / "module_results"
 module_dir.mkdir(exist_ok=True)
 
-result_dir = module_dir / "sdg_indicators"
-result_dir.mkdir(exist_ok=True)
+result_dir = module_dir / "sdg_indicators" / "degraded_land"
+result_dir.mkdir(exist_ok=True, parents=True)
 
 utils_dir = Path(__file__).parents[2] / "utils"
