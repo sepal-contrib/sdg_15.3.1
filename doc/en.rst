@@ -7,16 +7,6 @@ SDG 15.3.1
 
 This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG best practice guidance, such as the `best practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__. The methodology for SDG 15.3.1 was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
-.. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/utils/conservation_international.png
-    :target: https://www.conservation.org
-    :alt: CI_logo
-    :height: 120
-
-.. image:: https://raw.githubusercontent.com/12rambau/sdg_indicators_module/master/utils/trends_earth.png
-    :target: https://trends.earth/docs/en/index.html
-    :alt: Trends_earth_logo
-    :height: 40
-
 Select AOI
 ^^^^^^^^^^
 
