@@ -130,7 +130,7 @@ class gdrive(object):
 
             download = False
 
-            files = self.get_files(filename)
+            files = self.get_files(prefix)
 
             if files == []:
                 task_config = {
