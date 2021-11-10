@@ -62,7 +62,9 @@ def download_maps(aoi_model, model, output):
     # download all files
     downloads = any(
         [
-            drive_handler.download_to_disk(name, layer, aoi_model, output, scale)
+            drive_handler.download_to_disk(
+                name, layer, aoi_model, output, scale, f"{pattern}_{name}"
+            )
             for name, layer in layers.items()
         ]
     )
@@ -76,7 +78,10 @@ def download_maps(aoi_model, model, output):
     # digest the tiles
     for name in layers:
         digest_tiles(
-            name, result_dir, output, result_dir / f"{pattern}_{name}_merge.tif"
+            f"{pattern}_{name}",
+            result_dir,
+            output,
+            result_dir / f"{pattern}_{name}_merge.tif",
         )
 
     output.add_live_msg(ms.download.remove_gdrive)
