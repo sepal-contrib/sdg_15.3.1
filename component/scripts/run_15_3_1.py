@@ -45,7 +45,7 @@ def download_maps(aoi_model, model, output):
         f"land_cover": model.land_cover,
         f"soc": model.soc,
         f"productivity_trend": model.productivity_trend,
-        f"productivity_performance": model.productivity_state,
+        f"productivity_performance": model.productivity_performance,
         f"productivity_state": model.productivity_state,
         f"productivity_indicator": model.productivity,
         f"indicator_15_3_1": model.indicator_15_3_1,
