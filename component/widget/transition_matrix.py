@@ -7,9 +7,9 @@ from component.message import ms
 class MatrixInput(v.Html):
 
     VALUES = {
-        "+": (1, v.theme.themes.dark.success),
-        "": (0, v.theme.themes.dark.primary),
-        "-": (-1, v.theme.themes.dark.error),
+        "I": (1, v.theme.themes.dark.success),
+        "S": (0, v.theme.themes.dark.primary),
+        "D": (-1, v.theme.themes.dark.error),
     }
 
     def __init__(self, line, column, model, default_value, output):
@@ -48,7 +48,7 @@ class MatrixInput(v.Html):
         self.style_ = f"background-color: {color}"
         self.model.transition_matrix[self.line][self.column] = val
 
-        self.output.add_msg(ms._15_3_1.matrix_changed)
+        self.output.add_msg(ms.matrix_changed)
 
         return
 
@@ -57,7 +57,7 @@ class TransitionMatrix(v.SimpleTable):
 
     CLASSES = [*pm.lc_color]
 
-    DECODE = {1: "+", 0: "", -1: "-"}
+    DECODE = {1: "I", 0: "S", -1: "D"}
 
     def __init__(self, model, output):
 

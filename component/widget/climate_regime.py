@@ -8,9 +8,9 @@ from component.message import ms
 class ClimateRegime(v.Col):
 
     REGIMES = [
-        ms._15_3_1.clim_regim.per_pixel,
-        ms._15_3_1.clim_regim.predifined,
-        ms._15_3_1.clim_regim.custom,
+        ms.clim_regim.per_pixel,
+        ms.clim_regim.predifined,
+        ms.clim_regim.custom,
     ]
 
     def __init__(self, io, output):
@@ -20,15 +20,15 @@ class ClimateRegime(v.Col):
 
         # create the widgets
         self.type_select = v.Select(
-            label=ms._15_3_1.clim_option_lbl,
+            label=ms.clim_option_lbl,
             items=self.REGIMES,
             v_model=self.REGIMES[0],
         )
         self.climate_regimes = v.Select(
-            label=ms._15_3_1.clim_default_lbl, items=pm.climate_regimes, v_model=None
+            label=ms.clim_default_lbl, items=pm.climate_regimes, v_model=None
         )
         self.custom_regime = v.Slider(
-            label=ms._15_3_1.clim_custom_lbl, max=1, step=0.01, v_model=None
+            label=ms.clim_custom_lbl, max=1, step=0.01, v_model=None
         )
 
         # bind the to the output

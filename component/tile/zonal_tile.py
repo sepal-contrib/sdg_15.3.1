@@ -12,18 +12,16 @@ class ZonalTile(sw.Tile):
         self.aoi_model = aoi_model
         self.model = model
 
-        markdown = sw.Markdown(
-            """{}""".format("  \n".join(ms._15_3_1.result_text_zonalstats))
-        )
+        markdown = sw.Markdown("""{}""".format("  \n".join(ms.result_text_zonalstats)))
 
         # init the tile
         super().__init__(
             "result_tile",
-            ms._15_3_1.titles.zonal,
+            ms.titles.zonal,
             [markdown],
             alert=sw.Alert(),
             btn=sw.Btn(
-                text=ms._15_3_1.result_btn_zonalstats,
+                text=ms.result_btn_zonalstats,
                 icon="mdi-download",
                 class_="ma-5",
                 disabled=True,

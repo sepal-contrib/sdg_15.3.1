@@ -26,26 +26,30 @@ class InputTile(sw.Tile):
         self.zonal_stats_tile = zonal_stats_tile
 
         # create the widgets that will be displayed
-        markdown = sw.Markdown("""{}""".format("  \n".join(ms._15_3_1.process_text)))
+        markdown = sw.Markdown("""{}""".format("  \n".join(ms.process_text)))
         pickers = cw.PickerLine(self.model)
         self.sensor_select = cw.SensorSelect()
         vegetation_index = v.Select(
-            label=ms._15_3_1.vi_lbl, items=cp.vegetation_index, v_model=None
+            label=ms.vi_lbl,
+            items=cp.vegetation_index,
+            v_model=cp.vegetation_index[0]["value"],
         )
         trajectory = v.Select(
-            label=ms._15_3_1.traj_lbl, items=cp.trajectories, v_model=None
+            label=ms.traj_lbl,
+            items=cp.trajectories,
+            v_model=cp.trajectories[0]["value"],
         )
-        lceu = v.Select(label=ms._15_3_1.lceu_lbl, items=cp.lceu, v_model=None)
+        lceu = v.Select(label=ms.lceu_lbl, items=cp.lceu, v_model=cp.lceu[0]["value"])
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
         # create advanced parameters
         transition_label = v.Html(
-            class_="grey--text mt-2", tag="h3", children=[ms._15_3_1.transition_matrix]
+            class_="grey--text mt-2", tag="h3", children=[ms.transition_matrix]
         )
         transition_matrix = cw.TransitionMatrix(self.model, alert)
-        start_lc = cw.SelectLC(label=ms._15_3_1.start_lc)
-        end_lc = cw.SelectLC(label=ms._15_3_1.end_lc)
+        start_lc = cw.SelectLC(label=ms.start_lc)
+        end_lc = cw.SelectLC(label=ms.end_lc)
 
         # stack the advance parameters in a expandpanel
         advance_params = v.ExpansionPanels(
@@ -54,7 +58,7 @@ class InputTile(sw.Tile):
             children=[
                 v.ExpansionPanel(
                     children=[
-                        v.ExpansionPanelHeader(children=[ms._15_3_1.advance_params]),
+                        v.ExpansionPanelHeader(children=[ms.advance_params]),
                         v.ExpansionPanelContent(
                             children=[
                                 v.Flex(xs12=True, children=[start_lc]),
@@ -70,8 +74,7 @@ class InputTile(sw.Tile):
 
         # bind the standars widgets to variables
         (
-            self.model.bind(self.sensor_select, "sensors")
-            .bind(trajectory, "trajectory")
+            self.model.bind(trajectory, "trajectory")
             .bind(vegetation_index, "vegetation_index")
             .bind(lceu, "lceu")
             .bind(start_lc.w_image, "start_lc")
@@ -83,7 +86,7 @@ class InputTile(sw.Tile):
         # create the actual tile
         super().__init__(
             "input_tile",
-            ms._15_3_1.titles.inputs,
+            ms.titles.inputs,
             inputs=[
                 markdown,
                 pickers,
@@ -94,13 +97,14 @@ class InputTile(sw.Tile):
                 climate_regime,
                 advance_params,
             ],
-            btn=sw.Btn(ms._15_3_1.process_btn, class_="mt-5"),
+            btn=sw.Btn(ms.process_btn, class_="mt-5"),
             alert=alert,
         )
 
         # add links between the widgets
         self.btn.on_event("click", self.start_process)
         pickers.end_picker.observe(self.sensor_select.update_sensors, "v_model")
+        self.sensor_select.observe(self._sensor_bind, "update")
 
     @su.loading_button(debug=True)
     def start_process(self, widget, data, event):
@@ -109,13 +113,11 @@ class InputTile(sw.Tile):
         if not all(
             [
                 self.alert.check_input(self.aoi_model.name, ms.error.no_aoi),
-                self.alert.check_input(self.model.start, ms._15_3_1.error.no_start),
-                self.alert.check_input(self.model.end, ms._15_3_1.error.no_end),
-                self.alert.check_input(
-                    self.model.vegetation_index, ms._15_3_1.error.no_vi
-                ),
-                self.alert.check_input(self.model.trajectory, ms._15_3_1.error.no_traj),
-                self.alert.check_input(self.model.lceu, ms._15_3_1.error.no_lceu),
+                self.alert.check_input(self.model.start, ms.error.no_start),
+                self.alert.check_input(self.model.end, ms.error.no_end),
+                self.alert.check_input(self.model.vegetation_index, ms.error.no_vi),
+                self.alert.check_input(self.model.trajectory, ms.error.no_traj),
+                self.alert.check_input(self.model.lceu, ms.error.no_lceu),
                 self.alert.check_input(self.model.sensors, "no sensors"),
             ]
         ):
@@ -180,5 +182,12 @@ class InputTile(sw.Tile):
         # release the download btn
         self.result_tile.btn.disabled = False
         self.zonal_stats_tile.btn.disabled = False
+
+        return
+
+    def _sensor_bind(self, change):
+        """manually update the value of themodel as the observe is not triggered"""
+
+        self.model.sensors = self.sensor_select.v_model.copy()
 
         return

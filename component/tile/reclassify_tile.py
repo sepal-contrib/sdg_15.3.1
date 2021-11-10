@@ -28,3 +28,8 @@ class ReclassifyTile(rec.ReclassifyView):
 
         # change the metadata of the tile
         self._metadata = {"mount_id": "reclassify_tile"}
+
+        # clean w_image image type to have only image
+        # TODO, uncomment when the sepal_ui lib method will be available
+        # self.w_image.types = ["IMAGE"]
+        # self.w_image._get_items()

@@ -1,143 +1,131 @@
 {
-    "app": {
-        "title": "SDG 15.3.1: Proportion of land that is degraded over total land area",
-        "aoi_drawer": "Aoi selector",
-        "input_drawer": "Parameters",
-        "result_drawer": "Results",
-        "reclassify_drawer": "Customize LC",
-        "about_drawer": "About"
-    },
-    "_15_3_1": {
-        "classes": {
-            "forest": "Forest",
-            "grassland": "Grassland",
-            "cropland": "Cropland",
-            "wetland": "Wetland",
-            "artificial": "Artificial area",
-            "bareland": "Bare land",
-            "water": "Water body"
-        },
-        "trend": {
-            "ndvi": "Productivity (VI) trend",
-            "p_res": "Residual (Osereved VI - Predicetd VI) trend ",
-            "s_res": "Water use efficiency (WUE)",
-            "ue": "Rain use efficiency (RUE)"
-        },
-        "clim_regim": {
-            "temp_dry": "Temperate dry",
-            "temp_moist": "Temperate moist",
-            "trop_dry": "Tropical dry",
-            "trop_moist": "Tropical moist",
-            "trop_mont": "Tropical montain",
-            "per_pixel": "Per pixel based  on global climate data",
-            "predifined": "Use predefined climate regime",
-            "custom": "Use custom value"
-        },
-        "vi":{
-            "ndvi": "Normalised Difference Vegetation Index (NDVI)",
-            "evi": "Enhanced Vegetation Index (EVI)",
-            "msvi": "Modified Soil Adjusted Vegetation Index2 (MSVI2)"    
-        },
-        "lceu":{
-            "calculate": "Calculate based on land cover and soil texture",
-            "wte": "World Ecosystem",
-            "hru":"Global Homogeneous Response Units",
-            "gaes":"Global Agro-Environmental Stratification"
-        },
-        
-        "legend": {
-            "degraded" : "degraded",
-            "stable" : "stable",
-            "improved" : "improved"
-        },
-        "error": {
-            "wrong_year": "The year are not set in the corret order. <br> start < target_year < end",
-            "no_start": "Please provide a start date for baseline period",
-            "no_target": "please provide a start date of assemsment period",
-            "no_end": "Please provide a end date for the assesment period",
-            "no_traj": "Please provide a trajectory for the trend analysis",
-            "no_mix": "You cannot mix sentinel, modis and landsat data",
-            "no_vi" : "Please provide a vegetation index for the productivity analysis",
-            "no_lceu": "Please provide a land cover ecosystem functional units source"
-        },
-        "process_text": [
-            "This process tile will allow you to compute the value if the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)",
-            "By clicking on the process button, you will:",
-            "",
-            "- start the computation of the layers in GEE and display them on the map",
-            "- Download to your sepal folder the zonal statistics of the indicators perform on your AOI",
-            "- release the result tile button to download your indicators map locally"
-        ],
-        "result_text": [
-            "Once the layers are loaded on the map, click on the \"download\" button to download the indicators .tif in your sepal folder",
-            "The green buttons will be released once the files are retrieved from Gdrive and they will allow you to download them on your local computer."
-        ],
-        "result_text_zonalstats": [
-            "Once the result is ready, click on the \"download\" button to download the statistics (Shapefile) on your computer)",
-            "The green button shall be released once the files are ready to download on your local computer."
-        ],
-        "sensor_lbl": "Select sensor",
-        "traj_lbl": "Select trajectory",
-        "vi_lbl":"Select Vegetation Index",
-        "lceu_lbl": "Select Land cover ecosystem functional units",
-        "transition_matrix": "Transition matrix",
-        "advance_params": "advance parameters",
-        "start_lc": "Land Cover Image corresponding to start year",
-        "end_lc": "Land Cover Image corresponding to end year",
-        "titles": {
-            "inputs": "Computation parameters",
-            "results": "Spatial results",
-            "zonal": "Zonal statistics"
-        },
-        "process_btn": "Load the indicators",  
-        "map": {
-            "legend": {
-                "state": "Indicator state",
-                "lc": "LC classes"
-            }
-        },
-        "result_btn_zonalstats": "Calculate Zonal Statistics",
-        "result_btn": "Download maps as .tif in sepal",
-        "clim_option_lbl": "Climate regime options",
-        "clim_default_lbl": "Climate regime",
-        "clim_custom_lbl": "Custom climate regime value",
-        "start_lbl": "Starting year",
-        "end_lbl": "Ending year",
-        "matrix_changed": "You have changed your transition matrix",
-        "prod_layer": "Productivity sub-indicator",
-        "lc_layer": "Land cover sub indicator",
-        "lc_start": "Land cover {}",
-        "lc_end": "Land cover {}",
-        "soc_layer": "SOC sub-indicator",
-        "ind_layer": "Indicator 15.3.1",
-        "map_loading_complete":"All the layers are loaded on the Map ",
-        "stats_complete": "The statistics are now avaliable in the {} file of your computer or downloadable with the result tile link"
-        
-    },
-    "gdrive": {
-        "already_done" : "{} was already completed",
-        "error": {
-            "no_file": "The files are not available in your Gdrive"
-        }
-    },
-    "download": {
-        "merge_tile": "Merging the tile from Gdrive",
-        "completed": "Download completed",
-        "file_exist": "The file {} is already available on your computer",
-        "start_download": "Start the exportation of your maps",
-        "remove_gdrive": "Remove the files from your Gdrive folder",
-        "already_exist": "Folder {} already exist"
-    }, 
-    "gee": {
-        "status": "Status: {}",
-        "tasks_completed": "GEE task are completed",
-        "add_layer": "Loading the layer ({}) on the map"
-    },
-    "error": {
-        "no_aoi": "No aoi have been provided"
-    },
-    "select_lc": {
-        "not_image": "The asset need to be a valid GEE ee.Image",
-        "not_unccd": "the image is not reclassified using the UNCCD classfication. Please use the customize panel to reclassify your Image"
-    }
+	"app": {
+		"title": "SDG 15.3.1: Proportion of land that is degraded over total land area",
+		"aoi_drawer": "Aoi selector",
+		"input_drawer": "Parameters",
+		"result_drawer": "Results",
+		"reclassify_drawer": "Customize LC",
+		"about_drawer": "About"
+	},
+	"classes": {
+		"forest": "Forest",
+		"grassland": "Grassland",
+		"cropland": "Cropland",
+		"wetland": "Wetland",
+		"artificial": "Artificial area",
+		"bareland": "Bare land",
+		"water": "Water body"
+	},
+	"trend": {
+		"ndvi": "Productivity (VI) trend",
+		"p_res": "Residual (Osereved VI - Predicetd VI) trend ",
+		"s_res": "Water use efficiency (WUE)",
+		"ue": "Rain use efficiency (RUE)"
+	},
+	"clim_regim": {
+		"temp_dry": "Temperate dry",
+		"temp_moist": "Temperate moist",
+		"trop_dry": "Tropical dry",
+		"trop_moist": "Tropical moist",
+		"trop_mont": "Tropical montain",
+		"per_pixel": "Per pixel based  on global climate data",
+		"predifined": "Use predefined climate regime",
+		"custom": "Use custom value"
+	},
+	"vi": {
+		"ndvi": "Normalised Difference Vegetation Index (NDVI)",
+		"evi": "Enhanced Vegetation Index (EVI)",
+		"msvi": "Modified Soil Adjusted Vegetation Index2 (MSVI2)"
+	},
+	"lceu": {
+		"calculate": "Calculate based on land cover and soil texture",
+		"wte": "World Ecosystem",
+		"hru": "Global Homogeneous Response Units",
+		"gaes": "Global Agro-Environmental Stratification"
+	},
+
+	"legend": {
+		"degraded": "degraded",
+		"stable": "stable",
+		"improved": "improved"
+	},
+	"error": {
+		"wrong_year": "The year are not set in the corret order. <br> start < target_year < end",
+		"no_start": "Please provide a start date for baseline period",
+		"no_target": "please provide a start date of assemsment period",
+		"no_end": "Please provide a end date for the assesment period",
+		"no_traj": "Please provide a trajectory for the trend analysis",
+		"no_mix": "You cannot mix sentinel, modis and landsat data",
+		"no_vi": "Please provide a vegetation index for the productivity analysis",
+		"no_lceu": "Please provide a land cover ecosystem functional units source",
+		"no_aoi": "No aoi have been provided"
+	},
+	"process_text": [
+		"This process tile will allow you to compute the value of the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)"
+	],
+	"result_text": [
+		"Once the layers are loaded on the map, click on the \"download\" button to download the indicators `.tif` files to your SEPAL folders"
+	],
+	"result_text_zonalstats": [
+		"Once the result is ready, click on the \"download\" button to download the statistics (`.shp`) to your SEPAL folder."
+	],
+	"sensor_lbl": "Select sensor",
+	"traj_lbl": "Select trajectory",
+	"vi_lbl": "Select Vegetation Index",
+	"lceu_lbl": "Select Land cover ecosystem functional units",
+	"transition_matrix": "Transition matrix",
+	"advance_params": "advance parameters",
+	"start_lc": "Land Cover Image corresponding to start year",
+	"end_lc": "Land Cover Image corresponding to end year",
+	"titles": {
+		"inputs": "Computation parameters",
+		"results": "Spatial results",
+		"zonal": "Zonal statistics"
+	},
+	"process_btn": "Load the indicators",
+	"map": {
+		"legend": {
+			"state": "Indicator state",
+			"lc": "LC classes"
+		}
+	},
+	"result_btn_zonalstats": "Calculate Zonal Statistics",
+	"result_btn": "Download maps as .tif in sepal",
+	"clim_option_lbl": "Climate regime options",
+	"clim_default_lbl": "Climate regime",
+	"clim_custom_lbl": "Custom climate regime value",
+	"start_lbl": "Starting year",
+	"end_lbl": "Ending year",
+	"matrix_changed": "You have changed your transition matrix",
+	"prod_layer": "Productivity sub-indicator",
+	"lc_layer": "Land cover sub indicator",
+	"lc_start": "Land cover {}",
+	"lc_end": "Land cover {}",
+	"soc_layer": "SOC sub-indicator",
+	"ind_layer": "Indicator 15.3.1",
+	"map_loading_complete": "All the layers are loaded on the Map ",
+	"stats_complete": "The statistics are now avaliable in the {} file of your computer or downloadable with the result tile link",
+	"gdrive": {
+		"already_done": "{} was already completed",
+		"error": {
+			"no_file": "The files are not available in your Gdrive"
+		}
+	},
+	"download": {
+		"merge_tile": "Merging the tile from Gdrive",
+		"completed": "Download completed",
+		"file_exist": "The file {} is already available on your computer",
+		"start_download": "Start the exportation of your maps",
+		"remove_gdrive": "Remove the files from your Gdrive folder",
+		"already_exist": "Folder {} already exist"
+	},
+	"gee": {
+		"status": "Status: {}",
+		"tasks_completed": "GEE task are completed",
+		"add_layer": "Loading the layer ({}) on the map"
+	},
+	"select_lc": {
+		"not_image": "The asset need to be a valid GEE ee.Image",
+		"not_unccd": "the image is not reclassified using the UNCCD classfication. Please use the customize panel to reclassify your Image"
+	}
 }

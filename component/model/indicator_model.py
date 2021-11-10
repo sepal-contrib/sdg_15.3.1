@@ -17,11 +17,11 @@ class IndicatorModel(model.Model):
     sensors = Any(None).tag(sync=True)
 
     # Vegetation indices
-    vegetation_index = Any(None).tag(sync=True)
+    vegetation_index = Any(pm.vegetation_index[0]["value"]).tag(sync=True)
 
     # trajectory
-    trajectory = Any(None).tag(sync=True)
-    lceu = Any(None).tag(sync=True)
+    trajectory = Any(pm.trajectories[0]["value"]).tag(sync=True)
+    lceu = Any(pm.lceu[0]["value"]).tag(sync=True)
 
     # matrix, change output format to a plain list. we need it to remap the land cover instead of a matrix.
     transition_matrix = Any(pm.default_trans_matrix).tag(sync=True)
