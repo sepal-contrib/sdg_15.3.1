@@ -88,7 +88,7 @@ def download_maps(aoi_model, model, output):
 
     # remove the files from drive
     for name in layers:
-        drive_handler.delete_files(drive_handler.get_files(name))
+        drive_handler.delete_files(drive_handler.get_files(f"{pattern}_{name}"))
 
     # display msg
     output.add_live_msg(ms.download.completed, "success")
