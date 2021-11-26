@@ -15,7 +15,7 @@ This module allows to generate data for reporting on SDG indicators. The SEPAL S
 The methodology for SDG 15.3.1 module for GPG v1 (`good practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__) was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
 Methodology
-############
+-----------
 
 What is Land degradation
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -35,7 +35,7 @@ The first verison was issued in 2017. A revised version is issued in
 2021. The module is based on the latest version of the ducument.
 
 Approach
---------
+""""""""
 
 Under the definition adopted by UNCCD, the extent of land degradation
 for reporting on SDG Indicator 15.3.1 is calculated as a binary -
@@ -54,10 +54,10 @@ means the results of the sub indicators are integrated using the one out
 all out statistical princeple
 
 Sub-indicators
-**************
+##############
 
 Productivity
-''''''''''''
+++++++++++++
 
 Land productivity cycles exhibit phases over time. a countinous decease
 in productivity for a long time indicate potential degradation in land
@@ -188,19 +188,16 @@ Sensors : MODIS, Landsat 4, 5, 7 and 8, Sentinel 2
 NPP metric: NDVI, EVI and MSVI
 
 Land cover
-''''''''''
+++++++++++
 
 Soil Organic Carbon
-'''''''''''''''''''
++++++++++++++++++++
 
 Final indicator
-'''''''''''''''
-
-
++++++++++++++++
 
 Users Guide
-############
-
+-----------
 
 Select AOI
 ^^^^^^^^^^
@@ -229,7 +226,7 @@ After selecting the desired area, click over :guilabel:`Select these inputs` and
     :alt: AOI selection
     
 Parameters
-----------
+""""""""""
 
 To run the computation of SDG 15.3.1, several parameters need to be set. Please read the `trends.earth documentation page <https://trends.earth/docs/en/background/understanding_indicators15.html>`__ to better understand what influence each one of them will have on the computation of the SDG 15.3.1 indicator and it's sub-indicators.
 
@@ -237,7 +234,7 @@ To run the computation of SDG 15.3.1, several parameters need to be set. Please 
     :alt: parameters
 
 Mandatory parameters
-********************
+####################
 
 -   **Dates**: They are set in years and need to be in correct order. The **end date** that you select will change the list of available sensors. You won't be able to choose sensors that were not launch by the **end date**
 
@@ -256,7 +253,7 @@ Mandatory parameters
 -   **climate regime**: default to *Per pixel based on global climate data* but you can also use a fix value everywhere using a predefined climate regime in the dropdown menu or select a custom value on the slider
 
 Advanced parameters
-*******************
+###################
 
 To compute the land-cover subindicator the tool will use the CCI land cover system of the **start date** and the **end date**. these land cover Image will be reclassified in the UNCCD classification system and use to compute the land cover sub-indicator. Instead, users can specify custom values for the start and end land cover map using custom dataset. Provide the :code:`ee.Image` asset name and the band that need to be used and the CCI dataset will be replaced in the computation by your custom data. 
 
@@ -273,7 +270,7 @@ The lines stands for the baseline class and the columns for the target.
     :alt: advanced parameters
     
 launch computation
-******************
+##################
 
 Once all the parameters are set you can run the analysis by clicking on :guilabel:`Load the indicators`.
 It takes time to calulate all the sub-indicator. Look at the Alert at the bottom of the panel hat display the current state of analysis.
@@ -283,7 +280,7 @@ It takes time to calulate all the sub-indicator. Look at the Alert at the bottom
 
 
 Results
--------
+"""""""
 
 The results are displayed to the end user in the next panel. On the left the user will find the transition and the distribution charts and on the right, an interactive map where every indicator and sub-indicators layers are displayed.
 
@@ -348,7 +345,7 @@ The tool also display the land cover maps from baseline and target years using t
 .. sdg_reclassify:
 
 Reclassify
-----------
+""""""""""
 
 .. warning:: 
 
