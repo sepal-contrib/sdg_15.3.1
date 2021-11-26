@@ -10,15 +10,15 @@ degraded land and soil, including land affected by desertification,
 drought and floods, and strive to achieve a land degradation–neutral
 world.’
 
-This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG best practice guidance version 2, 
+This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__, 
 
-The methodology for SDG 15.3.1 module for GPG v1 (`best practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__. ) was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
+The methodology for SDG 15.3.1 module for GPG v1 (`good practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__) was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
 Methodology
-==================
+############
 
 What is Land degradation
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 The UNCCD defines land degradation as “\ *the reduction or loss of the
 biological or economic productivity and complexity of rain fed cropland,
@@ -29,13 +29,13 @@ practices”* (`UNCCD 1994, Article
 This definition was adopted for the SDG 15.3.1
 
 UNCCD Good Practice Guidelines
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The first verison was issued in 2017. A revised version is issued in
 2021. The module is based on the latest version of the ducument.
 
 Approach
-~~~~~~~~
+--------
 
 Under the definition adopted by UNCCD, the extent of land degradation
 for reporting on SDG Indicator 15.3.1 is calculated as a binary -
@@ -54,7 +54,7 @@ means the results of the sub indicators are integrated using the one out
 all out statistical princeple
 
 Sub-indicators
-^^^^^^^^^^^^^^
+**************
 
 Productivity
 ''''''''''''
@@ -199,7 +199,7 @@ Final indicator
 
 
 Users Guide
-------------------------
+############
 
 
 Select AOI
