@@ -2,10 +2,202 @@ SDG 15.3.1
 ==========
 
 .. note:: 
-    
-    Proportion of land that is degraded over total land area
 
-This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG best practice guidance, such as the `best practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__. The methodology for SDG 15.3.1 was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
+SDG Indicator 15.3.1 measures the proportion of land that is degraded
+over total land area. It is part of goal 15 that promotes “Life on Land”
+and target 15.3 that states: ‘By 2030, combat desertification, restore
+degraded land and soil, including land affected by desertification,
+drought and floods, and strive to achieve a land degradation–neutral
+world.’
+
+This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__, 
+
+The methodology for SDG 15.3.1 module for GPG v1 (`good practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__) was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
+
+Methodology
+-----------
+
+What is Land degradation
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The UNCCD defines land degradation as “\ *the reduction or loss of the
+biological or economic productivity and complexity of rain fed cropland,
+irrigated cropland, or range, pasture, forest and woodlands resulting
+from a combination of pressures, including land use and management
+practices”* (`UNCCD 1994, Article
+1 <https://www.unccd.int/sites/default/files/relevant-links/2017-01/UNCCD_Convention_ENG_0.pdf>`__).
+This definition was adopted for the SDG 15.3.1
+
+UNCCD Good Practice Guidelines
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The first verison was issued in 2017. A revised version is issued in
+2021. The module is based on the latest version of the ducument.
+
+Approach
+""""""""
+
+Under the definition adopted by UNCCD, the extent of land degradation
+for reporting on SDG Indicator 15.3.1 is calculated as a binary -
+degraded/not degraded - quantification using its three sub-indicators:
+
+-  Trends in land cover
+
+-  Trends in land productivity, and
+
+-  Trends in carbon stocks (above and below ground), currently
+   represented by soil organic carbon (SOC) stocks
+
+Essentially, any significant reduction or negative change in one of the
+three sub-indicators is considered to comprise land degradation. That
+means the results of the sub indicators are integrated using the one out
+all out statistical princeple
+
+Sub-indicators
+##############
+
+Productivity
+++++++++++++
+
+Land productivity cycles exhibit phases over time. a countinous decease
+in productivity for a long time indicate potential degradation in land
+productivity.
+
+Threre matrices are used to detect such changes in productivity:
+
+trend
+     
+
+It measures the trajectory of changes in productivity over long term.
+
+The Mann–Kendall trend test is used to describe the monotonic trend or
+trajectory (increasing or decreasing) of the productivity for a given
+time period. The test statistics $S$ is defined as:
+
+.. math:: S = \sum^{n-1}_{i=1}\sum^{n}_{j=i+1} sgn(x_j-x_i)
+
+Where: X_i and X_j are the productivity of the sequence i and j years, n
+is the length of the period and
+
+.. math:: sgn(x_i -x_j) =  \left\{\begin{matrix} 1 & \text{if}\; x_j > x_i \\ 0 & \text{if}\; x_j = x_i \\ -1 & \text{if}\; x_j < x_i \\ \end{matrix}\right.
+
+The variance of the S is determine using the following equation:
+
+.. math:: VAR(S) = \frac{1}{18} [n(n-1)(2n + 5) – T]
+
+Then the z score can be obtained using the following equation
+
+.. math:: z \ \text{score}= \left\{\begin{matrix} \frac{S-1}{\sqrt{VAR(S)}} & \text{if} \; S > 0 \\ 0 & \text{if} \, S = 0 \\ \frac{S+1}{\sqrt{VAR(S)}} & \text{if} \; S < 0 \end{matrix}\right.
+
+To identify the scale and dierction of the trend a five level scale is
+proposed:
+
+-  Z score < -1.96 = Degrading, as indicated by a significant decreasing
+   trend
+
+-  Z score < -1.28 AND ≥ -1.96 = Potentially Degrading
+
+-  Z score ≥ -1.28 AND ≤ 1.28 = No significant change
+
+-  Z score > 1.28 AND ≤ 1.96 = Potentially Improving, or
+
+-  Z score > 1.96 = Improving, as indicated by a significant increasing
+   trend
+
+The area of the lowest negative z-score level (< -1.96) is considered as
+degraded and areas in other z-score classes is as not degraded for
+calculating the sub-indicator.
+
+state
+     
+
+State represents the level of productivity in a land unit compared to
+the historical observations of productivity for that land unit over
+time. The mean and standard deviations are calculated as follows:
+
+.. math::
+
+   \mu = \frac{\sum_{n-15}^{n-3}x_n}{13} \\
+
+   \sigma = \sqrt{\frac{\sum_{n-15}^{n-3}(x_n-\mu)^2}{13}}
+
+Where x is the productivity and n is the year of analysis.
+
+The mean productivity of the current period is given as:
+
+.. math:: \bar{x} = \frac{\sum_{n-2}^nx_n}{3}
+
+and the z score is given as
+
+.. math:: z =\frac{\bar{x}-\mu}{\frac{\sigma}{\sqrt{3}}}
+
+The five level stats are as follows:
+
+-  Z score < -1.96 = Degraded, showing a significantly
+
+   lower mean in the recent years compared to the longer term
+
+-  Z score < -1.28 AND ≥ -1.96 = At risk of degrading
+
+-  Z score ≥ -1.28 AND ≤ 1.28 = No significant change
+
+-  Z score > 1.28 AND ≤ 1.96 = Potentially Improving
+
+-  Z score > 1.96 = Improving, as indicated by a significantly higher
+   mean in recent years compared to the longer term
+
+The area of the lowest negative z-score level (< -1.96) is considered as
+degraded and areas in other z-score classes is as not degraded for
+calculating the sub-indicator.
+
+performance
+           
+
+Productivity Performance indicates the level of local plant productivity
+relative to other regions with similar productivity potential.
+
+The maximum productivity index ($NPP_max$) value (90th percentile)
+observed within the simillar ecoregion is campared the observed
+productivty value (observed NPP). It is given as:
+
+.. math:: \text{performance} = \frac{NPP_{observed}}{NPP_{max}}
+
+The pixels with an NPP (vegetation index) less than 0.5 of the $NPP_max$
+is considered as degraded.
+
+to calculate the sub indicator following look table is used:
+
+===== ===== =========== ========
+trend State Performance Degraded
+===== ===== =========== ========
+Y     Y     Y           Y
+Y     Y     N           Y
+Y     N     Y           Y
+Y     N     N           Y
+N     Y     Y           Y
+N     Y     N           N
+N     N     Y           N
+N     N     N           N
+===== ===== =========== ========
+
+Available Dataset: 
+                  
+
+Sensors : MODIS, Landsat 4, 5, 7 and 8, Sentinel 2
+
+NPP metric: NDVI, EVI and MSVI
+
+Land cover
+++++++++++
+
+Soil Organic Carbon
++++++++++++++++++++
+
+Final indicator
++++++++++++++++
+
+Users Guide
+-----------
 
 Select AOI
 ^^^^^^^^^^
@@ -34,7 +226,7 @@ After selecting the desired area, click over :guilabel:`Select these inputs` and
     :alt: AOI selection
     
 Parameters
-----------
+""""""""""
 
 To run the computation of SDG 15.3.1, several parameters need to be set. Please read the `trends.earth documentation page <https://trends.earth/docs/en/background/understanding_indicators15.html>`__ to better understand what influence each one of them will have on the computation of the SDG 15.3.1 indicator and it's sub-indicators.
 
@@ -42,7 +234,7 @@ To run the computation of SDG 15.3.1, several parameters need to be set. Please 
     :alt: parameters
 
 Mandatory parameters
-********************
+####################
 
 -   **Dates**: They are set in years and need to be in correct order. The **end date** that you select will change the list of available sensors. You won't be able to choose sensors that were not launch by the **end date**
 
@@ -61,7 +253,7 @@ Mandatory parameters
 -   **climate regime**: default to *Per pixel based on global climate data* but you can also use a fix value everywhere using a predefined climate regime in the dropdown menu or select a custom value on the slider
 
 Advanced parameters
-*******************
+###################
 
 To compute the land-cover subindicator the tool will use the CCI land cover system of the **start date** and the **end date**. these land cover Image will be reclassified in the UNCCD classification system and use to compute the land cover sub-indicator. Instead, users can specify custom values for the start and end land cover map using custom dataset. Provide the :code:`ee.Image` asset name and the band that need to be used and the CCI dataset will be replaced in the computation by your custom data. 
 
@@ -78,7 +270,7 @@ The lines stands for the baseline class and the columns for the target.
     :alt: advanced parameters
     
 launch computation
-******************
+##################
 
 Once all the parameters are set you can run the analysis by clicking on :guilabel:`Load the indicators`.
 It takes time to calulate all the sub-indicator. Look at the Alert at the bottom of the panel hat display the current state of analysis.
@@ -88,7 +280,7 @@ It takes time to calulate all the sub-indicator. Look at the Alert at the bottom
 
 
 Results
--------
+"""""""
 
 The results are displayed to the end user in the next panel. On the left the user will find the transition and the distribution charts and on the right, an interactive map where every indicator and sub-indicators layers are displayed.
 
@@ -153,7 +345,7 @@ The tool also display the land cover maps from baseline and target years using t
 .. sdg_reclassify:
 
 Reclassify
-----------
+""""""""""
 
 .. warning:: 
 
