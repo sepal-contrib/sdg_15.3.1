@@ -1,8 +1,6 @@
 SDG 15.3.1
 ==========
 
-.. note:: 
-
 SDG Indicator 15.3.1 measures the proportion of land that is degraded
 over total land area. It is part of goal 15 that promotes “Life on Land”
 and target 15.3 that states: ‘By 2030, combat desertification, restore
