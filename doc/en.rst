@@ -257,7 +257,7 @@ To compute the land-cover subindicator the tool will use the CCI land cover syst
 
 .. note::
 
-    the custom dataset need to be classified in the UNCCD clasification system. PLease refer to :ref:`sdg_reclassiffy` to know how to reclassify your local dataset into this classification system.
+    the custom dataset need to be classified in the UNCCD clasification system. Please refer to :ref:`sdg_reclassify` to know how to reclassify your local dataset into this classification system.
     
 To compute the land cover sub-indicator, the user can modify the transition matrix. Based on the user local knowledge of the conditions in the study area and the land degradation processed occurring there, use the table below to identify which transitions correspond to degradation (D), improvement (I), or no change in terms of land condition (S).
 
