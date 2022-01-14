@@ -8,7 +8,7 @@ degraded land and soil, including land affected by desertification,
 drought and floods, and strive to achieve a land degradation–neutral
 world.’
 
-This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__, 
+This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__. 
 
 The methodology for SDG 15.3.1 module for GPG v1 (`good practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__) was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
