@@ -21,6 +21,7 @@ sensors = {
 precipitation = "NOAA/PERSIANN-CDR"
 
 land_cover = "users/amitghosh/sdg_module/esa_cci_lc_1992_2019"
+land_cover_ic = "users/amitghosh/sdg_module/esa/cci_landcover"
 soil_taxonomy = "OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02"
 soc = "users/geflanddegradation/toolbox_datasets/soc_sgrid_30cm"
 soc_isric = "projects/soilgrids-isric/soc_mean"

@@ -6,16 +6,13 @@ ee.Initialize()
 
 
 def land_cover(model, aoi_model, output):
-    """Calculate land cover indicator"""
+    """Calculate land cover sub-indicator"""
 
     # load the aoi extends
     geom = aoi_model.feature_collection.geometry().bounds()
 
     # load the land cover map
-    landcover = ee.Image(pm.land_cover).clip(geom)
-    landcover = landcover.where(landcover.eq(9999), pm.int_16_min).updateMask(
-        landcover.neq(pm.int_16_min)
-    )
+    landcover = ee.ImageCollection(pm.land_cover_ic)
 
     # Remap LC according to input matrix, aggregation of land cover classes to UNCCD classes.
     lc_year_start = min(
@@ -23,11 +20,19 @@ def land_cover(model, aoi_model, output):
     )
     lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
 
-    landcover_start = landcover.select(f"year_{lc_year_start}").rename(
-        "landcover_start"
+    landcover_start = (
+        landcover.filter(ee.Filter.calendarRange(lc_year_start, lc_year_start, "year"))
+        .first()
+        .clip(geom)
+        .rename("landcover_start")
     )
 
-    landcover_end = landcover.select(f"year_{lc_year_end}").rename("landcover_end")
+    landcover_start = (
+        landcover.filter(ee.Filter.calendarRange(lc_year_start, lc_year_start, "year"))
+        .first()
+        .clip(geom)
+        .rename("landcover_start")
+    )
 
     # create the landcover maps based on the custom one or based on CCI
     if model.start_lc and model.end_lc:
