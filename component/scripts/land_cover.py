@@ -27,11 +27,11 @@ def land_cover(model, aoi_model, output):
         .rename("landcover_start")
     )
 
-    landcover_start = (
-        landcover.filter(ee.Filter.calendarRange(lc_year_start, lc_year_start, "year"))
+    landcover_end = (
+        landcover.filter(ee.Filter.calendarRange(lc_year_end, lc_year_end, "year"))
         .first()
         .clip(geom)
-        .rename("landcover_start")
+        .rename("landcover_end")
     )
 
     # create the landcover maps based on the custom one or based on CCI
