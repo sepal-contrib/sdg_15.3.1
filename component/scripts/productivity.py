@@ -85,10 +85,7 @@ def productivity_performance(
 
     # land cover data from esa cci
     if model.lceu == "calculate":
-        lc = ee.Image(pm.land_cover).clip(
-            aoi_model.feature_collection.geometry().bounds()
-        )
-        lc = lc.where(lc.eq(9999), pm.int_16_min).updateMask(lc.neq(pm.int_16_min))
+        landcover = ee.ImageCollection(pm.land_cover_ic)
 
         soil_taxonomy = (
             ee.Image(pm.soil_taxonomy)
@@ -106,8 +103,12 @@ def productivity_performance(
         #################
 
         # reclassify lc to ipcc classes
-        lc_reclass = lc.select(f"year_{lc_year_start}").remap(
-            pm.ESA_lc_classes, pm.reclassification_matrix
+        lc_reclass = (
+            landcover.filter(
+                ee.Filter.calendarRange(lc_year_start, lc_year_start, "year")
+            )
+            .first()
+            .remap(pm.ESA_lc_classes, pm.reclassification_matrix)
         )
 
         lc_eco_functional_unit = soil_taxonomy.multiply(100).add(lc_reclass)
