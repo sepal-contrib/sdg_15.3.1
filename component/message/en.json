@@ -43,6 +43,10 @@
 		"hru": "Global Homogeneous Response Units",
 		"gaes": "Global Agro-Environmental Stratification"
 	},
+    "productivity_lookuptable":{
+        "gpgv2":"GPGv2",
+        "gpgv1":"GPGv1"    
+    },
 
 	"legend": {
 		"degraded": "degraded",
@@ -73,6 +77,7 @@
 	"traj_lbl": "Select trajectory",
 	"vi_lbl": "Select Vegetation Index",
 	"lceu_lbl": "Select Land cover ecosystem functional units",
+    "prod_lookup_lbl": "Select a look up table to combine productivity metrics",
 	"transition_matrix": "Transition matrix",
 	"advance_params": "advance parameters",
 	"start_lc": "Land Cover Image corresponding to start year",

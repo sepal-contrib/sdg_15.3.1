@@ -19,6 +19,11 @@ class IndicatorModel(model.Model):
     # Vegetation indices
     vegetation_index = Any(pm.vegetation_index[0]["value"]).tag(sync=True)
 
+    # Productivity lookup table
+    productivity_lookup_table = Any(pm.productivity_lookup_table[0]["value"]).tag(
+        sync=True
+    )
+
     # trajectory
     trajectory = Any(pm.trajectories[0]["value"]).tag(sync=True)
     lceu = Any(pm.lceu[0]["value"]).tag(sync=True)

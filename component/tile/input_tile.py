@@ -39,6 +39,11 @@ class InputTile(sw.Tile):
             items=cp.trajectories,
             v_model=cp.trajectories[0]["value"],
         )
+        productivity_lookup_table = v.Select(
+            label=ms.prod_lookup_lbl,
+            items=cp.productivity_lookup_table,
+            v_model=cp.productivity_lookup_table[0]["value"],
+        )
         lceu = v.Select(label=ms.lceu_lbl, items=cp.lceu, v_model=cp.lceu[0]["value"])
 
         climate_regime = cw.ClimateRegime(self.model, alert)
@@ -61,6 +66,7 @@ class InputTile(sw.Tile):
                         v.ExpansionPanelHeader(children=[ms.advance_params]),
                         v.ExpansionPanelContent(
                             children=[
+                                v.Flex(xs12=True, children=[productivity_lookup_table]),
                                 v.Flex(xs12=True, children=[start_lc]),
                                 v.Flex(xs12=True, children=[end_lc]),
                                 v.Flex(xs12=True, children=[transition_label]),
@@ -77,6 +83,7 @@ class InputTile(sw.Tile):
             self.model.bind(trajectory, "trajectory")
             .bind(vegetation_index, "vegetation_index")
             .bind(lceu, "lceu")
+            .bind(productivity_lookup_table, "productivity_lookup_table")
             .bind(start_lc.w_image, "start_lc")
             .bind(start_lc.w_band, "start_lc_band")
             .bind(end_lc.w_image, "end_lc")
