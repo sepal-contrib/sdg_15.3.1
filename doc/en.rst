@@ -1,8 +1,6 @@
 SDG 15.3.1
 ==========
 
-.. note:: 
-
 SDG Indicator 15.3.1 measures the proportion of land that is degraded
 over total land area. It is part of goal 15 that promotes “Life on Land”
 and target 15.3 that states: ‘By 2030, combat desertification, restore
@@ -10,7 +8,7 @@ degraded land and soil, including land affected by desertification,
 drought and floods, and strive to achieve a land degradation–neutral
 world.’
 
-This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__, 
+This module allows to generate data for reporting on SDG indicators. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__. 
 
 The methodology for SDG 15.3.1 module for GPG v1 (`good practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__) was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
@@ -259,7 +257,7 @@ To compute the land-cover subindicator the tool will use the CCI land cover syst
 
 .. note::
 
-    the custom dataset need to be classified in the UNCCD clasification system. PLease refer to :ref:`sdg_reclassiffy` to know how to reclassify your local dataset into this classification system.
+    the custom dataset need to be classified in the UNCCD clasification system. Please refer to :ref:`sdg_reclassify` to know how to reclassify your local dataset into this classification system.
     
 To compute the land cover sub-indicator, the user can modify the transition matrix. Based on the user local knowledge of the conditions in the study area and the land degradation processed occurring there, use the table below to identify which transitions correspond to degradation (D), improvement (I), or no change in terms of land condition (S).
 
