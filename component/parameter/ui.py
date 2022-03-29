@@ -23,6 +23,11 @@ lceu = [
     },
 ]
 
+productivity_lookup_table = [
+    {"text": ms.productivity_lookuptable.gpgv2, "value": "GPGv2"},
+    {"text": ms.productivity_lookuptable.gpgv1, "value": "GPGv1"},
+]
+
 trajectories = [
     {"text": ms.trend.ndvi, "value": "ndvi_trend", "disabled": False},
     {"text": ms.trend.p_res, "value": "p_res_trend", "disabled": False},
