@@ -61,7 +61,8 @@ def productivity_trajectory(
     trajectory = (
         ee.Image(0)
         .where(z_score.lt(-1.96), 1)
-        .where(z_score.gte(-1.96), 2)
+        .where(z_score.gte(-1.96).And(z_score.lte(1.96)), 2)
+        .where(z_score.gt(1.96), 3)
         .rename("trajectory")
         .uint8()
     )
@@ -221,11 +222,12 @@ def productivity_state(aoi_model, model, integrated_annual_vi, output):
         .uint8()
     )
 
-    # {0:"Nodata", 1:"Degraded", 2:"Not Degraded"}
+    # {0:"Nodata", 1:"Degraded", 2:"Stable",3:"Improved"}
     state = (
         ee.Image(0)
         .where(z_score.lt(-1.96), 1)
-        .where(z_score.gte(-1.96), 2)
+        .where(z_score.gte(-1.96).And(z_score.lte(1.96)), 2)
+        .where(z_score.gt(1.96), 3)
         .rename("state")
         .uint8()
     )
@@ -272,6 +274,30 @@ def productivity_final(trajectory, performance, state, output):
             trajectory_class.eq(2).And(state_class.eq(2)).And(performance_class.eq(2)),
             2,
         )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(1)).And(performance_class.eq(1)),
+            1,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(1)).And(performance_class.eq(2)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(2)).And(performance_class.eq(1)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(2)).And(performance_class.eq(2)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(3)).And(performance_class.eq(1)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(3)).And(performance_class.eq(2)),
+            3,
+        )
         .rename("productivity")
     )
 
@@ -316,6 +342,30 @@ def productivity_final_GPG1(trajectory, performance, state, output):
         .where(
             trajectory_class.eq(2).And(state_class.eq(2)).And(performance_class.eq(2)),
             2,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(1)).And(performance_class.eq(1)),
+            1,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(1)).And(performance_class.eq(2)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(2)).And(performance_class.eq(1)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(2)).And(performance_class.eq(2)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(3)).And(performance_class.eq(1)),
+            3,
+        )
+        .where(
+            trajectory_class.eq(3).And(state_class.eq(3)).And(performance_class.eq(2)),
+            3,
         )
         .rename("productivity")
     )

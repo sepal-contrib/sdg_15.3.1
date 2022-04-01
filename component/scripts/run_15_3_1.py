@@ -177,12 +177,20 @@ def compute_indicator_maps(aoi_model, model, output):
     # compute result maps
     model.land_cover = land_cover(model, aoi_model, output)
     model.soc = soil_organic_carbon(model, aoi_model, output)
-    model.productivity = productivity_final(
-        model.productivity_trend,
-        model.productivity_performance,
-        model.productivity_state,
-        output,
-    )
+    if model.productivity_lookup_table == "GPGv2":
+        model.productivity = productivity_final(
+            model.productivity_trend,
+            model.productivity_performance,
+            model.productivity_state,
+            output,
+        )
+    else:
+        model.productivity = productivity_final_GPG1(
+            model.productivity_trend,
+            model.productivity_performance,
+            model.productivity_state,
+            output,
+        )
 
     # sum up in a map
     model.indicator_15_3_1 = indicator_15_3_1(
@@ -395,12 +403,6 @@ def indicator_15_3_1(productivity, landcover, soc, output):
         .where(productivity.eq(1).And(landcover.lt(1)).And(soc.lt(1)), 1)
         .where(productivity.lt(1).And(landcover.eq(1)).And(soc.lt(1)), 1)
         .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(1)), 1)
-        .where(productivity.eq(2).And(landcover.lt(1)).And(soc.lt(1)), 2)
-        .where(productivity.lt(1).And(landcover.eq(2)).And(soc.lt(1)), 2)
-        .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(2)), 2)
-        .where(productivity.eq(3).And(landcover.lt(1)).And(soc.lt(1)), 3)
-        .where(productivity.lt(1).And(landcover.eq(3)).And(soc.lt(1)), 3)
-        .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(3)), 3)
         .updateMask(water)
     )
 
