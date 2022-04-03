@@ -9,9 +9,25 @@ class IndicatorModel(model.Model):
     #####################
     ##      input      ##
     #####################
-    # times
+    # Assesment period
+    ## Simple
     start = Any(None).tag(sync=True)
     end = Any(None).tag(sync=True)
+    ## productivity trend
+    trend_start = Any(None).tag(sync=True)
+    trend_end = Any(None).tag(sync=True)
+    ## productivity state
+    state_start = Any(None).tag(sync=True)
+    state_end = Any(None).tag(sync=True)
+    ## productivity performance
+    performance_start = Any(None).tag(sync=True)
+    performance_end = Any(None).tag(sync=True)
+    ## Land cover
+    landcover_t_start = Any(None).tag(sync=True)
+    landcover_t_end = Any(None).tag(sync=True)
+    ## Soil organic carbon
+    soc_t_start = Any(None).tag(sync=True)
+    soc_t_end = Any(None).tag(sync=True)
 
     # sensors
     sensors = Any(None).tag(sync=True)
@@ -39,6 +55,83 @@ class IndicatorModel(model.Model):
     start_lc_band = Any(None).tag(sync=True)
     end_lc = Any(None).tag(sync=True)
     end_lc_band = Any(None).tag(sync=True)
+
+    # Custom assessment period
+
+    # check for the custom trend period
+    @property
+    def p_trend_start(self):
+        if self.trend_start:
+            return self.trend_start
+        else:
+            return self.start
+
+    @property
+    def p_trend_end(self):
+        if self.trend_end:
+            return self.trend_end
+        else:
+            return self.end
+
+    # check for the custom state period
+    @property
+    def p_state_start(self):
+        if self.state_start:
+            return self.state_start
+        else:
+            return self.start
+
+    @property
+    def p_state_end(self):
+        if self.state_end:
+            return self.state_end
+        else:
+            return self.end
+
+    # check for the custom performance period
+    @property
+    def p_performance_start(self):
+        if self.performance_start:
+            return self.performance_start
+        else:
+            return self.start
+
+    @property
+    def p_performance_end(self):
+        if self.performance_end:
+            return self.performance_end
+        else:
+            return self.end
+
+    # check for the custom lc period
+    @property
+    def p_landcover_t_start(self):
+        if self.landcover_t_start:
+            return self.landcover_t_start
+        else:
+            return self.start
+
+    @property
+    def p_landcover_t_end(self):
+        if self.landcover_t_end:
+            return self.landcover_t_end
+        else:
+            return self.end
+
+    # check for the custom soc period
+    @property
+    def p_soc_t_start(self):
+        if self.soc_t_start:
+            return self.soc_t_start
+        else:
+            return self.start
+
+    @property
+    def p_soc_t_end(self):
+        if self.soc_t_end:
+            return self.soc_t_end
+        else:
+            return self.end
 
     ######################
     ##      output      ##

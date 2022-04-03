@@ -28,6 +28,9 @@ class InputTile(sw.Tile):
         # create the widgets that will be displayed
         markdown = sw.Markdown("""{}""".format("  \n".join(ms.process_text)))
         pickers = cw.PickerLine(self.model)
+        pickers_productivity = cw.PickerLineProductivity(self.model)
+        pickers_landcover = cw.PickerLineLC(self.model)
+        pickers_soc = cw.PickerLineSOC(self.model)
         self.sensor_select = cw.SensorSelect()
         vegetation_index = v.Select(
             label=ms.vi_lbl,
@@ -66,11 +69,14 @@ class InputTile(sw.Tile):
                         v.ExpansionPanelHeader(children=[ms.advance_params]),
                         v.ExpansionPanelContent(
                             children=[
+                                v.Flex(xs12=True, children=[pickers_productivity]),
                                 v.Flex(xs12=True, children=[productivity_lookup_table]),
+                                v.Flex(xs12=True, children=[pickers_landcover]),
                                 v.Flex(xs12=True, children=[start_lc]),
                                 v.Flex(xs12=True, children=[end_lc]),
                                 v.Flex(xs12=True, children=[transition_label]),
                                 v.Flex(xs12=True, children=[transition_matrix]),
+                                v.Flex(xs12=True, children=[pickers_soc]),
                             ]
                         ),
                     ]

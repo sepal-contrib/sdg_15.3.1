@@ -209,9 +209,11 @@ def compute_lc_transition_stats(aoi_model, model):
     scale = pm.sensors[model.sensors[0]][1]
     aoi = aoi_model.feature_collection.geometry().bounds()
     lc_year_start = min(
-        max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
+        max(model.p_landcover_t_start, pm.land_cover_first_year), pm.land_cover_max_year
     )
-    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
+    lc_year_end = min(
+        max(model.p_landcover_t_end, pm.land_cover_first_year), pm.land_cover_max_year
+    )
     lc_name = [*pm.lc_color]
 
     # make a list of all the possible transitions values

@@ -30,11 +30,14 @@ def productivity_trajectory(
 
     # ndvi trend
     if model.trajectory == trajectories[0]:
-        z_score = vi_trend(model.start, model.end, integrated_annual_vi)
+        z_score = vi_trend(model.p_trend_start, model.p_trend_end, integrated_annual_vi)
     # residual trend analysis
     elif model.trajectory == trajectories[1]:
         z_score = restrend(
-            model.start, model.end, integrated_annual_vi, climate_yearly_integration
+            model.p_trend_start,
+            model.p_trend_end,
+            integrated_annual_vi,
+            climate_yearly_integration,
         )
     # Water use efficiency
     elif model.trajectory == trajectories[2]:
@@ -43,7 +46,10 @@ def productivity_trajectory(
     # rain use efficiency trend
     elif model.trajectory == trajectories[3]:
         z_score = rain_use_efficiency_trend(
-            model.start, model.end, integrated_annual_vi, climate_yearly_integration
+            model.p_trend_start,
+            model.p_trend_end,
+            integrated_annual_vi,
+            climate_yearly_integration,
         )
 
     # Define Kendall parameter values for a significance of 0.05
@@ -120,8 +126,15 @@ def productivity_performance(
     # TODO: add all the available LCEU datasets
 
     # compute mean ndvi for the period
+    nvdi_yearly_integration_fltr = nvdi_yearly_integration.filter(
+        ee.Filter.gte("year", model.p_performance_start).And(
+            ee.Filter.lte("year", model.p_performance_end)
+        )
+    )
     ndvi_mean = (
-        nvdi_yearly_integration.select("vi").reduce(ee.Reducer.mean()).rename(["vi"])
+        nvdi_yearly_integration_fltr.select("vi")
+        .reduce(ee.Reducer.mean())
+        .rename(["vi"])
     )
 
     ################
@@ -182,8 +195,12 @@ def productivity_state(aoi_model, model, integrated_annual_vi, output):
     """
 
     # Filter the annual data of three most recent years
-    recent_yaers_filter = ee.Filter.rangeContains("year", model.end - 2, model.end)
-    previous_year_filter = ee.Filter.rangeContains("year", model.start, model.end - 2)
+    recent_yaers_filter = ee.Filter.rangeContains(
+        "year", model.p_state_end - 2, model.p_state_end
+    )
+    previous_year_filter = ee.Filter.rangeContains(
+        "year", model.p_state_start, model.p_state_end - 2
+    )
 
     # compute mean ndvi for the baseline and target period period
     recent_vi_xbar = (
@@ -381,11 +398,15 @@ def vi_trend(start, end, integrated_annual_vi):
     are masked out using a Mann-Kendall tau.
     """
 
+    integrated_annual_vi_fltr = integrated_annual_vi.filter(
+        ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))
+    )
+
     # Compute Kendall statistics
     n = end - start + 1
     z_coefficient = pm.z_coefficient(n)
     kendall_trend = (
-        integrated_annual_vi.select("vi")
+        integrated_annual_vi_fltr.select("vi")
         .reduce(ee.Reducer.kendallsCorrelation(), 2)
         .select("vi_tau")
         .multiply(z_coefficient)
@@ -411,9 +432,17 @@ def restrend(start, end, ndvi_yearly_integration, climate_yearly_integration):
     Output: A tuple of two ee.Image, linear trend and Mann-Kendall trend
     """
 
+    # Filter the image based on the assessment period
+    ndvi_yearly_integration_fltr = ndvi_yearly_integration.filter(
+        ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))
+    )
+    climate_yearly_integration_fltr = climate_yearly_integration.filter(
+        ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))
+    )
+
     # Apply function to create image collection of ndvi and climate
     ndvi_climate_yearly_integration = ndvi_climate_merge(
-        climate_yearly_integration, ndvi_yearly_integration, start, end
+        climate_yearly_integration_fltr, ndvi_yearly_integration_fltr, start, end
     )
 
     # Compute linear trend function to predict ndvi based on climate (independent are followed by dependent var
@@ -446,7 +475,7 @@ def restrend(start, end, ndvi_yearly_integration, climate_yearly_integration):
 
     # Apply function to compute NDVI annual residuals
     # residual_yearly_ndvi = image_collection_residuals(start, end, nvdi_yearly_integration, predicted_yearly_ndvi)
-    residual_yearly_ndvi = ndvi_yearly_integration.map(
+    residual_yearly_ndvi = ndvi_yearly_integration_fltr.map(
         partial(ndvi_residuals, modeled=predicted_yearly_ndvi)
     )
 
@@ -470,10 +499,17 @@ def rain_use_efficiency_trend(
     Calculate trend based on rain use efficiency.
     It is the ratio of ANPP(annual integral of NDVI as proxy) to annual precipitation.
     """
+    # Filter the image based on the assessment period
+    ndvi_yearly_integration_fltr = ndvi_yearly_integration.filter(
+        ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))
+    )
+    climate_yearly_integration_fltr = climate_yearly_integration.filter(
+        ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))
+    )
 
     # Apply function to create image collection of ndvi and climate
     ndvi_climate_yearly_integration = ndvi_climate_merge(
-        climate_yearly_integration, ndvi_yearly_integration
+        climate_yearly_integration_fltr, ndvi_yearly_integration_fltr
     )
 
     # Apply function to compute ue and store as a collection
