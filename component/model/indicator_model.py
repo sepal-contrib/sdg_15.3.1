@@ -56,6 +56,12 @@ class IndicatorModel(model.Model):
     end_lc = Any(None).tag(sync=True)
     end_lc_band = Any(None).tag(sync=True)
 
+    # analysis scale
+    # from the first sensor (we only combine compatible one)
+    @property
+    def scale(self):
+        return pm.sensors[self.sensors[0]][1]
+
     # Custom assessment period
 
     # check for the custom trend period
@@ -132,6 +138,21 @@ class IndicatorModel(model.Model):
             return self.soc_t_end
         else:
             return self.end
+
+    # Handle case of year_start/end that isn't included in the CCI data
+    @property
+    def lc_year_start_esa(self):
+        return min(
+            max(self.p_landcover_t_start, pm.land_cover_first_year),
+            pm.land_cover_max_year,
+        )
+
+    @property
+    def lc_year_end_esa(self):
+        return min(
+            max(self.p_landcover_t_end, pm.land_cover_first_year),
+            pm.land_cover_max_year,
+        )
 
     ######################
     ##      output      ##

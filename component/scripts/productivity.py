@@ -100,19 +100,12 @@ def productivity_performance(
             .clip(aoi_model.feature_collection.geometry().bounds())
         )
 
-        # should not be here it's a hidden parameter
-
-        # Handle case of year_start that isn't included in the CCI data
-        lc_year_start = min(
-            max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
-        )
-
-        #################
-
         # reclassify lc to ipcc classes
         lc_reclass = (
             landcover.filter(
-                ee.Filter.calendarRange(lc_year_start, lc_year_start, "year")
+                ee.Filter.calendarRange(
+                    model.lc_year_start_esa, model.lc_year_start_esa, "year"
+                )
             )
             .first()
             .remap(pm.ESA_lc_classes, pm.reclassification_matrix)
@@ -149,7 +142,7 @@ def productivity_performance(
     percentile_90 = ndvi_id.reduceRegion(
         reducer=ee.Reducer.percentile([90]).group(groupField=1, groupName="code"),
         geometry=aoi_model.feature_collection.geometry(),
-        scale=30,
+        scale=model.scale,
         maxPixels=1e15,
     )
 
