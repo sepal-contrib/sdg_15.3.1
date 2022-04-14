@@ -11,9 +11,11 @@ def soil_organic_carbon(model, aoi_model, output):
     soc = ee.Image(pm.soc).clip(aoi_model.feature_collection.geometry().bounds())
     soc = soc.updateMask(soc.neq(pm.int_16_min))
 
-    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
+    lc_year_end = min(
+        max(model.p_soc_t_end, pm.land_cover_first_year), pm.land_cover_max_year
+    )
     landcover = ee.ImageCollection(pm.land_cover_ic).filter(
-        ee.Filter.calendarRange(model.start, lc_year_end, "year")
+        ee.Filter.calendarRange(model.p_soc_t_start, lc_year_end, "year")
     )
 
     if not model.conversion_coef:
@@ -29,14 +31,18 @@ def soil_organic_carbon(model, aoi_model, output):
     # compute the soc change for the first two years
 
     lc_time0 = (
-        landcover.filter(ee.Filter.calendarRange(model.start, model.start, "year"))
+        landcover.filter(
+            ee.Filter.calendarRange(model.p_soc_t_start, model.p_soc_t_start, "year")
+        )
         .first()
         .remap(pm.translation_matrix[0], pm.translation_matrix[1])
     )
 
     lc_time1 = (
         landcover.filter(
-            ee.Filter.calendarRange(model.start + 1, model.start + 1, "year")
+            ee.Filter.calendarRange(
+                model.p_soc_t_start + 1, model.p_soc_t_start + 1, "year"
+            )
         )
         .first()
         .remap(pm.translation_matrix[0], pm.translation_matrix[1])
@@ -88,7 +94,7 @@ def soil_organic_carbon(model, aoi_model, output):
     # years = ee.List.sequence(1, model.end - model.start)
     # soc_images = years.itterate(compute_soc, soc_images)
 
-    for year in range(model.start + 1, lc_year_end):
+    for year in range(model.p_soc_t_start + 1, lc_year_end):
         lc_time0 = (
             landcover.filter(ee.Filter.calendarRange(year, year, "year"))
             .first()
@@ -132,7 +138,7 @@ def soil_organic_carbon(model, aoi_model, output):
             pm.IPCC_lc_change_matrix, pm.input_factor
         )
 
-        year_index = year - model.start
+        year_index = year - model.p_soc_t_start
 
         organic_carbon_change = organic_carbon_change.where(
             lc_time0.neq(lc_time1),
@@ -154,7 +160,7 @@ def soil_organic_carbon(model, aoi_model, output):
 
     # Compute soc percent change for the analysis period
     soc_percent_change = (
-        soc_images.select(lc_year_end - model.start)
+        soc_images.select(lc_year_end - model.p_soc_t_start)
         .subtract(soc_images.select(0))
         .divide(soc_images.select(0))
         .multiply(100)

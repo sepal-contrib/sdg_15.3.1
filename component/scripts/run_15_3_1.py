@@ -107,23 +107,19 @@ def display_maps(aoi_model, model, m, output):
     if not ("ADMIN" in aoi_model.method):
         geom = geom.bounds()
 
-    lc_year_start = min(
-        max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
-    )
-    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
     # add the layers
     output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
     m.addLayer(
         model.land_cover.select("start").clip(geom),
         pm.viz_lc,
-        ms.lc_start.format(lc_year_start),
+        ms.lc_start.format(model.lc_year_start_esa),
     )
 
     output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
     m.addLayer(
         model.land_cover.select("end").clip(geom),
         pm.viz_lc,
-        ms.lc_end.format(lc_year_end),
+        ms.lc_end.format(model.lc_year_end_esa),
     )
 
     output.add_live_msg(ms.gee.add_layer.format(ms.prod_layer))
@@ -206,12 +202,9 @@ def compute_lc_transition_stats(aoi_model, model):
     retun: DataFrame.
     """
     landcover = model.land_cover.select("transition")
-    scale = pm.sensors[model.sensors[0]][1]
+    scale = model.scale
     aoi = aoi_model.feature_collection.geometry().bounds()
-    lc_year_start = min(
-        max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
-    )
-    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
+
     lc_name = [*pm.lc_color]
 
     # make a list of all the possible transitions values
@@ -241,7 +234,9 @@ def compute_lc_transition_stats(aoi_model, model):
     df = [[*[i for i in x.split("_")], y] for x, y in data.items()]
 
     # convert to a DataFrame
-    df = pd.DataFrame(data=df, columns=[lc_year_start, lc_year_end, "Area"])
+    df = pd.DataFrame(
+        data=df, columns=[model.lc_year_start_esa, model.lc_year_end_esa, "Area"]
+    )
 
     return df
 

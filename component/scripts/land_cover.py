@@ -14,21 +14,25 @@ def land_cover(model, aoi_model, output):
     # load the land cover map
     landcover = ee.ImageCollection(pm.land_cover_ic)
 
-    # Remap LC according to input matrix, aggregation of land cover classes to UNCCD classes.
-    lc_year_start = min(
-        max(model.start, pm.land_cover_first_year), pm.land_cover_max_year
-    )
-    lc_year_end = min(max(model.end, pm.land_cover_first_year), pm.land_cover_max_year)
+    # Remap LC according to input matrix, aggregation of land cover classes to IPCC classes.
 
     landcover_start = (
-        landcover.filter(ee.Filter.calendarRange(lc_year_start, lc_year_start, "year"))
+        landcover.filter(
+            ee.Filter.calendarRange(
+                model.lc_year_start_esa, model.lc_year_start_esa, "year"
+            )
+        )
         .first()
         .clip(geom)
         .rename("landcover_start")
     )
 
     landcover_end = (
-        landcover.filter(ee.Filter.calendarRange(lc_year_end, lc_year_end, "year"))
+        landcover.filter(
+            ee.Filter.calendarRange(
+                model.lc_year_end_esa, model.lc_year_end_esa, "year"
+            )
+        )
         .first()
         .clip(geom)
         .rename("landcover_end")
@@ -47,7 +51,7 @@ def land_cover(model, aoi_model, output):
             pm.translation_matrix[0], pm.translation_matrix[1]
         ).rename("start")
 
-        # target land cover map reclassified into UNCCD classes
+        # target land cover map reclassified into IPCC classes
         landcover_end_remapped = landcover_end.remap(
             pm.translation_matrix[0], pm.translation_matrix[1]
         ).rename("end")
