@@ -67,16 +67,13 @@ class PickerLineProductivity(v.Layout):
         )
 
         super().__init__(
-            xs=12,
             row=True,
             children=[
-                v.Row(children=[self.trend_start_picker, self.trend_end_picker]),
-                v.Row(children=[self.state_start_picker, self.state_end_picker]),
-                v.Row(
-                    children=[
-                        self.performance_start_picker,
-                        self.performance_end_picker,
-                    ]
-                ),
+                v.Flex(xs12=True, md6=True, children=[self.trend_start_picker]),
+                v.Flex(xs12=True, md6=True, children = [self.trend_end_picker]),
+                v.Flex(xs12=True, md6=True, children=[self.state_start_picker]),
+                v.Flex(xs12=True, md6=True, children=[self.state_end_picker]),
+		v.Flex(xs12=True, md6=True, children=[self.performance_start_picker]),
+		v.Flex(xs12=True, md6=True, children=[self.performance_end_picker])
             ],
         )
