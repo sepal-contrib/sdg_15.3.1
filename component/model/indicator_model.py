@@ -1,6 +1,9 @@
 from sepal_ui import model
 from traitlets import Any
-
+import csv
+import re
+from random import sample
+import matplotlib.colors as pltc
 from component import parameter as pm
 
 
@@ -46,6 +49,7 @@ class IndicatorModel(model.Model):
 
     # matrix, change output format to a plain list. we need it to remap the land cover instead of a matrix.
     transition_matrix = Any(pm.default_trans_matrix).tag(sync=True)
+    custom_matrix_file = Any(None).tag(sync=True)
 
     # Climate regime
     conversion_coef = Any(None).tag(sync=True)
@@ -154,6 +158,90 @@ class IndicatorModel(model.Model):
             pm.land_cover_max_year,
         )
 
+    ##Custom land cover matrix and related parameters
+    # read the custom land cover matrix csv file
+    @property
+    def custom_lc_matrix_list(self):
+        return self.csv_reader()
+
+    # save the matrix
+    @property
+    def custom_transition_matrix(self):
+        return [i[2:] for i in self.custom_lc_matrix_list[2:]]
+
+    # save the class list and remove unwanted sysmbols including undescores
+    @property
+    def lc_classlist_end(self):
+        if self.start_lc and self.end_lc and self.custom_matrix_file:
+            lc_class = self.custom_lc_matrix_list[0][2:]
+            pattern = re.compile(r"[^a-zA-Z -]+")
+            lc_class = [re.sub(pattern, "", x) for x in lc_class]
+        else:
+            lc_class = pm.lc_class
+        return lc_class
+
+    @property
+    def lc_classlist_start(self):
+        if self.start_lc and self.end_lc and self.custom_matrix_file:
+            lc_class = [x[0] for x in self.custom_lc_matrix_list[2:]]
+            pattern = re.compile(r"[^a-zA-Z -]+")
+            lc_class = [re.sub(pattern, "", x) for x in lc_class]
+        else:
+            lc_class = pm.lc_class
+        return lc_class
+
+    # save the class code list and make a combination of all possible transitions
+    @property
+    def lc_codelist_end(self):
+        if self.start_lc and self.end_lc and self.custom_matrix_file:
+            lc_code = self.custom_lc_matrix_list[1][2:]
+        else:
+            lc_code = pm.lc_code
+        return lc_code
+
+    @property
+    def lc_codelist_start(self):
+        if self.start_lc and self.end_lc and self.custom_matrix_file:
+            lc_code = [x[1] for x in self.custom_lc_matrix_list[2:]]
+        else:
+            lc_code = pm.lc_code
+        return lc_code
+
+    @property
+    def lc_class_combination(self):
+        return [
+            int(str(lc_code_start) + str(lc_code_end))
+            for lc_code_start in self.lc_codelist_start
+            for lc_code_end in self.lc_codelist_end
+        ]
+
+    # flatten the land cover matrix
+    @property
+    def trans_matrix_flatten(self):
+        if self.start_lc and self.end_lc and self.custom_matrix_file:
+            matrix_flatten = [
+                item for sublist in self.custom_transition_matrix for item in sublist
+            ]
+        else:
+            matrix_flatten = [
+                item for sublist in self.transition_matrix for item in sublist
+            ]
+        return matrix_flatten
+
+    # create a dictionary of land cover colours
+    @property
+    def lc_color(self):
+        if self.start_lc and self.end_lc and self.custom_matrix_file:
+            all_colors = [hx for nm, hx in pltc.cnames.items()]
+            colors = sample(all_colors, len(self.lc_classlist_start))
+            lc_color = {
+                self.lc_classlist_start[i]: colors[i]
+                for i in range(len(self.lc_classlist_start))
+            }
+        else:
+            lc_color = pm.lc_color
+        return lc_color
+
     ######################
     ##      output      ##
     ######################
@@ -199,3 +287,12 @@ class IndicatorModel(model.Model):
         climate = f"cr{int(self.conversion_coef*100)}"
 
         return f"{start}_{end}_{sensor}_{vegetation_index}_{lceu}_{lc_matrix}_{climate}"
+
+    ##Csv reader
+    def csv_reader(self):
+        with open(self.custom_matrix_file, "r") as csv_file:
+            lc_matrix = csv.reader(csv_file)
+            lc_matrix_list = []
+            for line in lc_matrix:
+                lc_matrix_list.append(line)
+        return lc_matrix_list

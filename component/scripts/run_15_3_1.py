@@ -205,16 +205,13 @@ def compute_lc_transition_stats(aoi_model, model):
     scale = model.scale
     aoi = aoi_model.feature_collection.geometry().bounds()
 
-    lc_name = [*pm.lc_color]
-
-    # make a list of all the possible transitions values
-    class_value = [x * 10 + y for x, y in product(range(1, 8), repeat=2)]
-
     # make a list of all the possible transitions classes
-    class_name = [x + "_" + y for x, y in product(lc_name, repeat=2)]
+    class_name = [
+        i + "_" + j for i in model.lc_classlist_start for j in model.lc_classlist_end
+    ]
 
     # creat a multi band image with all the classes as bands
-    multiband_class = landcover.eq(class_value).rename(class_name)
+    multiband_class = landcover.eq(model.lc_class_combination).rename(class_name)
 
     # calculate the area
     pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
@@ -241,7 +238,7 @@ def compute_lc_transition_stats(aoi_model, model):
     return df
 
 
-def compute_stats_by_lc(aoi_model, model):
+def compute_stats_by_lc(aoi_model, model, select_landcover="end", indicator_name=None):
     """
     tabulate the area by land cover categories.
     input: ee.Image(ending land cover, final indicator)
@@ -250,23 +247,45 @@ def compute_stats_by_lc(aoi_model, model):
     """
 
     # land cover
-    landcover = model.land_cover.select("end")
+    landcover = model.land_cover.select(select_landcover)
 
     # final indicator
-    indicator = model.indicator_15_3_1
+    if indicator_name == "productivity sub-indicator":
+        indicator = model.productivity
+        variable = pm.degradation_class
+    elif indicator_name == "soc sub-indicator":
+        indicator = model.soc.select("soc")
+        variable = pm.degradation_class
+    elif indicator_name == "land cover sub-indicator":
+        indicator = model.land_cover.select("degradation")
+        variable = pm.degradation_class
+    elif indicator_name == "productivity state":
+        indicator = model.productivity_state.select("state_5_levels")
+        variable = pm.prod_state_5_class
+    elif indicator_name == "productivity trend":
+        indicator = model.productivity_trend.select("trajectory_5_levels")
+        variable = pm.prod_trend_5_class
+    elif indicator_name == "productivity performance":
+        indicator = model.productivity_performance
+        variable = pm.prod_performance_class
+    else:
+        indicator = model.indicator_15_3_1
+        variable = pm.degradation_class
+
     aoi = aoi_model.feature_collection.geometry().bounds()
-    lc_name = [*pm.lc_color]
-    deg_name = [*pm.legend]
+    lc_name = model.lc_classlist_start
+    lc_code = model.lc_codelist_start
+    scale = model.scale
 
     # combine indicator and land cover together.
-    # first digit represents the indicator, second digit represents land cover categories
-    lc_deg_combine = indicator.multiply(10).add(landcover)
+    # first digit represents the indicator, second two digits represents land cover categories
+    lc_deg_combine = landcover.multiply(10).add(indicator)
 
     # all possible combined values
-    class_value = [x * 10 + y for x, y in product(range(1, 4), range(1, 8))]
+    class_value = [x * 10 + y for x in lc_code for y in variable.keys()]
 
     # all possible combined categories
-    class_name = [x + "_" + y for x, y in product(deg_name, lc_name)]
+    class_name = [x + "_" + y for x in lc_name for y in variable.values()]
 
     # creat a multi band image with all the categories as bands
     multiband_class = lc_deg_combine.eq(class_value).rename(class_name)
@@ -277,10 +296,10 @@ def compute_stats_by_lc(aoi_model, model):
         **{
             "reducer": ee.Reducer.sum(),
             "geometry": aoi,
-            "scale": 300,
+            "scale": scale,
             "maxPixels": 1e13,
             "bestEffort": True,
-            "tileScale": 8,
+            "tileScale": 2,
         }
     )
     data = area_per_class.getInfo()
@@ -289,7 +308,7 @@ def compute_stats_by_lc(aoi_model, model):
     df = [[*[i for i in x.split("_")], y] for x, y in data.items()]
 
     # convert to a DataFrame
-    df = pd.DataFrame(data=df, columns=["Indicator", "Landcover", "Area"])
+    df = pd.DataFrame(data=df, columns=["Landcover", "Indicator", "Area"])
 
     return df
 

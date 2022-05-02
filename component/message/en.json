@@ -49,9 +49,10 @@
     },
 
 	"legend": {
-		"degraded": "degraded",
-		"stable": "stable",
-		"improved": "improved"
+		"degraded": "Degraded",
+		"stable": "Stable",
+		"improved": "Improved",
+        "nodata": "NoData"
 	},
 	"error": {
 		"wrong_year": "The year are not set in the corret order. <br> start < target_year < end",
@@ -82,6 +83,7 @@
 	"advance_params": "advance parameters",
 	"start_lc": "Land Cover Image corresponding to start year",
 	"end_lc": "Land Cover Image corresponding to end year",
+    "custom_matrix_csv":"Custom matrix",
 	"titles": {
 		"inputs": "Computation parameters",
 		"results": "Spatial results",

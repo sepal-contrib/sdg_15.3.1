@@ -46,7 +46,7 @@ def land_cover(model, aoi_model, output):
 
     else:
 
-        # baseline land cover map reclassified into UNCCD classes
+        # baseline land cover map reclassified into IPCC classes
         landcover_start_remapped = landcover_start.remap(
             pm.translation_matrix[0], pm.translation_matrix[1]
         ).rename("start")
@@ -58,19 +58,17 @@ def land_cover(model, aoi_model, output):
 
     water_mask = landcover_end.where(landcover_end.eq(210), 0).rename("water")
 
-    # compute transition map (first digit for historical land cover, and second digit for monitoring year land cover)
+    # compute transition map (first two digits for historical land cover, and second two digits for monitoring year land cover)
     landcover_transition = (
-        landcover_start_remapped.multiply(10)
+        landcover_start_remapped.multiply(100)
         .add(landcover_end_remapped)
         .rename("transition")
     )
 
     # definition of land cover transitions as degradation (-1), improvement (1), or no relevant change (0)
-    trans_matrix_flatten = [
-        item for sublist in model.transition_matrix for item in sublist
-    ]
+
     landcover_degredation = landcover_transition.remap(
-        pm.IPCC_lc_change_matrix, trans_matrix_flatten
+        model.lc_class_combination, model.trans_matrix_flatten
     )
 
     # use the byte convention
@@ -82,11 +80,9 @@ def land_cover(model, aoi_model, output):
     )
 
     land_cover_out = (
-        landcover_degredation.addBands(landcover_transition.uint8())
+        landcover_degredation.addBands(landcover_transition.uint16())
         .addBands(landcover_start_remapped.uint8())
-        .addBands(landcover_end.uint8())
         .addBands(landcover_end_remapped.uint8())
-        .addBands(landcover_transition.uint8())
         .addBands(water_mask.uint8())
     )
 

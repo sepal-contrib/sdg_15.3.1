@@ -58,6 +58,12 @@ class InputTile(sw.Tile):
         transition_matrix = cw.TransitionMatrix(self.model, alert)
         start_lc = cw.SelectLC(label=ms.start_lc)
         end_lc = cw.SelectLC(label=ms.end_lc)
+        custom_matrix_file = sw.FileInput(
+            extentions=[".txt", ".tsb", ".csv"],
+            label=ms.custom_matrix_csv,
+            v_model=None,
+            clearable=True,
+        )
 
         # stack the advance parameters in a expandpanel
         advance_params = v.ExpansionPanels(
@@ -76,6 +82,7 @@ class InputTile(sw.Tile):
                                 v.Flex(xs12=True, children=[end_lc]),
                                 v.Flex(xs12=True, children=[transition_label]),
                                 v.Flex(xs12=True, children=[transition_matrix]),
+                                v.Flex(xs12=True, children=[custom_matrix_file]),
                                 v.Flex(xs12=True, children=[pickers_soc]),
                             ]
                         ),
@@ -94,6 +101,7 @@ class InputTile(sw.Tile):
             .bind(start_lc.w_band, "start_lc_band")
             .bind(end_lc.w_image, "end_lc")
             .bind(end_lc.w_band, "end_lc_band")
+            .bind(custom_matrix_file, "custom_matrix_file")
         )
 
         # create the actual tile
@@ -167,22 +175,32 @@ class InputTile(sw.Tile):
 
         with plt.style.context("dark_background"):
             with self.result_tile.sankey_plot:
-                fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
+                fig, ax = cs.sankey(
+                    df=df, colorDict=self.model.lc_color, aspect=4, fontsize=12
+                )
                 fig.set_facecolor((0, 0, 0, 0))
                 plt.show()
 
             with self.result_tile.bar_plot:
-                fig, ax = cs.bar_plot(pivot_dflc)
+                fig, ax = cs.bar_plot(
+                    df=pivot_dflc,
+                    color=cp.legend_bar,
+                    title=f"Distribution of area by land cover, year:{self.model.lc_year_end_esa}",
+                )
                 ax.set_facecolor((0, 0, 0, 0))
                 fig.set_facecolor((0, 0, 0, 0))
                 plt.show()
 
         # save the figures by default
         pattern = str(result_dir / f"{self.aoi_model.name}_{self.model.folder_name()}")
-        fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
+        fig, ax = cs.sankey(df=df, colorDict=self.model.lc_color, aspect=4, fontsize=12)
         fig.savefig(f"{pattern}_lc_transition.png", dpi=200)
         plt.close()
-        fig, ax = cs.bar_plot(pivot_dflc)
+        fig, ax = cs.bar_plot(
+            df=pivot_dflc,
+            color=cp.legend_bar,
+            title=f"Distribution of area by land cover, year{self.model.lc_year_end_esa}",
+        )
         fig.savefig(f"{pattern}_area_distribution.png")
         plt.close()
 
@@ -190,7 +208,10 @@ class InputTile(sw.Tile):
         cs.export_legend(
             f"{pattern}_indicator_legend.png", cp.legend, "Indicator Status"
         )
-        cs.export_legend(f"{pattern}_lc_legend.png", cp.lc_color, "Land Cover class")
+        cs.export_legend(
+            f"{pattern}_lc_legend.png", self.model.lc_color, "Land Cover class"
+        )
+        df.to_csv(f"{pattern}_lc_transition.csv", index=False)
 
         # release the download btn
         self.result_tile.btn.disabled = False

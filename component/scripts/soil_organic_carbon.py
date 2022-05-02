@@ -48,8 +48,8 @@ def soil_organic_carbon(model, aoi_model, output):
         .remap(pm.translation_matrix[0], pm.translation_matrix[1])
     )
 
-    # compute transition map for the first two years(1st digit for baseline land cover, 2nd for target land cover)
-    lc_transition = lc_time0.multiply(10).add(lc_time1)
+    # compute transition map for the first two years(1st two digit for baseline land cover, 2nd two digits for target land cover)
+    lc_transition = lc_time0.multiply(100).add(lc_time1)
 
     # compute raster to register years since transition for the first and second year
     lc_transition_time = ee.Image(2).where(lc_time0.neq(lc_time1), 1)
