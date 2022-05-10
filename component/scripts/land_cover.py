@@ -75,15 +75,15 @@ def land_cover(model, aoi_model, output):
     # 1 degraded - 2 stable - 3 improved
     landcover_degredation = (
         landcover_degredation.remap([1, 0, -1, pm.int_16_min], [3, 2, 1, 0])
-        .uint8()
+        .uint16()
         .rename("degradation")
     )
 
     land_cover_out = (
         landcover_degredation.addBands(landcover_transition.uint16())
-        .addBands(landcover_start_remapped.uint8())
-        .addBands(landcover_end_remapped.uint8())
-        .addBands(water_mask.uint8())
+        .addBands(landcover_start_remapped.uint16())
+        .addBands(landcover_end_remapped.uint16())
+        .addBands(water_mask.uint16())
     )
 
     return land_cover_out
