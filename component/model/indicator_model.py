@@ -175,7 +175,7 @@ class IndicatorModel(model.Model):
         if self.start_lc and self.end_lc and self.custom_matrix_file:
             lc_class = self.custom_lc_matrix_list[0][2:]
             pattern = re.compile(r"[^a-zA-Z -]+")
-            lc_class = [re.sub(pattern, "", x) for x in lc_class]
+            lc_class = [re.sub(pattern, "", x.strip()) for x in lc_class]
         else:
             lc_class = pm.lc_class
         return lc_class
@@ -185,7 +185,7 @@ class IndicatorModel(model.Model):
         if self.start_lc and self.end_lc and self.custom_matrix_file:
             lc_class = [x[0] for x in self.custom_lc_matrix_list[2:]]
             pattern = re.compile(r"[^a-zA-Z -]+")
-            lc_class = [re.sub(pattern, "", x) for x in lc_class]
+            lc_class = [re.sub(pattern, "", x.strip()) for x in lc_class]
         else:
             lc_class = pm.lc_class
         return lc_class
@@ -194,7 +194,8 @@ class IndicatorModel(model.Model):
     @property
     def lc_codelist_end(self):
         if self.start_lc and self.end_lc and self.custom_matrix_file:
-            lc_code = self.custom_lc_matrix_list[1][2:]
+            lc_code_str = self.custom_lc_matrix_list[1][2:]
+            lc_code = [int(v) for v in lc_code_str]
         else:
             lc_code = pm.lc_code
         return lc_code
@@ -202,7 +203,8 @@ class IndicatorModel(model.Model):
     @property
     def lc_codelist_start(self):
         if self.start_lc and self.end_lc and self.custom_matrix_file:
-            lc_code = [x[1] for x in self.custom_lc_matrix_list[2:]]
+            lc_code_str = [x[1] for x in self.custom_lc_matrix_list[2:]]
+            lc_code = [int(v) for v in lc_code_str]
         else:
             lc_code = pm.lc_code
         return lc_code
@@ -220,7 +222,9 @@ class IndicatorModel(model.Model):
     def trans_matrix_flatten(self):
         if self.start_lc and self.end_lc and self.custom_matrix_file:
             matrix_flatten = [
-                item for sublist in self.custom_transition_matrix for item in sublist
+                int(item)
+                for sublist in self.custom_transition_matrix
+                for item in sublist
             ]
         else:
             matrix_flatten = [

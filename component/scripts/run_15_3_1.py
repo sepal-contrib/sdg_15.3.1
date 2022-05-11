@@ -421,3 +421,13 @@ def indicator_15_3_1(productivity, landcover, soc, output):
     )
 
     return indicator.uint8()
+
+
+def custom_lc_values(land_cover):
+    image = ee.Image(land_cover)
+    geometry = image.geometry()
+    reduction = image.reduceRegion(
+        ee.Reducer.frequencyHistogram(), geometry, bestEffort=True
+    )
+    values = ee.Dictionary(reduction.get(image.bandNames().get(0))).keys().getInfo()
+    return [int(v) for v in values]

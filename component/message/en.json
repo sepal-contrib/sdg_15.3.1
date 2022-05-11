@@ -143,6 +143,7 @@
 	},
 	"select_lc": {
 		"not_image": "The asset need to be a valid GEE ee.Image",
-		"not_unccd": "the image is not reclassified using the UNCCD classfication. Please use the customize panel to reclassify your Image"
+		"not_proper_code": "The land cover is not reclassified using the selected classfication system. Please use the customize panel to reclassify the land cover",
+        "diff_land_cover": "The two land cover dataset need to be different."
 	}
 }

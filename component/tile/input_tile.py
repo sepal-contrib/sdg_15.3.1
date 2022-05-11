@@ -144,10 +144,22 @@ class InputTile(sw.Tile):
         ):
             return
         if self.model.start_lc or self.model.end_lc:
+            diff_lc = None if self.model.start_lc == self.model.end_lc else True
             if not self.alert.check_input(
-                self.model.start_lc == self.model.end_lc,
-                "the lc custom class need to be all set. If two Images have been set, they need to be different.",
+                diff_lc,
+                ms.select_lc.diff_land_cover,
             ):
+                return
+        if self.model.start_lc and self.model.end_lc:
+            lc_check_dn = (
+                None
+                if set(self.model.lc_codelist_start)
+                != set(cs.custom_lc_values(self.model.start_lc))
+                or set(self.model.lc_codelist_end)
+                != set(cs.custom_lc_values(self.model.end_lc))
+                else True
+            )
+            if not self.alert.check_input(lc_check_dn, self.model.lc_codelist_end):
                 return
 
         # create a result folder including the data parameters

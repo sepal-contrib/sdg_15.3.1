@@ -17,10 +17,10 @@ class ReclassifyTile(rec.ReclassifyView):
         self.title.children[0].children = ["Adapt Land Cover map"]
 
         # remove the custom option
-        tmp_list = self.w_default.children.copy()
-        self.w_default.children = tmp_list[1:]
+        # tmp_list = self.w_default.children.copy()
+        # self.w_default.children = tmp_list[1:]
 
-        # select UNCCD by default
+        # select IPCC by default
         self.w_default.children[0].fire_event("click", None)
 
         # remove optional panel
