@@ -159,7 +159,7 @@ class InputTile(sw.Tile):
                 != set(cs.custom_lc_values(self.model.end_lc))
                 else True
             )
-            if not self.alert.check_input(lc_check_dn, self.model.lc_codelist_end):
+            if not self.alert.check_input(lc_check_dn, ms.select_lc.not_proper_code):
                 return
 
         # create a result folder including the data parameters
