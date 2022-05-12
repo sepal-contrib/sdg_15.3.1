@@ -107,18 +107,24 @@ def display_maps(aoi_model, model, m, output):
     if not ("ADMIN" in aoi_model.method):
         geom = geom.bounds()
 
+    viz_lc = {
+        "min": min(model.lc_codelist_start),
+        "max": max(model.lc_codelist_start),
+        "palette": list(model.lc_color.values()),
+    }
+
     # add the layers
     output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
     m.addLayer(
         model.land_cover.select("start").clip(geom),
-        pm.viz_lc,
+        viz_lc,
         ms.lc_start.format(model.lc_year_start_esa),
     )
 
     output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
     m.addLayer(
         model.land_cover.select("end").clip(geom),
-        pm.viz_lc,
+        viz_lc,
         ms.lc_end.format(model.lc_year_end_esa),
     )
 
@@ -150,6 +156,11 @@ def display_maps(aoi_model, model, m, output):
     )
     m.addLayer(aoi_line, {"palette": v.theme.themes.dark.accent}, "aoi")
     output.add_live_msg(ms.map_loading_complete, "success")
+    m.add_legend(
+        legend_title=ms.map.legend.lc,
+        legend_dict=model.lc_color,
+        position="topleft",
+    )
 
     return
 

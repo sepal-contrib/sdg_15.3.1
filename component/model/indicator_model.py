@@ -2,7 +2,7 @@ from sepal_ui import model
 from traitlets import Any
 import csv
 import re
-from random import sample
+import random
 import matplotlib.colors as pltc
 from component import parameter as pm
 
@@ -237,9 +237,22 @@ class IndicatorModel(model.Model):
     def lc_color(self):
         if self.start_lc and self.end_lc and self.custom_matrix_file:
             all_colors = [hx for nm, hx in pltc.cnames.items()]
-            colors = sample(all_colors, len(self.lc_classlist_start))
+            random.seed(100)
+            colors = random.sample(all_colors, len(self.lc_classlist_start))
+            sorted_classes = list(
+                dict(
+                    sorted(
+                        {
+                            x: y
+                            for x, y in zip(
+                                self.lc_codelist_start, self.lc_classlist_start
+                            )
+                        }.items()
+                    )
+                ).values()
+            )
             lc_color = {
-                self.lc_classlist_start[i]: colors[i]
+                sorted_classes[i]: colors[i]
                 for i in range(len(self.lc_classlist_start))
             }
         else:
