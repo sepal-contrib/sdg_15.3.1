@@ -65,7 +65,7 @@ lc_color = {
     ms.classes.water: "#0046C8",
 }
 
-viz_lc = {"max": 70, "min": 10, "palette": list(lc_color.values())}
+
 viz_prod = {"max": 3, "min": 1, "palette": list(legend.values())}
 viz_lc_sub = {"max": 3, "min": 1, "palette": list(legend.values())}
 viz_soc = {"max": 3, "min": 1, "palette": list(legend.values())}

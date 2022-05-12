@@ -9,7 +9,7 @@ class ReclassifyTile(rec.ReclassifyView):
 
         super().__init__(
             gee=True,
-            default_class={"UNCCD": str(cp.utils_dir / "UNCCD.csv")},
+            default_class={"IPCC CLASSES": str(cp.utils_dir / "UNCCD.csv")},
             save=True,
         )
 
@@ -21,7 +21,7 @@ class ReclassifyTile(rec.ReclassifyView):
         # self.w_default.children = tmp_list[1:]
 
         # select IPCC by default
-        self.w_default.children[0].fire_event("click", None)
+        self.w_default.children[1].fire_event("click", None)
 
         # remove optional panel
         self.w_optional.class_ = "d-none"

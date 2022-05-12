@@ -51,10 +51,38 @@ class InputTile(sw.Tile):
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
-        # create advanced parameters
-        transition_label = v.Html(
-            class_="grey--text mt-2", tag="h3", children=[ms.transition_matrix]
+        ##############################################################
+        ##             create advanced parameters                   ##
+        ##############################################################
+
+        ### Create section headings
+        # Productivity section
+        prod_sec_label = v.Html(
+            class_="green--text text--lighten-3 mt-2",
+            tag="h3",
+            children=[ms.productivity_sec],
         )
+
+        prod_sec = v.Banner(single_line=True, children=[prod_sec_label])
+        # Land cover section
+        landcover_sec_label = v.Html(
+            class_="brown--text text--lighten-3 mt-2",
+            tag="h3",
+            children=[ms.landcover_sec],
+        )
+        lc_sec = v.Banner(single_line=True, children=[landcover_sec_label])
+        # Land cover transition heading
+        transition_label = v.Html(
+            class_="grey--text mt-2", tag="h4", children=[ms.transition_matrix]
+        )
+        # SOC section heading
+        SOC_sec_label = v.Html(
+            class_="green--text text--lighten-4 mt-2", tag="h3", children=[ms.soc_sec]
+        )
+        soc_sec = v.Banner(single_line=True, children=[SOC_sec_label])
+
+        # Input weigtes
+
         transition_matrix = cw.TransitionMatrix(self.model, alert)
         start_lc = cw.SelectLC(label=ms.start_lc)
         end_lc = cw.SelectLC(label=ms.end_lc)
@@ -75,14 +103,17 @@ class InputTile(sw.Tile):
                         v.ExpansionPanelHeader(children=[ms.advance_params]),
                         v.ExpansionPanelContent(
                             children=[
+                                v.Flex(xs12=True, children=[prod_sec]),
                                 v.Flex(xs12=True, children=[pickers_productivity]),
                                 v.Flex(xs12=True, children=[productivity_lookup_table]),
+                                v.Flex(xs12=True, children=[lc_sec]),
                                 v.Flex(xs12=True, children=[pickers_landcover]),
                                 v.Flex(xs12=True, children=[start_lc]),
                                 v.Flex(xs12=True, children=[end_lc]),
                                 v.Flex(xs12=True, children=[transition_label]),
                                 v.Flex(xs12=True, children=[transition_matrix]),
                                 v.Flex(xs12=True, children=[custom_matrix_file]),
+                                v.Flex(xs12=True, children=[soc_sec]),
                                 v.Flex(xs12=True, children=[pickers_soc]),
                             ]
                         ),
