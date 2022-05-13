@@ -174,6 +174,7 @@ class InputTile(sw.Tile):
             ]
         ):
             return
+        # check if the custom land covers are different or not
         if self.model.start_lc or self.model.end_lc:
             diff_lc = None if self.model.start_lc == self.model.end_lc else True
             if not self.alert.check_input(
@@ -181,6 +182,7 @@ class InputTile(sw.Tile):
                 ms.select_lc.diff_land_cover,
             ):
                 return
+        # check if the land cover pixels and codes from the input matrix are same or not
         if self.model.start_lc and self.model.end_lc:
             lc_check_dn = (
                 None
@@ -191,6 +193,38 @@ class InputTile(sw.Tile):
                 else True
             )
             if not self.alert.check_input(lc_check_dn, ms.select_lc.not_proper_code):
+                return
+
+        # check if the input matrix contains proper values/atrributes or not
+        if self.model.start_lc and self.model.end_lc and self.model.custom_matrix_file:
+            check_min_max_error = (
+                None
+                if min(self.model.lc_codelist_start) < 10
+                or max(self.model.lc_codelist_start) > 99
+                else True
+            )
+            check_transition_code_error = (
+                None if {1, 0, -1} != set(self.model.trans_matrix_flatten) else True
+            )
+            check_lc_class_mismatch = (
+                None
+                if set(self.model.lc_classlist_start)
+                != set(self.model.lc_classlist_end)
+                else True
+            )
+            if not all(
+                [
+                    self.alert.check_input(
+                        check_min_max_error, ms.select_lc.min_max_error
+                    ),
+                    self.alert.check_input(
+                        check_transition_code_error, ms.select_lc.transition_code_error
+                    ),
+                    self.alert.check_input(
+                        check_lc_class_mismatch, ms.select_lc.lc_class_mismatch
+                    ),
+                ]
+            ):
                 return
 
         # create a result folder including the data parameters
