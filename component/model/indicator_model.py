@@ -236,7 +236,7 @@ class IndicatorModel(model.Model):
     @property
     def lc_color(self):
         if self.start_lc and self.end_lc and self.custom_matrix_file:
-            all_colors = [hx for nm, hx in pltc.cnames.items()]
+            all_colors = [hx for _, hx in pltc.cnames.items()]
             random.seed(100)
             colors = random.sample(all_colors, len(self.lc_classlist_start))
             sorted_classes = list(
@@ -251,10 +251,7 @@ class IndicatorModel(model.Model):
                     )
                 ).values()
             )
-            lc_color = {
-                sorted_classes[i]: colors[i]
-                for i in range(len(self.lc_classlist_start))
-            }
+            lc_color = dict(zip(sorted_classes, colors))
         else:
             lc_color = pm.lc_color
         return lc_color
