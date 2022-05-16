@@ -69,7 +69,7 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
     if len(rightLabels) == 0:
         rightLabels = pd.Series(dataFrame.right.unique()).unique()
 
-    # If no colorDict given, make one
+    # If no colorDict given
     if colorDict is None:
         raise ValueError("specify a colour palette")
 

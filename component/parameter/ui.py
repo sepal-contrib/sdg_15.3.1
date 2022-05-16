@@ -49,6 +49,12 @@ legend = {
     ms.legend.improved: "#2c7bb6",
 }
 
+legend_bar = {
+    ms.legend.degraded: "#d7191c",
+    ms.legend.stable: "#ffffbf",
+    ms.legend.improved: "#2c7bb6",
+    ms.legend.nodata: "#9ea7ad",
+}
 lc_color = {
     ms.classes.forest: "#02A000",
     ms.classes.grassland: "#FFB432",
@@ -59,7 +65,7 @@ lc_color = {
     ms.classes.water: "#0046C8",
 }
 
-viz_lc = {"max": 7, "min": 1, "palette": list(lc_color.values())}
+
 viz_prod = {"max": 3, "min": 1, "palette": list(legend.values())}
 viz_lc_sub = {"max": 3, "min": 1, "palette": list(legend.values())}
 viz_soc = {"max": 3, "min": 1, "palette": list(legend.values())}

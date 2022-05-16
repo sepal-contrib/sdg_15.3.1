@@ -49,9 +49,10 @@
     },
 
 	"legend": {
-		"degraded": "degraded",
-		"stable": "stable",
-		"improved": "improved"
+		"degraded": "Degraded",
+		"stable": "Stable",
+		"improved": "Improved",
+        "nodata": "NoData"
 	},
 	"error": {
 		"wrong_year": "The year are not set in the corret order. <br> start < target_year < end",
@@ -79,9 +80,13 @@
 	"lceu_lbl": "Select Land cover ecosystem functional units",
     "prod_lookup_lbl": "Select a look up table to combine productivity metrics",
 	"transition_matrix": "Transition matrix",
+    "productivity_sec": "PRODUCTIVITY",
+    "landcover_sec": "LAND COVER",
+    "soc_sec": "SOIL ORGANIC CARBON",
 	"advance_params": "advance parameters",
 	"start_lc": "Land Cover Image corresponding to start year",
 	"end_lc": "Land Cover Image corresponding to end year",
+    "custom_matrix_csv":"Custom matrix",
 	"titles": {
 		"inputs": "Computation parameters",
 		"results": "Spatial results",
@@ -141,6 +146,10 @@
 	},
 	"select_lc": {
 		"not_image": "The asset need to be a valid GEE ee.Image",
-		"not_unccd": "the image is not reclassified using the UNCCD classfication. Please use the customize panel to reclassify your Image"
+		"not_proper_code": "The land cover is not reclassified using the selected classfication system. Please use the customize panel to reclassify the land cover",
+        "diff_land_cover": "The two land cover dataset need to be different.",
+        "min_max_error": "The minimumum and maximum pixels values for lnd cover need to be greater than 9 and less than 100",
+        "transition_code_error": "The transition codes need to be 1 for improved transition, 0 for statble and -1 for degraded transition",
+        "lc_class_mismatch": "The class labels/names for the initial and target land cover need to be same"
 	}
 }
