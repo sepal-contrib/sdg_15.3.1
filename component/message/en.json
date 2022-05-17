@@ -80,10 +80,10 @@
 	"lceu_lbl": "Select Land cover ecosystem functional units",
     "prod_lookup_lbl": "Select a look up table to combine productivity metrics",
 	"transition_matrix": "Transition matrix",
-    "productivity_sec": "PRODUCTIVITY",
-    "landcover_sec": "LAND COVER",
-    "soc_sec": "SOIL ORGANIC CARBON",
-	"advance_params": "advance parameters",
+    "productivity_sec": "Productivity parameters",
+    "landcover_sec": "Land cover parametres",
+    "soc_sec": "Soil Organic Carbon (SOC) parameters",
+	"advance_params": "Advanced Parameters",
 	"start_lc": "Land Cover Image corresponding to start year",
 	"end_lc": "Land Cover Image corresponding to end year",
     "custom_matrix_csv":"Custom matrix",
@@ -150,6 +150,7 @@
         "diff_land_cover": "The two land cover dataset need to be different.",
         "min_max_error": "The minimumum and maximum pixels values for lnd cover need to be greater than 9 and less than 100",
         "transition_code_error": "The transition codes need to be 1 for improved transition, 0 for statble and -1 for degraded transition",
-        "lc_class_mismatch": "The class labels/names for the initial and target land cover need to be same"
+        "lc_class_mismatch": "The class labels/names for the initial and target land cover need to be same",
+        "custom_matrix_bool": "Would you like to upload a custom transition matrix?"
 	}
 }
