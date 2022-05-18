@@ -9,18 +9,19 @@ vegetation_index = [
 ]
 
 lceu = [
-    {"text": ms.lceu.calculate, "value": "calculate", "disabled": False},
+    {
+        "text": ms.lceu.gaes,
+        "value": "gaes",
+        "disabled": False,
+    },
+    {"text": ms.lceu.aez, "value": "aez", "disabled": False},
     {"text": ms.lceu.wte, "value": "wte", "disabled": False},
     {
         "text": ms.lceu.hru,
         "value": "hru",
-        "disabled": True,
+        "disabled": False,
     },
-    {
-        "text": ms.lceu.gaes,
-        "value": "gaes",
-        "disabled": True,
-    },
+    {"text": ms.lceu.calculate, "value": "calculate", "disabled": False},
 ]
 
 productivity_lookup_table = [

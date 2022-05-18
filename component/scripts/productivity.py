@@ -91,14 +91,16 @@ def productivity_performance(
     """
 
     # land cover data from esa cci
-    if model.lceu == "calculate":
+    if model.lceu == "gaes":
+        lc_eco_functional_unit = ee.Image(pm.gaes)
+    elif model.lceu == "aez":
+        lc_eco_functional_unit = ee.Image(pm.aez)
+    elif model.lceu == "hru":
+        lc_eco_functional_unit = ee.Image(pm.hru)
+    elif model.lceu == "calculate":
         landcover = ee.ImageCollection(pm.land_cover_ic)
 
-        soil_taxonomy = (
-            ee.Image(pm.soil_taxonomy)
-            .select("b0")
-            .clip(aoi_model.feature_collection.geometry().bounds())
-        )
+        soil_taxonomy = ee.Image(pm.soil_taxonomy).select("b0")
 
         # reclassify lc to ipcc classes
         lc_reclass = (
@@ -113,10 +115,7 @@ def productivity_performance(
 
         lc_eco_functional_unit = soil_taxonomy.multiply(100).add(lc_reclass)
     elif model.lceu == "wte":
-        lc_eco_functional_unit = ee.Image(pm.wte).clip(
-            aoi_model.feature_collection.geometry().bounds()
-        )
-    # TODO: add all the available LCEU datasets
+        lc_eco_functional_unit = ee.Image(pm.wte)
 
     # compute mean ndvi for the period
     nvdi_yearly_integration_fltr = nvdi_yearly_integration.filter(
@@ -132,11 +131,13 @@ def productivity_performance(
 
     ################
 
-    # create a binary mask.
-    mask = ndvi_mean.neq(0)
+    # fill the gaps in lceu with a negative value to prevent masking
+    lc_eco_functional_unit_filled = ee.Image(-1).where(
+        lc_eco_functional_unit, lc_eco_functional_unit
+    )
 
     # create a 2 band raster to compute 90th percentile per ecoregion (analysis restricted by mask and study area)
-    ndvi_id = ndvi_mean.addBands(lc_eco_functional_unit).updateMask(mask)
+    ndvi_id = ndvi_mean.addBands(lc_eco_functional_unit_filled)
 
     # compute 90th percentile by unit
     percentile_90 = ndvi_id.reduceRegion(
@@ -152,10 +153,14 @@ def productivity_performance(
     percentile = groups.map(lambda d: ee.Dictionary(d).get("p90"))
 
     # remap the similar ecoregion raster using their 90th percentile value
-    ecoregion_perc90 = lc_eco_functional_unit.remap(ids, percentile)
+    ecoregion_90th_percentile = lc_eco_functional_unit_filled.remap(ids, percentile)
+    # set a very small number to 0 valued pixels to prevent masking
+    ecoregion_90th_percentile_v2 = ecoregion_90th_percentile.where(
+        ecoregion_90th_percentile.eq(0), 0.001
+    )
 
     # compute the ratio of observed ndvi to 90th for that class
-    observed_ratio = ndvi_mean.divide(ecoregion_perc90)
+    observed_ratio = ndvi_mean.divide(ecoregion_90th_percentile_v2)
 
     # create final degradation output layer (0 is background), 2 is not
     # degreaded, 1 is degraded
@@ -269,6 +274,14 @@ def productivity_final(trajectory, performance, state, output):
             2,
         )
         .where(
+            trajectory_class.eq(1).And(state_class.eq(3)).And(performance_class.eq(1)),
+            1,
+        )
+        .where(
+            trajectory_class.eq(1).And(state_class.eq(3)).And(performance_class.eq(2)),
+            1,
+        )
+        .where(
             trajectory_class.eq(2).And(state_class.eq(1)).And(performance_class.eq(1)),
             1,
         )
@@ -282,6 +295,14 @@ def productivity_final(trajectory, performance, state, output):
         )
         .where(
             trajectory_class.eq(2).And(state_class.eq(2)).And(performance_class.eq(2)),
+            2,
+        )
+        .where(
+            trajectory_class.eq(2).And(state_class.eq(3)).And(performance_class.eq(1)),
+            2,
+        )
+        .where(
+            trajectory_class.eq(2).And(state_class.eq(3)).And(performance_class.eq(2)),
             2,
         )
         .where(
@@ -338,6 +359,14 @@ def productivity_final_GPG1(trajectory, performance, state, output):
             1,
         )
         .where(
+            trajectory_class.eq(1).And(state_class.eq(3)).And(performance_class.eq(1)),
+            1,
+        )
+        .where(
+            trajectory_class.eq(1).And(state_class.eq(3)).And(performance_class.eq(2)),
+            1,
+        )
+        .where(
             trajectory_class.eq(2).And(state_class.eq(1)).And(performance_class.eq(1)),
             1,
         )
@@ -351,6 +380,14 @@ def productivity_final_GPG1(trajectory, performance, state, output):
         )
         .where(
             trajectory_class.eq(2).And(state_class.eq(2)).And(performance_class.eq(2)),
+            2,
+        )
+        .where(
+            trajectory_class.eq(2).And(state_class.eq(3)).And(performance_class.eq(1)),
+            2,
+        )
+        .where(
+            trajectory_class.eq(2).And(state_class.eq(3)).And(performance_class.eq(2)),
             2,
         )
         .where(

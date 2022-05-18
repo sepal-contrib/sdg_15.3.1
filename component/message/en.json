@@ -41,7 +41,8 @@
 		"calculate": "Calculate based on land cover and soil texture",
 		"wte": "World Ecosystem",
 		"hru": "Global Homogeneous Response Units",
-		"gaes": "Global Agro-Environmental Stratification"
+		"gaes": "Global Agro-Environmental Stratification",
+        "aez" : "Global Agro-Ecological Zones"
 	},
     "productivity_lookuptable":{
         "gpgv2":"GPGv2",
