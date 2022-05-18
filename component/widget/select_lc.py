@@ -28,7 +28,6 @@ class SelectLC(v.Layout):
 
         # js behaviour
         self.w_image.observe(self._validate, "v_model")
-        self.w_band.observe(self._check_band, "v_model")
 
     @su.switch("loading", "disabled", on_widgets=["w_image"])
     def _validate(self, change):
@@ -66,32 +65,5 @@ class SelectLC(v.Layout):
         self.w_band.items = natsorted(
             ee.Image(self.w_image.v_model).bandNames().getInfo()
         )
-
-        return
-
-    @su.switch("loading", "disabled", on_widgets=["w_band"])
-    def _check_band(self, change):
-        """check if the band is a UNCCD classification"""
-
-        self.w_band.error = False
-        self.w_band.error_messages = None
-
-        if change["new"] == None:
-            return
-
-        # the asset need to be reclassified as a UNCCD LC map
-        image = ee.Image(self.w_image.v_model).select(change["new"])
-        geometry = image.geometry()
-        reduction = image.reduceRegion(
-            ee.Reducer.frequencyHistogram(), geometry, bestEffort=True
-        )
-
-        values = ee.Dictionary(reduction.get(image.bandNames().get(0))).keys().getInfo()
-
-        if not all(int(v) in list(range(8)) for v in values):
-            self.w_band.v_model = None
-            self.w_band.error = True
-            self.w_band.error_messages = ms.select_lc.not_unccd
-            return
 
         return

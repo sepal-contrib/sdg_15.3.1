@@ -23,11 +23,7 @@ class ResultTile(sw.Tile):
         # create the result map
         # with its legend
         self.m = cw.ResultMap()
-        self.m.add_legend(
-            legend_title=ms.map.legend.lc,
-            legend_dict=cp.lc_color,
-            position="topleft",
-        )
+
         self.m.add_legend(
             legend_title=ms.map.legend.state,
             legend_dict=cp.legend,

@@ -51,13 +51,47 @@ class InputTile(sw.Tile):
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
-        # create advanced parameters
-        transition_label = v.Html(
-            class_="grey--text mt-2", tag="h3", children=[ms.transition_matrix]
+        ##############################################################
+        ##             create advanced parameters                   ##
+        ##############################################################
+
+        ### Create section headings
+        # Productivity section
+        prod_sec_label = v.Html(
+            class_="green--text text--lighten-3 mt-2",
+            tag="h3",
+            children=[ms.productivity_sec],
         )
+
+        prod_sec = v.Banner(single_line=True, children=[prod_sec_label])
+        # Land cover section
+        landcover_sec_label = v.Html(
+            class_="brown--text text--lighten-3 mt-2",
+            tag="h3",
+            children=[ms.landcover_sec],
+        )
+        lc_sec = v.Banner(single_line=True, children=[landcover_sec_label])
+        # Land cover transition heading
+        transition_label = v.Html(
+            class_="grey--text mt-2", tag="h4", children=[ms.transition_matrix]
+        )
+        # SOC section heading
+        SOC_sec_label = v.Html(
+            class_="green--text text--lighten-4 mt-2", tag="h3", children=[ms.soc_sec]
+        )
+        soc_sec = v.Banner(single_line=True, children=[SOC_sec_label])
+
+        # Input weigtes
+
         transition_matrix = cw.TransitionMatrix(self.model, alert)
         start_lc = cw.SelectLC(label=ms.start_lc)
         end_lc = cw.SelectLC(label=ms.end_lc)
+        custom_matrix_file = sw.FileInput(
+            extentions=[".txt", ".tsb", ".csv"],
+            label=ms.custom_matrix_csv,
+            v_model=None,
+            clearable=True,
+        )
 
         # stack the advance parameters in a expandpanel
         advance_params = v.ExpansionPanels(
@@ -69,13 +103,17 @@ class InputTile(sw.Tile):
                         v.ExpansionPanelHeader(children=[ms.advance_params]),
                         v.ExpansionPanelContent(
                             children=[
+                                v.Flex(xs12=True, children=[prod_sec]),
                                 v.Flex(xs12=True, children=[pickers_productivity]),
                                 v.Flex(xs12=True, children=[productivity_lookup_table]),
+                                v.Flex(xs12=True, children=[lc_sec]),
                                 v.Flex(xs12=True, children=[pickers_landcover]),
                                 v.Flex(xs12=True, children=[start_lc]),
                                 v.Flex(xs12=True, children=[end_lc]),
                                 v.Flex(xs12=True, children=[transition_label]),
                                 v.Flex(xs12=True, children=[transition_matrix]),
+                                v.Flex(xs12=True, children=[custom_matrix_file]),
+                                v.Flex(xs12=True, children=[soc_sec]),
                                 v.Flex(xs12=True, children=[pickers_soc]),
                             ]
                         ),
@@ -94,6 +132,7 @@ class InputTile(sw.Tile):
             .bind(start_lc.w_band, "start_lc_band")
             .bind(end_lc.w_image, "end_lc")
             .bind(end_lc.w_band, "end_lc_band")
+            .bind(custom_matrix_file, "custom_matrix_file")
         )
 
         # create the actual tile
@@ -135,10 +174,56 @@ class InputTile(sw.Tile):
             ]
         ):
             return
+        # check if the custom land covers are different or not
         if self.model.start_lc or self.model.end_lc:
+            diff_lc = None if self.model.start_lc == self.model.end_lc else True
             if not self.alert.check_input(
-                self.model.start_lc == self.model.end_lc,
-                "the lc custom class need to be all set. If two Images have been set, they need to be different.",
+                diff_lc,
+                ms.select_lc.diff_land_cover,
+            ):
+                return
+        # check if the land cover pixels and codes from the input matrix are same or not
+        if self.model.start_lc and self.model.end_lc:
+            lc_check_dn = (
+                None
+                if set(self.model.lc_codelist_start)
+                != set(cs.custom_lc_values(self.model.start_lc))
+                or set(self.model.lc_codelist_end)
+                != set(cs.custom_lc_values(self.model.end_lc))
+                else True
+            )
+            if not self.alert.check_input(lc_check_dn, ms.select_lc.not_proper_code):
+                return
+
+        # check if the input matrix contains proper values/atrributes or not
+        if self.model.start_lc and self.model.end_lc and self.model.custom_matrix_file:
+            check_min_max_error = (
+                None
+                if min(self.model.lc_codelist_start) < 10
+                or max(self.model.lc_codelist_start) > 99
+                else True
+            )
+            check_transition_code_error = (
+                None if {1, 0, -1} != set(self.model.trans_matrix_flatten) else True
+            )
+            check_lc_class_mismatch = (
+                None
+                if set(self.model.lc_classlist_start)
+                != set(self.model.lc_classlist_end)
+                else True
+            )
+            if not all(
+                [
+                    self.alert.check_input(
+                        check_min_max_error, ms.select_lc.min_max_error
+                    ),
+                    self.alert.check_input(
+                        check_transition_code_error, ms.select_lc.transition_code_error
+                    ),
+                    self.alert.check_input(
+                        check_lc_class_mismatch, ms.select_lc.lc_class_mismatch
+                    ),
+                ]
             ):
                 return
 
@@ -167,22 +252,32 @@ class InputTile(sw.Tile):
 
         with plt.style.context("dark_background"):
             with self.result_tile.sankey_plot:
-                fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
+                fig, ax = cs.sankey(
+                    df=df, colorDict=self.model.lc_color, aspect=4, fontsize=12
+                )
                 fig.set_facecolor((0, 0, 0, 0))
                 plt.show()
 
             with self.result_tile.bar_plot:
-                fig, ax = cs.bar_plot(pivot_dflc)
+                fig, ax = cs.bar_plot(
+                    df=pivot_dflc,
+                    color=cp.legend_bar,
+                    title=f"Distribution of area by land cover, year:{self.model.lc_year_end_esa}",
+                )
                 ax.set_facecolor((0, 0, 0, 0))
                 fig.set_facecolor((0, 0, 0, 0))
                 plt.show()
 
         # save the figures by default
         pattern = str(result_dir / f"{self.aoi_model.name}_{self.model.folder_name()}")
-        fig, ax = cs.sankey(df=df, colorDict=cp.lc_color, aspect=4, fontsize=12)
+        fig, ax = cs.sankey(df=df, colorDict=self.model.lc_color, aspect=4, fontsize=12)
         fig.savefig(f"{pattern}_lc_transition.png", dpi=200)
         plt.close()
-        fig, ax = cs.bar_plot(pivot_dflc)
+        fig, ax = cs.bar_plot(
+            df=pivot_dflc,
+            color=cp.legend_bar,
+            title=f"Distribution of area by land cover, year{self.model.lc_year_end_esa}",
+        )
         fig.savefig(f"{pattern}_area_distribution.png")
         plt.close()
 
@@ -190,7 +285,10 @@ class InputTile(sw.Tile):
         cs.export_legend(
             f"{pattern}_indicator_legend.png", cp.legend, "Indicator Status"
         )
-        cs.export_legend(f"{pattern}_lc_legend.png", cp.lc_color, "Land Cover class")
+        cs.export_legend(
+            f"{pattern}_lc_legend.png", self.model.lc_color, "Land Cover class"
+        )
+        df.to_csv(f"{pattern}_lc_transition.csv", index=False)
 
         # release the download btn
         self.result_tile.btn.disabled = False
