@@ -57,7 +57,7 @@ def land_cover(model, aoi_model, output):
         ).rename("end")
 
     ## Waterbody data to mask indicators
-    if model.start_lc and model.end_lc and model.water_mask_pixel >= 9:
+    if model.start_lc and model.end_lc and model.water_mask_pixel > 9:
         water_body = (
             landcover_end_remapped.eq(int(model.water_mask_pixel))
             .selfMask()
