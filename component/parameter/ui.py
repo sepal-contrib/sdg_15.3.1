@@ -36,6 +36,8 @@ trajectories = [
     {"text": ms.trend.ue, "value": "ue_trend", "disabled": False},
 ]
 
+jrc_seasonality_tick = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
 climate_regimes = [
     {"text": ms.clim_regim.temp_dry, "value": 0.80},
     {"text": ms.clim_regim.temp_moist, "value": 0.69},

@@ -56,7 +56,31 @@ def land_cover(model, aoi_model, output):
             pm.translation_matrix[0], pm.translation_matrix[1]
         ).rename("end")
 
-    water_mask = landcover_end.where(landcover_end.eq(210), 0).rename("water")
+    ## Waterbody data to mask indicators
+    if model.start_lc and model.end_lc and model.water_mask_pixel >= 9:
+        water_body = (
+            landcover_end_remapped.eq(int(model.water_mask_pixel))
+            .selfMask()
+            .rename("water")
+        )
+    ##to extract the waterbody from the defaul land cover data set
+    elif int(model.water_mask_pixel) == 70:
+        water_body = landcover_end.eq(210).selfMask().rename("water")
+    elif model.water_mask_asset_id and model.water_mask_asset_band:
+        water_body = (
+            ee.Image(model.water_mask_asset_id)
+            .select(model.water_mask_asset_band)
+            .selfMask()
+            .rename("water")
+        )
+    else:
+        water_body = (
+            ee.Image(pm.jrc_water)
+            .select("seasonality")
+            .gte(int(model.seasonality))
+            .selfMask()
+            .rename("water")
+        )
 
     # compute transition map (first two digits for historical land cover, and second two digits for monitoring year land cover)
     landcover_transition = (
@@ -83,7 +107,7 @@ def land_cover(model, aoi_model, output):
         landcover_degredation.addBands(landcover_transition.uint16())
         .addBands(landcover_start_remapped.uint16())
         .addBands(landcover_end_remapped.uint16())
-        .addBands(water_mask.uint16())
+        .addBands(water_body.uint16())
     )
 
     return land_cover_out
