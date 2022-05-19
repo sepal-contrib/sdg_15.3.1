@@ -7,3 +7,4 @@ from .sensor_select import *
 from .transition_matrix import *
 from .result_map import *
 from .select_lc import *
+from .bool_question import *
