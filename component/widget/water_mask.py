@@ -28,6 +28,7 @@ class WaterMask(v.Col):
             label=ms.mask.water_pixel_lbl,
             color="blue",
             track_color="blue",
+            min=9,
             max=99,
             step=1,
             thumb_label="always",
@@ -43,7 +44,7 @@ class WaterMask(v.Col):
             thumb_label=True,
             ticks=True,
             tick_labels=pm.jrc_seasonality_tick,
-            v_model=5,
+            v_model=8,
         )
 
         # bind the to the output

@@ -64,7 +64,7 @@ def land_cover(model, aoi_model, output):
             .rename("water")
         )
     ##to extract the waterbody from the defaul land cover data set
-    elif int(model.water_mask_pixel) == 70:
+    elif model.water_mask_pixel == 70:
         water_body = landcover_end.eq(210).selfMask().rename("water")
     elif model.water_mask_asset_id and model.water_mask_asset_band:
         water_body = (
