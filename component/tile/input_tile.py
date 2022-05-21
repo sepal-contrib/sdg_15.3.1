@@ -102,6 +102,7 @@ class InputTile(sw.Tile):
             v_model=None,
             clearable=True,
         ).hide()
+        water_mask = cw.WaterMask(self.model, alert)
 
         # Create expansion panels for the three sub indicators to stack into the adavanced parameter expand panel widget
         # expand panels for productivity parameters
@@ -136,6 +137,7 @@ class InputTile(sw.Tile):
                                 v.Flex(xs12=True, children=[pickers_landcover]),
                                 v.Flex(xs12=True, children=[start_lc]),
                                 v.Flex(xs12=True, children=[end_lc]),
+                                v.Flex(xs12=True, children=[water_mask]),
                                 v.Flex(xs12=True, children=[transition_label]),
                                 v.Flex(
                                     xs12=True, children=[self.default_lc_matrix_bool]

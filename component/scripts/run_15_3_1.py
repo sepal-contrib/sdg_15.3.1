@@ -428,13 +428,13 @@ def indicator_15_3_1(productivity, landcover, soc, output):
         .where(productivity.eq(1).And(landcover.lt(1)).And(soc.lt(1)), 1)
         .where(productivity.lt(1).And(landcover.eq(1)).And(soc.lt(1)), 1)
         .where(productivity.lt(1).And(landcover.lt(1)).And(soc.eq(1)), 1)
-        .updateMask(water)
     )
 
-    return indicator.uint8()
+    return indicator.where(water, 0).uint8()
 
 
 def custom_lc_values(land_cover):
+    """helper function to get the unique pixel values of the cutom land cover data"""
     image = ee.Image(land_cover)
     geometry = image.geometry()
     reduction = image.reduceRegion(

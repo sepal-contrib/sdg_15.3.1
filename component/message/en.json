@@ -32,6 +32,14 @@
 		"predifined": "Use predefined climate regime",
 		"custom": "Use custom value"
 	},
+    "mask":{
+        "jrc":"Global Surface Water (JRC)",
+        "pixel":"Extract from the land cover data",
+        "asset":"Specify an asset",
+        "water_pixel_lbl":"Water pixel",
+        "asset_lbl":"Select the water mask asset",
+        "season_lbl": "Seasonality (months)"
+    },
 	"vi": {
 		"ndvi": "Normalised Difference Vegetation Index (NDVI)",
 		"evi": "Enhanced Vegetation Index (EVI)",
@@ -103,6 +111,7 @@
 	"result_btn_zonalstats": "Calculate Zonal Statistics",
 	"result_btn": "Download maps as .tif in sepal",
 	"clim_option_lbl": "Climate regime options",
+    "water_mask_option_lbl":"Select water-body data",
 	"clim_default_lbl": "Climate regime",
 	"clim_custom_lbl": "Custom climate regime value",
 	"start_lbl": "Starting year",
