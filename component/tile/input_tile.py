@@ -51,26 +51,36 @@ class InputTile(sw.Tile):
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
+        self.default_lc_matrix_bool = cw.BoolQuestion(
+            "Would you like to modify the default transition matrix?"
+        )
+
+        self.custom_lc_matrix_bool = cw.BoolQuestion(ms.select_lc.custom_matrix_bool)
+
         ##############################################################
         ##             create advanced parameters                   ##
         ##############################################################
 
         ### Create section headings
+        # Main heading
+        main_heading_label = v.Html(
+            class_="red--text text--lighten-3 mt-2",
+            tag="h3",
+            children=[ms.advance_params],
+        )
+
         # Productivity section
         prod_sec_label = v.Html(
             class_="green--text text--lighten-3 mt-2",
             tag="h3",
             children=[ms.productivity_sec],
         )
-
-        prod_sec = v.Banner(single_line=True, children=[prod_sec_label])
         # Land cover section
         landcover_sec_label = v.Html(
             class_="brown--text text--lighten-3 mt-2",
             tag="h3",
             children=[ms.landcover_sec],
         )
-        lc_sec = v.Banner(single_line=True, children=[landcover_sec_label])
         # Land cover transition heading
         transition_label = v.Html(
             class_="grey--text mt-2", tag="h4", children=[ms.transition_matrix]
@@ -79,42 +89,99 @@ class InputTile(sw.Tile):
         SOC_sec_label = v.Html(
             class_="green--text text--lighten-4 mt-2", tag="h3", children=[ms.soc_sec]
         )
-        soc_sec = v.Banner(single_line=True, children=[SOC_sec_label])
 
         # Input weigtes
 
-        transition_matrix = cw.TransitionMatrix(self.model, alert)
+        self._transition_matrix = cw.TransitionMatrix(self.model, alert)
+        self._transition_matrix.hide()
         start_lc = cw.SelectLC(label=ms.start_lc)
         end_lc = cw.SelectLC(label=ms.end_lc)
-        custom_matrix_file = sw.FileInput(
+        self.custom_matrix_file = sw.FileInput(
             extentions=[".txt", ".tsb", ".csv"],
             label=ms.custom_matrix_csv,
             v_model=None,
             clearable=True,
+        ).hide()
+        water_mask = cw.WaterMask(self.model, alert)
+
+        # Create expansion panels for the three sub indicators to stack into the adavanced parameter expand panel widget
+        # expand panels for productivity parameters
+
+        productivity_e_panel = v.ExpansionPanels(
+            class_="mb-5",
+            popout=True,
+            children=[
+                v.ExpansionPanel(
+                    children=[
+                        v.ExpansionPanelHeader(children=[prod_sec_label]),
+                        v.ExpansionPanelContent(
+                            children=[
+                                v.Flex(xs12=True, children=[pickers_productivity]),
+                                v.Flex(xs12=True, children=[productivity_lookup_table]),
+                            ]
+                        ),
+                    ]
+                )
+            ],
+        )
+        # expand panels for land cover parameters
+        land_cover_e_panel = v.ExpansionPanels(
+            class_="mb-5",
+            popout=True,
+            children=[
+                v.ExpansionPanel(
+                    children=[
+                        v.ExpansionPanelHeader(children=[landcover_sec_label]),
+                        v.ExpansionPanelContent(
+                            children=[
+                                v.Flex(xs12=True, children=[pickers_landcover]),
+                                v.Flex(xs12=True, children=[start_lc]),
+                                v.Flex(xs12=True, children=[end_lc]),
+                                v.Flex(xs12=True, children=[water_mask]),
+                                v.Flex(xs12=True, children=[transition_label]),
+                                v.Flex(
+                                    xs12=True, children=[self.default_lc_matrix_bool]
+                                ),
+                                v.Flex(xs12=True, children=[self._transition_matrix]),
+                                v.Flex(
+                                    xs12=True, children=[self.custom_lc_matrix_bool]
+                                ),
+                                v.Flex(xs12=True, children=[self.custom_matrix_file]),
+                            ]
+                        ),
+                    ]
+                )
+            ],
+        )
+        # expand panels for SOC parameters
+        soc_e_panel = v.ExpansionPanels(
+            class_="mb-5",
+            popout=True,
+            children=[
+                v.ExpansionPanel(
+                    children=[
+                        v.ExpansionPanelHeader(children=[SOC_sec_label]),
+                        v.ExpansionPanelContent(
+                            children=[v.Flex(xs12=True, children=[pickers_soc])]
+                        ),
+                    ]
+                )
+            ],
         )
 
-        # stack the advance parameters in a expandpanel
+        # stack the advance parameters expand panels in an expandpanel
         advance_params = v.ExpansionPanels(
             class_="mb-5",
             popout=True,
             children=[
                 v.ExpansionPanel(
                     children=[
-                        v.ExpansionPanelHeader(children=[ms.advance_params]),
+                        v.ExpansionPanelHeader(children=[main_heading_label]),
                         v.ExpansionPanelContent(
                             children=[
-                                v.Flex(xs12=True, children=[prod_sec]),
-                                v.Flex(xs12=True, children=[pickers_productivity]),
-                                v.Flex(xs12=True, children=[productivity_lookup_table]),
-                                v.Flex(xs12=True, children=[lc_sec]),
-                                v.Flex(xs12=True, children=[pickers_landcover]),
-                                v.Flex(xs12=True, children=[start_lc]),
-                                v.Flex(xs12=True, children=[end_lc]),
-                                v.Flex(xs12=True, children=[transition_label]),
-                                v.Flex(xs12=True, children=[transition_matrix]),
-                                v.Flex(xs12=True, children=[custom_matrix_file]),
-                                v.Flex(xs12=True, children=[soc_sec]),
-                                v.Flex(xs12=True, children=[pickers_soc]),
+                                productivity_e_panel,
+                                land_cover_e_panel,
+                                soc_e_panel,
                             ]
                         ),
                     ]
@@ -132,7 +199,6 @@ class InputTile(sw.Tile):
             .bind(start_lc.w_band, "start_lc_band")
             .bind(end_lc.w_image, "end_lc")
             .bind(end_lc.w_band, "end_lc_band")
-            .bind(custom_matrix_file, "custom_matrix_file")
         )
 
         # create the actual tile
@@ -157,6 +223,10 @@ class InputTile(sw.Tile):
         self.btn.on_event("click", self.start_process)
         pickers.end_picker.observe(self.sensor_select.update_sensors, "v_model")
         self.sensor_select.observe(self._sensor_bind, "update")
+        self.default_lc_matrix_bool.observe(self._display_default_matrix, "v_model")
+        self.custom_lc_matrix_bool.observe(
+            self._display_custom_lc_file_selection, "v_model"
+        )
 
     @su.loading_button(debug=True)
     def start_process(self, widget, data, event):
@@ -302,3 +372,26 @@ class InputTile(sw.Tile):
         self.model.sensors = self.sensor_select.v_model.copy()
 
         return
+
+    def _display_custom_lc_file_selection(self, change):
+        """Show hide the lc custom matrix file selection widget"""
+        v_model = change["new"]
+        if v_model == 1:
+            self.custom_matrix_file.show()
+            self.default_lc_matrix_bool.hide()
+        else:
+            self.custom_matrix_file.v_model = None
+            self.custom_matrix_file.hide()
+            self.default_lc_matrix_bool.show()
+        return
+
+    def _display_default_matrix(self, change):
+        """Show hide the lc default matrix file selection widget"""
+        v_model = change["new"]
+        if v_model == 1:
+            self._transition_matrix.show()
+            self.custom_lc_matrix_bool.hide()
+
+        else:
+            self._transition_matrix.hide()
+            self.custom_lc_matrix_bool.show()
