@@ -68,24 +68,9 @@ Productivity trend
 
 It measures the trajectory of changes in productivity over the long term.
 
-The `Mann–Kendall<https://vsp.pnnl.gov/help/Vsample/Design_Trend_Mann_Kendall.htm>`__ trend test is used to describe the monotonic trend or
+The `Mann–Kendall <https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient>`__ trend test is used to describe the monotonic trend or
 trajectory (increasing or decreasing) of the productivity for a given
-time period. The test statistics :math:`$S$` is defined as:
-
-.. math:: S = \sum^{n-1}_{i=1}\sum^{n}_{j=i+1} sgn(x_j-x_i)
-
-Where: :math:`X_i` and :math:`X_j` are the productivity of the sequence :math:`i` and :math:`j` years, :math:`n`
-is the length of the period and
-
-.. math:: sgn(x_i -x_j) =  \left\{\begin{matrix} 1 & \text{if}\; x_j > x_i \\ 0 & \text{if}\; x_j = x_i \\ -1 & \text{if}\; x_j < x_i \\ \end{matrix}\right.
-
-The variance of the :math:`$S$` is determine using the following equation:
-
-.. math:: VAR(S) = \frac{1}{18} [n(n-1)(2n + 5) – T]
-
-Then the :math:`z` score can be obtained using the following equation
-
-.. math:: z \ \text{score}= \left\{\begin{matrix} \frac{S-1}{\sqrt{VAR(S)}} & \text{if} \; S > 0 \\ 0 & \text{if} \, S = 0 \\ \frac{S+1}{\sqrt{VAR(S)}} & \text{if} \; S < 0 \end{matrix}\right.
+time period.
 
 To identify the scale and direction of the trend a five-level scale is
 proposed:
@@ -145,7 +130,7 @@ The five-level stats are as follows:
 -  Z score > 1.28 AND ≤ 1.96 = Potentially Improving
 
 -  Z score > 1.96 = Improving, as indicated by a significantly higher
-   mean in recent years compared to the longer term
+   mean in recent years compared to the longer term.
    
 
 
@@ -174,6 +159,7 @@ Look-up table to combine productivity metrics
 
 +------------+------------+----------------+---------------+---------------+
 |  Trend     | State      | Performance    | Productivity sub-indicator    |
++------------+------------+----------------+---------------+---------------+
 |            |            |                | GPG version 1 | GPG version 1 |
 +============+============+================+===============+===============+
 | Degrdaded  |  Degrdaded |  Degrdaded     | Degrdaded     |  Degrdaded    |
@@ -239,15 +225,15 @@ Transition matrix for custom land cover legends
 A custom transition matrix can be used in combination with the custom land cover legend. The matrix is a comma-separated value(.csv) file and needs to be in the following format:
 
 The first two columns, excluding the first two cells (:math:`a_{31}...a_{n1} \text{and } a_{32}...a_{n2}` ), must contain class labelling and pixel values for the initial land cover respectively.
-The first two rows, excluding the first two cells, (:math:`a_{13}...a_{1n} \text{and } a_{23}...a_{2n}` ) must contain class labelling and pixel values for the final land cover respectively. The rest of the higher indexed cells :math:`\left(\begin{bmatrix}a_{33}&\cdots&a_{3n}\\\vdots&\ddots&\vdots\\2_{n3}&\cdots&3_{nn}\end{bmatrix} \right)` must contain a transition matrix. Cells :math:`a_{11},a_{12},a_{21}, \text{and } a_{22}` can be used to store some metadata. Use 1 to denote improved transitions, 0 for stable and -1 for degraded transitions.
+The first two rows, excluding the first two cells, (:math:`a_{13}...a_{1n} \text{and } a_{23}...a_{2n}` ) must contain class labelling and pixel values for the final land cover respectively. The rest of the higher indexed cells :math:`\left(\left[\begin{matrix}a_{33}&\cdots&a_{3n}\\\vdots&\ddots&\vdots\\2_{n3}&\cdots&3_{nn}\end{matrix} \right]\right)` must contain a transition matrix. Cells :math:`a_{11},a_{12},a_{21}, \text{and } a_{22}` can be used to store some metadata. Use 1 to denote improved transitions, 0 for stable and -1 for degraded transitions.
 
 .. math::
-    \mathbf{A} = \begin{bmatrix}%
+    \mathbf{A} = \left[ \begin{matrix}%
     a_{11}&a_{12}&a_{13}&\cdots&a_{1n}\\
     a_{21}&a_{22}&a_{23}&\cdots&a_{2n}\\
     a_{31}&a_{32}&a_{33}&\cdots&a_{3n}\\
     \vdots&\vdots&\vdots&\ddots&\vdots\\
-    a_{n1}&a_{n2}&a_{n3}&\cdots&a_{nn}\end{bmatrix}
+    a_{n1}&a_{n2}&a_{n3}&\cdots&a_{nn}\end{matrix}\right]
 
 
 An example of a custom transition matrix:
@@ -312,17 +298,18 @@ Mandatory parameters
 
 .. note::
    
-        Some of the sensors are incompatible with each other. Thus selecting Landsat, MODIS or Sentinel dataset in the **sensors** dropdown will deselect the others. 
+        Some of the sensors are incompatible with each other. Thus selecting Landsat, MODIS or Sentinel dataset in the **sensors** dropdown will deselect the others.
         
 -   **Vegetation index**: THe vegetation index will be used to compute the trend trajectory, default to *NDVI*.
 
 -   **trajectory**: There are 3 options available to calculate the productivity trend that describes the trajectory of change, default to *productivity (VI) trend*.
 
 -   **land ecosystem functional unit**: default to *Global Agro-Environmental Stratification (GAES)*, other available options are:
-    - `Global Agro Ecological Zones (GAEZ), historical AEZ with 53 classes<https://gaez.fao.org/>`__ 
-    - `World Ecosystem<https://doi.org/10.1016/j.gecco.2019.e00860>`__
-    - `Global Homogeneous Response Units<https://doi.pangaea.de/10.1594/PANGAEA.775369>`__
-    - Calculate based on the land cover(`ESA CCI<https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-land-cover?tab=overview>`__) and soil texture (`ISRIC<https://www.isric.org/explore/soilgrids>`__)
+
+    - `Global Agro Ecological Zones (GAEZ), historical AEZ with 53 classes <https://gaez.fao.org/>`__ 
+    - `World Ecosystem <https://doi.org/10.1016/j.gecco.2019.e00860>`__
+    - `Global Homogeneous Response Units <https://doi.pangaea.de/10.1594/PANGAEA.775369>`__
+    - Calculate based on the land cover (`ESA CCI <https://cds.climate.copernicus.eu/cdsapp#!/dataset/satellite-land-cover?tab=overview>`__) and soil texture (`ISRIC <https://www.isric.org/explore/soilgrids>`__)
 
 -   **climate regime**: default to *Per pixel based on global climate data* but you can also use a fixed value everywhere using a predefined climate regime in the dropdown menu or select a custom value on the slider
 
@@ -333,7 +320,7 @@ Advanced parameters
     :alt: advanced parameters
 
 Productivity related parameters
-+++++++++++++++++++++++
++++++++++++++++++++++++++++++++
 
 Assessment periods for all the metrics can be specified individually. Keep them blank to use the Start and End dates for the respective metric.
 
@@ -376,14 +363,14 @@ The rows stand for the initial classes and the columns for the final classes.
     
 Custom land cover transition matrix
 
-If you would like to use a custom land cover transition matrix, select the :guilabel:`Yes` radio button and select the CSV file. Use `this matrix<https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/utils/ipccsx_matrix.csv>`__ as a template to prepare a matrix for your land cover map.
+If you would like to use a custom land cover transition matrix, select the :guilabel:`Yes` radio button and select the CSV file. Use `this matrix <https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/utils/ipccsx_matrix.csv>`__ as a template to prepare a matrix for your land cover map.
 
 
 SOC related parameters:
-++++++++++++++++++++++++++++++
++++++++++++++++++++++++
     
 Launch the computation
-##################
+######################
 
 Once all the parameters are set you can run the analysis by clicking on :guilabel:`Load the indicators`.
 It takes time to calulate all the sub-indicator. Look at the Alert at the bottom of the panel that displays the current state of analysis.
@@ -507,3 +494,4 @@ The following GIF will show you the full reclassification process with an simple
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/reclassify_demo.gif
     :alt: reclassification demo
+
