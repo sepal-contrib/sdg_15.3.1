@@ -3,9 +3,9 @@ import ipyvuetify as v
 from component.message import ms
 
 vegetation_index = [
-    {"text": ms.vi.ndvi, "value": "ndvi"},
-    {"text": ms.vi.evi, "value": "evi"},
-    {"text": ms.vi.msvi, "value": "msvi"},
+    {"text": ms.vi.ndvi, "value": "ndvi", "disabled": False},
+    {"text": ms.vi.evi, "value": "evi", "disabled": False},
+    {"text": ms.vi.msvi, "value": "msvi", "disabled": False},
 ]
 
 lceu = [
