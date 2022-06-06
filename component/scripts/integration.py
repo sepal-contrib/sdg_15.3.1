@@ -22,10 +22,28 @@ def integrate_ndvi_climate(aoi_model, model, output):
     period_start = min(filter(lambda v: v is not None, start_list))
     period_end = max(filter(lambda v: v is not None, end_list))
 
-    if "MODIS MOD13Q1" in model.sensors:
-        modis_vi = ee.ImageCollection(pm.sensors["MODIS MOD13Q1"][0]).filterDate(
-            f"{period_start}-01-01", f"{period_end}-12-31"
-        )
+    if "MODIS MOD13Q1" in model.sensors or "MODIS MYD13Q1" in model.sensors:
+        if "MODIS MOD13Q1" in model.sensors and "MODIS MYD13Q1" in model.sensors:
+            modis_vi_mod = ee.ImageCollection(
+                pm.sensors["MODIS MOD13Q1"][0]
+            ).filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+            modis_vi_myd = ee.ImageCollection(
+                pm.sensors["MODIS MYD13Q1"][0]
+            ).filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+            modis_vi_ = modis_vi_mod.merge(modis_vi_myd)
+            modis_vi = modis_vi_.map(partial(cloud_mask, sensor="MODIS"))
+
+        elif "MODIS MOD13Q1" in model.sensors:
+            modis_vi_ = ee.ImageCollection(pm.sensors["MODIS MOD13Q1"][0]).filterDate(
+                f"{period_start}-01-01", f"{period_end}-12-31"
+            )
+            modis_vi = modis_vi_.map(partial(cloud_mask, sensor="MODIS"))
+        elif "MODIS MYD13Q1" in model.sensors:
+            modis_vi_ = ee.ImageCollection(pm.sensors["MODIS MYD13Q1"][0]).filterDate(
+                f"{period_start}-01-01", f"{period_end}-12-31"
+            )
+            modis_vi = modis_vi_.map(partial(cloud_mask, sensor="MODIS"))
+
         if model.vegetation_index == "ndvi":
             integrated_vi_coll = annual_modis_vi(
                 modis_vi.select("NDVI"), period_start, period_end
@@ -162,9 +180,23 @@ def cloud_mask(img, sensor):
         # Both flags should be set to zero, indicating clear conditions.
         mask = qa.bitwiseAnd(cloudBitMask).eq(0).And(qa.bitwiseAnd(cirrusBitMask).eq(0))
 
-        img = img.updateMask(mask)  # .divide(10000)
+        img = img.updateMask(mask).divide(10000)
+    elif sensor == "MODIS":
+        qa = img.select("DetailedQA")
+        viqamask1 = bit_selection(qa, 0, 1).lte(1)
+        snowmask = bit_selection(qa, 14, 14).eq(0)
+        shadowmask = bit_selection(qa, 15, 15).eq(0)
+        mixedcloudmask = bit_selection(qa, 10, 10).eq(0)
+        mask = viqamask1.And(snowmask).And(shadowmask).And(mixedcloudmask)
+        img = img.updateMask(mask)
 
     return img
+
+
+def bit_selection(bitmask, start_bit, end_bit):
+    bit_len = ee.Number(1).add(end_bit).subtract(start_bit)
+    bit_position = ee.Number(1).leftShift(bit_len).subtract(1)
+    return bitmask.rightShift(start_bit).bitwiseAnd(bit_position)
 
 
 def int_yearly_ndvi(ndvi_coll, start, end):

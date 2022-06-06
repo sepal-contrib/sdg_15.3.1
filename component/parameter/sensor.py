@@ -12,8 +12,9 @@ sensors = {
     "Landsat 4": ["LANDSAT/LT04/C01/T1_SR", 30, "l4"],
     "Landsat 5": ["LANDSAT/LT05/C01/T1_SR", 30, "l5"],
     "Landsat 7": ["LANDSAT/LE07/C01/T1_SR", 30, "l6"],
-    "MODIS MOD13Q1": ["MODIS/006/MOD13Q1", 250, "modis"],
-    "MODIS NPP": ["MODIS/006/MOD17A3HGF", 250, "modis"],
+    "MODIS MOD13Q1": ["MODIS/061/MOD13Q1", 250, "modis"],
+    "MODIS MYD13Q1": ["MODIS/061/MYD13Q1", 250, "modis"],
+    "Terra NPP": ["MODIS/006/MOD17A3HGF", 250, "modis"],
     "Landsat 8": ["LANDSAT/LC08/C01/T1_SR", 30, "l8"],
     "Sentinel 2": ["COPERNICUS/S2", 10, "s2"],
 }
