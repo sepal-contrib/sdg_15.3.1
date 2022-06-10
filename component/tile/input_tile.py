@@ -32,7 +32,7 @@ class InputTile(sw.Tile):
         pickers_landcover = cw.PickerLineLC(self.model)
         pickers_soc = cw.PickerLineSOC(self.model)
         self.sensor_select = cw.SensorSelect()
-        vegetation_index = v.Select(
+        self.vegetation_index = v.Select(
             label=ms.vi_lbl,
             items=cp.vegetation_index,
             v_model=cp.vegetation_index[0]["value"],
@@ -192,7 +192,7 @@ class InputTile(sw.Tile):
         # bind the standars widgets to variables
         (
             self.model.bind(trajectory, "trajectory")
-            .bind(vegetation_index, "vegetation_index")
+            .bind(self.vegetation_index, "vegetation_index")
             .bind(lceu, "lceu")
             .bind(productivity_lookup_table, "productivity_lookup_table")
             .bind(start_lc.w_image, "start_lc")
@@ -209,7 +209,7 @@ class InputTile(sw.Tile):
                 markdown,
                 pickers,
                 self.sensor_select,
-                vegetation_index,
+                self.vegetation_index,
                 trajectory,
                 lceu,
                 climate_regime,
@@ -371,6 +371,9 @@ class InputTile(sw.Tile):
 
         self.model.sensors = self.sensor_select.v_model.copy()
 
+        # check it the VI can still be used
+        self._update_vegetation_index()
+
         return
 
     def _display_custom_lc_file_selection(self, change):
@@ -395,3 +398,17 @@ class InputTile(sw.Tile):
         else:
             self._transition_matrix.hide()
             self.custom_lc_matrix_bool.show()
+
+    def _update_vegetation_index(self):
+        """disable the MSVI2 vegetation option in case of Derived VI Landsat * sensor/s"""
+
+        is_derived = any(
+            [s.startswith("Derived VI") for s in self.sensor_select.v_model]
+        )
+        tmp_items = self.vegetation_index.items.copy()
+        next(i for i in tmp_items if i["value"] == "msvi")["disabled"] = is_derived
+        self.vegetation_index.items = []
+        self.vegetation_index.items = tmp_items
+        self.vegetation_index.v_model = None
+
+        return
