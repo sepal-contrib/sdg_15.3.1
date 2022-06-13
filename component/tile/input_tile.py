@@ -409,6 +409,6 @@ class InputTile(sw.Tile):
         next(i for i in tmp_items if i["value"] == "msvi")["disabled"] = is_derived
         self.vegetation_index.items = []
         self.vegetation_index.items = tmp_items
-        self.vegetation_index.v_model = None
+        self.vegetation_index.v_model = tmp_items[0]["value"]
 
         return
