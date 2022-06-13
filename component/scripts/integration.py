@@ -56,10 +56,13 @@ def integrate_ndvi_climate(aoi_model, model, output):
             msvi_coll = modis_vi.map(calculate_msvi_modis).select("msvi")
             integrated_vi_coll = annual_modis_vi(msvi_coll, period_start, period_end)
 
-    elif "MODIS NPP" in model.sensors:
-        integrated_vi_coll = ee.ImageCollection(pm.sensors["MODIS NPP"][0]).filterDate(
-            f"{period_start}-01-01", f"{period_end}-12-31"
+    elif "Terra NPP" in model.sensors:
+        npp_filtered = (
+            ee.ImageCollection(pm.sensors["Terra NPP"][0])
+            .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+            .select("Npp")
         )
+        integrated_vi_coll = preproc_modis_npp(npp_filtered, period_start, period_end)
     else:
         if pm.sensors[model.sensors[0]][3] == "SR":
             # create the composite image collection
@@ -123,7 +126,6 @@ def integrate_ndvi_climate(aoi_model, model, output):
                 integrated_vi_coll = annual_modis_vi(vi_coll, period_start, period_end)
             else:
                 print(f"{model.vegetation_index} is not available as a derived index")
-                return
 
     # TODO: option to select multiple precipitation datasets.
     # process the climate dataset to use with the pixel restrend, RUE calculation
@@ -345,6 +347,22 @@ def annual_modis_vi(modis_img, start, end):
         years.map(
             lambda year: modis_img.filter(ee.Filter.calendarRange(year, field="year"))
             .reduce(ee.Reducer.mean())
+            .rename("vi")
+            .addBands(ee.Image().constant(year).float().rename("year"))
+            .set("year", year)
+        )
+    )
+    return img_coll
+
+
+def preproc_modis_npp(npp_coll, start, end):
+
+    years = ee.List.sequence(start, end)
+    img_coll = ee.ImageCollection.fromImages(
+        years.map(
+            lambda year: npp_coll.filter(ee.Filter.calendarRange(year, field="year"))
+            .first()
+            .multiply(0.0001)
             .rename("vi")
             .addBands(ee.Image().constant(year).float().rename("year"))
             .set("year", year)

@@ -37,7 +37,7 @@ class InputTile(sw.Tile):
             items=cp.vegetation_index,
             v_model=cp.vegetation_index[0]["value"],
         )
-        trajectory = v.Select(
+        self.trajectory = v.Select(
             label=ms.traj_lbl,
             items=cp.trajectories,
             v_model=cp.trajectories[0]["value"],
@@ -191,7 +191,7 @@ class InputTile(sw.Tile):
 
         # bind the standars widgets to variables
         (
-            self.model.bind(trajectory, "trajectory")
+            self.model.bind(self.trajectory, "trajectory")
             .bind(self.vegetation_index, "vegetation_index")
             .bind(lceu, "lceu")
             .bind(productivity_lookup_table, "productivity_lookup_table")
@@ -210,7 +210,7 @@ class InputTile(sw.Tile):
                 pickers,
                 self.sensor_select,
                 self.vegetation_index,
-                trajectory,
+                self.trajectory,
                 lceu,
                 climate_regime,
                 advance_params,
@@ -367,12 +367,14 @@ class InputTile(sw.Tile):
         return
 
     def _sensor_bind(self, change):
-        """manually update the value of themodel as the observe is not triggered"""
+        """manually update the value of the model as the observe is not triggered"""
 
         self.model.sensors = self.sensor_select.v_model.copy()
 
         # check it the VI can still be used
         self._update_vegetation_index()
+        # hide the vegetation index and trajectory options in case of MODIS NPP data
+        self._hide_vi_n_trend()
 
         return
 
@@ -412,3 +414,11 @@ class InputTile(sw.Tile):
         self.vegetation_index.v_model = tmp_items[0]["value"]
 
         return
+
+    def _hide_vi_n_trend(self):
+        if "Terra NPP" in self.sensor_select.v_model:
+            self.vegetation_index.hide()
+            self.trajectory.hide()
+        else:
+            self.vegetation_index.show()
+            self.trajectory.show()
