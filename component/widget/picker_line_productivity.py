@@ -70,10 +70,10 @@ class PickerLineProductivity(v.Layout):
             row=True,
             children=[
                 v.Flex(xs12=True, md6=True, children=[self.trend_start_picker]),
-                v.Flex(xs12=True, md6=True, children = [self.trend_end_picker]),
+                v.Flex(xs12=True, md6=True, children=[self.trend_end_picker]),
                 v.Flex(xs12=True, md6=True, children=[self.state_start_picker]),
                 v.Flex(xs12=True, md6=True, children=[self.state_end_picker]),
-		v.Flex(xs12=True, md6=True, children=[self.performance_start_picker]),
-		v.Flex(xs12=True, md6=True, children=[self.performance_end_picker])
+                v.Flex(xs12=True, md6=True, children=[self.performance_start_picker]),
+                v.Flex(xs12=True, md6=True, children=[self.performance_end_picker]),
             ],
         )

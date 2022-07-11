@@ -27,15 +27,17 @@ class SensorSelect(v.Select):
 
         # define the offset that should be used based on the year in the sensors list
         if change["new"] >= 2015:  # launch of Sentinel 2
-            last_sat = 7
+            last_sat = 12
         elif change["new"] >= 2013:  # launch of Landsat 8
-            last_sat = 6
-        elif change["new"] >= 1999:  # launch of landsat 7 and MODIS
-            last_sat = 5
+            last_sat = 11
+        elif change["new"] >= 2002:  # launch of Landsat MODIS aqua
+            last_sat = 9
+        elif change["new"] >= 1999:  # launch of landsat 7 and MODIS terra
+            last_sat = 8
         elif change["new"] >= 1984:  # launch of landsat 5
-            last_sat = 2
+            last_sat = 4
         else:
-            last_sat = 1
+            last_sat = 2
 
         # get the availabel sats
         items = [*pm.sensors][:last_sat]
@@ -44,7 +46,16 @@ class SensorSelect(v.Select):
         self.items = sorted(items)
 
         # remove the non landsat satellites from the default values
-        no_default_list = ["Sentinel 2", "MODIS MOD13Q1", "MODIS NPP"]
+        no_default_list = [
+            "Landsat 4",
+            "Landsat 5",
+            "Landsat 7",
+            "Landsat 8",
+            "Sentinel 2",
+            "MODIS MOD13Q1",
+            "MODIS MYD13Q1",
+            "Terra NPP",
+        ]
         self.v_model = [i for i in items if i not in no_default_list]
 
         return
@@ -60,7 +71,7 @@ class SensorSelect(v.Select):
             return self
 
         # use positionning in the list as boolean value
-        sensors = ["Landsat", "Sentinel", "MODIS"]
+        sensors = ["Derived", "Landsat", "Sentinel", "MODIS", "Terra"]
 
         # guess the new input
         new_value = list(set(change["new"]) - set(change["old"]))[0]
