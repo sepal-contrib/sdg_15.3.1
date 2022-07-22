@@ -314,7 +314,7 @@ class InputTile(sw.Tile):
 
         # get the stats by lc
         dflc = cs.compute_stats_by_lc(self.aoi_model, self.model)
-        pivot_dflc = dflc.pivot(index="Landcover", columns="Indicator")["Area"]
+        pivot_dflc = dflc.pivot(index="landcover", columns="Indicator 15.3.1")["Area"]
 
         # create the diagrams
         self.result_tile.sankey_plot.clear_output()
@@ -329,10 +329,10 @@ class InputTile(sw.Tile):
                 plt.show()
 
             with self.result_tile.bar_plot:
-                fig, ax = cs.bar_plot(
+                fig, ax = cs.barh_plot(
                     df=pivot_dflc,
-                    color=cp.legend_bar,
-                    title=f"Distribution of area by land cover, year:{self.model.lc_year_end_esa}",
+                    color=cp.legend,
+                    title=f"Distribution of area by land cover ({self.model.lc_year_start_esa})",
                 )
                 ax.set_facecolor((0, 0, 0, 0))
                 fig.set_facecolor((0, 0, 0, 0))
@@ -343,10 +343,10 @@ class InputTile(sw.Tile):
         fig, ax = cs.sankey(df=df, colorDict=self.model.lc_color, aspect=4, fontsize=12)
         fig.savefig(f"{pattern}_lc_transition.png", dpi=200)
         plt.close()
-        fig, ax = cs.bar_plot(
+        fig, ax = cs.barh_plot(
             df=pivot_dflc,
-            color=cp.legend_bar,
-            title=f"Distribution of area by land cover, year{self.model.lc_year_end_esa}",
+            color=cp.legend,
+            title=f"Distribution of area by land cover ({self.model.lc_year_start_esa})",
         )
         fig.savefig(f"{pattern}_area_distribution.png")
         plt.close()
