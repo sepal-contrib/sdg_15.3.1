@@ -51,9 +51,7 @@ class InputTile(sw.Tile):
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
-        self.default_lc_matrix_bool = cw.BoolQuestion(
-            "Would you like to modify the default transition matrix?"
-        )
+        self.default_lc_matrix_bool = cw.BoolQuestion(ms.select_lc.default_matrix_bool)
 
         self.custom_lc_matrix_bool = cw.BoolQuestion(ms.select_lc.custom_matrix_bool)
 
@@ -102,6 +100,7 @@ class InputTile(sw.Tile):
             v_model=None,
             clearable=True,
         ).hide()
+        lc_pixel_check = v.Switch(label=ms.select_lc.verify_lc_pixel, v_model=True)
         water_mask = cw.WaterMask(self.model, alert)
 
         # Create expansion panels for the three sub indicators to stack into the adavanced parameter expand panel widget
@@ -147,6 +146,7 @@ class InputTile(sw.Tile):
                                     xs12=True, children=[self.custom_lc_matrix_bool]
                                 ),
                                 v.Flex(xs12=True, children=[self.custom_matrix_file]),
+                                v.Flex(xs12=True, children=[lc_pixel_check]),
                             ]
                         ),
                     ]
@@ -200,6 +200,7 @@ class InputTile(sw.Tile):
             .bind(end_lc.w_image, "end_lc")
             .bind(end_lc.w_band, "end_lc_band")
             .bind(self.custom_matrix_file, "custom_matrix_file")
+            .bind(lc_pixel_check, "lc_pixel_check")
         )
 
         # create the actual tile
@@ -253,9 +254,9 @@ class InputTile(sw.Tile):
                 ms.select_lc.diff_land_cover,
             ):
                 return
-        # check if the land cover pixels and codes from the input matrix are same or not
-        if self.model.start_lc and self.model.end_lc:
-            lc_check_dn = (
+        # check if the land cover pixels and codes from the input matrix are same or not (exact match)
+        if self.model.start_lc and self.model.end_lc and self.model.lc_pixel_check:
+            lc_check_pixels = (
                 None
                 if set(self.model.lc_codelist_start)
                 != set(cs.custom_lc_values(self.model.start_lc))
@@ -264,10 +265,30 @@ class InputTile(sw.Tile):
                 else True
             )
             if not self.alert.check_input(
-                lc_check_dn, f"{self.model.custom_lc_matrix_list}"
+                lc_check_pixels, ms.select_lc.not_proper_code
             ):
                 return
 
+        # check if the land cover pixels and codes from the input matrix are same or not (exact match)
+        if self.model.start_lc and self.model.end_lc and not self.model.lc_pixel_check:
+            lc_subset_check_pixels = (
+                True
+                if (
+                    (set(cs.custom_lc_values(self.model.start_lc))).issubset(
+                        set(self.model.lc_codelist_start)
+                    )
+                )
+                and (
+                    (set(cs.custom_lc_values(self.model.end_lc))).issubset(
+                        set(self.model.lc_codelist_end)
+                    )
+                )
+                else None
+            )
+            if not self.alert.check_input(
+                lc_subset_check_pixels, ms.select_lc.not_proper_code_subset
+            ):
+                return
         # check if the input matrix contains proper values/atrributes or not
         if self.model.start_lc and self.model.end_lc and self.model.custom_matrix_file:
             check_min_max_error = (
