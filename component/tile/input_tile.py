@@ -199,6 +199,7 @@ class InputTile(sw.Tile):
             .bind(start_lc.w_band, "start_lc_band")
             .bind(end_lc.w_image, "end_lc")
             .bind(end_lc.w_band, "end_lc_band")
+            .bind(self.custom_matrix_file, "custom_matrix_file")
         )
 
         # create the actual tile
@@ -262,7 +263,9 @@ class InputTile(sw.Tile):
                 != set(cs.custom_lc_values(self.model.end_lc))
                 else True
             )
-            if not self.alert.check_input(lc_check_dn, ms.select_lc.not_proper_code):
+            if not self.alert.check_input(
+                lc_check_dn, f"{self.model.custom_lc_matrix_list}"
+            ):
                 return
 
         # check if the input matrix contains proper values/atrributes or not
