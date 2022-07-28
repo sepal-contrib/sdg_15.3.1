@@ -8,13 +8,13 @@
 		"about_drawer": "About"
 	},
 	"classes": {
-		"forest": "Forest",
+		"forest": "Tree-covered areas",
 		"grassland": "Grassland",
 		"cropland": "Cropland",
 		"wetland": "Wetland",
-		"artificial": "Artificial area",
-		"bareland": "Bare land",
-		"water": "Water body"
+		"artificial": "Artificial surfaces",
+		"bareland": "Other land",
+		"water": "Water bodies"
 	},
 	"trend": {
 		"ndvi": "Productivity (VI) trend",
