@@ -9,7 +9,7 @@ class ReclassifyTile(rec.ReclassifyView):
 
         super().__init__(
             gee=True,
-            default_class={"IPCC CLASSES": str(cp.utils_dir / "IPCC.csv")},
+            default_class={"UNCCD CLASSES": str(cp.utils_dir / "UNCCD.csv")},
             save=True,
         )
 

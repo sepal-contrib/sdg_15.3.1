@@ -1,12 +1,7 @@
 SDG 15.3.1
 ==========
 
-SDG Indicator 15.3.1 measures the proportion of land that is degraded
-over total land area. It is part of goal 15 which promotes “Life on Land”
-and target 15.3 states: ‘By 2030, combat desertification, restore
-degraded land and soil, including land affected by desertification,
-drought and floods, and strive to achieve a land degradation–neutral
-world.’
+SDG Indicator 15.3.1 measures the proportion of land that is degraded over the total land area. It is part of the SDG 15 which promotes “Life on Land” and target 15.3 states: ‘By 2030, combat desertification, restore degraded land and soil, including land affected by desertification, drought and floods, and strive to achieve a land degradation–neutral world.’
 
 This module allows generating data for reporting on SDG indicator 15.3.1. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__. 
 
@@ -18,7 +13,7 @@ Methodology
 What is Land degradation?
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The UNCCD defines land degradation as “\ *the reduction or loss of the
+UNCCD defines land degradation as “\ *the reduction or loss of the
 biological or economic productivity and complexity of rain-fed cropland,
 irrigated cropland, or range, pasture, forest and woodlands resulting
 from a combination of pressures, including land use and management
@@ -29,8 +24,7 @@ This definition was adopted for the SDG 15.3.1
 UNCCD Good Practice Guidelines
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The first version was issued in 2017. A revised version is issued in
-2021. The module is based on the latest version (version 2) of the document.
+UNCCD published the first version of the `good practice guidance (GPG) <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__ in 2017. A revised version of the `GPG <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__ was published in 2021. The module is based on the latest version (version 2) of the GPG.
 
 Approach
 """"""""
@@ -57,16 +51,13 @@ Sub-indicators
 Productivity
 ++++++++++++
 
-Land productivity cycles exhibit phases over time, a continuous decrease
-in productivity for a long time indicate potential degradation in land
-productivity.
-
+The land productivity sub-indicator measures the changes in land productivity. A continuous decrease in productivity for a long time indicates potential degradation in land productivity.
 Three matrices are used to detect such changes in productivity:
 
-Productivity trend
+**Productivity trend**
      
 
-It measures the trajectory of changes in productivity over the long term.
+It measures the trajectory of changes in productivity over time.
 
 The `Mann–Kendall <https://en.wikipedia.org/wiki/Kendall_rank_correlation_coefficient>`__ trend test is used to describe the monotonic trend or
 trajectory (increasing or decreasing) of the productivity for a given
@@ -94,12 +85,12 @@ area above 1.96 is considered improved for calculating the sub-indicator.
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/trend_z.svg
     :alt: trend z score
 
-Productivity state
+**Productivity state**
      
 
-The state represents the level of productivity in a land unit compared to
+The state represents the current level of productivity in a land unit compared to
 the historical observations of productivity for that land unit over
-time. The mean and standard deviations are calculated as follows:
+time. It is measured as follows:
 
 .. math::
 
@@ -141,16 +132,16 @@ the area between z-score -1.96 to 1.96 is considered stable and the area above
 Productivity performance
            
 
-Productivity Performance indicates the level of local plant productivity
+Productivity performance indicates the level of local land productivity
 relative to other regions with similar productivity potential.
 
-The maximum productivity index (:math:`$NPP_max$`) value (90:sup:`th` percentile)
+The maximum productivity index, :math:`NPP_{max}` value (90 :sup:`th` percentile)
 observed within the simillar ecoregion is campared the observed
 productivty value (observed NPP). It is given as:
 
 .. math:: \text{performance} = \frac{NPP_{observed}}{NPP_{max}}
 
-The pixels with an NPP (vegetation index) less than 0.5 of the :math:`$NPP_max$`
+The pixels with an NPP (vegetation index) less than 0.5 of the :math:`NPP_{max}`
 is considered as degraded.
 
 Either of the following look-up tables can be used to calculate the sub-indicator:
@@ -159,8 +150,7 @@ Look-up table to combine productivity metrics
 
 +------------+------------+----------------+---------------+---------------+
 |  Trend     | State      | Performance    | Productivity sub-indicator    |
-+------------+------------+----------------+---------------+---------------+
-|            |            |                | GPG version 1 | GPG version 1 |
+|            |            |                | GPG v1        | GPG v 2       |
 +============+============+================+===============+===============+
 | Degrdaded  |  Degrdaded |  Degrdaded     | Degrdaded     |  Degrdaded    |
 +------------+------------+----------------+---------------+---------------+
@@ -209,23 +199,22 @@ Available Dataset:
 
 Sensors : MODIS, Landsat 4, 5, 7 and 8, Sentinel 2
 
-NPP metric: NDVI, EVI and MSVI
+NPP metric: NDVI, EVI and MSVI, Terra NPP
 
 Land cover
 ++++++++++
 
+The land cover sub-indicator is based on transitions of land cover from the initial year to the final year. A transition matrix is used to mark the transitions as degraded, stable or improved. A default matrix with predefined transition statuses is given based on UNCCD land cover categories. The transitions can be altered in the matrix considering  local context and  settings.
 
-The land cover indicator is based on transitions of land cover from the initial year to the final year. A transition matrix is used to mark the transition as degraded, stable or improved. A default matrix with predefined transition statuses is given based on IPCC classes. The matrix can be customised based on context and local settings. 
-
-Default land cover dataset: ESA CCI land cover
+Default land cover dataset: ESA CCI land cover (1992 - 2020)
 
 
-Transition matrix for custom land cover legends
+**Transition matrix for custom land cover legends**
 
-A custom transition matrix can be used in combination with the custom land cover legend. The matrix is a comma-separated value(.csv) file and needs to be in the following format:
+A custom transition matrix can be used in combination with the custom land cover legend. The matrix needs to be a comma-separated value(.csv) file in the following form:
 
-The first two columns, excluding the first two cells (:math:`a_{31}...a_{n1} \text{and } a_{32}...a_{n2}` ), must contain class labelling and pixel values for the initial land cover respectively.
-The first two rows, excluding the first two cells, (:math:`a_{13}...a_{1n} \text{and } a_{23}...a_{2n}` ) must contain class labelling and pixel values for the final land cover respectively. The rest of the higher indexed cells :math:`\left(\left[\begin{matrix}a_{33}&\cdots&a_{3n}\\\vdots&\ddots&\vdots\\2_{n3}&\cdots&3_{nn}\end{matrix} \right]\right)` must contain a transition matrix. Cells :math:`a_{11},a_{12},a_{21}, \text{and } a_{22}` can be used to store some metadata. Use 1 to denote improved transitions, 0 for stable and -1 for degraded transitions.
+The first two columns, excluding the first two cells (:math:`a_{31}...a_{n1} \text{and } a_{32}...a_{n2}` ), must contain class labels  and pixel values for the initial land cover respectively.
+The first two rows, excluding the first two cells, (:math:`a_{13}...a_{1n} \text{and } a_{23}...a_{2n}` ) must contain class labels and pixel values for the final land cover respectively. The rest of the higher indexed cells :math:`\left(\left[\begin{matrix}a_{33}&\cdots&a_{3n}\\\vdots&\ddots&\vdots\\2_{n3}&\cdots&3_{nn}\end{matrix} \right]\right)` must contain the transition matrix. Cells :math:`a_{11},a_{12},a_{21}, \text{and } a_{22}` can be used to store some metadata. Use 1 to denote improved transitions, 0 for stable and -1 for degraded transitions.
 
 .. math::
     \mathbf{A} = \left[ \begin{matrix}%
@@ -250,7 +239,7 @@ Based on the IPCC methodology (Chapter 6).
 Final indicator
 +++++++++++++++
 
-The final indicator is based on the one out all out the principle.
+The final indicator is calculated based on the one out all out the principle.
 
 Users Guide
 -----------
@@ -258,7 +247,7 @@ Users Guide
 Select AOI
 ^^^^^^^^^^
 
-The SDG 15.3.1 will be calculated based on the user inputs. The first mandatory input is the Area Of Interest (AOI). In this step you’ll have the possibility to choose from a predefined list of administrative layers or use your datasets, the available options are:
+SDG indicator 15.3.1 will be calculated based on the user inputs. The first mandatory input is the Area Of Interest (AOI). In this step you’ll have the possibility to choose from a predefined list of administrative layers or use your own datasets, the available options are:
 
 **Predefined layers**
 
@@ -300,7 +289,7 @@ Mandatory parameters
    
         Some of the sensors are incompatible with each other. Thus selecting Landsat, MODIS or Sentinel dataset in the **sensors** dropdown will deselect the others.
         
--   **Vegetation index**: THe vegetation index will be used to compute the trend trajectory, default to *NDVI*.
+-   **Vegetation index**: The vegetation index will be used to compute the trend trajectory, default to *NDVI*.
 
 -   **trajectory**: There are 3 options available to calculate the productivity trend that describes the trajectory of change, default to *productivity (VI) trend*.
 
@@ -319,7 +308,7 @@ Advanced parameters
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/advanced_parameters.png
     :alt: advanced parameters
 
-Productivity related parameters
+Productivity parameters
 +++++++++++++++++++++++++++++++
 
 Assessment periods for all the metrics can be specified individually. Keep them blank to use the Start and End dates for the respective metric.
@@ -328,31 +317,31 @@ Assessment periods for all the metrics can be specified individually. Keep them 
     
      If you only specify either the start or the end year of a particular metric, the module will ignore the value.
 
-The default productivity look-up table is set to GPG version 2. We could also select GPG version 1. Please refer to the approach section for the tables.  Please read section 4.2.5 of the `GPG version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__ to know more about the look-up table.
+The default productivity look-up table is set to GPG version 2. You could also select GPG version 1. Please refer to the approach section for the tables.  Please read section 4.2.5 of the `GPG version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__ to know more about the look-up table.
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/prod_params.png
     :alt: productivity parameters
 
 
-Land cover related parameters:
+Land cover parameters:
 ++++++++++++++++++++++++++++++
 
-Water body data
+**Water body data**
 
-The default water body data is set to JRC water body seasonality data with a seasonality of 8 months. An :code:`ee.Image` can be used for the water body data with a pixel value greater than equal to 1. Waterbody can be extracted from the land cover data by specifying the corresponding pixel value. To use the water body from ESA CCI land cover data, set the slider to 70.
+The default water body data is set to JRC water body seasonality data with a seasonality of 8 months. An :code:`ee.Image` can be used for the water body data with a pixel value greater than equal to 1. Waterbody can be extracted from the land cover data by specifying the corresponding pixel value. Set the slider at 70 to use the waterbody extent from ESA CCI land cover data in case of default land cover and land cover data using UNCDD land cover categories (default matrix).
 
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/water_body.png
     :alt: water body
 
 
-The default land cover is set to the ESA CCI land cover data. The tool will use the CCI land cover system of the **start date** and the **end date**. These land cover images will be reclassified into the IPCC classification system and used to compute the land cover sub-indicator. However, You can specify your data for the start and the end land cover data. Provide the :code:`ee.Image` asset name and the band that need to be used and the default dataset will be replaced in the computation by your custom data. 
+The default land cover is set to the ESA CCI land cover data. The tool will use the CCI land cover system of the **start date** and the **end date**. These land cover images will be reclassified into the UNCCD land cover categories and used to compute the land cover sub-indicator. However, You can specify your own data for the start and the end land cover data. Provide the :code:`ee.Image` asset name and the band that need to be used and the default dataset will be replaced in the computation with the specified land cover data. 
 
 .. note::
 
-     If would like to use the default land cover transition matrix, the custom dataset needs to be classified in the IPCC classification system. Please refer to :ref:`sdg_reclassify` to know how to reclassify your local dataset into a different classification system.
+     If you would like to use the default land cover transition matrix, the custom dataset needs to be classified in the UNCCD land cover categories. Please refer to :ref:`sdg_reclassify` to know how to reclassify the local dataset into different classification systems.
     
-To compute the land cover sub-indicator with the IPCC classes, the user can modify the default transition matrix. Based on the user's local knowledge of the conditions in the study area and the land degradation process occurring there, use the table below to identify which transitions correspond to degradation (D), improvement (I), or no change in terms of land condition (S).
+To compute the land cover sub-indicator with the UNCCD land cover categories, the user can modify the default transition matrix. Based on the user's local knowledge of the conditions in the study area and the land degradation process occurring there, use the table below to identify which transitions correspond to degradation (D), improvement (I), or no change in terms of land condition (S).
 
 The rows stand for the initial classes and the columns for the final classes.
 
@@ -361,19 +350,22 @@ The rows stand for the initial classes and the columns for the final classes.
 
 
     
-Custom land cover transition matrix
+**Custom land cover transition matrix**
 
 If you would like to use a custom land cover transition matrix, select the :guilabel:`Yes` radio button and select the CSV file. Use `this matrix <https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/utils/ipccsx_matrix.csv>`__ as a template to prepare a matrix for your land cover map.
 
+.. tip::
 
-SOC related parameters:
+    The module varifies the land cover pixel values with the values mentioned in the transition matrix. If there is/are missing class/es in your land cover data, switch of :guilabel:`Verify land cover pixel` to bypasss the exact matching of pixel values.
+
+SOC parameters:
 +++++++++++++++++++++++
     
 Launch the computation
 ######################
 
 Once all the parameters are set you can run the analysis by clicking on :guilabel:`Load the indicators`.
-It takes time to calulate all the sub-indicator. Look at the Alert at the bottom of the panel that displays the current state of analysis.
+It takes time to calculate all the sub-indicator. Look at the Alert at the bottom of the panel that displays the current state of analysis.
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/validate_data.png
     :alt: validate data
@@ -382,9 +374,9 @@ It takes time to calulate all the sub-indicator. Look at the Alert at the bottom
 Results
 """""""
 
-The results are displayed to the end user in the next panel. On the left the user will find the transition and the distribution charts and on the right, an interactive map where every indicator and sub-indicators layers are displayed.
+The results are displayed to the end user in the next panel. On the left, the user will find the transition and the distribution charts on the right, an interactive map where every indicator and sub-indicators are displayed.
 
-click on the :guilabel:`donwload` button to exort all the layers, charts and tables to your SEPAL folder. 
+Click on the :guilabel:`donwload` button to export all the layers, charts and tables to your SEPAL folder. 
 
 The results are gathered in the :code:`module_results/sdg_indicators/` folder. In this folder a folder is set for each AOI (e.g. :code:`SGP/` for Singapore) and within this folder results are grouped by run computation. the title of the folder reflect the parameters following this symbology: :code:`<start_year>_<end_year>_<satellites>_<vegetation index>_<lc units>_<custom LC>_<climate>`.
 
@@ -397,7 +389,7 @@ The results are gathered in the :code:`module_results/sdg_indicators/` folder. I
     
 .. note:: 
 
-    the results are interactive, don't hesitate to interact with both the charts and the map layers using the widgets.
+    The results are interactive, don't hesitate to interact with both the charts and the map layers using the widgets.
     
     .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/results_interaction.gif
         :alt: result interaction
@@ -405,17 +397,17 @@ The results are gathered in the :code:`module_results/sdg_indicators/` folder. I
 Transition graph 
 ^^^^^^^^^^^^^^^^
 
-This chart is the `Sankey diagram <https://en.wikipedia.org/wiki/Sankey_diagram>`__ of the land cover transition between baseline and target year. The color is corresponding to the initial class.
+This chart is the `Sankey diagram <https://en.wikipedia.org/wiki/Sankey_diagram>`__ of the land cover transition between baseline and target year. The colour is corresponding to the initial class.
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/transition_graph.png
-    :alt: transiton graph
+    :alt: transition graph
     :width: 40%
     :align: center
 
 Distribution graph 
 ^^^^^^^^^^^^^^^^^^
 
-This chart displays the distribution of the SDG 15.3.1 indicator on each classes of the input land cover.
+This chart displays the distribution of the SDG 15.3.1 indicator by land cover classes.
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/distribution_graph.png
     :alt: distribution chart
@@ -425,16 +417,16 @@ This chart displays the distribution of the SDG 15.3.1 indicator on each classes
 Interactive map
 ^^^^^^^^^^^^^^^
 
-Are displayed on the map the following indicators: 
+Following layers are available on the interactive map:
 
--   SDG 15.3.1
+-   Final indicator SDG 15.3.1
 -   land cover sub-indicator
--   trajectory sub-indicator
--   performance sub-indicator
+-   Productivity sub-indicator
+-   Land cover sub-indicator
+-   SOC sub-indicator
+-   Land cover maps, and
+-   AOI
 
-These indicator are all displayed using the same symbology (Improved: blue, stable: beige, degraded: red).
-
-The tool also display the land cover maps from baseline and target years using the UNCCD symbology.
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/lc_map.png
     :alt: lc_map
@@ -449,30 +441,56 @@ Reclassify
 
 .. warning:: 
 
-    To reclassify a land_cover map, this map need to be available to the user as a :code:`ee.Image` in GEE.
+    To reclassify a land cover data, it needs to be available to the user as a :code:`ee.Image` in GEE.
 
 .. image:: https://raw.githubusercontent.com/sepal-contrib/sdg_15.3.1/master/doc/img/reclassification.png
     :alt: reclassification
 
 
-In order to use a custom land cover map, the user needs to first reclassify to a classification system. For the default IPCC classification system,  values between 10 to 70 are used to describe the following land cover classes: This is the 
+In order to use a custom land cover map, the user needs to first reclassify to a classification system. 
 
-#. forest
-#. grassland
-#. cropland
-#. wetland
-#. artificial
-#. bareland
-#. water
-
-This is the default matrix. 
-
-First select the asset in the combobox. It will be part of the dropdown value if the asset is part of the user's asset list. If that's not the case simply set the name of the asset in the TextField.
+First, select the asset in the combobox. It will be part of the dropdown value if the asset is part of the user's asset list. If that's not the case simply set the name of the asset in the TextField.
 
 
 Then select the band that will be reclassified.
 
-For a custom legend/classification system, upload a matrix with first clomun as pixel values, second column as class label and third as hex colour code.
+For the default UNCCD land cover categories,  values between 10 to 70 are used to describe the following land cover classes:
+
+#. Tree-covered areas (10)
+#. Grassland (20)
+#. Cropland (30)
+#. Wetland (40)
+#. Artificial surface (50)
+#. Other lands (60)
+#. Water bodies (70)
+
+These categories are specified in the default UNCCD classification system. For a custom legend/classification system, upload a matrix with first clomun as pixel values, second column as class label and third as colour code HEX format. An example is given below:
+
++--+-----------------+-------+
+|21|Rural settlement |#005CE6|
++--+-----------------+-------+
+|22|Mixed plantation |#FFFFBE|
++--+-----------------+-------+
+|23|Urban settlement |#FFAA00|
++--+-----------------+-------+
+|24|Mines            |#F2D9BF|
++--+-----------------+-------+
+|25|Bare soil        |#E6E600|
++--+-----------------+-------+
+|26|Rivers           |#2699CC|
++--+-----------------+-------+
+|27|Lake             |#40B3FF|
++--+-----------------+-------+
+|28|Mangrove         |#5C8944|
++--+-----------------+-------+
+|29|Forest           |#B3FF80|
++--+-----------------+-------+
+|30|Cropland         |#704489|
++--+-----------------+-------+
+|31|Grassland        |#99FF00|
++--+-----------------+-------+
+|32|Orchard          |#1DBD9C|
++--+-----------------+-------+
 
 
 .. note::

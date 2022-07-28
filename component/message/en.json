@@ -8,13 +8,13 @@
 		"about_drawer": "About"
 	},
 	"classes": {
-		"forest": "Forest",
+		"forest": "Tree-covered areas",
 		"grassland": "Grassland",
 		"cropland": "Cropland",
 		"wetland": "Wetland",
-		"artificial": "Artificial area",
-		"bareland": "Bare land",
-		"water": "Water body"
+		"artificial": "Artificial surfaces",
+		"bareland": "Other land",
+		"water": "Water bodies"
 	},
 	"trend": {
 		"ndvi": "Productivity (VI) trend",
@@ -156,11 +156,14 @@
 	},
 	"select_lc": {
 		"not_image": "The asset need to be a valid GEE ee.Image",
-		"not_proper_code": "The land cover is not reclassified using the selected classfication system. Please use the customize panel to reclassify the land cover",
+		"not_proper_code": "The land cover is not reclassified using the selected classfication system. Please use the customize panel to reclassify the land cover.",
+        "not_proper_code_subset": "The pixel values of land cover category are not mentioned in the transition matrix. Please use the customize panel to reclassify the land cover.",
         "diff_land_cover": "The two land cover dataset need to be different.",
         "min_max_error": "The minimumum and maximum pixels values for lnd cover need to be greater than 9 and less than 100",
         "transition_code_error": "The transition codes need to be 1 for improved transition, 0 for statble and -1 for degraded transition",
         "lc_class_mismatch": "The class labels/names for the initial and target land cover need to be same",
-        "custom_matrix_bool": "Would you like to upload a custom transition matrix?"
+        "custom_matrix_bool": "Would you like to upload a custom transition matrix?",
+        "default_matrix_bool": "Would you like to modify the default transition matrix?",
+        "verify_lc_pixel":"Varify land cover pixel values"
 	}
 }

@@ -51,9 +51,7 @@ class InputTile(sw.Tile):
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
-        self.default_lc_matrix_bool = cw.BoolQuestion(
-            "Would you like to modify the default transition matrix?"
-        )
+        self.default_lc_matrix_bool = cw.BoolQuestion(ms.select_lc.default_matrix_bool)
 
         self.custom_lc_matrix_bool = cw.BoolQuestion(ms.select_lc.custom_matrix_bool)
 
@@ -102,6 +100,7 @@ class InputTile(sw.Tile):
             v_model=None,
             clearable=True,
         ).hide()
+        lc_pixel_check = v.Switch(label=ms.select_lc.verify_lc_pixel, v_model=True)
         water_mask = cw.WaterMask(self.model, alert)
 
         # Create expansion panels for the three sub indicators to stack into the adavanced parameter expand panel widget
@@ -147,6 +146,7 @@ class InputTile(sw.Tile):
                                     xs12=True, children=[self.custom_lc_matrix_bool]
                                 ),
                                 v.Flex(xs12=True, children=[self.custom_matrix_file]),
+                                v.Flex(xs12=True, children=[lc_pixel_check]),
                             ]
                         ),
                     ]
@@ -199,6 +199,8 @@ class InputTile(sw.Tile):
             .bind(start_lc.w_band, "start_lc_band")
             .bind(end_lc.w_image, "end_lc")
             .bind(end_lc.w_band, "end_lc_band")
+            .bind(self.custom_matrix_file, "custom_matrix_file")
+            .bind(lc_pixel_check, "lc_pixel_check")
         )
 
         # create the actual tile
@@ -252,9 +254,9 @@ class InputTile(sw.Tile):
                 ms.select_lc.diff_land_cover,
             ):
                 return
-        # check if the land cover pixels and codes from the input matrix are same or not
-        if self.model.start_lc and self.model.end_lc:
-            lc_check_dn = (
+        # check if the land cover pixels and codes from the input matrix are same or not (exact match)
+        if self.model.start_lc and self.model.end_lc and self.model.lc_pixel_check:
+            lc_check_pixels = (
                 None
                 if set(self.model.lc_codelist_start)
                 != set(cs.custom_lc_values(self.model.start_lc))
@@ -262,9 +264,31 @@ class InputTile(sw.Tile):
                 != set(cs.custom_lc_values(self.model.end_lc))
                 else True
             )
-            if not self.alert.check_input(lc_check_dn, ms.select_lc.not_proper_code):
+            if not self.alert.check_input(
+                lc_check_pixels, ms.select_lc.not_proper_code
+            ):
                 return
 
+        # check if the land cover pixels and codes from the input matrix are same or not (exact match)
+        if self.model.start_lc and self.model.end_lc and not self.model.lc_pixel_check:
+            lc_subset_check_pixels = (
+                True
+                if (
+                    (set(cs.custom_lc_values(self.model.start_lc))).issubset(
+                        set(self.model.lc_codelist_start)
+                    )
+                )
+                and (
+                    (set(cs.custom_lc_values(self.model.end_lc))).issubset(
+                        set(self.model.lc_codelist_end)
+                    )
+                )
+                else None
+            )
+            if not self.alert.check_input(
+                lc_subset_check_pixels, ms.select_lc.not_proper_code_subset
+            ):
+                return
         # check if the input matrix contains proper values/atrributes or not
         if self.model.start_lc and self.model.end_lc and self.model.custom_matrix_file:
             check_min_max_error = (
@@ -314,7 +338,7 @@ class InputTile(sw.Tile):
 
         # get the stats by lc
         dflc = cs.compute_stats_by_lc(self.aoi_model, self.model)
-        pivot_dflc = dflc.pivot(index="Landcover", columns="Indicator")["Area"]
+        pivot_dflc = dflc.pivot(index="landcover", columns="Indicator 15.3.1")["Area"]
 
         # create the diagrams
         self.result_tile.sankey_plot.clear_output()
@@ -329,10 +353,10 @@ class InputTile(sw.Tile):
                 plt.show()
 
             with self.result_tile.bar_plot:
-                fig, ax = cs.bar_plot(
+                fig, ax = cs.barh_plot(
                     df=pivot_dflc,
-                    color=cp.legend_bar,
-                    title=f"Distribution of area by land cover, year:{self.model.lc_year_end_esa}",
+                    color=cp.legend,
+                    title=f"Distribution of area by land cover ({self.model.lc_year_start_esa})",
                 )
                 ax.set_facecolor((0, 0, 0, 0))
                 fig.set_facecolor((0, 0, 0, 0))
@@ -343,10 +367,10 @@ class InputTile(sw.Tile):
         fig, ax = cs.sankey(df=df, colorDict=self.model.lc_color, aspect=4, fontsize=12)
         fig.savefig(f"{pattern}_lc_transition.png", dpi=200)
         plt.close()
-        fig, ax = cs.bar_plot(
+        fig, ax = cs.barh_plot(
             df=pivot_dflc,
-            color=cp.legend_bar,
-            title=f"Distribution of area by land cover, year{self.model.lc_year_end_esa}",
+            color=cp.legend,
+            title=f"Distribution of area by land cover ({self.model.lc_year_start_esa})",
         )
         fig.savefig(f"{pattern}_area_distribution.png")
         plt.close()
