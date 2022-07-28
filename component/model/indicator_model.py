@@ -65,6 +65,7 @@ class IndicatorModel(model.Model):
     water_mask_asset_id = Any(None).tag(sync=True)
     water_mask_asset_band = Any(None).tag(sync=True)
     seasonality = Any(None).tag(sync=True)
+    lc_pixel_check = Any(None).tag(sync=True)
 
     # analysis scale
     # from the first sensor (we only combine compatible one)

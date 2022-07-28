@@ -8,6 +8,8 @@ from ipywidgets import Output
 import ipyvuetify as v
 import geopandas as gpd
 import pandas as pd
+from urllib.request import urlopen
+import json
 from sepal_ui.scripts import utils as su
 
 from component import parameter as pm
@@ -217,18 +219,17 @@ def compute_lc_transition_stats(aoi_model, model):
     aoi = aoi_model.feature_collection.geometry().bounds()
 
     # make a list of all the possible transitions classes
-    class_name = [
+    class_name_combination = [
         i + "_" + j for i in model.lc_classlist_start for j in model.lc_classlist_end
     ]
 
     # creat a multi band image with all the classes as bands
-    multiband_class = landcover.eq(model.lc_class_combination).rename(class_name)
 
     # calculate the area
-    pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
+    pixel_area = ee.Image.pixelArea().divide(10000).addBands(landcover.selfMask())
     area_per_class = pixel_area.reduceRegion(
         **{
-            "reducer": ee.Reducer.sum(),
+            "reducer": ee.Reducer.sum().group(1, "lc_comb"),
             "geometry": aoi,
             "scale": scale,
             "maxPixels": 1e13,
@@ -236,90 +237,70 @@ def compute_lc_transition_stats(aoi_model, model):
             "tileScale": 2,
         }
     )
-    data = area_per_class.getInfo()
 
-    # split the transition names and organise the data
-    df = [[*[i for i in x.split("_")], y] for x, y in data.items()]
-
-    # convert to a DataFrame
+    fc = ee.FeatureCollection([ee.Feature(None, area_per_class)])
+    fc_url = fc.getDownloadURL(**{"filetype": "geojson", "filename": "stats_url"})
+    response = urlopen(fc_url)
+    geojson_data = json.loads(response.read())
+    jas = geojson_data["features"][0]["properties"]["groups"]
+    lc_combination_label = dict(zip(model.lc_class_combination, class_name_combination))
+    organised_data = [[lc_combination_label[g["lc_comb"]], g["sum"]] for g in jas]
+    df = [[*[i for i in x.split("_")], y] for x, y in organised_data]
     df = pd.DataFrame(
         data=df, columns=[model.lc_year_start_esa, model.lc_year_end_esa, "Area"]
     )
-
     return df
 
 
-def compute_stats_by_lc(aoi_model, model, select_landcover="end", indicator_name=None):
-    """
-    tabulate the area by land cover categories.
-    input: ee.Image(ending land cover, final indicator)
-    return: DataFrame
-
-    """
+def compute_stats_by_lc(
+    aoi_model,
+    model,
+    select_landcover="start",
+    indicator_name="Indicator 15.3.1",
+    best_effort=True,
+    tile_scale=2,
+):
 
     # land cover
     landcover = model.land_cover.select(select_landcover)
 
-    # final indicator
-    if indicator_name == "productivity sub-indicator":
-        indicator = model.productivity
-        variable = pm.degradation_class
-    elif indicator_name == "soc sub-indicator":
-        indicator = model.soc.select("soc")
-        variable = pm.degradation_class
-    elif indicator_name == "land cover sub-indicator":
-        indicator = model.land_cover.select("degradation")
-        variable = pm.degradation_class
-    elif indicator_name == "productivity state":
-        indicator = model.productivity_state.select("state_5_levels")
-        variable = pm.prod_state_5_class
-    elif indicator_name == "productivity trend":
-        indicator = model.productivity_trend.select("trajectory_5_levels")
-        variable = pm.prod_trend_5_class
-    elif indicator_name == "productivity performance":
-        indicator = model.productivity_performance
-        variable = pm.prod_performance_class
-    else:
-        indicator = model.indicator_15_3_1
-        variable = pm.degradation_class
+    # indicator
+    indicator, cat_labels = indicator_n_category_label(model, indicator_name)
 
     aoi = aoi_model.feature_collection.geometry().bounds()
-    lc_name = model.lc_classlist_start
-    lc_code = model.lc_codelist_start
     scale = model.scale
-
-    # combine indicator and land cover together.
-    # first digit represents the indicator, second two digits represents land cover categories
-    lc_deg_combine = landcover.multiply(10).add(indicator)
-
-    # all possible combined values
-    class_value = [x * 10 + y for x in lc_code for y in variable.keys()]
-
-    # all possible combined categories
-    class_name = [x + "_" + y for x in lc_name for y in variable.values()]
-
-    # creat a multi band image with all the categories as bands
-    multiband_class = lc_deg_combine.eq(class_value).rename(class_name)
-
-    # calculate the area
-    pixel_area = multiband_class.multiply(ee.Image.pixelArea().divide(10000))
-    area_per_class = pixel_area.reduceRegion(
-        **{
-            "reducer": ee.Reducer.sum(),
-            "geometry": aoi,
-            "scale": scale,
-            "maxPixels": 1e13,
-            "bestEffort": True,
-            "tileScale": 2,
-        }
+    lc_code_label = dict(zip(model.lc_codelist_start, model.lc_classlist_start))
+    area_stats = (
+        ee.Image.pixelArea()
+        .divide(10000)
+        .addBands(landcover)
+        .addBands(indicator)
+        .reduceRegion(
+            **{
+                "reducer": ee.Reducer.sum().group(1, "lc").group(2, "indicator"),
+                "geometry": aoi,
+                "maxPixels": 1e13,
+                "scale": scale,
+                "bestEffort": best_effort,
+                "tileScale": tile_scale,
+            }
+        )
     )
-    data = area_per_class.getInfo()
-
-    # split and organise the data
-    df = [[*[i for i in x.split("_")], y] for x, y in data.items()]
-
-    # convert to a DataFrame
-    df = pd.DataFrame(data=df, columns=["Landcover", "Indicator", "Area"])
+    # create a FC with null geometry to get a download URL
+    fc = ee.FeatureCollection([ee.Feature(None, area_stats)])
+    fc_url = fc.getDownloadURL(**{"filetype": "geojson", "filename": "stats_url"})
+    response = urlopen(fc_url)
+    geojson_data = json.loads(response.read())
+    # filter out the atribute dictionary that contails the stats
+    jas = geojson_data["features"][0]["properties"]["groups"]
+    # organise the data in a list of lists and replace the pixel values with labels
+    organised_data = [
+        [lc_code_label[g["lc"]], cat_labels[i["indicator"]], g["sum"]]
+        for i in jas
+        for g in i["groups"]
+    ]
+    # convert the list of lists to a pandas DF
+    df = pd.DataFrame(organised_data, columns=["landcover", indicator_name, "Area"])
 
     return df
 
@@ -442,3 +423,31 @@ def custom_lc_values(land_cover):
     )
     values = ee.Dictionary(reduction.get(image.bandNames().get(0))).keys().getInfo()
     return [int(v) for v in values]
+
+
+def indicator_n_category_label(model, indicator_name):
+    """helper function to get the indicators and the category label"""
+
+    if indicator_name == "Productivity sub-indicator":
+        indicator = model.productivity
+        cat_labels = pm.degradation_class
+    elif indicator_name == "Soc sub-indicator":
+        indicator = model.soc.select("soc")
+        cat_labels = pm.degradation_class
+    elif indicator_name == "Land cover sub-indicator":
+        indicator = model.land_cover.select("degradation")
+        cat_labels = pm.degradation_class
+    elif indicator_name == "Productivity state":
+        indicator = model.productivity_state.select("state_5_levels")
+        cat_labels = pm.prod_state_5_class
+    elif indicator_name == "Productivity trend":
+        indicator = model.productivity_trend.select("trajectory_5_levels")
+        cat_labels = pm.prod_trend_5_class
+    elif indicator_name == "Productivity performance":
+        indicator = model.productivity_performance
+        cat_labels = pm.prod_performance_class
+    elif indicator_name == "Indicator 15.3.1":
+        indicator = model.indicator_15_3_1
+        cat_labels = pm.degradation_class
+
+    return indicator, cat_labels

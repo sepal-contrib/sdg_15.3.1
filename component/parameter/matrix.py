@@ -18,13 +18,13 @@ default_trans_matrix = [
 
 lc_code = [10, 20, 30, 40, 50, 60, 70]
 lc_class = [
-    "Forest",
+    "Tree-covered areas",
     "Grassland",
     "Cropland",
     "Wetland",
-    "Artificial area",
-    "Bare land",
-    "Water body",
+    "Artificial surfaces",
+    "Other land",
+    "Water bodies",
 ]
 
 degradation_class = {0: "NoData", 1: "Degraded", 2: "Stable", 3: "Improved"}
