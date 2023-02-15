@@ -164,6 +164,6 @@
         "lc_class_mismatch": "The class labels/names for the initial and target land cover need to be same",
         "custom_matrix_bool": "Would you like to upload a custom transition matrix?",
         "default_matrix_bool": "Would you like to modify the default transition matrix?",
-        "verify_lc_pixel":"Varify land cover pixel values"
+        "verify_lc_pixel":"Verify land cover pixel values"
 	}
 }

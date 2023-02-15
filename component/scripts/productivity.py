@@ -197,7 +197,7 @@ def productivity_state(aoi_model, model, integrated_annual_vi, output):
         "year", model.p_state_end - 2, model.p_state_end
     )
     previous_year_filter = ee.Filter.rangeContains(
-        "year", model.p_state_start, model.p_state_end - 2
+        "year", model.p_state_start, model.p_state_end - 3
     )
 
     # compute mean ndvi for the baseline and target period period
