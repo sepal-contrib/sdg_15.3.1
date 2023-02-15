@@ -97,6 +97,7 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
         if i == 0:
             myD["bottom"] = 0
             myD["top"] = myD["left"]
+            topEdge = myD["top"]
         else:
             myD["bottom"] = (
                 leftWidths[leftLabels[i - 1]]["top"] + 0.02 * dataFrame.leftWeight.sum()
@@ -113,6 +114,7 @@ def sankey(df, colorDict=None, aspect=4, rightColor=False, fontsize=14):
         if i == 0:
             myD["bottom"] = 0
             myD["top"] = myD["right"]
+            topEdge = myD["top"]
         else:
             myD["bottom"] = (
                 rightWidths[rightLabels[i - 1]]["top"]

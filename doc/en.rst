@@ -1,9 +1,9 @@
 SDG 15.3.1
 ==========
 
-SDG Indicator 15.3.1 measures the proportion of land that is degraded over the total land area. It is part of the SDG 15 which promotes “Life on Land” and target 15.3 states: ‘By 2030, combat desertification, restore degraded land and soil, including land affected by desertification, drought and floods, and strive to achieve a land degradation–neutral world.’
+The amount of degraded land relative to the total amount of land is measured by SDG Indicator 15.3.1. Target 15.3 of SDG 15 promotes "Life on Land" and reads as follows: Combat desertification by 2030, restore degraded land and soil, including those damaged by droughts, floods, and desertification, and work towards a world free of land degradation. To help achieve Target 15.3 of the Sustainable Development Goals, governments, international organisations, and civil society must take action to combat desertification and restore degraded land. Sustainable land management can be a significant measure that has a positive impact on degraded land. By taking such actions, we can ensure the preservation of biodiversity, promote sustainable land use, and create a sustainable future for generations to come. These actions can help improve the health of the environment and boost agricultural production in these areas, which will in turn ensure food security, reduce poverty, and promote social welfare.
 
-This module allows generating data for reporting on SDG indicator 15.3.1. The SEPAL SDG indicator module follows SDG `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__. 
+This module allows generating data for reporting on SDG indicator 15.3.1. The SEPAL SDG indicator module follows UNCCD `good practice guidance version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__. 
 
 The methodology for SDG 15.3.1 module for GPG v1 (`good practice guidance from UNCCD on SDG 15.3.1 <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__) was implemented in consultation with the `trends.earth <https://trends.earth/docs/en/index.html>`__ team and `Conservation International <https://www.conservation.org>`__.
 
@@ -12,38 +12,28 @@ Methodology
 
 What is Land degradation?
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-UNCCD defines land degradation as “\ *the reduction or loss of the
-biological or economic productivity and complexity of rain-fed cropland,
-irrigated cropland, or range, pasture, forest and woodlands resulting
-from a combination of pressures, including land use and management
-practices”* (`UNCCD 1994, Article
+The United Nations Convention to Combat Desertification (UNCCD) defines land degradation as "\ *the reduction or loss of the biological or economic productivity and complexity of rain-fed cropland, irrigated cropland, or range, pasture, forest, and woodlands resulting from a combination of pressures, including land use and management practises"* (`UNCCD 1994, Article
 1 <https://www.unccd.int/sites/default/files/relevant-links/2017-01/UNCCD_Convention_ENG_0.pdf>`__).
 This definition was adopted for the SDG 15.3.1
 
 UNCCD Good Practice Guidelines
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-UNCCD published the first version of the `good practice guidance (GPG) <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__ in 2017. A revised version of the `GPG <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__ was published in 2021. The module is based on the latest version (version 2) of the GPG.
+In 2017, the UNCCD released the first version of the  `good practice guidance (GPG) <https://prais.unccd.int/sites/default/files/helper_documents/4-GPG_15.3.1_EN.pdf>`__. In 2021, a revised version of the `GPG <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__ was published. The module is based on the most recent version of the GPG (version 2). The GPG outlines a comprehensive approach to land degradation and suggests methods for restoring degraded land by providing guidance for governments, businesses, local communities, and other stakeholders.
+
 
 Approach
 """"""""
 
-Under the definition adopted by UNCCD, the extent of land degradation
-for reporting on SDG Indicator 15.3.1 is calculated as a binary -
-degraded/not degraded - quantification using its three sub-indicators:
+The amount of land degradation for SDG Indicator 15.3.1 is measured using a combination of three sub-indicators. The results of the sub-indicators are put together using the one-out-all-out statistical principle to make a binary indicator that says the land in question is either "degraded" or "not degraded." 
 
--  Trends in land cover
+- The transition of land cover over time provides important insights into how land characteristics have changed. 
 
--  Trends in land productivity, and
+- Trends in land productivity measure important changes in productivity over time, whether they are positive, negative, or stay the same. 
 
--  Trends in carbon stocks (above and below ground), currently
-   represented by soil organic carbon (SOC) stocks
+- Changes in above- and below-ground carbon stocks, which are currently shown by soil organic carbon (SOC) stocks.
 
-Essentially, any significant reduction or negative change in one of the
-three sub-indicators is considered to comprise land degradation. That
-means the results of the sub-indicators are integrated using the one out
-all out statistical principle.
+Any significant decrease or negative change in one of the three sub-indicators is regarded as land degradation. 
 
 Sub-indicators
 ##############
@@ -281,7 +271,10 @@ To run the computation of SDG 15.3.1, several parameters need to be set. Please 
 Mandatory parameters
 ####################
 
--   **Dates**: They are set in years and need to be in the correct order. The **end date** that you select will change the list of available sensors. You won't be able to choose sensors that were not launched by the **end date**
+-   **Assessment period**: are set in years and must be in the correct order. The **Starting year** that you select will update the list of available sensors. You won't be able to choose sensors that were not launched by the **Ending year**
+
+.. note::
+        In a strictly technical sense, the productivity state metric assessment period should be longer than four years (historical plus the last three years). However, the assessment time frame for each of the sub-indicators and metrics is customizable in the :ref:`Advanced parameters` section.
 
 -   **Sensors**: After selecting the dates, all the available sensors within the timeframe will be available. You can deselect or re-select any sensor you want. The default value is set to all the Landsat satellites available within the selected timeframe.
 
@@ -302,6 +295,9 @@ Mandatory parameters
 
 -   **climate regime**: default to *Per pixel based on global climate data* but you can also use a fixed value everywhere using a predefined climate regime in the dropdown menu or select a custom value on the slider
 
+
+.. advanced-parameters:
+
 Advanced parameters
 ###################
 
@@ -311,11 +307,11 @@ Advanced parameters
 Productivity parameters
 +++++++++++++++++++++++++++++++
 
-Assessment periods for all the metrics can be specified individually. Keep them blank to use the Start and End dates for the respective metric.
+Assessment periods for all the metrics can be specified individually. Keep them blank to use the Start and End dates for the respective metric. 
 
 .. note::
     
-     If you only specify either the start or the end year of a particular metric, the module will ignore the value.
+     If the Starting  and Ending years you've chosen for your assessment period aren't at least four years apart, then you'll also need to choose an assessment period for the productivity state that's longer than that. The module will disregard the value of a particular metric if you only specify the start or end year.
 
 The default productivity look-up table is set to GPG version 2. You could also select GPG version 1. Please refer to the approach section for the tables.  Please read section 4.2.5 of the `GPG version 2 <https://www.unccd.int/sites/default/files/documents/2021-09/UNCCD_GPG_SDG-Indicator-15.3.1_version2_2021.pdf>`__ to know more about the look-up table.
 
