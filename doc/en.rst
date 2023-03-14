@@ -274,7 +274,7 @@ Mandatory parameters
 -   **Assessment period**: are set in years and must be in the correct order. The **Starting year** that you select will update the list of available sensors. You won't be able to choose sensors that were not launched by the **Ending year**
 
 .. note::
-        In a strictly technical sense, the productivity state metric assessment period should be longer than four years (historical plus the last three years). However, the assessment time frame for each of the sub-indicators and metrics is customizable in the :ref:`Advanced parameters` section.
+        In a strictly technical sense, the productivity state metric assessment period should be longer than four years (historical plus the last three years). However, the assessment time frame for each of the sub-indicators and metrics is customizable in the :ref:`sdg-advanced-parameters` section.
 
 -   **Sensors**: After selecting the dates, all the available sensors within the timeframe will be available. You can deselect or re-select any sensor you want. The default value is set to all the Landsat satellites available within the selected timeframe.
 
@@ -296,7 +296,7 @@ Mandatory parameters
 -   **climate regime**: default to *Per pixel based on global climate data* but you can also use a fixed value everywhere using a predefined climate regime in the dropdown menu or select a custom value on the slider
 
 
-.. advanced-parameters:
+.. _sdg-advanced-parameters:
 
 Advanced parameters
 ###################
@@ -335,7 +335,7 @@ The default land cover is set to the ESA CCI land cover data. The tool will use 
 
 .. note::
 
-     If you would like to use the default land cover transition matrix, the custom dataset needs to be classified in the UNCCD land cover categories. Please refer to :ref:`sdg_reclassify` to know how to reclassify the local dataset into different classification systems.
+     If you would like to use the default land cover transition matrix, the custom dataset needs to be classified in the UNCCD land cover categories. Please refer to :ref:`sdg-reclassify` to know how to reclassify the local dataset into different classification systems.
     
 To compute the land cover sub-indicator with the UNCCD land cover categories, the user can modify the default transition matrix. Based on the user's local knowledge of the conditions in the study area and the land degradation process occurring there, use the table below to identify which transitions correspond to degradation (D), improvement (I), or no change in terms of land condition (S).
 
@@ -430,7 +430,7 @@ Following layers are available on the interactive map:
     :align: center
 
 
-.. sdg_reclassify:
+.. _sdg-reclassify:
 
 Reclassify
 """"""""""
