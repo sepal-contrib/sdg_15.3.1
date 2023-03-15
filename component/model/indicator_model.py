@@ -8,7 +8,6 @@ from component import parameter as pm
 
 
 class IndicatorModel(model.Model):
-
     #####################
     ##      input      ##
     #####################
@@ -37,6 +36,9 @@ class IndicatorModel(model.Model):
 
     # Vegetation indices
     vegetation_index = Any(pm.vegetation_index[0]["value"]).tag(sync=True)
+
+    # Vegetation Index thresholds value
+    threshold = Any(None).tag(synch=True)
 
     # Productivity lookup table
     productivity_lookup_table = Any(pm.productivity_lookup_table[0]["value"]).tag(
