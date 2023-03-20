@@ -6,11 +6,9 @@ from component.message import ms
 
 
 class SensorSelect(v.Select):
-
     update = Int(0).tag(sync=True)
 
     def __init__(self):
-
         super().__init__(
             items=[],
             label=ms.sensor_lbl,
@@ -21,12 +19,13 @@ class SensorSelect(v.Select):
         )
 
     def update_sensors(self, change):
-
         # deselect all
         self.v_model = []
 
         # define the offset that should be used based on the year in the sensors list
-        if change["new"] >= 2015:  # launch of Sentinel 2
+        if change["new"] >= 2021:  # launch of Landsat 9
+            last_sat = 13
+        elif change["new"] >= 2017:  # launch of Sentinel 2
             last_sat = 12
         elif change["new"] >= 2013:  # launch of Landsat 8
             last_sat = 11
@@ -51,6 +50,7 @@ class SensorSelect(v.Select):
             "Landsat 5",
             "Landsat 7",
             "Landsat 8",
+            "Landsat 9",
             "Sentinel 2",
             "MODIS MOD13Q1",
             "MODIS MYD13Q1",

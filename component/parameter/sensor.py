@@ -15,21 +15,21 @@ sensors = {
         "l4",
         "VI",
     ],
-    "Landsat 4": ["LANDSAT/LT04/C01/T1_SR", 30, "l4", "SR"],
+    "Landsat 4": ["LANDSAT/LT04/C02/T1_L2", 30, "l4", "SR"],
     "Derived VI Landsat 5": [
         ["LANDSAT/LT05/C01/T1_32DAY_NDVI", "LANDSAT/LT05/C01/T1_32DAY_EVI"],
         30,
         "",
         "VI",
     ],
-    "Landsat 5": ["LANDSAT/LT05/C01/T1_SR", 30, "l5", "SR"],
+    "Landsat 5": ["LANDSAT/LT05/C02/T1_L2", 30, "l5", "SR"],
     "Derived VI Landsat 7": [
         ["LANDSAT/LE07/C01/T1_32DAY_NDVI", "LANDSAT/LE07/C01/T1_32DAY_EVI"],
         30,
         "l7",
         "VI",
     ],
-    "Landsat 7": ["LANDSAT/LE07/C01/T1_SR", 30, "l7", "SR"],
+    "Landsat 7": ["LANDSAT/LE07/C02/T1_L2", 30, "l7", "SR"],
     "MODIS MOD13Q1": ["MODIS/061/MOD13Q1", 250, "modis", ""],
     "Terra NPP": ["MODIS/006/MOD17A3HGF", 250, "modis", ""],
     "MODIS MYD13Q1": ["MODIS/061/MYD13Q1", 250, "modis", ""],
@@ -39,8 +39,9 @@ sensors = {
         "l8",
         "VI",
     ],
-    "Landsat 8": ["LANDSAT/LC08/C01/T1_SR", 30, "l8", "SR"],
-    "Sentinel 2": ["COPERNICUS/S2", 10, "s2", "SR"],
+    "Landsat 8": ["LANDSAT/LC08/C02/T1_L2", 30, "l8", "SR"],
+    "Sentinel 2": ["COPERNICUS/S2_SR_HARMONIZED", 10, "s2", "SR"],
+    "Landsat 9": ["LANDSAT/LC09/C02/T1_L2", 30, "21", "SR"],
 }
 
 

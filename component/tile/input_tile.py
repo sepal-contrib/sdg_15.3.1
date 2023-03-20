@@ -11,7 +11,6 @@ from component import scripts as cs
 
 class InputTile(sw.Tile):
     def __init__(self, aoi_model, model, result_tile, zonal_stats_tile):
-
         # use model
         self.aoi_model = aoi_model
         self.model = model
@@ -29,6 +28,15 @@ class InputTile(sw.Tile):
         markdown = sw.Markdown("""{}""".format("  \n".join(ms.process_text)))
         pickers = cw.PickerLine(self.model)
         pickers_productivity = cw.PickerLineProductivity(self.model)
+        threshold = v.Slider(
+            label=ms.threshold.threshold_lbl,
+            track_color="green",
+            min=-1,
+            max=1,
+            step=0.01,
+            thumb_label="always",
+            v_model=0,
+        )
         pickers_landcover = cw.PickerLineLC(self.model)
         pickers_soc = cw.PickerLineSOC(self.model)
         self.sensor_select = cw.SensorSelect()
@@ -115,6 +123,7 @@ class InputTile(sw.Tile):
                         v.ExpansionPanelHeader(children=[prod_sec_label]),
                         v.ExpansionPanelContent(
                             children=[
+                                v.Flex(xs12=True, children=[threshold]),
                                 v.Flex(xs12=True, children=[pickers_productivity]),
                                 v.Flex(xs12=True, children=[productivity_lookup_table]),
                             ]
@@ -194,6 +203,7 @@ class InputTile(sw.Tile):
             self.model.bind(self.trajectory, "trajectory")
             .bind(self.vegetation_index, "vegetation_index")
             .bind(lceu, "lceu")
+            .bind(threshold, "threshold")
             .bind(productivity_lookup_table, "productivity_lookup_table")
             .bind(start_lc.w_image, "start_lc")
             .bind(start_lc.w_band, "start_lc_band")
@@ -232,7 +242,6 @@ class InputTile(sw.Tile):
 
     @su.loading_button(debug=True)
     def start_process(self, widget, data, event):
-
         # check the inputs
         if not all(
             [
