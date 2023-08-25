@@ -45,6 +45,9 @@
 		"evi": "Enhanced Vegetation Index - 2 (EVI2)",
 		"msvi": "Modified Soil Adjusted Vegetation Index - 2 (MSVI2)"
 	},
+    "threshold":{
+        "threshold_lbl":"VI threshold"
+    },
 	"lceu": {
 		"calculate": "Calculate based on land cover and soil texture",
 		"wte": "World Ecosystem",

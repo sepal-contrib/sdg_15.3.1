@@ -10,7 +10,6 @@ ee.Initialize()
 
 
 def integrate_ndvi_climate(aoi_model, model, output):
-
     # Caculate the maximum extent of assessment period from all the inputs to integrate the vi over the entire period
     start_list = [
         model.start,
@@ -45,16 +44,33 @@ def integrate_ndvi_climate(aoi_model, model, output):
             modis_vi = modis_vi_.map(partial(cloud_mask, sensor="MODIS"))
 
         if model.vegetation_index == "ndvi":
+            modis_vi_scalled = modis_vi.select("NDVI").map(
+                partial(img_scalling, scale_factor=0.0001)
+            )
+            modis_vi_w_threshold = modis_vi_scalled.map(
+                partial(vi_threshold, threshold=model.threshold)
+            )
             integrated_vi_coll = annual_modis_vi(
-                modis_vi.select("NDVI"), period_start, period_end
+                modis_vi_w_threshold, period_start, period_end
             )
         elif model.vegetation_index == "evi":
+            modis_vi_scalled = modis_vi.select("EVI").map(
+                partial(img_scalling, scale_factor=0.0001)
+            )
+            modis_vi_w_threshold = modis_vi_scalled.map(
+                partial(vi_threshold, threshold=model.threshold)
+            )
             integrated_vi_coll = annual_modis_vi(
-                modis_vi.select("EVI"), period_start, period_end
+                modis_vi_w_threshold, period_start, period_end
             )
         elif model.vegetation_index == "msvi":
             msvi_coll = modis_vi.map(calculate_msvi_modis).select("msvi")
-            integrated_vi_coll = annual_modis_vi(msvi_coll, period_start, period_end)
+            msvi_collection_w_threshold = msvi_coll.map(
+                partial(vi_threshold, threshold=model.threshold)
+            )
+            integrated_vi_coll = annual_modis_vi(
+                msvi_collection_w_threshold, period_start, period_end
+            )
 
     elif "Terra NPP" in model.sensors:
         npp_filtered = (
@@ -69,7 +85,6 @@ def integrate_ndvi_climate(aoi_model, model, output):
             i_img_coll = ee.ImageCollection([])
 
             for sensor in model.sensors:
-
                 # get the image collection
                 # filter its bounds to fit the aoi extends
                 # rename the bands
@@ -79,17 +94,13 @@ def integrate_ndvi_climate(aoi_model, model, output):
                 sat = (
                     ee.ImageCollection(pm.sensors[sensor][0])
                     .filterBounds(aoi_model.feature_collection)
+                    .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
                     .map(partial(rename_band, sensor=sensor))
-                    .map(partial(adapt_res, sensor=sensor))
                     .map(partial(cloud_mask, sensor=sensor))
+                    .map(partial(apply_scale_factor, sensor=sensor))
                 )
 
                 i_img_coll = i_img_coll.merge(sat)
-
-            # Filtering the img collection using start year and end year
-            i_img_coll = i_img_coll.filterDate(
-                f"{period_start}-01-01", f"{period_end}-12-31"
-            )
 
             # Prepare VI collection from the images
             if model.vegetation_index == "ndvi":
@@ -99,7 +110,12 @@ def integrate_ndvi_climate(aoi_model, model, output):
             elif model.vegetation_index == "msvi":
                 vi_coll = i_img_coll.map(calculate_msvi).select("msvi")
             # Integrate observed NDVI datasets at the annual level
-            integrated_vi_coll = int_yearly_ndvi(vi_coll, period_start, period_end)
+            vi_coll_w_threshold = vi_coll.map(
+                partial(vi_threshold, threshold=model.threshold)
+            )
+            integrated_vi_coll = int_yearly_ndvi(
+                vi_coll_w_threshold, period_start, period_end
+            )
 
         elif pm.sensors[model.sensors[0]][3] == "VI":
             if model.vegetation_index == "ndvi":
@@ -123,7 +139,13 @@ def integrate_ndvi_climate(aoi_model, model, output):
                     )
                     vi_coll = vi_coll.merge(sat)
 
-                integrated_vi_coll = annual_modis_vi(vi_coll, period_start, period_end)
+                vi_coll_w_threshold = vi_coll.map(
+                    partial(vi_threshold, threshold=model.threshold)
+                )
+                integrated_vi_coll = annual_modis_vi(
+                    vi_coll_w_threshold, period_start, period_end
+                )
+
             else:
                 print(f"{model.vegetation_index} is not available as a derived index")
 
@@ -142,14 +164,13 @@ def integrate_ndvi_climate(aoi_model, model, output):
 
 
 def rename_band(img, sensor):
-
     if sensor in ["Landsat 4", "Landsat 5", "Landsat 7"]:
         img = img.select(
-            ["B1", "B3", "B4", "pixel_qa"], ["Blue", "Red", "NIR", "pixel_qa"]
+            ["SR_B1", "SR_B3", "SR_B4", "QA_PIXEL"], ["Blue", "Red", "NIR", "pixel_qa"]
         )
-    elif sensor == "Landsat 8":
+    elif sensor in ["Landsat 8", "Landsat 9"]:
         img = img.select(
-            ["B2", "B4", "B5", "pixel_qa"], ["Blue", "Red", "NIR", "pixel_qa"]
+            ["SR_B2", "SR_B4", "SR_B5", "QA_PIXEL"], ["Blue", "Red", "NIR", "pixel_qa"]
         )
     elif sensor == "Sentinel 2":
         img = img.select(["B2", "B4", "B8", "QA60"], ["Blue", "Red", "NIR", "QA60"])
@@ -157,50 +178,20 @@ def rename_band(img, sensor):
     return img
 
 
-def adapt_res(img, sensor):
-    """reproject landasat images in the sentinel resolution"""
-
-    # get sentinel projection
-    sentinel_proj = ee.ImageCollection("COPERNICUS/S2").first().projection()
-
-    # change landsat resolution
-    if sensor in ["landsat 8, Landsat 7, Landsat 5, Landsat 4"]:
-        img = img.changeProj(img.projection(), sentinel_proj)
-
-    # the reflectance alignment won't be a problem as we don't use the bands per se but only the computed ndvi
-
-    return img
-
-
 def cloud_mask(img, sensor):
     """mask the clouds based on the sensor name, sentine 2 data will be multiplyed by 10000 to meet the scale of landsat data"""
 
-    if sensor in ["Landsat 5", "Landsat 7", "Landsat 4"]:
+    if sensor in ["Landsat 5", "Landsat 7", "Landsat 4", "Landsat 8", "Landsat 9"]:
         qa = img.select("pixel_qa")
-        # If the cloud bit (5) is set and the cloud confidence (7) is high
-        # or the cloud shadow bit is set (3), then it's a bad pixel.
+        # If the cloud bit (3) is set and the cloud confidence (8) is high
+        # or the cloud shadow bit is set (4), then it's a bad pixel.
         cloud = (
-            qa.bitwiseAnd(1 << 5).And(qa.bitwiseAnd(1 << 7)).Or(qa.bitwiseAnd(1 << 3))
+            qa.bitwiseAnd(1 << 3).And(qa.bitwiseAnd(1 << 8)).Or(qa.bitwiseAnd(1 << 4))
         )
         # Remove edge pixels that don't occur in all bands
         mask2 = img.mask().reduce(ee.Reducer.min())
 
         img = img.updateMask(cloud.Not()).updateMask(mask2)
-
-    elif sensor == "Landsat 8":
-        # Bits 3 and 5 are cloud shadow and cloud, respectively.
-        cloudShadowBitMask = 1 << 3
-        cloudsBitMask = 1 << 5
-        # Get the pixel QA band.
-        qa = img.select("pixel_qa")
-        # Both flags should be set to zero, indicating clear conditions.
-        mask = (
-            qa.bitwiseAnd(cloudShadowBitMask)
-            .eq(0)
-            .And(qa.bitwiseAnd(cloudsBitMask).eq(0))
-        )
-
-        img = img.updateMask(mask)
 
     elif sensor == "Sentinel 2":
         qa = img.select("QA60")
@@ -229,11 +220,25 @@ def bit_selection(bitmask, start_bit, end_bit):
     return bitmask.rightShift(start_bit).bitwiseAnd(bit_position)
 
 
+def apply_scale_factor(img, sensor):
+    """Applies scaling factors to Landsat collection 2"""
+    if sensor in ["Landsat 5", "Landsat 7", "Landsat 4", "Landsat 8", "Landsat 9"]:
+        scalled_img = (
+            img.multiply(0.0000275)
+            .add(-0.2)
+            .copyProperties(img, ["system:time_start", "system:time_end"])
+        )
+    elif sensor == "Sentinel 2":
+        scalled_img = img.multiply(0.0001).copyProperties(
+            img, ["system:time_start", "system:time_end"]
+        )
+    return scalled_img
+
+
 def int_yearly_ndvi(ndvi_coll, start, end):
     """Function to integrate observed NDVI datasets at the annual level"""
 
     def daily_to_monthly_to_annual(year):
-
         ndvi_collection = ndvi_coll
         ndvi_coll_ann = ndvi_collection.filter(
             ee.Filter.calendarRange(year, field="year")
@@ -250,11 +255,7 @@ def int_yearly_ndvi(ndvi_coll, start, end):
             )
         )
         img_coll_ndvi = (
-            img_coll.reduce(ee.Reducer.mean())
-            .float()
-            .rename("vi")
-            .addBands(ee.Image().constant(year).float().rename("year"))
-            .set("year", year)
+            img_coll.reduce(ee.Reducer.mean()).float().rename("vi").set("year", year)
         )
         return img_coll_ndvi
 
@@ -314,7 +315,6 @@ def calculate_evi(img):
 
 
 def calculate_msvi(img):
-
     msvi2 = (
         img.expression(
             "(2 * nir + 1 - sqrt(pow((2 * nir + 1), 2) - 8 * (nir - red)) ) / 2",
@@ -338,6 +338,20 @@ def calculate_msvi_modis(img):
     return msvi2
 
 
+def vi_threshold(img, threshold):
+    """function to scale and apply vi threshold"""
+    threshold_bin = img.gt(threshold)
+    return img.multiply(threshold_bin).copyProperties(
+        img, ["system:time_start", "system:time_end"]
+    )
+
+
+def img_scalling(img, scale_factor):
+    return img.multiply(scale_factor).copyProperties(
+        img, ["system:time_start", "system:time_end"]
+    )
+
+
 def annual_modis_vi(modis_img, start, end):
     """Function to integrate observed precipitation datasets at the annual level"""
 
@@ -356,7 +370,6 @@ def annual_modis_vi(modis_img, start, end):
 
 
 def preproc_modis_npp(npp_coll, start, end):
-
     years = ee.List.sequence(start, end)
     img_coll = ee.ImageCollection.fromImages(
         years.map(
