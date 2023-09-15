@@ -24,11 +24,11 @@ class ResultTile(sw.Tile):
         # with its legend
         self.m = cw.ResultMap()
 
-        self.m.add_legend(
-            legend_title=ms.map.legend.state,
-            legend_dict=cp.legend,
-            position="topleft",
-        )
+#        self.m.add_legend(
+#            legend_title=ms.map.legend.state,
+#            legend_dict=cp.legend,
+#            position="topleft",
+#        )
 
         # display the graphs next to the map
         self.sankey_plot = Output()
