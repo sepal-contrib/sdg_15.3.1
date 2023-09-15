@@ -158,11 +158,11 @@ def display_maps(aoi_model, model, m, output):
     )
     m.addLayer(aoi_line, {"palette": v.theme.themes.dark.accent}, "aoi")
     output.add_live_msg(ms.map_loading_complete, "success")
-    m.add_legend(
-        legend_title=ms.map.legend.lc,
-        legend_dict=model.lc_color,
-        position="topleft",
-    )
+#    m.add_legend(
+#        legend_title=ms.map.legend.lc,
+#        legend_dict=model.lc_color,
+#        position="topleft",
+#    )
 
     return
 
