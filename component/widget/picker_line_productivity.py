@@ -1,55 +1,53 @@
 import ipyvuetify as v
 
 from component import parameter as pm
-from component.message import ms
+from component.message import cm
 
 
 class PickerLineProductivity(v.Layout):
-
     YEAR_RANGE = [y for y in range(pm.sensor_max_year, pm.L4_start - 1, -1)]
 
     def __init__(self, model):
-
         self.model = model
 
         # create the widgets
         self.trend_start_picker = v.Select(
-            label=ms.trend_start_lbl,
+            label=cm.trend_start_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,
             class_="ml-5 mr-5",
         )
         self.trend_end_picker = v.Select(
-            label=ms.trend_end_lbl,
+            label=cm.trend_end_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,
             class_="ml-5 mr-5",
         )
         self.state_start_picker = v.Select(
-            label=ms.state_start_lbl,
+            label=cm.state_start_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,
             class_="ml-5 mr-5",
         )
         self.state_end_picker = v.Select(
-            label=ms.state_end_lbl,
+            label=cm.state_end_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,
             class_="ml-5 mr-5",
         )
         self.performance_start_picker = v.Select(
-            label=ms.performance_start_lbl,
+            label=cm.performance_start_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,
             class_="ml-5 mr-5",
         )
         self.performance_end_picker = v.Select(
-            label=ms.performance_end_lbl,
+            label=cm.performance_end_lbl,
             items=self.YEAR_RANGE,
             xs4=True,
             v_model=None,

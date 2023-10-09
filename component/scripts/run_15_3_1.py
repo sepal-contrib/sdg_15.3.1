@@ -13,7 +13,7 @@ import json
 from sepal_ui.scripts import utils as su
 
 from component import parameter as pm
-from component.message import ms
+from component.message import cm
 
 from .gdrive import gdrive
 from .gee import wait_for_completion
@@ -27,7 +27,6 @@ ee.Initialize()
 
 
 def download_maps(aoi_model, model, output):
-
     # create a result folder including the data parameters
     # create the aoi and parameter folder if not existing
     aoi_dir = pm.result_dir / su.normalize_str(aoi_model.name)
@@ -38,7 +37,7 @@ def download_maps(aoi_model, model, output):
     # from the first sensor (we only combine compatible one)
     scale = pm.sensors[model.sensors[0]][1]
 
-    output.add_live_msg(ms.download.start_download)
+    output.add_live_msg(cm.download.start_download)
 
     # create the export path
     # they are in correct order don't change it
@@ -75,7 +74,7 @@ def download_maps(aoi_model, model, output):
     # If not it's going to crash
     if downloads:
         wait_for_completion([name for name in layers], output)
-    output.add_live_msg(ms.gee.tasks_completed, "success")
+    output.add_live_msg(cm.gee.tasks_completed, "success")
 
     # digest the tiles
     for name in layers:
@@ -86,20 +85,19 @@ def download_maps(aoi_model, model, output):
             result_dir / f"{pattern}_{name}_merge.tif",
         )
 
-    output.add_live_msg(ms.download.remove_gdrive)
+    output.add_live_msg(cm.download.remove_gdrive)
 
     # remove the files from drive
     for name in layers:
         drive_handler.delete_files(drive_handler.get_files(f"{pattern}_{name}"))
 
     # display msg
-    output.add_live_msg(ms.download.completed, "success")
+    output.add_live_msg(cm.download.completed, "success")
 
     return tuple([result_dir / f"{pattern}_{name}_merge.tif" for name in layers])
 
 
 def display_maps(aoi_model, model, m, output):
-
     m.zoom_ee_object(aoi_model.feature_collection.geometry())
 
     # get the geometry to clip on
@@ -116,38 +114,38 @@ def display_maps(aoi_model, model, m, output):
     }
 
     # add the layers
-    output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
+    output.add_live_msg(cm.gee.add_layer.format(cm.lc_layer))
     m.addLayer(
         model.land_cover.select("start").clip(geom),
         viz_lc,
-        ms.lc_start.format(model.lc_year_start_esa),
+        cm.lc_start.format(model.lc_year_start_esa),
     )
 
-    output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
+    output.add_live_msg(cm.gee.add_layer.format(cm.lc_layer))
     m.addLayer(
         model.land_cover.select("end").clip(geom),
         viz_lc,
-        ms.lc_end.format(model.lc_year_end_esa),
+        cm.lc_end.format(model.lc_year_end_esa),
     )
 
-    output.add_live_msg(ms.gee.add_layer.format(ms.prod_layer))
-    m.addLayer(model.productivity.clip(geom).selfMask(), pm.viz_prod, ms.prod_layer)
+    output.add_live_msg(cm.gee.add_layer.format(cm.prod_layer))
+    m.addLayer(model.productivity.clip(geom).selfMask(), pm.viz_prod, cm.prod_layer)
 
-    output.add_live_msg(ms.gee.add_layer.format(ms.lc_layer))
+    output.add_live_msg(cm.gee.add_layer.format(cm.lc_layer))
     m.addLayer(
         model.land_cover.select("degradation").clip(geom).selfMask(),
         pm.viz_lc_sub,
-        ms.lc_layer,
+        cm.lc_layer,
     )
 
-    output.add_live_msg(ms.gee.add_layer.format(ms.soc_layer))
-    m.addLayer(model.soc.clip(geom).selfMask(), pm.viz_soc, ms.soc_layer)
+    output.add_live_msg(cm.gee.add_layer.format(cm.soc_layer))
+    m.addLayer(model.soc.clip(geom).selfMask(), pm.viz_soc, cm.soc_layer)
 
-    output.add_live_msg(ms.gee.add_layer.format(ms.ind_layer))
+    output.add_live_msg(cm.gee.add_layer.format(cm.ind_layer))
     m.addLayer(
         model.indicator_15_3_1.clip(geom).selfMask(),
         pm.viz_indicator,
-        ms.ind_layer,
+        cm.ind_layer,
     )
 
     # add the aoi on the map
@@ -157,9 +155,9 @@ def display_maps(aoi_model, model, m, output):
         **{"featureCollection": aoi_model.feature_collection, "color": 1, "width": 2}
     )
     m.addLayer(aoi_line, {"palette": v.theme.themes.dark.accent}, "aoi")
-    output.add_live_msg(ms.map_loading_complete, "success")
+    output.add_live_msg(cm.map_loading_complete, "success")
     m.add_legend(
-        legend_title=ms.map.legend.lc,
+        legend_title=cm.map.legend.lc,
         legend_dict=model.lc_color,
         position="topleft",
     )
@@ -168,10 +166,9 @@ def display_maps(aoi_model, model, m, output):
 
 
 def compute_indicator_maps(aoi_model, model, output):
-
     # raise an error if the years are not in the right order
     if not (model.start < model.end):
-        raise Exception(ms.error.wrong_year)
+        raise Exception(cm.error.wrong_year)
 
     # compute intermediary maps
     vi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
@@ -260,7 +257,6 @@ def compute_stats_by_lc(
     best_effort=True,
     tile_scale=2,
 ):
-
     # land cover
     landcover = model.land_cover.select(select_landcover)
 
@@ -306,7 +302,6 @@ def compute_stats_by_lc(
 
 
 def compute_zonal_analysis(aoi_model, model, output):
-
     # create a result folder including the data parameters
     # create the aoi and parameter folder if not existing
     aoi_dir = pm.result_dir / su.normalize_str(aoi_model.name)
@@ -320,7 +315,7 @@ def compute_zonal_analysis(aoi_model, model, output):
     # check if the file already exist
     indicator_zip = indicator_stats.with_suffix(".zip")
     if indicator_zip.is_file():
-        output.add_live_msg(ms.download.already_exist.format(indicator_zip), "warning")
+        output.add_live_msg(cm.download.already_exist.format(indicator_zip), "warning")
         return indicator_zip
 
     output_widget = Output()
@@ -367,13 +362,12 @@ def compute_zonal_analysis(aoi_model, model, output):
             file = indicator_stats.with_suffix(suffix)
             myzip.write(file, file.name)
 
-    output.add_live_msg(ms.stats_complete.format(indicator_zip), "success")
+    output.add_live_msg(cm.stats_complete.format(indicator_zip), "success")
 
     return indicator_zip
 
 
 def indicator_15_3_1(productivity, landcover, soc, output):
-
     water = landcover.select("water")
     landcover = landcover.select("degradation")
 

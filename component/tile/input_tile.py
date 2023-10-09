@@ -3,7 +3,7 @@ from sepal_ui import sepalwidgets as sw
 from sepal_ui.scripts import utils as su
 import matplotlib.pyplot as plt
 
-from component.message import ms
+from component.message import cm
 from component import widget as cw
 from component import parameter as cp
 from component import scripts as cs
@@ -25,11 +25,11 @@ class InputTile(sw.Tile):
         self.zonal_stats_tile = zonal_stats_tile
 
         # create the widgets that will be displayed
-        markdown = sw.Markdown("""{}""".format("  \n".join(ms.process_text)))
+        markdown = sw.Markdown("""{}""".format("  \n".join(cm.process_text)))
         pickers = cw.PickerLine(self.model)
         pickers_productivity = cw.PickerLineProductivity(self.model)
         threshold = v.Slider(
-            label=ms.threshold.threshold_lbl,
+            label=cm.threshold.threshold_lbl,
             track_color="green",
             min=-1,
             max=1,
@@ -41,27 +41,27 @@ class InputTile(sw.Tile):
         pickers_soc = cw.PickerLineSOC(self.model)
         self.sensor_select = cw.SensorSelect()
         self.vegetation_index = v.Select(
-            label=ms.vi_lbl,
+            label=cm.vi_lbl,
             items=cp.vegetation_index,
             v_model=cp.vegetation_index[0]["value"],
         )
         self.trajectory = v.Select(
-            label=ms.traj_lbl,
+            label=cm.traj_lbl,
             items=cp.trajectories,
             v_model=cp.trajectories[0]["value"],
         )
         productivity_lookup_table = v.Select(
-            label=ms.prod_lookup_lbl,
+            label=cm.prod_lookup_lbl,
             items=cp.productivity_lookup_table,
             v_model=cp.productivity_lookup_table[0]["value"],
         )
-        lceu = v.Select(label=ms.lceu_lbl, items=cp.lceu, v_model=cp.lceu[0]["value"])
+        lceu = v.Select(label=cm.lceu_lbl, items=cp.lceu, v_model=cp.lceu[0]["value"])
 
         climate_regime = cw.ClimateRegime(self.model, alert)
 
-        self.default_lc_matrix_bool = cw.BoolQuestion(ms.select_lc.default_matrix_bool)
+        self.default_lc_matrix_bool = cw.BoolQuestion(cm.select_lc.default_matrix_bool)
 
-        self.custom_lc_matrix_bool = cw.BoolQuestion(ms.select_lc.custom_matrix_bool)
+        self.custom_lc_matrix_bool = cw.BoolQuestion(cm.select_lc.custom_matrix_bool)
 
         ##############################################################
         ##             create advanced parameters                   ##
@@ -72,43 +72,43 @@ class InputTile(sw.Tile):
         main_heading_label = v.Html(
             class_="red--text text--lighten-3 mt-2",
             tag="h3",
-            children=[ms.advance_params],
+            children=[cm.advance_params],
         )
 
         # Productivity section
         prod_sec_label = v.Html(
             class_="green--text text--lighten-3 mt-2",
             tag="h3",
-            children=[ms.productivity_sec],
+            children=[cm.productivity_sec],
         )
         # Land cover section
         landcover_sec_label = v.Html(
             class_="brown--text text--lighten-3 mt-2",
             tag="h3",
-            children=[ms.landcover_sec],
+            children=[cm.landcover_sec],
         )
         # Land cover transition heading
         transition_label = v.Html(
-            class_="grey--text mt-2", tag="h4", children=[ms.transition_matrix]
+            class_="grey--text mt-2", tag="h4", children=[cm.transition_matrix]
         )
         # SOC section heading
         SOC_sec_label = v.Html(
-            class_="green--text text--lighten-4 mt-2", tag="h3", children=[ms.soc_sec]
+            class_="green--text text--lighten-4 mt-2", tag="h3", children=[cm.soc_sec]
         )
 
         # Input weigtes
 
         self._transition_matrix = cw.TransitionMatrix(self.model, alert)
         self._transition_matrix.hide()
-        start_lc = cw.SelectLC(label=ms.start_lc)
-        end_lc = cw.SelectLC(label=ms.end_lc)
+        start_lc = cw.SelectLC(label=cm.start_lc)
+        end_lc = cw.SelectLC(label=cm.end_lc)
         self.custom_matrix_file = sw.FileInput(
             extentions=[".txt", ".tsb", ".csv"],
-            label=ms.custom_matrix_csv,
-            v_model=None,
+            label=cm.custom_matrix_csv,
+            v_model="",
             clearable=True,
         ).hide()
-        lc_pixel_check = v.Switch(label=ms.select_lc.verify_lc_pixel, v_model=True)
+        lc_pixel_check = v.Switch(label=cm.select_lc.verify_lc_pixel, v_model=True)
         water_mask = cw.WaterMask(self.model, alert)
 
         # Create expansion panels for the three sub indicators to stack into the adavanced parameter expand panel widget
@@ -216,7 +216,7 @@ class InputTile(sw.Tile):
         # create the actual tile
         super().__init__(
             "input_tile",
-            ms.titles.inputs,
+            cm.titles.inputs,
             inputs=[
                 markdown,
                 pickers,
@@ -227,7 +227,7 @@ class InputTile(sw.Tile):
                 climate_regime,
                 advance_params,
             ],
-            btn=sw.Btn(ms.process_btn, class_="mt-5"),
+            btn=sw.Btn(cm.process_btn, class_="mt-5"),
             alert=alert,
         )
 
@@ -245,12 +245,12 @@ class InputTile(sw.Tile):
         # check the inputs
         if not all(
             [
-                self.alert.check_input(self.aoi_model.name, ms.error.no_aoi),
-                self.alert.check_input(self.model.start, ms.error.no_start),
-                self.alert.check_input(self.model.end, ms.error.no_end),
-                self.alert.check_input(self.model.vegetation_index, ms.error.no_vi),
-                self.alert.check_input(self.model.trajectory, ms.error.no_traj),
-                self.alert.check_input(self.model.lceu, ms.error.no_lceu),
+                self.alert.check_input(self.aoi_model.name, cm.error.no_aoi),
+                self.alert.check_input(self.model.start, cm.error.no_start),
+                self.alert.check_input(self.model.end, cm.error.no_end),
+                self.alert.check_input(self.model.vegetation_index, cm.error.no_vi),
+                self.alert.check_input(self.model.trajectory, cm.error.no_traj),
+                self.alert.check_input(self.model.lceu, cm.error.no_lceu),
                 self.alert.check_input(self.model.sensors, "no sensors"),
             ]
         ):
@@ -260,7 +260,7 @@ class InputTile(sw.Tile):
             diff_lc = None if self.model.start_lc == self.model.end_lc else True
             if not self.alert.check_input(
                 diff_lc,
-                ms.select_lc.diff_land_cover,
+                cm.select_lc.diff_land_cover,
             ):
                 return
         # check if the land cover pixels and codes from the input matrix are same or not (exact match)
@@ -274,7 +274,7 @@ class InputTile(sw.Tile):
                 else True
             )
             if not self.alert.check_input(
-                lc_check_pixels, ms.select_lc.not_proper_code
+                lc_check_pixels, cm.select_lc.not_proper_code
             ):
                 return
 
@@ -295,7 +295,7 @@ class InputTile(sw.Tile):
                 else None
             )
             if not self.alert.check_input(
-                lc_subset_check_pixels, ms.select_lc.not_proper_code_subset
+                lc_subset_check_pixels, cm.select_lc.not_proper_code_subset
             ):
                 return
         # check if the input matrix contains proper values/atrributes or not
@@ -318,13 +318,13 @@ class InputTile(sw.Tile):
             if not all(
                 [
                     self.alert.check_input(
-                        check_min_max_error, ms.select_lc.min_max_error
+                        check_min_max_error, cm.select_lc.min_max_error
                     ),
                     self.alert.check_input(
-                        check_transition_code_error, ms.select_lc.transition_code_error
+                        check_transition_code_error, cm.select_lc.transition_code_error
                     ),
                     self.alert.check_input(
-                        check_lc_class_mismatch, ms.select_lc.lc_class_mismatch
+                        check_lc_class_mismatch, cm.select_lc.lc_class_mismatch
                     ),
                 ]
             ):
@@ -418,7 +418,7 @@ class InputTile(sw.Tile):
             self.custom_matrix_file.show()
             self.default_lc_matrix_bool.hide()
         else:
-            self.custom_matrix_file.v_model = None
+            self.custom_matrix_file.v_model = ""
             self.custom_matrix_file.hide()
             self.default_lc_matrix_bool.show()
         return

@@ -172,7 +172,6 @@ class ResultMap(sm.SepalMap):
         legend_text = "".join(legend_html)
 
         try:
-
             legend_output_widget = widgets.Output(
                 layout={
                     # "border": "1px solid black",
@@ -182,7 +181,7 @@ class ResultMap(sm.SepalMap):
                     "min_height": min_height,
                     "height": height,
                     "width": width,
-                    "overflow": "scroll",
+                    "overflow": "auto",
                 }
             )
             legend_control = ipyleaflet.WidgetControl(

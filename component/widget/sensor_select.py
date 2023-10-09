@@ -2,7 +2,7 @@ import ipyvuetify as v
 from traitlets import observe, Int
 
 from component import parameter as pm
-from component.message import ms
+from component.message import cm
 
 
 class SensorSelect(v.Select):
@@ -11,7 +11,7 @@ class SensorSelect(v.Select):
     def __init__(self):
         super().__init__(
             items=[],
-            label=ms.sensor_lbl,
+            label=cm.sensor_lbl,
             multiple=True,
             v_model=[],
             chips=True,
@@ -65,6 +65,9 @@ class SensorSelect(v.Select):
         """
         prevent users from mixing landsat, sentinel 2 and  MODIS sensors together
         """
+
+        if not change["new"]:
+            return
 
         # exit if its a removal
         if len(change["new"]) <= len(change["old"]):

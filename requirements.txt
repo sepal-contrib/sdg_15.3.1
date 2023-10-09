@@ -1,30 +1,19 @@
-# these libs are requested to build common python libs 
-# if you are an advance user and are sure to not use them you can comment the following lines
+# base libs
 wheel
-Cython
-pybind11
+voila
 pre-commit
+earthengine-api
 
-# if you require GDAL and or pyproj in your module please uncomment these lines
-# there are set up to be inlined with SEPAL implementation of GDAL and PROJ version
-pygdal==3.4.0.10
-pyproj<3.0.0
+# This version contains file input improements and a fix for the map resize
+# and javascript links error fixed + versioning + navdrawer fix 
+git+https://github.com/12rambau/sepal_ui.git@sepal_pre_release
 
-# uncomment if you want to run your module with GEE in SEPAL
-git+https://github.com/openforis/earthengine-api.git@v0.1.270#egg=earthengine-api&subdirectory=python
-
-# the base lib to run any sepal_ui based app 
-# don't forget to fix it to a specific version when you're app is ready
-sepal_ui==2.4.0
 
 # custom libs
-pandas==1.3.3
-matplotlib==3.1.2
-numpy==1.18
-geopandas==0.10.1
-rasterio==1.1.5
-ipywidgets==7.6.5
-ipyvuetify==1.8.1
-traitlets==5.1.0
-natsort==7.1.1
-cryptography>=2.1.4
+pandas
+matplotlib
+numpy
+geopandas
+rasterio
+natsort
+geemap

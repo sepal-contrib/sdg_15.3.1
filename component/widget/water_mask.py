@@ -1,31 +1,29 @@
 import ipyvuetify as v
 
 from component import parameter as pm
-from component.message import ms
+from component.message import cm
 from component import widget as cw
 
 
 class WaterMask(v.Col):
-
     MASKS = [
-        ms.mask.jrc,
-        ms.mask.pixel,
-        ms.mask.asset,
+        cm.mask.jrc,
+        cm.mask.pixel,
+        cm.mask.asset,
     ]
 
     def __init__(self, model, output):
-
         self.model = model
         self.output = output
 
         # create the widgets
         self.type_select = v.Select(
-            label=ms.water_mask_option_lbl,
+            label=cm.water_mask_option_lbl,
             items=self.MASKS,
             v_model=self.MASKS[0],
         )
         self.pixel_value = v.Slider(
-            label=ms.mask.water_pixel_lbl,
+            label=cm.mask.water_pixel_lbl,
             color="blue",
             track_color="blue",
             min=9,
@@ -34,9 +32,9 @@ class WaterMask(v.Col):
             thumb_label="always",
             v_model=None,
         )
-        self.ee_asset = cw.SelectLC(ms.mask.asset_lbl)
+        self.ee_asset = cw.SelectLC(cm.mask.asset_lbl)
         self.seasonality = v.Slider(
-            label=ms.mask.season_lbl,
+            label=cm.mask.season_lbl,
             color="blue",
             min=1,
             max=12,
@@ -73,7 +71,6 @@ class WaterMask(v.Col):
         self.type_select.observe(self._update_selection, "v_model")
 
     def _update_selection(self, change):
-
         # reset the variables
         self._reset()
 
@@ -89,10 +86,9 @@ class WaterMask(v.Col):
         return
 
     def _reset(self):
-
         # remove values
         self.pixel_value.v_model = None
-        self.ee_asset.w_image.v_model = None
+        self.ee_asset.w_image.v_model = ""
         self.ee_asset.w_band.v_model = None
 
         # hide components

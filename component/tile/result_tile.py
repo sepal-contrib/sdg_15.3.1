@@ -5,7 +5,7 @@ from sepal_ui import mapping as sm
 from ipywidgets import Output, link
 from ipyleaflet import LegendControl
 
-from component.message import ms
+from component.message import cm
 from component import parameter as cp
 from component import scripts as cs
 from component import widget as cw
@@ -13,19 +13,18 @@ from component import widget as cw
 
 class ResultTile(sw.Tile):
     def __init__(self, aoi_model, model, **kwargs):
-
         # get model for the downloading
         self.aoi_model = aoi_model
         self.model = model
 
-        markdown = sw.Markdown("""{}""".format("  \n".join(ms.result_text)))
+        markdown = sw.Markdown("""{}""".format("  \n".join(cm.result_text)))
 
         # create the result map
         # with its legend
         self.m = cw.ResultMap()
 
         self.m.add_legend(
-            legend_title=ms.map.legend.state,
+            legend_title=cm.map.legend.state,
             legend_dict=cp.legend,
             position="topleft",
         )
@@ -69,11 +68,11 @@ class ResultTile(sw.Tile):
         # init the tile
         super().__init__(
             "result_tile",
-            ms.titles.results,
+            cm.titles.results,
             [markdown, plot_line],
             alert=sw.Alert(),
             btn=sw.Btn(
-                text=ms.result_btn,
+                text=cm.result_btn,
                 icon="mdi-download",
                 class_="ma-5",
                 disabled=True,
@@ -86,7 +85,6 @@ class ResultTile(sw.Tile):
 
     @su.loading_button(debug=True)
     def download_maps(self, widget, event, data):
-
         # download the files
         links = cs.download_maps(self.aoi_model, self.model, self.alert)
 
