@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 from component.message import cm
 from component import parameter as pm
-from .gdrive import gdrive
+from .gdrive import GDrive
 
 
 def digest_tiles(filename, result_dir, output, tmp_file):
@@ -16,7 +16,7 @@ def digest_tiles(filename, result_dir, output, tmp_file):
         time.sleep(2)
         return
 
-    drive_handler = gdrive()
+    drive_handler = GDrive()
     files = drive_handler.get_files(filename)
 
     # if no file, it means that the download had failed

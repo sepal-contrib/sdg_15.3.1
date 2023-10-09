@@ -15,7 +15,7 @@ from sepal_ui.scripts import utils as su
 from component import parameter as pm
 from component.message import cm
 
-from .gdrive import gdrive
+from .gdrive import GDrive
 from .gee import wait_for_completion
 from .download import digest_tiles
 from .integration import *
@@ -53,7 +53,7 @@ def download_maps(aoi_model, model, output):
     }
 
     # load the drive_handler
-    drive_handler = gdrive()
+    drive_handler = GDrive()
 
     # clip the images if it's an administrative layer and keep the bounding box if not
     if aoi_model.feature_collection:
