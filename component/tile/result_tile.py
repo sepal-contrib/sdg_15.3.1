@@ -1,9 +1,7 @@
 import ipyvuetify as v
 from sepal_ui import sepalwidgets as sw
 from sepal_ui.scripts import utils as su
-from sepal_ui import mapping as sm
 from ipywidgets import Output, link
-from ipyleaflet import LegendControl
 
 from component.message import cm
 from component import parameter as cp

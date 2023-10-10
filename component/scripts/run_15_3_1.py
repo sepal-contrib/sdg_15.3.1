@@ -1,6 +1,4 @@
 from zipfile import ZipFile
-import time
-from itertools import product
 
 import ee
 import geemap
