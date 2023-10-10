@@ -1,3 +1,14 @@
+## 1.1.1 (2023-10-10)
+
+### Fix
+
+- **reclassify_view**: use sepalwidget card instead
+- **geemap**: remove extra display spaces on ui's
+
+### Refactor
+
+- remove unused imports
+
 ## 1.1.0 (2023-10-09)
 
 ### Feat
