@@ -81,7 +81,7 @@ class ResultTile(sw.Tile):
         self.btn.on_event("click", self.download_maps)
         link((self.tabs, "v_model"), (self.content, "v_model"))
 
-    @su.loading_button(debug=True)
+    @su.loading_button()
     def download_maps(self, widget, event, data):
         # download the files
         links = cs.download_maps(self.aoi_model, self.model, self.alert)

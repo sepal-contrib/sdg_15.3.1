@@ -30,7 +30,7 @@ class ZonalTile(sw.Tile):
         # link the downlad as tif to a function
         self.btn.on_event("click", self.compute_stats)
 
-    @su.loading_button(debug=False)
+    @su.loading_button()
     def compute_stats(self, widget, event, data):
         # download the files
         stats = cs.compute_zonal_analysis(self.aoi_model, self.model, self.alert)

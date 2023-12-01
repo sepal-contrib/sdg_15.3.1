@@ -531,15 +531,15 @@ class ReclassifyView(sw.Card):
         ]
 
         # Decorate functions
-        self.reclassify = loading_button(self.alert, self.reclassify_btn, debug=True)(
+        self.reclassify = loading_button(self.alert, self.reclassify_btn)(
             self.reclassify
         )
-        self.get_reclassify_table = loading_button(
-            self.alert, self.get_table, debug=True
-        )(self.get_reclassify_table)
-        self.load_matrix_content = loading_button(
-            self.alert, self.import_table, debug=True
-        )(self.load_matrix_content)
+        self.get_reclassify_table = loading_button(self.alert, self.get_table)(
+            self.get_reclassify_table
+        )
+        self.load_matrix_content = loading_button(self.alert, self.import_table)(
+            self.load_matrix_content
+        )
 
         # JS Events
         self.import_table.on_event("click", lambda *args: self.import_dialog.show())

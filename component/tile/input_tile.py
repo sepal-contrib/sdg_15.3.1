@@ -240,7 +240,7 @@ class InputTile(sw.Tile):
             self._display_custom_lc_file_selection, "v_model"
         )
 
-    @su.loading_button(debug=True)
+    @su.loading_button()
     def start_process(self, widget, data, event):
         # check the inputs
         if not all(
