@@ -1,11 +1,14 @@
+import json
 from pathlib import Path
 
 import ee
 import io
 from googleapiclient.http import MediaIoBaseDownload
+from google.oauth2.credentials import Credentials
+
 from apiclient import discovery
 
-from component.message import ms
+from component.message import cm
 from .gee import search_task
 
 import logging
@@ -13,16 +16,18 @@ import logging
 logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
 
 
-class gdrive(object):
+class GDrive:
     def __init__(self):
-
         self.initialize = ee.Initialize()
-        self.credentials = ee.Credentials()
+        # Access to sepal access token
+        self.access_token = json.loads(
+            (Path.home() / ".config/earthengine/credentials").read_text()
+        ).get("access_token")
         self.service = discovery.build(
             serviceName="drive",
             version="v3",
             cache_discovery=False,
-            credentials=self.credentials,
+            credentials=Credentials(self.access_token),
         )
 
     def tasks_list(self):
@@ -146,7 +151,7 @@ class gdrive(object):
                 task.start()
                 download = True
             else:
-                output.add_live_msg(ms.gdrive.already_done.format(filename), "success")
+                output.add_live_msg(cm.gdrive.already_done.format(filename), "success")
 
             return download
 

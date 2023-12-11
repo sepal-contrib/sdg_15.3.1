@@ -1,11 +1,9 @@
 import ipyvuetify as v
 from sepal_ui import sepalwidgets as sw
 from sepal_ui.scripts import utils as su
-from sepal_ui import mapping as sm
 from ipywidgets import Output, link
-from ipyleaflet import LegendControl
 
-from component.message import ms
+from component.message import cm
 from component import parameter as cp
 from component import scripts as cs
 from component import widget as cw
@@ -13,22 +11,21 @@ from component import widget as cw
 
 class ResultTile(sw.Tile):
     def __init__(self, aoi_model, model, **kwargs):
-
         # get model for the downloading
         self.aoi_model = aoi_model
         self.model = model
 
-        markdown = sw.Markdown("""{}""".format("  \n".join(ms.result_text)))
+        markdown = sw.Markdown("""{}""".format("  \n".join(cm.result_text)))
 
         # create the result map
         # with its legend
         self.m = cw.ResultMap()
 
-#        self.m.add_legend(
-#            legend_title=ms.map.legend.state,
-#            legend_dict=cp.legend,
-#            position="topleft",
-#        )
+        self.m.add_legend(
+            legend_title=cm.map.legend.state,
+            legend_dict=cp.legend,
+            position="topleft",
+        )
 
         # display the graphs next to the map
         self.sankey_plot = Output()
@@ -69,11 +66,11 @@ class ResultTile(sw.Tile):
         # init the tile
         super().__init__(
             "result_tile",
-            ms.titles.results,
+            cm.titles.results,
             [markdown, plot_line],
             alert=sw.Alert(),
             btn=sw.Btn(
-                text=ms.result_btn,
+                text=cm.result_btn,
                 icon="mdi-download",
                 class_="ma-5",
                 disabled=True,
@@ -84,9 +81,8 @@ class ResultTile(sw.Tile):
         self.btn.on_event("click", self.download_maps)
         link((self.tabs, "v_model"), (self.content, "v_model"))
 
-    @su.loading_button(debug=True)
+    @su.loading_button()
     def download_maps(self, widget, event, data):
-
         # download the files
         links = cs.download_maps(self.aoi_model, self.model, self.alert)
 

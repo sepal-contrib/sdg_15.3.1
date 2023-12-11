@@ -4,7 +4,7 @@ import ee
 from natsort import natsorted
 import ipyvuetify as v
 
-from component.message import ms
+from component.message import cm
 from component import parameter as cp
 
 ee.Initialize()
@@ -12,7 +12,6 @@ ee.Initialize()
 
 class SelectLC(v.Layout):
     def __init__(self, label="select Land Cover"):
-
         # create the layout
         super().__init__(row=True, xs12=True)
 
@@ -33,7 +32,8 @@ class SelectLC(v.Layout):
     def _validate(self, change):
         """
         Validate the selected access. Throw an error message if is not accesible.
-        If the asset can be accessed check that it only include values within the classification"""
+        If the asset can be accessed check that it only include values within the classification
+        """
 
         w = self.w_image  # it's also change["owner"]
 
@@ -48,7 +48,7 @@ class SelectLC(v.Layout):
             w.asset_info = None
             w.valid = False
             w.error = True
-            w.error_messages = ms.select_lc.not_image
+            w.error_messages = cm.select_lc.not_image
             return
 
         # call the band list update

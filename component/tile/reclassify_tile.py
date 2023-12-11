@@ -1,16 +1,15 @@
-from sepal_ui import reclassify as rec
-from sepal_ui import sepalwidgets as sw
-
+from sepal_ui.aoi import AoiModel
+from component.widget import reclassify as rec
 from component import parameter as cp
 
 
 class ReclassifyTile(rec.ReclassifyView):
-    def __init__(self):
-
+    def __init__(self, aoi_model: AoiModel):
         super().__init__(
             gee=True,
             default_class={"UNCCD CLASSES": str(cp.utils_dir / "UNCCD.csv")},
             save=True,
+            aoi_model=aoi_model,
         )
 
         # change the title

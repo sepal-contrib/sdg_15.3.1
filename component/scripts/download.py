@@ -5,24 +5,23 @@ from rasterio.merge import merge
 from matplotlib.colors import to_rgba
 from matplotlib import pyplot as plt
 
-from component.message import ms
+from component.message import cm
 from component import parameter as pm
-from .gdrive import gdrive
+from .gdrive import GDrive
 
 
 def digest_tiles(filename, result_dir, output, tmp_file):
-
     if tmp_file.is_file():
-        output.add_live_msg(ms.download.file_exist.format(tmp_file), "warning")
+        output.add_live_msg(cm.download.file_exist.format(tmp_file), "warning")
         time.sleep(2)
         return
 
-    drive_handler = gdrive()
+    drive_handler = GDrive()
     files = drive_handler.get_files(filename)
 
     # if no file, it means that the download had failed
     if not len(files):
-        raise Exception(ms.gdrive.error.no_file)
+        raise Exception(cm.gdrive.error.no_file)
 
     drive_handler.download_files(files, result_dir)
 
@@ -31,7 +30,7 @@ def digest_tiles(filename, result_dir, output, tmp_file):
     files = [file for file in result_dir.glob(pathname)]
 
     # run the merge process
-    output.add_live_msg(ms.download.merge_tile)
+    output.add_live_msg(cm.download.merge_tile)
 
     # manual open and close because I don't know how many file there are
     sources = [rio.open(file) for file in files]

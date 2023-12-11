@@ -1,0 +1,11 @@
+[project]
+version = "1.1.1"
+
+[tool.commitizen]
+version = "1.1.1"
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
+changelog_incremental = true
+version_files = [
+    "pyproject.toml:version",
+]

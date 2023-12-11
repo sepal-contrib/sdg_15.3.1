@@ -2,8 +2,15 @@ import os
 
 from sepal_ui import mapping as sm
 from geemap.legends import builtin_legends
+from geemap.map_widgets import _set_css_in_cell_output
 import ipywidgets as widgets
 import ipyleaflet
+import IPython
+
+try:
+    IPython.get_ipython().events.unregister("pre_run_cell", _set_css_in_cell_output)
+except Exception as e:
+    pass
 
 
 class ResultMap(sm.SepalMap):
@@ -172,7 +179,6 @@ class ResultMap(sm.SepalMap):
         legend_text = "".join(legend_html)
 
         try:
-
             legend_output_widget = widgets.Output(
                 layout={
                     # "border": "1px solid black",
@@ -182,7 +188,7 @@ class ResultMap(sm.SepalMap):
                     "min_height": min_height,
                     "height": height,
                     "width": width,
-                    "overflow": "scroll",
+                    "overflow": "auto",
                 }
             )
             legend_control = ipyleaflet.WidgetControl(

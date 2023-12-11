@@ -1,11 +1,10 @@
 import ipyvuetify as v
 
 from component import parameter as pm
-from component.message import ms
+from component.message import cm
 
 
 class MatrixInput(v.Html):
-
     VALUES = {
         "I": (1, v.theme.themes.dark.success),
         "S": (0, v.theme.themes.dark.primary),
@@ -13,7 +12,6 @@ class MatrixInput(v.Html):
     }
 
     def __init__(self, line, column, model, default_value, output):
-
         # get the io for dynamic modification
         self.model = model
 
@@ -42,25 +40,22 @@ class MatrixInput(v.Html):
         self.val.observe(self.color_change, "v_model")
 
     def color_change(self, change):
-
         val, color = self.VALUES[change["new"]]
 
         self.style_ = f"background-color: {color}"
         self.model.transition_matrix[self.line][self.column] = val
 
-        self.output.add_msg(ms.matrix_changed)
+        self.output.add_msg(cm.matrix_changed)
 
         return
 
 
 class TransitionMatrix(v.SimpleTable):
-
     CLASSES = [*pm.lc_color]
 
     DECODE = {1: "I", 0: "S", -1: "D"}
 
     def __init__(self, model, output):
-
         # create a header
         header = [
             v.Html(
@@ -75,7 +70,6 @@ class TransitionMatrix(v.SimpleTable):
         # create a row
         rows = []
         for i, baseline in enumerate(self.CLASSES):
-
             inputs = []
             for j, target in enumerate(self.CLASSES):
                 # create a input with default matrix value
