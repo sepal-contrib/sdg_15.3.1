@@ -7,8 +7,6 @@ import ipyvuetify as v
 from component.message import cm
 from component import parameter as cp
 
-ee.Initialize()
-
 
 class SelectLC(v.Layout):
     def __init__(self, label="select Land Cover"):

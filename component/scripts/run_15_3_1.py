@@ -21,8 +21,6 @@ from .productivity import *
 from .soil_organic_carbon import *
 from .land_cover import *
 
-ee.Initialize()
-
 
 def download_maps(aoi_model, model, output):
     # create a result folder including the data parameters

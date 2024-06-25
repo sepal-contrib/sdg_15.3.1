@@ -101,7 +101,9 @@ class ReclassifyModel(Model):
             su.init_ee()
 
         if self.gee:
-            self.folder = folder or ee.data.getAssetRoots()[0]["id"]
+            self.folder = folder or Path(
+                f"projects/{ee.data._cloud_api_user_project}/assets/"
+            )
         else:
             self.folder = None
 

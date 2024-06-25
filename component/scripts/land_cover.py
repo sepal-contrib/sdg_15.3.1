@@ -2,8 +2,6 @@ import ee
 
 from component import parameter as pm
 
-ee.Initialize()
-
 
 def land_cover(model, aoi_model, output):
     """Calculate land cover sub-indicator"""

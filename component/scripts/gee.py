@@ -4,7 +4,6 @@ import ee
 
 from component.message import cm
 
-ee.Initialize()
 
 # messages
 STATUS = "Status : {0}"

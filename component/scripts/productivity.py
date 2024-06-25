@@ -5,8 +5,6 @@ import ee
 
 from component import parameter as pm
 
-ee.Initialize()
-
 
 def productivity_trajectory(
     model, integrated_annual_vi, climate_yearly_integration, output

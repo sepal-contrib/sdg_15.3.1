@@ -6,8 +6,6 @@ import ee
 
 from component import parameter as pm
 
-ee.Initialize()
-
 
 def integrate_ndvi_climate(aoi_model, model, output):
     # Caculate the maximum extent of assessment period from all the inputs to integrate the vi over the entire period

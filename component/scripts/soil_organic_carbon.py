@@ -1,7 +1,5 @@
 import ee
 
-ee.Initialize()
-
 from component import parameter as pm
 
 
