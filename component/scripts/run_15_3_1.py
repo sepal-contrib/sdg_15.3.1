@@ -167,7 +167,9 @@ def compute_indicator_maps(aoi_model, model, output):
         raise Exception(cm.error.wrong_year)
 
     # compute intermediary maps
-    vi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
+    #vi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
+    climate_int = integrate_climate(aoi_model, model, output)
+    vi_int = integrate_vi(aoi_model, model, output)
     model.productivity_trend = productivity_trajectory(
         model, vi_int, climate_int, output
     )
