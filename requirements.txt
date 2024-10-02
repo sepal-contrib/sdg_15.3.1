@@ -13,4 +13,4 @@ matplotlib
 numpy
 geopandas
 natsort
-geemap
+geemap<=v0.34.2
