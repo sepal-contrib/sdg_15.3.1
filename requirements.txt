@@ -4,7 +4,7 @@ voila
 pre-commit
 earthengine-api
 
-sepal_ui==2.21.1
+sepal_ui==2.21.0
 rasterio<1.3.11 # Leave it here even if it's already in the sepal_ui requirements. Check https://github.com/openforis/sepal/issues/328
 
 # custom libs
