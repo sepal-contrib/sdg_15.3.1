@@ -142,6 +142,7 @@ def productivity_performance(
         reducer=ee.Reducer.percentile([90]).group(groupField=1, groupName="code"),
         geometry=aoi_model.feature_collection.geometry(),
         scale=model.scale,
+        bestEffort=True,
         maxPixels=1e15,
     )
 

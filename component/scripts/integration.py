@@ -7,8 +7,7 @@ import ee
 from component import parameter as pm
 
 
-def integrate_ndvi_climate(aoi_model, model, output):
-    # Caculate the maximum extent of assessment period from all the inputs to integrate the vi over the entire period
+def integrate_climate(aoi_model, model, output):
     start_list = [
         model.start,
         model.trend_start,
@@ -18,137 +17,204 @@ def integrate_ndvi_climate(aoi_model, model, output):
     end_list = [model.end, model.trend_end, model.state_end, model.performance_end]
     period_start = min(filter(lambda v: v is not None, start_list))
     period_end = max(filter(lambda v: v is not None, end_list))
+    precipitation = (
+        ee.ImageCollection(pm.precipitation)
+        .filterBounds(aoi_model.feature_collection)
+        .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+        .select("precipitation")
+    )
 
-    if "MODIS MOD13Q1" in model.sensors or "MODIS MYD13Q1" in model.sensors:
-        if "MODIS MOD13Q1" in model.sensors and "MODIS MYD13Q1" in model.sensors:
-            modis_vi_mod = ee.ImageCollection(
-                pm.sensors["MODIS MOD13Q1"][0]
-            ).filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
-            modis_vi_myd = ee.ImageCollection(
-                pm.sensors["MODIS MYD13Q1"][0]
-            ).filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
-            modis_vi_ = modis_vi_mod.merge(modis_vi_myd)
-            modis_vi = modis_vi_.map(partial(cloud_mask, sensor="MODIS"))
+    climate_int = int_yearly_climate(precipitation, period_start, period_end)
+    return climate_int
 
-        elif "MODIS MOD13Q1" in model.sensors:
-            modis_vi_ = ee.ImageCollection(pm.sensors["MODIS MOD13Q1"][0]).filterDate(
-                f"{period_start}-01-01", f"{period_end}-12-31"
-            )
-            modis_vi = modis_vi_.map(partial(cloud_mask, sensor="MODIS"))
-        elif "MODIS MYD13Q1" in model.sensors:
-            modis_vi_ = ee.ImageCollection(pm.sensors["MODIS MYD13Q1"][0]).filterDate(
-                f"{period_start}-01-01", f"{period_end}-12-31"
-            )
-            modis_vi = modis_vi_.map(partial(cloud_mask, sensor="MODIS"))
 
-        if model.vegetation_index == "ndvi":
-            modis_vi_scalled = modis_vi.select("NDVI").map(
-                partial(img_scalling, scale_factor=0.0001)
-            )
-            modis_vi_w_threshold = modis_vi_scalled.map(
-                partial(vi_threshold, threshold=model.threshold)
-            )
-            integrated_vi_coll = annual_modis_vi(
-                modis_vi_w_threshold, period_start, period_end
-            )
-        elif model.vegetation_index == "evi":
-            modis_vi_scalled = modis_vi.select("EVI").map(
-                partial(img_scalling, scale_factor=0.0001)
-            )
-            modis_vi_w_threshold = modis_vi_scalled.map(
-                partial(vi_threshold, threshold=model.threshold)
-            )
-            integrated_vi_coll = annual_modis_vi(
-                modis_vi_w_threshold, period_start, period_end
-            )
-        elif model.vegetation_index == "msvi":
-            msvi_coll = modis_vi.map(calculate_msvi_modis).select("msvi")
-            msvi_collection_w_threshold = msvi_coll.map(
-                partial(vi_threshold, threshold=model.threshold)
-            )
-            integrated_vi_coll = annual_modis_vi(
-                msvi_collection_w_threshold, period_start, period_end
-            )
+def integrate_vi(aoi_model, model, output):
+    start_list = [
+        model.start,
+        model.trend_start,
+        model.state_start,
+        model.performance_start,
+    ]
+    end_list = [model.end, model.trend_end, model.state_end, model.performance_end]
+    period_start = min(filter(lambda v: v is not None, start_list))
+    period_end = max(filter(lambda v: v is not None, end_list))
+    ee_asset_list = [
+        inner_list[0] for inner_list in (pm.sensors[key] for key in model.sensors)
+    ]
 
-    elif "Terra NPP" in model.sensors:
-        npp_filtered = (
-            ee.ImageCollection(pm.sensors["Terra NPP"][0])
-            .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
-            .select("Npp")
+    if {"MODIS MOD13Q1", "MODIS MYD13Q1"} & set(model.sensors):
+        integrated_vi = process_modis(
+            model.sensors,
+            ee_asset_list,
+            model.vegetation_index,
+            model.threshold,
+            period_start,
+            period_end,
         )
-        integrated_vi_coll = preproc_modis_npp(npp_filtered, period_start, period_end)
+    elif "Terra NPP" in model.sensors:
+        integrated_vi = process_terra_npp(ee_asset_list, period_start, period_end)
+    elif "Sentinel 2" in model.sensors:
+        integrated_vi = process_sentinel2(
+            aoi_model.feature_collection,
+            model.sensors[0],
+            ee_asset_list[0],
+            model.vegetation_index,
+            model.threshold,
+            period_start,
+            period_end,
+        )
+    elif "Derived VI Landsat" in model.sensors:
+        asset_id = (
+            ee_asset_list[0][0]
+            if model.vegetation_index == "ndvi"
+            else ee_asset_list[0][1]
+        )
+        integrated_vi = process_landsat_derived_vi(
+            aoi_model.feature_collection,
+            asset_id,
+            model.threshold,
+            period_start,
+            period_end,
+        )
+    elif "GEE Asset" in model.sensors:
+        integrated_vi = ee.ImageCollection(model.integrated_vi_asset)
+    elif {"Landsat 4", "Landsat 5", "Landsat 7", "Landsat 8", "Landsat 9"} & set(
+        model.sensors
+    ):
+        integrated_vi = process_landsat_sensors(
+            aoi_model.feature_collection,
+            model.sensors,
+            ee_asset_list,
+            model.vegetation_index,
+            model.threshold,
+            period_start,
+            period_end,
+        )
     else:
-        if pm.sensors[model.sensors[0]][3] == "SR":
-            # create the composite image collection
-            i_img_coll = ee.ImageCollection([])
+        raise ValueError("No valid sensor type found in the model.")
+    return integrated_vi
 
-            for sensor in model.sensors:
-                # get the image collection
-                # filter its bounds to fit the aoi extends
-                # rename the bands
-                # adapt the resolution to meet sentinel 2 native one (10m)
-                # mask the clouds and adapt the scale
-                # TODO: filter the images before applying the other functions!
-                sat = (
-                    ee.ImageCollection(pm.sensors[sensor][0])
-                    .filterBounds(aoi_model.feature_collection)
-                    .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
-                    .map(partial(rename_band, sensor=sensor))
-                    .map(partial(cloud_mask, sensor=sensor))
-                    .map(partial(apply_scale_factor, sensor=sensor))
-                )
 
-                i_img_coll = i_img_coll.merge(sat)
+def process_modis(
+    sensor_list, ee_asset_list, vi_index, threshold, period_start, period_end
+):
+    modis_coll_ = ee.ImageCollection(ee_asset_list[0]).filterDate(
+        f"{period_start}-01-01", f"{period_end}-12-31"
+    )
 
-            # Prepare VI collection from the images
-            if model.vegetation_index == "ndvi":
-                vi_coll = i_img_coll.map(calculate_ndvi).select("ndvi")
-            elif model.vegetation_index == "evi":
-                vi_coll = i_img_coll.map(calculate_evi).select("evi")
-            elif model.vegetation_index == "msvi":
-                vi_coll = i_img_coll.map(calculate_msvi).select("msvi")
-            # Integrate observed NDVI datasets at the annual level
-            vi_coll_w_threshold = vi_coll.map(
-                partial(vi_threshold, threshold=model.threshold)
+    # merge the collection if both the MODIS sensors are selected
+    if len(sensor_list) > 1:
+        modis_coll_ = modis_coll_.merge(
+            ee.ImageCollection(ee_asset_list[1]).filterDate(
+                f"{period_start}-01-01", f"{period_end}-12-31"
             )
-            integrated_vi_coll = int_yearly_ndvi(
-                vi_coll_w_threshold, period_start, period_end
-            )
+        )
+    # Apply the cloud mask
+    modis_coll = modis_coll_.map(partial(cloud_mask, sensor="MODIS"))
 
-        elif pm.sensors[model.sensors[0]][3] == "VI":
-            if model.vegetation_index == "ndvi":
-                vi_coll = ee.ImageCollection([])
-                for sensor in model.sensors:
-                    sat = (
-                        ee.ImageCollection(pm.sensors[sensor][0][0])
-                        .filterBounds(aoi_model.feature_collection)
-                        .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
-                    )
-                    vi_coll = vi_coll.merge(sat)
+    if vi_index in ["ndvi", "evi"]:
+        modis_vi_scalled = modis_coll.select(vi_index.upper()).map(
+            partial(img_scalling, scale_factor=0.0001)
+        )
+        modis_vi_w_threshold = modis_vi_scalled.map(
+            partial(vi_threshold, threshold=threshold)
+        )
+    elif vi_index == "msvi":
+        modis_vi_scalled = modis_coll.map(calculate_msvi_modis).select("msvi")
+        modis_vi_w_threshold = modis_vi_scalled.map(
+            partial(vi_threshold, threshold=threshold)
+        )
+    else:
+        raise ValueError(f"Unsupported vegetation index: {vi_index}")
 
-                integrated_vi_coll = annual_modis_vi(vi_coll, period_start, period_end)
-            elif model.vegetation_index == "evi":
-                vi_coll = ee.ImageCollection([])
-                for sensor in model.sensors:
-                    sat = (
-                        ee.ImageCollection(pm.sensors[sensor][0][1])
-                        .filterBounds(aoi_model.feature_collection)
-                        .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
-                    )
-                    vi_coll = vi_coll.merge(sat)
+    integrated_vi_coll = annual_modis_vi(modis_vi_w_threshold, period_start, period_end)
+    return integrated_vi_coll
 
-                vi_coll_w_threshold = vi_coll.map(
-                    partial(vi_threshold, threshold=model.threshold)
-                )
-                integrated_vi_coll = annual_modis_vi(
-                    vi_coll_w_threshold, period_start, period_end
-                )
 
-            else:
-                print(f"{model.vegetation_index} is not available as a derived index")
+def process_terra_npp(ee_asset_list, period_start, period_end):
+    npp_filtered = (
+        ee.ImageCollection(ee_asset_list[0])
+        .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+        .select("Npp")
+    )
+    integrated_vi_coll = preproc_modis_npp(npp_filtered, period_start, period_end)
 
-    # TODO: option to select multiple precipitation datasets.
-    # process the climate dataset to use with the pixel restrend, RUE calculation
+    return integrated_vi_coll
+
+
+# todo: need to create a widget to customize the cloud filter value
+def process_landsat_sensors(
+    aoi, sensor_list, ee_asset_list, vi_index, threshold, period_start, period_end
+):
+    i_img_coll = ee.ImageCollection([])
+
+    for sensor, asset_id in zip(sensor_list, ee_asset_list):
+        sat = (
+            ee.ImageCollection(asset_id)
+            .filterBounds(aoi)
+            .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+            .filter(ee.Filter.lt("CLOUD_COVER_LAND", 20))
+            .map(partial(rename_band, sensor=sensor))
+            .map(partial(cloud_mask, sensor=sensor))
+            .map(partial(apply_scale_factor, sensor=sensor))
+        )
+
+        i_img_coll = i_img_coll.merge(sat)
+
+    if vi_index in ["ndvi", "evi", "msvi"]:
+        vi_coll = i_img_coll.map(globals()[f"calculate_{vi_index}"]).select(
+            vi_index.lower()
+        )
+        vi_coll_w_threshold = vi_coll.map(partial(vi_threshold, threshold=threshold))
+        integrated_vi_coll = int_yearly_ndvi(
+            vi_coll_w_threshold, period_start, period_end
+        )
+    else:
+        raise ValueError(f"Unsupported vegetation index: {vi_index}")
+
+    return integrated_vi_coll
+
+
+# todo: need to create a widget to customize the cloud filter value
+def process_sentinel2(
+    aoi, sensor, ee_asset_id, vi_index, threshold, period_start, period_end
+):
+    i_img_coll = (
+        ee.ImageCollection(ee_asset_id)
+        .filterBounds(aoi)
+        .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
+        .map(partial(rename_band, sensor=sensor))
+        .map(partial(cloud_mask, sensor=sensor))
+        .map(partial(apply_scale_factor, sensor=sensor))
+    )
+
+    if vi_index in ["ndvi", "evi", "msvi"]:
+        vi_coll = i_img_coll.map(globals()[f"calculate_{vi_index}"]).select(
+            vi_index.lower()
+        )
+        vi_coll_w_threshold = vi_coll.map(partial(vi_threshold, threshold=threshold))
+        integrated_vi_coll = int_yearly_ndvi(
+            vi_coll_w_threshold, period_start, period_end
+        )
+    else:
+        raise ValueError(f"Unsupported vegetation index: {vi_index}")
+
+    return integrated_vi_coll
+
+
+def process_landsat_derived_vi(aoi, asset_id, threshold, period_start, period_end):
+    img_coll = (
+        ee.ImageCollection(asset_id)
+        .filterBounds(aoi)
+        .filterDate(f"{period_start}-01-01", f"{period_end}-12-31")
+        .map(partial(vi_threshold, threshold=threshold))
+    )
+    integrated_vi_coll = annual_modis_vi(img_coll, period_start, period_end)
+    return integrated_vi_coll
+
+
+def process_climate_data(aoi_model, period_start, period_end):
     precipitation = (
         ee.ImageCollection(pm.precipitation)
         .filterBounds(aoi_model.feature_collection)
@@ -158,7 +224,7 @@ def integrate_ndvi_climate(aoi_model, model, output):
 
     climate_int = int_yearly_climate(precipitation, period_start, period_end)
 
-    return (integrated_vi_coll, climate_int)
+    return climate_int
 
 
 def rename_band(img, sensor):
@@ -198,8 +264,11 @@ def cloud_mask(img, sensor):
         cirrusBitMask = 1 << 11
         # Both flags should be set to zero, indicating clear conditions.
         mask = qa.bitwiseAnd(cloudBitMask).eq(0).And(qa.bitwiseAnd(cirrusBitMask).eq(0))
-
-        img = img.updateMask(mask).divide(10000)
+        img = (
+            img.updateMask(mask)
+            .divide(10000)
+            .copyProperties(img, ["system:time_start", "system:time_end"])
+        )
     elif sensor == "MODIS":
         qa = img.select("DetailedQA")
         viqamask1 = bit_selection(qa, 0, 1).lte(1)
@@ -241,8 +310,10 @@ def int_yearly_ndvi(ndvi_coll, start, end):
         ndvi_coll_ann = ndvi_collection.filter(
             ee.Filter.calendarRange(year, field="year")
         )
-        months = ndvi_coll_ann.aggregate_array("system:time_start").map(
-            lambda x: ee.Number.parse(ee.Date(x).format("MM"))
+        months = (
+            ndvi_coll_ann.aggregate_array("system:time_start")
+            .map(lambda x: ee.Number.parse(ee.Date(x).format("MM")))
+            .distinct()
         )
 
         img_coll = ee.ImageCollection.fromImages(
