@@ -3,7 +3,7 @@ L4_start = 1982
 
 # max year for land cover
 land_cover_max_year = 2022
-sensor_max_year = 2023
+sensor_max_year = 2024
 
 land_cover_first_year = 1992
 
