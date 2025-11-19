@@ -1,0 +1,22 @@
+name: sdg_15.3.1
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - gdal=3.8.3
+  - rasterio
+  - geopandas
+  - pip
+  - pip:
+    - sepal_ui==2.21.0
+    - rasterio<1.3.11
+    - wheel
+    - voila
+    - earthengine-api
+    - pre-commit
+    - pandas
+    - matplotlib
+    - numpy
+    - geopandas
+    - natsort
