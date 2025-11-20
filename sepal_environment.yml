@@ -1,0 +1,19 @@
+name: sdg_15.3.1
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pyproj  # Always include to avoid PROJ conflicts
+  - wheel
+  - pre-commit
+  - rasterio
+  - pandas
+  - matplotlib
+  - numpy
+  - geopandas
+  - natsort
+  - pip
+  - pip:
+    - sepal_ui==2.21.0
+    - git+https://github.com/openforis/earthengine-api.git@v1.1.5rc0#egg=earthengine-api&subdirectory=python
