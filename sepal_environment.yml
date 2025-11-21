@@ -9,12 +9,13 @@ dependencies:
   - pre-commit
   - rasterio
   - gdal=3.8.3
-  - pandas
+  - pandas=2.2.3
   - matplotlib
   - numpy
-  - geopandas
+  - geopandas=1.0.1
   - natsort
   - pip
+  - geemap<=0.34.2
   - pip:
     - sepal_ui==2.21.0
     - git+https://github.com/openforis/earthengine-api.git@v1.1.5rc0#egg=earthengine-api&subdirectory=python
