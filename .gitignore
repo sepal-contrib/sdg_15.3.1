@@ -131,3 +131,4 @@ dmypy.json
 .pyre/
 .idea/
 .vscode/sftp.json
+CLAUDE.md
