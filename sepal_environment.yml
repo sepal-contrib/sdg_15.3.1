@@ -5,7 +5,7 @@ channels:
 dependencies:
   - python=3.10
   - pyproj  # Always include to avoid PROJ conflicts
-  - setuptools
+  - setuptools<=80
   - wheel
   - pre-commit
   - gdal=3.8.3
