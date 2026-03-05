@@ -1,4 +1,5 @@
 # base libs
+setuptools<=80
 wheel
 voila
 pre-commit
