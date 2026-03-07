@@ -1,9 +1,12 @@
+from datetime import datetime
+
 # first images year
 L4_start = 1982
 
 # max year for land cover
 land_cover_max_year = 2022
-sensor_max_year = 2024
+current_year = datetime.now().year
+sensor_max_year = current_year - 1
 
 land_cover_first_year = 1992
 
@@ -11,7 +14,10 @@ land_cover_first_year = 1992
 sensors = {
     "Landsat 4": ["LANDSAT/LT04/C02/T1_L2", 30, "l4", "SR"],
     "Derived VI Landsat": [
-        ["LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NDVI", "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_EVI"],
+        [
+            "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NDVI",
+            "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_EVI",
+        ],
         30,
         "",
         "VI",
