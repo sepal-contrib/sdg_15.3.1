@@ -5,43 +5,30 @@ import ipyleaflet
 from IPython.display import display
 
 
-# Built-in legend definitions (extracted from geemap)
+# Example Built-in legend definitions
 BUILTIN_LEGENDS = {
-    "NLCD": {
-        "11 Open Water": "466b9f",
-        "12 Perennial Ice/Snow": "d1def8",
-        "21 Developed, Open Space": "dec5c5",
-        "22 Developed, Low Intensity": "d99282",
-        "23 Developed, Medium Intensity": "eb0000",
-        "24 Developed High Intensity": "ab0000",
-        "31 Barren Land (Rock/Sand/Clay)": "b3ac9f",
-        "41 Deciduous Forest": "68ab5f",
-        "42 Evergreen Forest": "1c5f2c",
-        "43 Mixed Forest": "b5c58f",
-        "51 Dwarf Scrub": "af963c",
-        "52 Shrub/Scrub": "ccb879",
-        "71 Grassland/Herbaceous": "dfdfc2",
-        "72 Sedge/Herbaceous": "d1d182",
-        "73 Lichens": "a3cc51",
-        "74 Moss": "82ba9e",
-        "81 Pasture/Hay": "dcd939",
-        "82 Cultivated Crops": "ab6c28",
-        "90 Woody Wetlands": "b8d9eb",
-        "95 Emergent Herbaceous Wetlands": "6c9fb8",
+    "UNCCD_LandCover": {
+        "10 Tree-covered areas": "006400",
+        "20 Grassland": "7CFC00",
+        "30 Cropland": "FFD700",
+        "40 Wetland": "40E0D0",
+        "50 Artificial surfaces": "FF0000",
+        "60 Bare land": "A0522D",
+        "70 Water bodies": "0000FF",
     }
 }
 
-# HTML template for legend (self-contained)
+# HTML template for legend
 LEGEND_TEMPLATE = """
 <div style="position: fixed; 
-     bottom: 20px; right: 20px; width: auto; height: auto; 
-     border:2px solid grey; z-index:9999; font-size:14px;
+     bottom: 2px; right: 2px; width: auto; height: auto; 
+     border:0px solid grey; z-index:9999; font-size:14px;
      background-color: white;
      ">
-  <div style="padding: 10px; font-weight: bold; text-align: center;">
+  <div style="padding: 0px; font-weight: bold; text-align: center;">
     Legend
   </div>
-  <ul style="list-style-type: none; margin: 0; padding: 10px;">
+  <ul style="list-style-type: none; margin: 0; padding: 0px;">
   </ul>
 </div>
 """
@@ -91,11 +78,11 @@ class ResultMap(sm.SepalMap):
         # Extract kwargs with defaults
         min_width = kwargs.get("min_width", None)
         max_width = kwargs.get(
-            "max_width", "300px" if kwargs.get("width") is None else None
+            "max_width", "150px" if kwargs.get("width") is None else None
         )
         min_height = kwargs.get("min_height", None)
         max_height = kwargs.get(
-            "max_height", "400px" if kwargs.get("height") is None else None
+            "max_height", "600px" if kwargs.get("height") is None else None
         )
         height = kwargs.get("height", None)
         width = kwargs.get("width", None)
@@ -220,19 +207,19 @@ class ResultMap(sm.SepalMap):
      max-width: 150px;
      height: auto; 
      z-index: 9999; 
-     font-size: 10px;
+     font-size: 12px;
      background-color: rgba(255, 255, 255, 0.9);
      color: #333;
      border-radius: 4px;
-     padding: 6px;
-     box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+     padding: 5px;
+     box-shadow: 0 1px 1px rgba(0,0,0,0.2);
      ">
   <div style="padding: 3px 0 4px 0; 
               font-weight: bold; 
-              font-size: 11px;
+              font-size: 13px;
               color: #333;
-              border-bottom: 1px solid rgba(0,0,0,0.1);
-              margin-bottom: 4px;">
+              border-bottom: 1px solid rgba(0,0,0,0.2);
+              margin-bottom: 5px;">
     {title}
   </div>
   <ul style="list-style-type: none; 
@@ -258,7 +245,7 @@ class ResultMap(sm.SepalMap):
                      border-radius: 2px;
                      flex-shrink: 0;"></span>
         <span style="color: #333; 
-                     font-size: 9px;
+                     font-size: 12px;
                      white-space: nowrap;
                      overflow: hidden;
                      text-overflow: ellipsis;">{key}</span>
@@ -271,41 +258,45 @@ class ResultMap(sm.SepalMap):
 </div>
 
 <style>
-@media (prefers-color-scheme: dark) {
-  .leaflet-container div[style*="z-index: 9999"] {
-    background-color: rgba(50, 50, 50, 0.9) !important;
-    color: #e0e0e0 !important;
-  }
-  .leaflet-container div[style*="z-index: 9999"] div {
-    color: #e0e0e0 !important;
-    border-bottom-color: rgba(255,255,255,0.1) !important;
-  }
-  .leaflet-container div[style*="z-index: 9999"] span {
-    color: #e0e0e0 !important;
-  }
-  .leaflet-container div[style*="z-index: 9999"] li span:first-child {
-    border-color: rgba(255,255,255,0.3) !important;
-  }
+/* Toggle style based on the sepal_ui theme change */
+/* Light theme - default */
+.v-application .leaflet-container div[style*="z-index: 9999"] {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  color: #333 !important;
 }
-
-/* Explicit dark theme class support */
-.theme--dark div[style*="z-index: 9999"],
-.v-application.theme--dark div[style*="z-index: 9999"] {
+ 
+/* Dark theme - when SEPAL dark mode is enabled */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] {
   background-color: rgba(50, 50, 50, 0.9) !important;
   color: #e0e0e0 !important;
 }
-.theme--dark div[style*="z-index: 9999"] div,
-.v-application.theme--dark div[style*="z-index: 9999"] div {
+ 
+/* Title styling for dark theme */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] > div {
   color: #e0e0e0 !important;
   border-bottom-color: rgba(255,255,255,0.1) !important;
+  background: transparent !important;
 }
-.theme--dark div[style*="z-index: 9999"] span,
-.v-application.theme--dark div[style*="z-index: 9999"] span {
+ 
+/* Text labels only (not color swatches) for dark theme */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] li > span:last-child {
   color: #e0e0e0 !important;
+  background: transparent !important;
 }
-.theme--dark div[style*="z-index: 9999"] li span:first-child,
-.v-application.theme--dark div[style*="z-index: 9999"] li span:first-child {
+ 
+/* List and list items - transparent backgrounds */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] ul {
+  background: transparent !important;
+}
+ 
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] li {
+  background: transparent !important;
+}
+ 
+/* Color swatch borders in dark theme (first span in li) */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] li > span:first-child {
   border-color: rgba(255,255,255,0.3) !important;
+  /* Keep the background color from inline styles - don't override! */
 }
 </style>
 """
