@@ -20,59 +20,6 @@ import ee
 __all__ = ["ReclassifyModel"]
 
 
-def _get_ee_project_folder():
-    """
-    Get the Earth Engine project folder with backward compatibility.
-
-    Returns:
-        str: The project folder path
-    """
-    try:
-        # Try new method (EE API >= 0.1.277)
-        if (
-            hasattr(ee.data, "_cloud_api_user_project")
-            and ee.data._cloud_api_user_project
-        ):
-            return f"projects/{ee.data._cloud_api_user_project}/assets/"
-    except:
-        pass
-
-    try:
-        # Try alternative method using initialized credentials
-        if hasattr(ee.data, "getAssetRoots"):
-            roots = ee.data.getAssetRoots()
-            if roots:
-                return roots[0]["id"] + "/"
-    except:
-        pass
-
-    try:
-        # Fallback: try to get from list assets
-        assets_list = ee.data.listAssets(
-            {"parent": "projects/earthengine-legacy/assets"}
-        )
-        if assets_list and "assets" in assets_list:
-            # Use the first available project
-            return "projects/earthengine-legacy/assets/"
-    except:
-        pass
-
-    # Final fallback - use legacy users path
-    # This will need to be set manually by the user
-    try:
-        # Try to get the current user
-        # This is a workaround - ideally user should set this explicitly
-        return "users/" + ee.data.getAssetRoots()[0]["id"].split("/")[-1] + "/"
-    except:
-        # Absolute fallback
-        raise Exception(
-            "Could not automatically determine Earth Engine project folder. "
-            "Please set the 'folder' parameter explicitly when creating ReclassifyModel, "
-            "e.g., ReclassifyModel(folder='users/your-username/') or "
-            "ReclassifyModel(folder='projects/your-project/assets/')"
-        )
-
-
 class ReclassifyModel(Model):
     """
     Reclassification model to store information about the current reclassification and share them within your app. save all the input and output of the reclassification + the the matrix to move from one to another. It is embeding 2 backends, one based on GEE that will use assets as in/out and another based on python that will use local files as in/out. The model can handle both vector and raster data, the format and name of the output will be determined from the the input format/name. The developer will still have the possiblity to choose where to save the outputs (folder name).
@@ -154,7 +101,9 @@ class ReclassifyModel(Model):
             su.init_ee()
 
         if self.gee:
-            self.folder = folder or Path(_get_ee_project_folder())
+            self.folder = folder or Path(
+                f"{ee.data.getProjectConfig().get('name').rsplit('/', 1)[0]}/assets/"
+            )
         else:
             self.folder = None
 
