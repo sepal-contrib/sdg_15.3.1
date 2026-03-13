@@ -102,7 +102,7 @@ class ReclassifyModel(Model):
 
         if self.gee:
             self.folder = folder or Path(
-                f"projects/{ee.data._cloud_api_user_project}/assets/"
+                f"{ee.data.getProjectConfig().get('name').rsplit('/', 1)[0]}/assets/"
             )
         else:
             self.folder = None
@@ -426,7 +426,7 @@ class ReclassifyModel(Model):
                 """Add reclass column to the new feature"""
                 index = ee_from.indexOf(feat.get(self.band))
                 # if search value is not in from, -1 is returned
-                new_val = ee.Algorithcm.If(index.eq(-1), NO_VALUE, ee_to.get(index))
+                new_val = ee.Algorithm.If(index.eq(-1), NO_VALUE, ee_to.get(index))
                 return feat.set({"reclass": new_val})
 
             ee_matrix = ee.List(list(matrix.items())).unzip()

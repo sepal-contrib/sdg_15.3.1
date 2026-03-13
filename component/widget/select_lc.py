@@ -42,7 +42,7 @@ class SelectLC(v.Layout):
             return
 
         # the asset need to be an image
-        if not w.asset_info["type"] == "IMAGE":
+        if not w.asset_info or w.asset_info.get("type") != "IMAGE":
             w.asset_info = None
             w.valid = False
             w.error = True
