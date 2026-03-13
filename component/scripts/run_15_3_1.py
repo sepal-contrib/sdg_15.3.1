@@ -2,7 +2,6 @@ from zipfile import ZipFile
 
 import ee
 
-# import geemap
 from ipywidgets import Output
 import ipyvuetify as v
 import geopandas as gpd
