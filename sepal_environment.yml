@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - python=3.12
+  - sepal-ui
   - pyproj  # Always include to avoid PROJ conflicts
   - setuptools<=80
   - wheel
@@ -16,7 +17,6 @@ dependencies:
   - natsort
   - pip
   - pip:
-    - sepal_ui
     - git+https://github.com/openforis/earthengine-api.git@v1.6.14#egg=earthengine-api&subdirectory=python
     - plotly>=5.2.2,<6.0
     - ee-extra<2025.7.2
