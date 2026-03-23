@@ -19,6 +19,11 @@ jobs:
           environment-file: sepal_environment.yml
           cache-environment: true
 
+      - name: Verify ee-api fork
+        shell: micromamba-shell {0}
+        run: |
+          python -c "import ee; v=ee.__version__; print('ee-api:', v); assert v == '1.6.14', 'Expected fork 1.6.14, got ' + v"
+
       - name: Install test deps
         shell: micromamba-shell {0}
         run: pip install pytest nbmake ipykernel
