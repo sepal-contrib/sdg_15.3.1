@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  EARTHENGINE_TOKEN: ${{ secrets.EARTHENGINE_TOKEN }}
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: sepal_environment.yml
+          cache-environment: true
+
+      - name: Verify ee-api fork
+        shell: micromamba-shell {0}
+        run: |
+          python -c "import ee; v=ee.__version__; print('ee-api:', v); assert v == '1.6.14', 'Expected fork 1.6.14, got ' + v"
+
+      - name: Install test deps
+        shell: micromamba-shell {0}
+        run: pip install pytest nbmake ipykernel
+
+      - name: Register kernel
+        shell: micromamba-shell {0}
+        run: python -m ipykernel install --user --name=test-kernel
+
+      - name: Test UI notebook
+        shell: micromamba-shell {0}
+        run: pytest --nbmake ui.ipynb --nbmake-timeout=600 --nbmake-kernel=test-kernel

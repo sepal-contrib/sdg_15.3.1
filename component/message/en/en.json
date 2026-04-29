@@ -81,10 +81,10 @@
 		"This process tile will allow you to compute the value of the sdg indicator 15.3.1 and its sub-indicators (land cover, soil organic carbon and productivity)"
 	],
 	"result_text": [
-		"Once the layers are loaded on the map, click on the \"download\" button to download the indicators `.tif` files to your SEPAL folders"
+		"Once the layers are loaded on the map, click on the \"Download maps as Geotiff in SEPAL\" button to download the layers (indicator, sub-indicators and productivity metrics) in geotif format to your SEPAL folders"
 	],
 	"result_text_zonalstats": [
-		"Once the result is ready, click on the \"download\" button to download the statistics (`.shp`) to your SEPAL folder."
+		"Once the result is ready, click on the \"Calculate Zonal Statistics\" button to download the statistics (`.shp`) to your SEPAL folder."
 	],
 	"sensor_lbl": "Select sensor",
 	"traj_lbl": "Select trajectory",
@@ -112,7 +112,7 @@
 		}
 	},
 	"result_btn_zonalstats": "Calculate Zonal Statistics",
-	"result_btn": "Download maps as .tif in sepal",
+	"result_btn": "Download maps as Geotiff in SEPAL",
 	"clim_option_lbl": "Climate regime options",
     "water_mask_option_lbl":"Select water-body data",
 	"clim_default_lbl": "Climate regime",
@@ -150,11 +150,11 @@
 		"file_exist": "The file {} is already available on your computer",
 		"start_download": "Start the exportation of your maps",
 		"remove_gdrive": "Remove the files from your Gdrive folder",
-		"already_exist": "Folder {} already exist"
+		"already_exist": "Folder {} already exists"
 	},
 	"gee": {
 		"status": "Status: {}",
-		"tasks_completed": "GEE task are completed",
+		"tasks_completed": "GEE tasks are completed",
 		"add_layer": "Loading the layer ({}) on the map"
 	},
 	"select_lc": {

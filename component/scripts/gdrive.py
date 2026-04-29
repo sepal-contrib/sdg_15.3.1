@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-
+from sepal_ui.scripts.drive_interface import GDriveInterface
 import ee
 import io
 from googleapiclient.http import MediaIoBaseDownload
@@ -16,21 +16,23 @@ import logging
 logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
 
 
-class GDrive:
-    def __init__(self):
-        # Access to sepal access token
-        self.access_token = json.loads(
-            (Path.home() / ".config/earthengine/credentials").read_text()
-        ).get("access_token")
-        self.service = discovery.build(
-            serviceName="drive",
-            version="v3",
-            cache_discovery=False,
-            credentials=Credentials(self.access_token),
-        )
+class GDrive(GDriveInterface):
+    """Extended GDrive interface with additional functionality for 15.3.1 related operations.
+    This class extends GDriveInterface to add 15.3.1 specific methods for handling
+    Earth Engine exports and rerouting files from Gdrive to SEPAL.
+    """
+
+    def __init__(self, sepal_headers=None):
+        """Initialize GDrive with SEPAL credentials.
+
+        Args:
+            sepal_headers: Optional SEPAL headers dictionary for authentication.
+                          If not provided, falls back to file-based credentials.
+        """
+        super().__init__(sepal_headers)
 
     def tasks_list(self):
-        """for debugging purpose, print the list of all the tasks in gee"""
+        """For debugging purpose, print the list of all the tasks in gee"""
         service = self.service
 
         tasks = service.tasks().list(tasklist="@default", q="trashed = false").execute()
@@ -41,7 +43,8 @@ class GDrive:
         return
 
     def print_file_list(self):
-        """for debugging purpose, print the list of all the file in the Gdrive"""
+        """For debugging purpose, print the list of all the files in the Gdrive"""
+        # Override parent method to show more files
         service = self.service
 
         results = (
@@ -58,7 +61,11 @@ class GDrive:
                 print("{0} ({1})".format(item["name"], item["id"]))
 
     def get_items(self):
-        """get all the items in the Gdrive, items will have 2 columns, 'name' and 'id'"""
+        """Get all the TIFF items in the Gdrive.
+
+        Returns:
+            list: Items will have 2 columns, 'name' and 'id'
+        """
         service = self.service
 
         # get list of files
@@ -76,8 +83,14 @@ class GDrive:
         return items
 
     def get_files(self, file_name):
-        """look for the file_name patern in my Gdrive files and retreive a list of Ids"""
+        """Look for the file_name pattern in my Gdrive files and retrieve a list of Ids.
 
+        Args:
+            file_name (str): Pattern to search for in file names
+
+        Returns:
+            list: List of dictionaries with 'id' and 'name' keys
+        """
         items = self.get_items()
         files = []
         for item in items:
@@ -87,15 +100,19 @@ class GDrive:
         return files
 
     def download_files(self, files, local_path):
-        """download the files from gdrive to the local_path"""
+        """Download the files from gdrive to the local_path.
 
+        Args:
+            files (list): List of file dictionaries with 'id' and 'name' keys
+            local_path (str or Path): Path where files should be saved
+        """
         # create path object
         local_path = Path(local_path)
 
         # open the gdrive service
         service = self.service
 
-        # request the files from gdrvie in chunks
+        # request the files from gdrive in chunks
         for file in files:
             request = service.files().get_media(fileId=file["id"])
             fh = io.BytesIO()
@@ -108,8 +125,11 @@ class GDrive:
                 f.write(fh.getvalue())
 
     def delete_files(self, files):
-        """delete files from gdrive disk"""
+        """Delete files from gdrive disk.
 
+        Args:
+            files (list): List of file dictionaries with 'id' key
+        """
         # open gdrive service
         service = self.service
 
@@ -118,19 +138,22 @@ class GDrive:
             service.files().delete(fileId=file["id"]).execute()
 
     def download_to_disk(self, filename, image, aoi_io, output, scale=30, prefix=None):
-        """download the tile to the GEE disk
+        """Download the tile to the GEE disk.
 
         Args:
-            filename (str): descripsion of the file
-            image (ee.FeatureCollection): image to export
-            aoi_name (str): Id of the aoi used to clip the image
+            filename (str): Description of the file
+            image (ee.Image): Image to export
+            aoi_io: AOI model with feature_collection attribute
+            output: Output widget for messages
+            scale (int): Scale in meters for export (default: 30)
+            prefix (str): File name prefix for the export
 
         Returns:
-            download (bool) : True if a task is running, false if not
+            bool: True if a task is running, False if not
         """
 
         def launch_task(filename, image, aoi_io, output, scale, prefix):
-            """check if file exist and launch the process if not"""
+            """Check if file exists and launch the process if not"""
 
             download = False
 

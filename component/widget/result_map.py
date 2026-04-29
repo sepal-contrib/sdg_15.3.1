@@ -1,20 +1,53 @@
 import os
-
 from sepal_ui import mapping as sm
-from geemap.legends import builtin_legends
-from geemap.map_widgets import _set_css_in_cell_output
 import ipywidgets as widgets
 import ipyleaflet
-import IPython
+from IPython.display import display
 
-try:
-    IPython.get_ipython().events.unregister("pre_run_cell", _set_css_in_cell_output)
-except Exception as e:
-    pass
+
+# Example Built-in legend definitions
+BUILTIN_LEGENDS = {
+    "UNCCD_LandCover": {
+        "10 Tree-covered areas": "006400",
+        "20 Grassland": "7CFC00",
+        "30 Cropland": "FFD700",
+        "40 Wetland": "40E0D0",
+        "50 Artificial surfaces": "FF0000",
+        "60 Bare land": "A0522D",
+        "70 Water bodies": "0000FF",
+    }
+}
+
+# HTML template for legend
+LEGEND_TEMPLATE = """
+<div style="position: fixed; 
+     bottom: 2px; right: 2px; width: auto; height: auto; 
+     border:0px solid grey; z-index:9999; font-size:14px;
+     background-color: white;
+     ">
+  <div style="padding: 0px; font-weight: bold; text-align: center;">
+    Legend
+  </div>
+  <ul style="list-style-type: none; margin: 0; padding: 0px;">
+  </ul>
+</div>
+"""
+
+
+def rgb_to_hex(rgb):
+    """Convert RGB tuple to hex color string.
+
+    Args:
+        rgb (tuple): RGB color as tuple of integers (r, g, b)
+
+    Returns:
+        str: Hex color string with # prefix
+    """
+    return "#{:02x}{:02x}{:02x}".format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
 
 
 class ResultMap(sm.SepalMap):
-    """extend the classic sepal map to provide 2 legends at the same time"""
+    """Extend the classic sepal map to provide 2 legends at the same time"""
 
     def add_legend(
         self,
@@ -27,82 +60,42 @@ class ResultMap(sm.SepalMap):
         layer_name=None,
         **kwargs,
     ):
-        """Adds a customized basemap to the map.
+        """Adds a customized legend to the map.
+
         Args:
             legend_title (str, optional): Title of the legend. Defaults to 'Legend'.
-            legend_dict (dict, optional): A dictionary containing legend items as keys and color as values. If provided, legend_keys and legend_colors will be ignored. Defaults to None.
+            legend_dict (dict, optional): A dictionary containing legend items as keys
+                and color as values. If provided, legend_keys and legend_colors will be
+                ignored. Defaults to None.
             legend_keys (list, optional): A list of legend keys. Defaults to None.
             legend_colors (list, optional): A list of legend colors. Defaults to None.
             position (str, optional): Position of the legend. Defaults to 'bottomright'.
-            builtin_legend (str, optional): Name of the builtin legend to add to the map. Defaults to None.
-            layer_name (str, optional): Layer name of the legend to be associated with. Defaults to None.
+            builtin_legend (str, optional): Name of the builtin legend to add to the map.
+                Defaults to None.
+            layer_name (str, optional): Layer name of the legend to be associated with.
+                Defaults to None.
         """
-        import pkg_resources
-        from IPython.display import display
-
-        pkg_dir = os.path.dirname(
-            pkg_resources.resource_filename("geemap", "geemap.py")
+        # Extract kwargs with defaults
+        min_width = kwargs.get("min_width", None)
+        max_width = kwargs.get(
+            "max_width", "150px" if kwargs.get("width") is None else None
         )
-        legend_template = os.path.join(pkg_dir, "data/template/legend.html")
+        min_height = kwargs.get("min_height", None)
+        max_height = kwargs.get(
+            "max_height", "600px" if kwargs.get("height") is None else None
+        )
+        height = kwargs.get("height", None)
+        width = kwargs.get("width", None)
 
-        if "min_width" not in kwargs.keys():
-            min_width = None
-        if "max_width" not in kwargs.keys():
-            max_width = None
-        else:
-            max_width = kwargs["max_width"]
-        if "min_height" not in kwargs.keys():
-            min_height = None
-        else:
-            min_height = kwargs["min_height"]
-        if "max_height" not in kwargs.keys():
-            max_height = None
-        else:
-            max_height = kwargs["max_height"]
-        if "height" not in kwargs.keys():
-            height = None
-        else:
-            height = kwargs["height"]
-        if "width" not in kwargs.keys():
-            width = None
-        else:
-            width = kwargs["width"]
-
-        if width is None:
-            max_width = "300px"
-        if height is None:
-            max_height = "400px"
-
-        if not os.path.exists(legend_template):
-            print("The legend template does not exist.")
+        # Set default legend keys if not provided
+        if legend_keys is None:
+            legend_keys = ["One", "Two", "Three", "Four", "etc"]
+        elif not isinstance(legend_keys, list):
+            print("The legend keys must be a list.")
             return
 
-        if legend_keys is not None:
-            if not isinstance(legend_keys, list):
-                print("The legend keys must be a list.")
-                return
-        else:
-            legend_keys = ["One", "Two", "Three", "Four", "etc"]
-
-        if legend_colors is not None:
-            if not isinstance(legend_colors, list):
-                print("The legend colors must be a list.")
-                return
-            elif all(isinstance(item, tuple) for item in legend_colors):
-                try:
-                    legend_colors = [rgb_to_hex(x) for x in legend_colors]
-                except Exception as e:
-                    print(e)
-            elif all(
-                (item.startswith("#") and len(item) == 7) for item in legend_colors
-            ):
-                pass
-            elif all((len(item) == 6) for item in legend_colors):
-                pass
-            else:
-                print("The legend colors must be a list of tuples.")
-                return
-        else:
+        # Process legend colors
+        if legend_colors is None:
             legend_colors = [
                 "#8DD3C7",
                 "#FFFFB3",
@@ -110,44 +103,57 @@ class ResultMap(sm.SepalMap):
                 "#FB8072",
                 "#80B1D3",
             ]
-
-        if len(legend_keys) != len(legend_colors):
-            print("The legend keys and values must be the same length.")
+        elif not isinstance(legend_colors, list):
+            print("The legend colors must be a list.")
+            return
+        elif all(isinstance(item, tuple) for item in legend_colors):
+            try:
+                legend_colors = [rgb_to_hex(x) for x in legend_colors]
+            except Exception as e:
+                print(f"Error converting RGB to hex: {e}")
+                return
+        elif all((item.startswith("#") and len(item) == 7) for item in legend_colors):
+            pass
+        elif all((len(item) == 6) for item in legend_colors):
+            pass
+        else:
+            print("The legend colors must be a list of hex colors or RGB tuples.")
             return
 
-        allowed_builtin_legends = builtin_legends.keys()
+        # Handle builtin legends
         if builtin_legend is not None:
-            if builtin_legend not in allowed_builtin_legends:
+            if builtin_legend not in BUILTIN_LEGENDS:
                 print(
                     "The builtin legend must be one of the following: {}".format(
-                        ", ".join(allowed_builtin_legends)
+                        ", ".join(BUILTIN_LEGENDS.keys())
                     )
                 )
                 return
-            else:
-                legend_dict = builtin_legends[builtin_legend]
-                legend_keys = list(legend_dict.keys())
-                legend_colors = list(legend_dict.values())
+            legend_dict = BUILTIN_LEGENDS[builtin_legend]
+            legend_keys = list(legend_dict.keys())
+            legend_colors = list(legend_dict.values())
 
+        # Handle legend dictionary
         if legend_dict is not None:
             if not isinstance(legend_dict, dict):
                 print("The legend dict must be a dictionary.")
                 return
-            else:
-                legend_keys = list(legend_dict.keys())
-                legend_colors = list(legend_dict.values())
-                if all(isinstance(item, tuple) for item in legend_colors):
-                    try:
-                        legend_colors = [rgb_to_hex(x) for x in legend_colors]
-                    except Exception as e:
-                        print(e)
+            legend_keys = list(legend_dict.keys())
+            legend_colors = list(legend_dict.values())
+            if all(isinstance(item, tuple) for item in legend_colors):
+                try:
+                    legend_colors = [rgb_to_hex(x) for x in legend_colors]
+                except Exception as e:
+                    print(f"Error converting RGB to hex: {e}")
+                    return
 
-        allowed_positions = [
-            "topleft",
-            "topright",
-            "bottomleft",
-            "bottomright",
-        ]
+        # Validate legend keys and colors match
+        if len(legend_keys) != len(legend_colors):
+            print("The legend keys and values must be the same length.")
+            return
+
+        # Validate position
+        allowed_positions = ["topleft", "topright", "bottomleft", "bottomright"]
         if position not in allowed_positions:
             print(
                 "The position must be one of the following: {}".format(
@@ -156,32 +162,13 @@ class ResultMap(sm.SepalMap):
             )
             return
 
-        header = []
-        content = []
-        footer = []
+        # Build legend HTML
+        legend_html = self._build_legend_html(legend_title, legend_keys, legend_colors)
 
-        with open(legend_template) as f:
-            lines = f.readlines()
-            lines[3] = lines[3].replace("Legend", legend_title)
-            header = lines[:6]
-            footer = lines[11:]
-
-        for index, key in enumerate(legend_keys):
-            color = legend_colors[index]
-            if not color.startswith("#"):
-                color = "#" + color
-            item = "      <li><span style='background:{};'></span>{}</li>\n".format(
-                color, key
-            )
-            content.append(item)
-
-        legend_html = header + content + footer
-        legend_text = "".join(legend_html)
-
+        # Create and add legend widget
         try:
             legend_output_widget = widgets.Output(
                 layout={
-                    # "border": "1px solid black",
                     "max_width": max_width,
                     "min_width": min_width,
                     "max_height": max_height,
@@ -194,11 +181,124 @@ class ResultMap(sm.SepalMap):
             legend_control = ipyleaflet.WidgetControl(
                 widget=legend_output_widget, position=position
             )
-            legend_widget = widgets.HTML(value=legend_text)
+            legend_widget = widgets.HTML(value=legend_html)
             with legend_output_widget:
                 display(legend_widget)
 
             self.add_control(legend_control)
 
         except Exception as e:
-            raise Exception(e)
+            raise Exception(f"Error adding legend to map: {e}")
+
+    def _build_legend_html(self, title, keys, colors):
+        """Build the HTML string for the legend.
+
+        Args:
+            title (str): Legend title
+            keys (list): List of legend item labels
+            colors (list): List of hex color codes
+
+        Returns:
+            str: Complete HTML for the legend
+        """
+        header = f"""
+<div style="position: relative; 
+     width: auto; 
+     max-width: 150px;
+     height: auto; 
+     z-index: 9999; 
+     font-size: 12px;
+     background-color: rgba(255, 255, 255, 0.9);
+     color: #333;
+     border-radius: 4px;
+     padding: 5px;
+     box-shadow: 0 1px 1px rgba(0,0,0,0.2);
+     ">
+  <div style="padding: 3px 0 4px 0; 
+              font-weight: bold; 
+              font-size: 13px;
+              color: #333;
+              border-bottom: 1px solid rgba(0,0,0,0.2);
+              margin-bottom: 5px;">
+    {title}
+  </div>
+  <ul style="list-style-type: none; 
+             margin: 0; 
+             padding: 0;">
+"""
+
+        content = []
+        for key, color in zip(keys, colors):
+            # Ensure color has # prefix
+            if not color.startswith("#"):
+                color = "#" + color
+            item = f"""      <li style="margin: 2px 0; 
+                   line-height: 14px;
+                   display: flex;
+                   align-items: center;">
+        <span style="background: {color}; 
+                     display: inline-block; 
+                     width: 12px; 
+                     height: 12px; 
+                     margin-right: 4px; 
+                     border: 1px solid rgba(0,0,0,0.2);
+                     border-radius: 2px;
+                     flex-shrink: 0;"></span>
+        <span style="color: #333; 
+                     font-size: 12px;
+                     white-space: nowrap;
+                     overflow: hidden;
+                     text-overflow: ellipsis;">{key}</span>
+      </li>
+"""
+            content.append(item)
+
+        footer = """
+  </ul>
+</div>
+
+<style>
+/* Toggle style based on the sepal_ui theme change */
+/* Light theme - default */
+.v-application .leaflet-container div[style*="z-index: 9999"] {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  color: #333 !important;
+}
+ 
+/* Dark theme - when SEPAL dark mode is enabled */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] {
+  background-color: rgba(50, 50, 50, 0.9) !important;
+  color: #e0e0e0 !important;
+}
+ 
+/* Title styling for dark theme */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] > div {
+  color: #e0e0e0 !important;
+  border-bottom-color: rgba(255,255,255,0.1) !important;
+  background: transparent !important;
+}
+ 
+/* Text labels only (not color swatches) for dark theme */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] li > span:last-child {
+  color: #e0e0e0 !important;
+  background: transparent !important;
+}
+ 
+/* List and list items - transparent backgrounds */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] ul {
+  background: transparent !important;
+}
+ 
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] li {
+  background: transparent !important;
+}
+ 
+/* Color swatch borders in dark theme (first span in li) */
+.v-application.theme--dark .leaflet-container div[style*="z-index: 9999"] li > span:first-child {
+  border-color: rgba(255,255,255,0.3) !important;
+  /* Keep the background color from inline styles - don't override! */
+}
+</style>
+"""
+
+        return header + "".join(content) + footer

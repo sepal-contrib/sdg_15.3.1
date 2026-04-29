@@ -1,7 +1,7 @@
 from zipfile import ZipFile
 
 import ee
-import geemap
+
 from ipywidgets import Output
 import ipyvuetify as v
 import geopandas as gpd
@@ -167,7 +167,7 @@ def compute_indicator_maps(aoi_model, model, output):
         raise Exception(cm.error.wrong_year)
 
     # compute intermediary maps
-    #vi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
+    # vi_int, climate_int = integrate_ndvi_climate(aoi_model, model, output)
     climate_int = integrate_climate(aoi_model, model, output)
     vi_int = integrate_vi(aoi_model, model, output)
     model.productivity_trend = productivity_trajectory(
@@ -322,32 +322,37 @@ def compute_zonal_analysis(aoi_model, model, output):
     # to be removed when moving to shp
     indicator_csv = indicator_stats.with_suffix(".csv")
     scale = 100 if "Sentinel 2" in model.sensors else 300
+    aoi_gdf = None
+
     with output_widget:
-        geemap.zonal_statistics_by_group(
+        # Use custom zonal statistics function that returns GeoDataFrame directly
+        aoi_gdf = zonal_statistics_to_geodataframe(
             in_value_raster=model.indicator_15_3_1,
             in_zone_vector=aoi_model.feature_collection,
-            out_file_path=indicator_csv,
-            statistics_type="SUM",
             denominator=1000000,
             decimal_places=2,
             scale=scale,
             tile_scale=1.0,
         )
-    # this should be removed once geemap is repaired
-    #########################################################################
-    aoi_json = geemap.ee_to_geojson(aoi_model.feature_collection)
-    aoi_gdf = gpd.GeoDataFrame.from_features(aoi_json).set_crs("EPSG:4326")
 
-    indicator_df = pd.read_csv(indicator_csv)
-    if "Class_0" in indicator_df.columns:
-        aoi_gdf["NoData"] = indicator_df["Class_0"]
-    if "Class_3" in indicator_df.columns:
-        aoi_gdf["Improve"] = indicator_df["Class_3"]
-    if "Class_2" in indicator_df.columns:
-        aoi_gdf["Stable"] = indicator_df["Class_2"]
-    if "Class_1" in indicator_df.columns:
-        aoi_gdf["Degrade"] = indicator_df["Class_1"]
+    # Check if computation was successful
+    if aoi_gdf is None:
+        raise Exception("Failed to compute zonal statistics")
+
+    # Map class columns to meaningful names
+    if "Class_0" in aoi_gdf.columns:
+        aoi_gdf["NoData"] = aoi_gdf["Class_0"]
+    if "Class_3" in aoi_gdf.columns:
+        aoi_gdf["Improve"] = aoi_gdf["Class_3"]
+    if "Class_2" in aoi_gdf.columns:
+        aoi_gdf["Stable"] = aoi_gdf["Class_2"]
+    if "Class_1" in aoi_gdf.columns:
+        aoi_gdf["Degrade"] = aoi_gdf["Class_1"]
+
+    # Remove LineString geometries
     aoi_gdf = aoi_gdf[aoi_gdf.geom_type != "LineString"]
+
+    # Save to shapefile
     aoi_gdf.to_file(indicator_stats.with_suffix(".shp"))
     #########################################################################
 
@@ -443,3 +448,122 @@ def indicator_n_category_label(model, indicator_name):
         cat_labels = pm.degradation_class
 
     return indicator, cat_labels
+
+
+def ee_to_geojson(ee_object):
+    """Convert Earth Engine object to GeoJSON.
+
+    Args:
+        ee_object: Earth Engine FeatureCollection or Geometry
+
+    Returns:
+        dict: GeoJSON dictionary
+    """
+    try:
+        # Get the GeoJSON representation from Earth Engine
+        if isinstance(ee_object, ee.FeatureCollection):
+            geojson = ee_object.getInfo()
+        elif isinstance(ee_object, ee.Geometry):
+            geojson = ee.Feature(ee_object).getInfo()
+        else:
+            geojson = ee_object.getInfo()
+        return geojson
+    except Exception as e:
+        raise Exception(f"Error converting EE object to GeoJSON: {e}")
+
+
+def zonal_statistics_to_geodataframe(
+    in_value_raster,
+    in_zone_vector,
+    denominator=1000000,  # Default to hectares if input is m2
+    decimal_places=2,
+    scale=None,
+    tile_scale=2.0,
+):
+    """Compute zonal statistics and return as GeoDataFrame directly."""
+
+    print(f"Starting zonal statistics computation...")
+
+    def calculate_class_areas(feature):
+        """Calculate area for each class within a feature."""
+        # 1. Ensure we have the pixel area as the primary band to be summed
+        # 2. Add the value raster as the grouping band
+        # Order matters: [SummedBand, GroupingBand]
+        pixel_area = ee.Image.pixelArea()
+
+        # Select first band of raster to ensure it's a single band image
+        val_raster = in_value_raster.select([0])
+
+        # Combine: Band 0 = area, Band 1 = class
+        combined = pixel_area.addBands(val_raster)
+
+        # Reduce the region
+        stats = combined.reduceRegion(
+            reducer=ee.Reducer.sum().group(
+                groupField=1,  # The index of val_raster in 'combined'
+                groupName="class",
+            ),
+            geometry=feature.geometry(),
+            scale=scale,
+            maxPixels=1e13,
+            tileScale=tile_scale,
+        )
+
+        # Get groups and handle null cases (where feature doesn't overlap raster)
+        groups = ee.List(stats.get("groups"))
+
+        # Map over groups to create a dictionary of {Class_N: Area}
+        def create_dict(group):
+            group = ee.Dictionary(group)
+            # Format the key as 'Class_N' and value as the area
+            key = ee.Number(group.get("class")).format("Class_%d")
+            val = ee.Number(group.get("sum")).divide(denominator)
+            return ee.List([key, val])
+
+        # Convert list of lists to dictionary and set as properties
+        # We use a conditional to handle empty lists
+        new_props = ee.Dictionary(
+            ee.Algorithms.If(
+                groups.size().gt(0),
+                ee.Dictionary(groups.map(create_dict).flatten()),
+                ee.Dictionary({}),
+            )
+        )
+
+        return feature.set(new_props)
+
+    try:
+        # Map calculation over features
+        # We use .filter(ee.Filter.bounds(...)) if possible to speed up,
+        # but here we apply to the whole collection
+        result_fc = in_zone_vector.map(calculate_class_areas)
+
+        # Fetch data to local python environment
+        # If this collection is very large (>5000 features), consider exporting to Drive instead
+        print("Converting EE FeatureCollection to GeoJSON...")
+        result_geojson = result_fc.getInfo()
+
+        if not result_geojson or "features" not in result_geojson:
+            raise Exception("Earth Engine returned an empty object.")
+
+        # Create GeoDataFrame
+        gdf = gpd.GeoDataFrame.from_features(result_geojson)
+
+        # Set CRS (standard for EE is 4326)
+        if not gdf.empty:
+            gdf.set_crs("EPSG:4326", inplace=True)
+
+            # Round the Class columns
+            class_cols = [c for c in gdf.columns if c.startswith("Class_")]
+            gdf[class_cols] = gdf[class_cols].fillna(0).round(decimal_places)
+
+            print(f"✓ Success: Processed {len(gdf)} features.")
+
+        return gdf
+
+    except Exception as e:
+        print(f"✗ Zonal statistics failed: {e}")
+        # Hint for the user if it's a memory issue
+        if "reproducibility" in str(e) or "capacity" in str(e):
+            print("Try increasing the 'scale' or simplifying your AOI geometries.")
+        return None
