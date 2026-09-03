@@ -5,6 +5,9 @@ channels:
 dependencies:
   - python=3.12
   - sepal-ui>=3.1.1,<4
+  # sepal-ui 3.1.1 carries no ipyvuetify cap, so a fresh solve takes 3.0 and
+  # loses CalendarDaily; below 1.8 there is no _version.semver either
+  - ipyvuetify>=1.8,<3
   - pyproj  # Always include to avoid PROJ conflicts
   - setuptools<=80
   - wheel
