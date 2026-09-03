@@ -8,6 +8,9 @@ dependencies:
   # sepal-ui 3.1.1 carries no ipyvuetify cap, so a fresh solve takes 3.0 and
   # loses CalendarDaily; below 1.8 there is no _version.semver either
   - ipyvuetify>=1.8,<3
+  # libarrow 15.0.2 links libgflags.so.2.2 but declares only glog, so gflags 2.3
+  # drops that SONAME from the solve and pyarrow stops importing
+  - gflags>=2.2,<2.3
   - pyproj  # Always include to avoid PROJ conflicts
   - setuptools<=80
   - wheel
