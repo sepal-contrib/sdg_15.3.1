@@ -4,7 +4,7 @@ channels:
   - defaults
 dependencies:
   - python=3.12
-  - sepal-ui
+  - sepal-ui>=3.1.1,<4
   - pyproj  # Always include to avoid PROJ conflicts
   - setuptools<=80
   - wheel
