@@ -4,9 +4,12 @@ channels:
   - defaults
 dependencies:
   - python=3.12
-  - sepal-ui>=3.1.1,<4
-  # sepal-ui 3.1.1 carries no ipyvuetify cap, so a fresh solve takes 3.0 and
-  # loses CalendarDaily; below 1.8 there is no _version.semver either
+  # sepal-ui was renamed to pysepal at 3.3.0; pysepal ships a sepal_ui shim that
+  # redirects the old imports, so component/ is unchanged. Nothing else in the
+  # solve moves: sepal-ui is simply replaced by pysepal and pysepal-api.
+  - pysepal>=3.8.3,<4
+  # pysepal declares this cap itself; kept explicit because ipyvuetify 3 drops
+  # CalendarDaily, and below 1.8 there is no _version.semver
   - ipyvuetify>=1.8,<3
   # libarrow 15.0.2 links libgflags.so.2.2 but declares only glog, so gflags 2.3
   # drops that SONAME from the solve and pyarrow stops importing
