@@ -18,9 +18,19 @@ from typing import Any, cast
 
 import ee
 
-__all__ = ["as_image"]
+__all__ = ["as_collection", "as_element", "as_image"]
 
 
 def as_image(obj: Any) -> ee.Image:
     """Narrow an untyped `ee` chain back to `ee.Image`. See the module docstring."""
     return cast("ee.Image", obj)
+
+
+def as_collection(obj: Any) -> ee.ImageCollection:
+    """Narrow an untyped `ee` chain back to `ee.ImageCollection`. See the module docstring."""
+    return cast("ee.ImageCollection", obj)
+
+
+def as_element(obj: Any) -> ee.Element:
+    """Narrow an untyped `ee` chain back to `ee.Element`. See the module docstring."""
+    return cast("ee.Element", obj)
