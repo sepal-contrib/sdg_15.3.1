@@ -30,7 +30,7 @@ __all__ = ["Problem", "check_custom_lc_codes", "validate"]
 
 # The top-level `transition_matrix` field has no vocabulary of its own — it only
 # ever pairs with the built-in 7-class IPCC scheme (Task 3's default()).
-_DEFAULT_TRANSITION_MATRIX_SIZE = len(DEFAULT_LC_CODES) ** 2
+_DEFAULT_LC_CLASS_COUNT = len(DEFAULT_LC_CODES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,15 +222,34 @@ def _land_cover_problems(spec: RunSpec) -> tuple[Problem, ...]:
     return tuple(problems)
 
 
+def _matrix_shape_defect(
+    rows: tuple[tuple[int, ...], ...], expected_rows: int, expected_cols: int
+) -> str | None:
+    """Compare rows and columns, not the total cell count.
+
+    ``TransitionMatrix`` itself now guarantees a rectangular shape
+    (``scheme.py``'s ``__post_init__``), so counting cells is not enough: a
+    matrix can be perfectly rectangular and still be the *wrong* rectangle — the
+    default 7x7 crammed into a single 49-value row, or a custom scheme's matrix
+    transposed — and a bare ``len(flatten()) == 49`` check cannot tell the
+    difference, because ``flatten()`` reads either shape into the same sequence.
+    """
+    if len(rows) != expected_rows:
+        return f"has {len(rows)} row(s), expected {expected_rows}"
+    for index, row in enumerate(rows):
+        if len(row) != expected_cols:
+            return f"row {index} has {len(row)} value(s), expected {expected_cols}"
+    return None
+
+
 def _matrix_problems(
-    matrix: TransitionMatrix, field: str, expected_size: int
+    matrix: TransitionMatrix, field: str, expected_rows: int, expected_cols: int
 ) -> tuple[Problem, ...]:
     problems: list[Problem] = []
-    flat = matrix.flatten()
 
     # input_tile.py:310 tested `{1, 0, -1} != set(flatten)`, which rejects a
     # legitimate matrix using only two of the three values. Relaxed to a subset.
-    foreign = sorted(set(flat) - {-1, 0, 1})
+    foreign = sorted(set(matrix.flatten()) - {-1, 0, 1})
     if foreign:
         problems.append(
             Problem(
@@ -241,18 +260,13 @@ def _matrix_problems(
             )
         )
 
-    if len(flat) != expected_size:
-        # TransitionMatrix performs no shape validation of its own (Task 3); a
-        # ragged or wrongly-sized matrix reaches land_cover.py's remap and fails
-        # there with a GEE arity error instead of at construction.
+    shape_defect = _matrix_shape_defect(matrix.rows, expected_rows, expected_cols)
+    if shape_defect is not None:
         problems.append(
             Problem(
                 field=field,
                 code="invalid_transition_matrix",
-                message=(
-                    f"The transition matrix has {len(flat)} cells; the land cover "
-                    f"vocabulary it must score needs exactly {expected_size}."
-                ),
+                message=f"The transition matrix is the wrong shape: {shape_defect}.",
                 fatal=True,
             )
         )
@@ -263,14 +277,23 @@ def _matrix_problems(
 def _transition_matrix_problems(spec: RunSpec) -> tuple[Problem, ...]:
     problems = list(
         _matrix_problems(
-            spec.transition_matrix, "transition_matrix", _DEFAULT_TRANSITION_MATRIX_SIZE
+            spec.transition_matrix,
+            "transition_matrix",
+            _DEFAULT_LC_CLASS_COUNT,
+            _DEFAULT_LC_CLASS_COUNT,
         )
     )
     source = spec.land_cover
     if isinstance(source, CustomLandCoverSource) and source.scheme is not None:
         scheme = source.scheme
-        expected = len(scheme.start_codes) * len(scheme.end_codes)
-        problems.extend(_matrix_problems(scheme.matrix, "land_cover.scheme.matrix", expected))
+        problems.extend(
+            _matrix_problems(
+                scheme.matrix,
+                "land_cover.scheme.matrix",
+                len(scheme.start_codes),
+                len(scheme.end_codes),
+            )
+        )
     return tuple(problems)
 
 

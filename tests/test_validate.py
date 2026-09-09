@@ -259,15 +259,19 @@ def test_custom_scheme_matrix_is_checked_under_its_own_field():
     assert problem.field == "land_cover.scheme.matrix"
 
 
-def test_ragged_transition_matrix_is_fatal():
-    # TransitionMatrix performs no shape validation on its own (Task 3); a
-    # matrix whose flattened length doesn't match its scheme's code count feeds
-    # land_cover.py's remap the wrong number of values — a GEE arity error at
-    # runtime rather than one caught at construction.
-    ragged = TransitionMatrix(((0, -1, 1), (-1, 0)))
-    problem = only(BASE.evolve(transition_matrix=ragged), "invalid_transition_matrix")
+def test_wrong_shape_transition_matrix_is_fatal():
+    # TransitionMatrix rejects a genuinely ragged shape at construction
+    # (test_scheme.py::test_ragged_rows_are_rejected) — but a matrix can be
+    # perfectly rectangular and still be the *wrong* rectangle. Cramming the
+    # default 7x7 into a single 49-value row keeps the same total cell count
+    # and the same legal values, so a bare `len(flatten()) == 49` check (the
+    # bug in the first cut of this rule) would miss it entirely.
+    wrong_shape = TransitionMatrix((TransitionMatrix.default().flatten(),))
+    assert len(wrong_shape.flatten()) == 49
+    problem = only(BASE.evolve(transition_matrix=wrong_shape), "invalid_transition_matrix")
     assert problem.field == "transition_matrix"
     assert problem.fatal is True
+    assert "1 row" in problem.message
 
 
 def test_undersized_custom_scheme_matrix_is_fatal():
@@ -276,6 +280,30 @@ def test_undersized_custom_scheme_matrix_is_fatal():
             start_asset="users/someone/start",
             end_asset="users/someone/end",
             scheme=scheme(TransitionMatrix(((0, -1),))),  # 1x2, the scheme needs 2x2
+        )
+    )
+    problem = only(spec, "invalid_transition_matrix")
+    assert problem.field == "land_cover.scheme.matrix"
+
+
+def test_transposed_custom_scheme_matrix_is_fatal():
+    # 2 start classes x 3 end classes needs a 2x3 matrix (6 cells); a 3x2
+    # transpose has the same 6 cells and the same legal values, so — like the
+    # single-row case above — a total-cell-count check alone would miss the
+    # swap. Only comparing rows and columns separately catches it.
+    transposed_scheme = LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Cropland", "Wetland"),
+        end_codes=(10, 30, 40),
+        matrix=TransitionMatrix(((0, -1), (1, 0), (1, -1))),  # 3x2, the scheme needs 2x3
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=transposed_scheme,
         )
     )
     problem = only(spec, "invalid_transition_matrix")
@@ -328,15 +356,22 @@ sub_periods = st.builds(
     land_cover=overrides,
     soc=overrides,
 )
-matrices = (
-    st.lists(
-        st.lists(st.integers(min_value=-3, max_value=3), min_size=1, max_size=3).map(tuple),
-        min_size=1,
-        max_size=3,
+
+
+@st.composite
+def _matrices(draw: st.DrawFn) -> TransitionMatrix:
+    # TransitionMatrix rejects a ragged shape (scheme.py), so rows/cols are
+    # drawn first and every row is filled to that width — independently-sized
+    # rows would raise while Hypothesis is still generating the example.
+    rows = draw(st.integers(min_value=1, max_value=3))
+    cols = draw(st.integers(min_value=1, max_value=3))
+    values = draw(
+        st.lists(st.integers(min_value=-3, max_value=3), min_size=rows * cols, max_size=rows * cols)
     )
-    .map(tuple)
-    .map(TransitionMatrix)
-)
+    return TransitionMatrix(tuple(tuple(values[i * cols : (i + 1) * cols]) for i in range(rows)))
+
+
+matrices = _matrices()
 schemes = st.builds(
     LandCoverScheme,
     start_names=st.just(("Forest", "Cropland")),

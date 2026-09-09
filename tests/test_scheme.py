@@ -121,6 +121,22 @@ def test_constructor_coerces_rows_like_from_list() -> None:
     assert all(isinstance(row, tuple) for row in m.rows)
 
 
+def test_ragged_rows_are_rejected() -> None:
+    """flatten() reads rows in order regardless of length, so a ragged matrix
+    silently shifts every value after a short or long row once it is zipped
+    against LandCoverScheme.class_combinations in resolve.py — a wrong-but-
+    plausible transition table, not a loud error. _matrix_from_json is the one
+    path that can hand the constructor a ragged shape read straight off disk,
+    bypassing sdg1531.validate entirely, so the guard belongs here too."""
+    with pytest.raises(ValueError, match="same length"):
+        TransitionMatrix(rows=((0, -1, 1), (-1, 0)))
+
+
+def test_a_single_row_is_never_ragged() -> None:
+    # one row has nothing to disagree with — this is a valid (if unusual) shape
+    assert TransitionMatrix(rows=((0, -1, 1, 0),)).rows == ((0, -1, 1, 0),)
+
+
 # --------------------------------------------------------------------------
 # LandCoverScheme — the default vocabulary
 # --------------------------------------------------------------------------

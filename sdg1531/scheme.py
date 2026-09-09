@@ -63,18 +63,31 @@ class TransitionMatrix:
     rows: tuple[tuple[int, ...], ...]
 
     def __post_init__(self) -> None:
-        """Coerce ``rows`` to a tuple of tuples of ints.
+        """Coerce ``rows`` to a tuple of tuples of ints, and reject a ragged shape.
 
-        Without this, ``TransitionMatrix(rows=[[0, -1], [1, 0]])`` is accepted
-        silently: the instance is frozen but its rows are still mutable lists, and
-        :meth:`is_default` then compares ``list != tuple`` and reports False for a
-        semantically-default matrix. ``from_list`` already does the right thing,
-        but nothing forced every caller (Task 5's deserializer among them) through
-        it — this makes the constructor itself safe.
+        Without the coercion, ``TransitionMatrix(rows=[[0, -1], [1, 0]])`` is
+        accepted silently: the instance is frozen but its rows are still mutable
+        lists, and :meth:`is_default` then compares ``list != tuple`` and reports
+        False for a semantically-default matrix. ``from_list`` already does the
+        right thing, but nothing forced every caller (Task 5's deserializer among
+        them) through it — this makes the constructor itself safe.
+
+        Without the shape check, a ragged matrix (rows of unequal length) was
+        accepted too. :meth:`flatten` reads it row by row regardless, so a short
+        or long row shifts every value after it — and because that flattened
+        sequence is zipped against ``LandCoverScheme.class_combinations`` in
+        ``resolve.py``, the result is not a loud error but a silently misaligned
+        transition table. Deserializing a spec (``_matrix_from_json``) is the one
+        path that can hand this constructor a ragged shape read straight off
+        disk, bypassing ``sdg1531.validate`` entirely.
         """
-        object.__setattr__(
-            self, "rows", tuple(tuple(int(value) for value in row) for row in self.rows)
-        )
+        rows = tuple(tuple(int(value) for value in row) for row in self.rows)
+        object.__setattr__(self, "rows", rows)
+        lengths = {len(row) for row in rows}
+        if len(lengths) > 1:
+            raise ValueError(
+                f"TransitionMatrix rows must all be the same length; got lengths {sorted(lengths)}"
+            )
 
     @classmethod
     def default(cls) -> TransitionMatrix:
