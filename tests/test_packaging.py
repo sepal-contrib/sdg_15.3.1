@@ -30,8 +30,11 @@ def test_requires_python_is_312() -> None:
 def test_runtime_dependencies_are_declared() -> None:
     deps = _pyproject()["project"]["dependencies"]
     names = {d.split("[")[0].split(">")[0].split("=")[0].split("<")[0].strip() for d in deps}
-    # the domain is ee + pandas + geopandas + stdlib and nothing else (spec §4)
-    assert names == {"earthengine-api", "pandas", "geopandas"}
+    # the domain is ee + pandas + geopandas + stdlib and nothing else (spec §4),
+    # plus anyascii: pure-Python, zero dependencies, required so
+    # sdg1531.naming.normalize_str transliterates non-Latin AOI names
+    # byte-identically to the legacy pysepal scripts/utils.py:140.
+    assert names == {"earthengine-api", "pandas", "geopandas", "anyascii"}
 
 
 def test_dev_and_app_extras_exist() -> None:

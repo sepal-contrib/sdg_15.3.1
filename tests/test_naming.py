@@ -67,6 +67,27 @@ def test_normalize_str_display_mode_keeps_spaces_and_apostrophes():
     assert naming.normalize_str("Côte d'Ivoire", folder=False) == "Cote d'Ivoire"
 
 
+@pytest.mark.parametrize(
+    "raw,transliterated",
+    [
+        ("Ørsted", "Orsted"),
+        ("Łódź", "Lodz"),
+        ("Straße", "Strasse"),
+        ("Кавказ", "Kavkaz"),
+        ("日本", "RiBen"),
+    ],
+)
+def test_normalize_str_transliterates_non_latin_scripts(raw, transliterated):
+    # pysepal scripts/utils.py:140 is anyascii-backed, which *transliterates*
+    # rather than strips: an AOI name outside Latin-1 must still reach the
+    # same folder component the legacy would have used, or a user with such a
+    # name gets a different (or empty) result directory (spec §7, data
+    # contract). A plain NFKD ascii-fold instead silently drops the leading
+    # or non-Latin letters ("rsted", "odz", "Strae", "", "") - this is what
+    # would have caught that.
+    assert naming.normalize_str(raw) == transliterated
+
+
 def test_naming_does_not_import_ee():
     # sys.modules["ee"] = None makes any `import ee` raise ImportError, so the
     # subprocess exits non-zero if naming (or anything it imports) pulls ee in.

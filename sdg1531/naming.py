@@ -9,9 +9,10 @@ changed.
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Iterable, Mapping
 from types import MappingProxyType
+
+from anyascii import anyascii
 
 from .catalog import SENSORS
 from .enums import IndicatorLayer
@@ -31,9 +32,6 @@ __all__ = [
     "run_label",
 ]
 
-# pysepal scripts/utils.py:138 verbatim. anyascii is replaced by an NFKD fold
-# so the domain keeps a stdlib-only dependency set; the two agree on the Latin
-# text that reaches an AOI name.
 _FOLDER_RE = re.compile(r"[^a-zA-Z\d\-_]")
 _DISPLAY_RE = re.compile(r"[^a-zA-Z\d\-_ ']")
 
@@ -54,6 +52,15 @@ LAYER_BASENAMES: Mapping[str, str] = MappingProxyType(
 def normalize_str(msg: str, folder: bool = True) -> str:
     """Make ``msg`` safe for a folder or GEE asset id.
 
+    Transcribed from ``pysepal`` ``scripts/utils.py:128-140`` verbatim
+    (``re.sub(regex, "_", anyascii(msg))``): ``anyascii`` *transliterates*
+    rather than strips, so e.g. "Ørsted" becomes "Orsted" and "Кавказ"
+    becomes "Kavkaz" instead of both losing their non-Latin letters. That
+    matters here because the AOI name it sanitises is user-supplied and
+    ends up in ``run_label``, which names a directory users already have on
+    disk (``run_15_3_1.py:313-317`` globs on it) — a divergent transliteration
+    would orphan an existing user's results.
+
     Args:
         msg: the string to sanitise.
         folder: when False, spaces and apostrophes survive (display form).
@@ -62,10 +69,9 @@ def normalize_str(msg: str, folder: bool = True) -> str:
         ``msg`` folded to ASCII with every remaining unsafe character replaced
         by ``_``.
     """
-    ascii_only = unicodedata.normalize("NFKD", msg).encode("ascii", "ignore").decode()
     regex = _FOLDER_RE if folder else _DISPLAY_RE
 
-    return regex.sub("_", ascii_only)
+    return regex.sub("_", anyascii(msg))
 
 
 def _sensor_catalog_token(name: str) -> str:
