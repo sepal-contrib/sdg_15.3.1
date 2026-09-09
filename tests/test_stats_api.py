@@ -14,6 +14,7 @@ from sdg1531.enums import IndicatorLayer
 from sdg1531.errors import StatisticsError
 from sdg1531.ports import InfoFetcher
 from sdg1531.stats.api import (
+    _ZONAL_LABELS,
     fetch_areas_by_land_cover,
     fetch_band_names,
     fetch_distinct_pixel_values,
@@ -41,6 +42,23 @@ class RaisingFetcher:
         return [await self.get_info_async(obj) for obj in ee_objects]
 
 
+class WideFetcher:
+    """A fetcher shaped like the REAL implementor, third defaulted parameter and all.
+
+    pysepal's ``GEEInterface.get_info_async`` takes ``serialized_object=None``
+    (gee_interface.py:194) and satisfies ``InfoFetcher`` regardless, because a
+    Protocol allows extra parameters that have defaults. Nothing calls this class --
+    it exists so the conformance check below cannot regress to an equality that would
+    reject the one implementor the port was written for.
+    """
+
+    async def get_info_async(
+        self, ee_object: Any = None, tag: Any = None, serialized_object: Any = None
+    ) -> Any: ...
+
+    async def get_info_batch_async(self, ee_objects: list[Any]) -> list[Any]: ...
+
+
 @pytest.fixture()
 def ctx() -> ExecutionContext:
     return make_ctx()
@@ -55,7 +73,7 @@ def _params(func) -> list[str]:
     ]
 
 
-@pytest.mark.parametrize("fetcher_class", [FakeFetcher, RaisingFetcher])
+@pytest.mark.parametrize("fetcher_class", [FakeFetcher, RaisingFetcher, WideFetcher])
 def test_the_test_fetchers_satisfy_the_protocol(fetcher_class) -> None:
     """Structural conformance, checked at RUNTIME.
 
@@ -66,7 +84,12 @@ def test_the_test_fetchers_satisfy_the_protocol(fetcher_class) -> None:
     load-bearing because a Protocol matches positional-or-keyword parameters by
     name.
 
-    The real implementor is pysepal's ``GEEInterface``, which the suite may not
+    The declared names must be a PREFIX of the implemented ones, not equal to them:
+    a Protocol is satisfied by an implementor that takes further parameters as long
+    as they have defaults, and the real implementor does exactly that -- see
+    :class:`WideFetcher`. Demanding equality would reject ``GEEInterface`` itself.
+
+    That real implementor is pysepal's ``GEEInterface``, which the suite may not
     import (Tier-0 isolation); ``sdg1531/ports.py`` records the signatures this was
     written against, pysepal 3.8.3 ``gee_interface.py:193`` and ``:207``.
     """
@@ -74,11 +97,11 @@ def test_the_test_fetchers_satisfy_the_protocol(fetcher_class) -> None:
     assert attrs == ["get_info_async", "get_info_batch_async"]
 
     for name in attrs:
-        declared = getattr(InfoFetcher, name)
+        declared = _params(getattr(InfoFetcher, name))
         implemented = getattr(fetcher_class, name, None)
         assert implemented is not None, f"{fetcher_class.__name__} has no {name}"
         assert inspect.iscoroutinefunction(implemented), name
-        assert _params(implemented) == _params(declared), name
+        assert _params(implemented)[: len(declared)] == declared, name
 
 
 @pytest.mark.asyncio
@@ -207,6 +230,16 @@ async def test_fetch_zonal_areas_decodes_the_feature_collection() -> None:
         10.5,
         20.25,
         2.0,
+    ]
+    # and their ORDER is the legacy's -- :343-350 adds Class_0, Class_3, Class_2,
+    # Class_1, which is the field order of the shapefile Task 18 writes. Sorting
+    # _ZONAL_LABELS would reorder fields users have tooling keyed on, with every
+    # value assertion above still green.
+    assert [c for c in gdf.columns if c in set(_ZONAL_LABELS.values())] == [
+        "NoData",
+        "Improve",
+        "Stable",
+        "Degrade",
     ]
     # the second call is the mapped collection, sent only after the probe came back
     assert len(fetcher.calls) == 2

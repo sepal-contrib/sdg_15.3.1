@@ -11,8 +11,8 @@ two tables are written out in full, at the two sites that use them, and are
 deliberately NOT derived from :class:`~sdg1531.engine.indicator.ClassifiedLayer`.
 See ``requests.py``'s docstring for why they must be allowed to disagree.
 
-EXPECTED_DIVERGENCES note -- two divergences from the legacy. Task 17's parity
-harness must carry both:
+EXPECTED_DIVERGENCES note -- three divergences from the legacy. Task 17's parity
+harness must carry all three:
 
 1. **Behaviour-changing.** ``zonal_statistics_to_geodataframe``
    (run_15_3_1.py:475-569) prints four progress and failure lines (:485, :543,
@@ -25,13 +25,26 @@ harness must carry both:
    frame, and the four ``if "Class_N" in columns`` guards of :343-350 are ported as
    a total loop that adds the column when it is missing (see
    :func:`decode_zonal_areas`), which changes a KeyError-free omission into a
-   zero-filled column and nothing else.
+   zero-filled column and nothing else. It also covers one input the legacy did
+   NOT treat as an error: ``{"features": []}`` passed ``:546``'s guard (the key is
+   present) and decoded to an empty frame, which then failed further downstream at
+   ``to_file``; :func:`decode_zonal_areas` raises on it, naming the likely cause.
+   That makes the entry deliberately wider than "reporting only" by exactly one
+   input shape.
 2. **Behaviour-changing.** :func:`decode_distinct_pixel_values` returns the values
    SORTED; ``custom_lc_values`` (run_15_3_1.py:421-422) returned them in the
    frequency histogram's own key order. The entry is the ORDER and nothing else --
    the same integers, the same count. Every legacy consumer wrapped the result in
    ``set()`` (input_tile.py:271, :273, :286, :291), so no shipped behaviour depended
    on the order; sorting makes the value deterministic for a caller that does not.
+3. **Behaviour-changing.** :func:`decode_transition_areas` zips the transition codes
+   against the class-name pairs with ``strict=True`` and raises where
+   ``run_15_3_1.py:241``'s bare ``zip`` truncated to the shorter of the two. Scoped
+   to a scheme whose code list and name list disagree in length -- which cannot
+   happen for a scheme built by :mod:`sdg1531.scheme` and means the scheme itself is
+   malformed, not that odd input arrived from Earth Engine. For every well-formed
+   scheme the two are identical. Truncating instead produced a silently
+   MISLABELLED table, which is the failure mode worth trading a raise for.
 """
 
 from __future__ import annotations
@@ -81,6 +94,23 @@ _STATS_LABELS: Mapping[IndicatorLayer, Mapping[int, str]] = MappingProxyType(
 _ZONAL_DECIMALS = 2  # run_15_3_1.py:333 decimal_places=2, as passed by the caller
 
 
+def _field(entry: Any, key: str, *, what: str) -> Any:
+    """One field off a group entry, naming the payload when it is absent.
+
+    The unknown-*code* paths below already raise a domain error; the missing-*key*
+    paths used to surface as a bare ``KeyError('lc_comb')`` from four frames down,
+    which is a milder form of the same "error with no context" that spec §7's fix is
+    about. ``TypeError`` is caught alongside because a group entry that is not a
+    mapping at all (a bare string, say) fails at the subscript rather than the lookup.
+    """
+    try:
+        return entry[key]
+    except (KeyError, TypeError) as exc:
+        raise StatisticsError(
+            f"Earth Engine returned a {what} entry with no {key!r} field: {entry!r}"
+        ) from exc
+
+
 def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: Any) -> pd.DataFrame:
     """Land cover transition areas -> a three column frame.
 
@@ -99,12 +129,19 @@ def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: Any) -> pd.D
     ]
     # strict=True where the legacy truncated: both sequences are the start x end
     # cartesian product of the same scheme, so a length mismatch means the scheme
-    # itself is malformed, not that odd input arrived from Earth Engine.
-    labels = dict(zip(r.lc_class_combinations, name_pairs, strict=True))
+    # itself is malformed, not that odd input arrived from Earth Engine. See the
+    # module docstring's EXPECTED_DIVERGENCES note 3.
+    try:
+        labels = dict(zip(r.lc_class_combinations, name_pairs, strict=True))
+    except ValueError as exc:
+        raise StatisticsError(
+            f"This run's land cover scheme is malformed: {len(r.lc_class_combinations)} "
+            f"transition codes for {len(name_pairs)} class-name pairs."
+        ) from exc
 
     rows: list[list[Any]] = []
     for group in groups:
-        code = int(group["lc_comb"])
+        code = int(_field(group, "lc_comb", what="land cover transitions"))
         try:
             start_name, end_name = labels[code]
         except KeyError as exc:
@@ -112,7 +149,7 @@ def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: Any) -> pd.D
                 f"Earth Engine returned the transition code {code}, which is not in the "
                 "land cover vocabulary of this run."
             ) from exc
-        rows.append([start_name, end_name, group["sum"]])
+        rows.append([start_name, end_name, _field(group, "sum", what="land cover transitions")])
 
     return pd.DataFrame(data=rows, columns=[r.lc_year_start_esa, r.lc_year_end_esa, "Area"])
 
@@ -131,17 +168,18 @@ def decode_areas_by_land_cover(
     labels = _STATS_LABELS[layer]
     code_to_name = r.scheme.code_to_name_start()
 
+    what = f"areas by land cover for {layer.value}"
     rows: list[list[Any]] = []
     for outer in groups:
-        raw_class = outer["indicator"]
+        raw_class = _field(outer, "indicator", what=what)
         try:
             class_label = labels[int(raw_class)]
         except KeyError as exc:
             raise StatisticsError(
                 f"Earth Engine returned class {raw_class!r} for {layer.value}, which has no label."
             ) from exc
-        for inner in outer["groups"]:
-            code = int(inner["lc"])
+        for inner in _field(outer, "groups", what=what):
+            code = int(_field(inner, "lc", what=what))
             try:
                 lc_label = code_to_name[code]
             except KeyError as exc:
@@ -149,7 +187,7 @@ def decode_areas_by_land_cover(
                     f"Earth Engine returned the land cover code {code}, which is not in "
                     "the land cover vocabulary of this run."
                 ) from exc
-            rows.append([lc_label, class_label, inner["sum"]])
+            rows.append([lc_label, class_label, _field(inner, "sum", what=what)])
 
     return pd.DataFrame(rows, columns=["landcover", layer.value, "Area"])
 

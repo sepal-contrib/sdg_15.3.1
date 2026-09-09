@@ -27,6 +27,8 @@ from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.engine.land_cover import LandCoverMaps
 from sdg1531.enums import IndicatorLayer
 from sdg1531.resolve import resolve
+from sdg1531.stats import decode as decode_module
+from sdg1531.stats import requests as requests_module
 from sdg1531.stats.decode import _STATS_LABELS
 from sdg1531.stats.requests import (
     _STATS_BAND,
@@ -48,6 +50,7 @@ from tests.engine.graph import (
     _renamed_bands,
     _root,
     _scalar_list_arg,
+    _select_bands_of,
     _spine,
     _spine_functions,
     _string_list_arg,
@@ -74,10 +77,12 @@ def ctx() -> ExecutionContext:
 # --- graph readers ------------------------------------------------------------
 #
 # The whole-graph readers in tests/engine/graph.py (`_selected_bands`,
-# `_loaded_asset_ids`, `count_calls`) are imported and used as-is. What they cannot
-# answer is WHICH operand contributed a given selection: a union over the request
-# sees {"start", "state_5_levels"} whether the land cover side or the indicator side
-# produced either one. These three read one subtree, or one node's arguments.
+# `_loaded_asset_ids`, `count_calls`) are imported and used as-is, and the readers
+# below delegate to its node-level primitives rather than re-inlining them. What the
+# shared readers cannot answer is WHICH operand contributed a given selection: a
+# union over the request sees {"start", "state_5_levels"} whether the land cover side
+# or the indicator side produced either one. These scope to one subtree, or to one
+# node's arguments.
 
 
 def _constant(deref, arg):
@@ -88,12 +93,15 @@ def _constant(deref, arg):
 
 
 def _selected_in(node, deref, graph) -> set[str]:
-    """Every band name passed to `.select(...)` inside ONE subtree."""
+    """Every band name passed to `.select(...)` inside ONE subtree.
+
+    The shared `_selected_bands` answers this for a whole request; only the walk's
+    starting point differs, so the per-node extraction is the shared
+    `_select_bands_of` rather than a second copy of it.
+    """
     names: set[str] = set()
     for current in _walk(node, deref, graph):
-        call = _call(current)
-        if call is not None and call.get("functionName") == "Image.select":
-            names.update(_string_list_arg(deref(call["arguments"]["bandSelectors"]), deref))
+        names.update(_select_bands_of(current, deref) or [])
     return names
 
 
@@ -137,6 +145,16 @@ def _added_bands(deref, graph, image_node):
     ]
 
 
+def _divide_constant(deref, image_node):
+    """The scalar the pixel-area image is divided by, off the operand image's spine."""
+    for node in _spine(image_node, deref, _RECEIVER_ARG):
+        call = _call(node)
+        if call is not None and call.get("functionName") == "Image.divide":
+            denominator = _call(deref(call["arguments"]["image2"]))
+            return _constant(deref, denominator["arguments"]["value"])
+    raise AssertionError("no Image.divide on the operand image's spine")
+
+
 def _operand_selections(obj):
     """`(indicator selection, land cover selection)` for an areas-by-land-cover request."""
     deref, graph, args = _sole_call(obj, "Image.reduceRegion")
@@ -166,9 +184,7 @@ def test_build_transition_areas_groups_on_the_transition_band(ctx):
     ]
     assert _added_bands(deref, graph, image) == [{"transition"}]
     assert count_calls(request, "Image.selfMask") == 1
-    divide = _call(_spine(image, deref, _RECEIVER_ARG)[1])
-    denominator = _call(deref(divide["arguments"]["image2"]))
-    assert _constant(deref, denominator["arguments"]["value"]) == 10000  # m2 -> hectares
+    assert _divide_constant(deref, image) == 10000  # m2 -> hectares
 
     # :228-232
     assert _call(deref(args["geometry"]))["functionName"] == "Geometry.bounds"
@@ -254,6 +270,23 @@ def test_productivity_state_and_trend_statistics_use_the_five_level_band(layer, 
     assert export_band in _renamed_bands(request)
     assert export_band not in indicator
     assert export_band not in landcover
+
+
+def test_each_statistics_table_lives_in_the_module_the_docs_send_readers_to():
+    """The split is pinned, not just described.
+
+    ``_STATS_BAND`` belongs beside the request that selects it, ``_STATS_LABELS``
+    beside the decoder that applies it -- and it has to stay there, because
+    ``decode.py`` is on ``tests/test_isolation.py``'s ee-freedom roster and importing
+    ``requests`` would drag ``ee`` into it. ``sdg1531/engine/indicator.py``'s
+    docstrings send Task 17's harness to these two modules, and that prose has
+    already drifted once (it named ``stats/requests.py`` for both), so the fact it
+    describes is asserted here rather than trusted.
+    """
+    assert "_STATS_BAND" in vars(requests_module)
+    assert "_STATS_LABELS" not in vars(requests_module)
+    assert "_STATS_LABELS" in vars(decode_module)
+    assert "_STATS_BAND" not in vars(decode_module)
 
 
 def test_both_statistics_tables_match_the_legacy_branch_for_branch():
@@ -490,28 +523,54 @@ def test_build_distinct_pixel_values_and_band_names_are_lists():
     assert _loaded_asset_ids(names) == {"users/x/asset"}
 
 
-# --- the one constant whose Python TYPE is load-bearing ------------------------
+# --- the constants whose Python TYPE is load-bearing ---------------------------
+#
+# `int` and `float` are DIFFERENT serialized graphs and Task 17 diffs the string:
+# `json.dumps` writes 10000000000000.0 for the float and 10000000000000 for the int.
+# `assert x == 1e13` cannot see that, because `1 == 1.0` in Python -- so every
+# assertion above that compares a constant with `==` is blind to its type, and every
+# numeric constant this module puts into a graph is pinned below AS JSON instead,
+# which carries the type. Only the constants this module OWNS are listed; `scale` is
+# a pass-through whose type belongs to the caller.
 
 
-def test_max_pixels_reaches_every_reducer_as_the_legacy_float():
-    """``1e13`` must stay a float all the way into the encoded graph.
+def _pinned_constants(request):
+    """`{name: json}` for every constant `requests.py` chose, in one request."""
+    deref, _graph, args = _sole_call(request, "Image.reduceRegion")
+    pinned = {
+        key: json.dumps(_constant(deref, args[key]))
+        for key in ("maxPixels", "tileScale")
+        if key in args
+    }
+    if "Image.divide" in _spine_functions(deref(args["image"]), deref, _RECEIVER_ARG):
+        pinned["area divisor"] = json.dumps(_divide_constant(deref, deref(args["image"])))
+    return pinned
 
-    ``json.dumps`` writes ``10000000000000.0`` for the float and
-    ``10000000000000`` for ``int(1e13)``, so an int would be a real serialized
-    difference from the legacy (run_15_3_1.py:230, :276, :508) even though the two
-    compare equal in Python -- and Task 17 diffs the serialized string. The call
-    sites wrap the value in ``ee.Number`` only because ``ee`` types ``maxPixels`` as
-    an integer; this is what pins that the wrapper changed nothing.
-    """
-    zones = make_zones()
-    requests = [
+
+def test_the_two_area_reducers_keep_the_legacy_constant_types():
+    """run_15_3_1.py:230/:276 pass the FLOAT 1e13, :232/:279 the INT 2, :224/:269 the
+    INT 10000. A float `tileScale` or divisor is a real serialized difference."""
+    for request in (
         build_transition_areas(StubMaps(), make_ctx()),
         build_areas_by_land_cover(StubMaps(), make_ctx(), layer=IndicatorLayer.SOC),
-        build_zonal_areas(StubMaps(), zones, scale=300),
-    ]
+    ):
+        assert _pinned_constants(request) == {
+            "maxPixels": "10000000000000.0",
+            "tileScale": "2",
+            "area divisor": "10000",
+        }
 
-    for request in requests:
-        deref, _graph, args = _sole_call(request, "Image.reduceRegion")
-        value = _constant(deref, args["maxPixels"])
-        assert isinstance(value, float), (request, type(value))
-        assert json.dumps(value) == "10000000000000.0"
+
+def test_the_zonal_reducer_keeps_the_legacy_constant_types():
+    """:508 passes the FLOAT 1e13 and :335 the FLOAT 1.0 -- the tile scale is a float
+    only because the call site spells it ``1.0``, which next to ``_TILE_SCALE = 2``
+    reads like a typo and is exactly what makes it worth pinning. :520's denominator
+    is an int."""
+    request = build_zonal_areas(StubMaps(), make_zones(), scale=300)
+
+    assert _pinned_constants(request) == {
+        "maxPixels": "10000000000000.0",
+        "tileScale": "1.0",
+    }
+    deref, _graph, divide_args = _sole_call(request, "Number.divide")
+    assert json.dumps(_constant(deref, divide_args["right"])) == "1000000"

@@ -39,6 +39,13 @@ JSON_HALF = (
     "sdg1531.resolve",
     "sdg1531.naming",
     "sdg1531.truth_table",
+    # ports.py declares the InfoFetcher Protocol and imports only `typing`; keeping it
+    # ee-free is what lets the app pass pysepal's GEEInterface without the domain ever
+    # importing either. sdg1531/stats/decode.py is the ee-free half of the stats split,
+    # and that freedom is the whole reason _STATS_LABELS lives there rather than beside
+    # _STATS_BAND in stats/requests.py (which may, and does, import ee).
+    "sdg1531.ports",
+    "sdg1531.stats.decode",
     "sdg1531.stats.plots",
 )
 

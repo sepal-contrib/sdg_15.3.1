@@ -27,15 +27,14 @@ deliberately no second ``export_layers()``.
 
 The seam is the images, not the vocabulary. :attr:`ClassifiedLayer.band` and
 :attr:`ClassifiedLayer.labels` are the MAP AND EXPORT vocabulary (spec §8). The
-STATISTICS vocabulary is Task 15's: ``sdg1531/stats/requests.py`` is SPECIFIED to
-carry its own ``_STATS_BAND`` / ``_STATS_LABELS`` tables and to read only
-``.image`` from here (task-15-brief.md:655-665, :310-320, :699-702). That module
-does not exist yet, so this is a statement about what Task 15 must do, not about
-code in the tree. Under it the two vocabularies deliberately disagree for the
-trend and state layers -- statistics keep the legacy 5-class bands, export takes
-the 3-class ones -- so "unifying" them would silently change the statistics. See
-EXPECTED_DIVERGENCES note 4, whose narrowing depends on Task 15 landing as
-briefed.
+STATISTICS vocabulary is Task 15's: it carries its own tables and reads only
+``.image`` from here -- ``_STATS_BAND`` in ``sdg1531/stats/requests.py`` and
+``_STATS_LABELS`` in ``sdg1531/stats/decode.py``, which stays free of ``ee``
+(task-15-brief.md:655-665, :310-320, :699-702). Under them the two vocabularies
+deliberately disagree for the trend and state layers -- statistics keep the legacy
+5-class bands, export takes the 3-class ones -- so "unifying" them would silently
+change the statistics. See EXPECTED_DIVERGENCES note 4, whose narrowing depends on
+Task 15 having landed as briefed, which it did.
 
 ResolvedSpec fields read here: none directly. :func:`build_indicator_maps` threads
 ``r`` into the sub-indicator builders and keeps it on
@@ -81,14 +80,15 @@ harness must carry all four:
    Spec §8 gives them an export band and a legend for the first time. This is a NEW
    capability, not a changed one -- and in particular it is not intended to change
    the statistics: ``indicator_n_category_label``'s ``trajectory_5_levels`` /
-   ``state_5_levels`` branches (:437-442) are to be ported faithfully by Task 15's
-   ``stats/requests.py``, whose ``_STATS_BAND`` / ``_STATS_LABELS`` keep the 5-class
-   band and the 6-entry legend (task-15-brief.md:655-665, :310-320). That module is
-   not in the tree yet, so this half of the entry is a DEPENDENCY on Task 15 rather
-   than a fact about shipped code: if Task 15 lands a 3-class statistics band for
-   trend or state, this note becomes wrong in the licensing direction and must be
-   revisited. Filing it as behaviour-changing instead would hand the harness a
-   licence to wave through a real statistics regression.
+   ``state_5_levels`` branches (:437-442) are ported faithfully by Task 15, whose
+   ``_STATS_BAND`` (``stats/requests.py``) and ``_STATS_LABELS``
+   (``stats/decode.py``) keep the 5-class band and the 6-entry legend
+   (task-15-brief.md:655-665, :310-320). Task 15 has landed and does exactly that,
+   so this half of the entry is now a fact about shipped code rather than a
+   dependency: a 3-class statistics band for trend or state would make this note
+   wrong in the licensing direction and must be revisited. Filing it as
+   behaviour-changing instead would hand the harness a licence to wave through a
+   real statistics regression.
 """
 
 from __future__ import annotations
@@ -134,10 +134,10 @@ class ClassifiedLayer:
     Consumers select it: ``layer.image.select(layer.band)``.
 
     ``band`` and ``labels`` are the MAP AND EXPORT vocabulary only. The statistics
-    path is specified to keep its own -- ``_STATS_BAND`` / ``_STATS_LABELS`` in
-    ``sdg1531/stats/requests.py``, which Task 15 has yet to write -- and to read
-    only ``.image`` from here; for trend and state the two are meant to disagree
-    (see the module docstring and EXPECTED_DIVERGENCES note 4).
+    path keeps its own -- ``_STATS_BAND`` in ``sdg1531/stats/requests.py`` and
+    ``_STATS_LABELS`` in ``sdg1531/stats/decode.py`` -- and reads only ``.image``
+    from here; for trend and state the two deliberately disagree (see the module
+    docstring and EXPECTED_DIVERGENCES note 4).
 
     ``label`` is the layer's snake id -- ``id.value``, e.g. ``"productivity_trend"``
     -- not a human display string. Translated display labels live in the app layer

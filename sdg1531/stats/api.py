@@ -75,12 +75,18 @@ _MAX_ZONAL_FEATURES = 5000
 
 # transcribed from run_15_3_1.py:343-350 - note the legacy spellings "Degrade" and
 # "Improve", which name columns in every shapefile shipped so far.
+#
+# The ORDER is the legacy's too, and is not the natural 0-1-2-3: :343-350 assigns
+# Class_0, Class_3, Class_2 then Class_1, and `decode_zonal_areas` adds the named
+# columns in this table's iteration order, so this is the field order of the
+# shapefile Task 18 writes. Users have tooling keyed on those fields; sorting the
+# table would silently reorder them.
 _ZONAL_LABELS: Mapping[int, str] = MappingProxyType(
     {
-        0: "NoData",
-        1: "Degrade",
-        2: "Stable",
-        3: "Improve",
+        0: "NoData",  # :343-344
+        3: "Improve",  # :345-346
+        2: "Stable",  # :347-348
+        1: "Degrade",  # :349-350
     }
 )
 

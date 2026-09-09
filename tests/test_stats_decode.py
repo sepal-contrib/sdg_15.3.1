@@ -68,6 +68,39 @@ def test_decode_transition_areas_chains_the_missing_key():
     assert isinstance(excinfo.value.__cause__, KeyError)
 
 
+@pytest.mark.parametrize("missing", ["lc_comb", "sum"])
+def test_decode_transition_areas_names_a_group_entry_missing_a_field(missing):
+    """A bare ``KeyError('lc_comb')`` four frames down is an error with no context."""
+    entry = {"lc_comb": 1010, "sum": 1.0}
+    del entry[missing]
+
+    with pytest.raises(StatisticsError, match=rf"no {missing!r} field") as excinfo:
+        decode_transition_areas([entry], FakeResolved())
+
+    assert "land cover transitions" in str(excinfo.value)
+    assert isinstance(excinfo.value.__cause__, KeyError)
+
+
+def test_decode_transition_areas_names_a_group_entry_that_is_not_a_mapping():
+    """A non-mapping entry fails at the subscript, not the lookup -- TypeError."""
+    with pytest.raises(StatisticsError, match=r"no 'lc_comb' field") as excinfo:
+        decode_transition_areas(["not-a-mapping"], FakeResolved())
+    assert isinstance(excinfo.value.__cause__, TypeError)
+
+
+def test_decode_transition_areas_rejects_a_malformed_scheme():
+    """``zip(strict=True)`` where run_15_3_1.py:241 truncated -- a code list and a name
+    list of different lengths mislabels every row after the mismatch."""
+    r = FakeResolved()
+    r.lc_class_combinations = r.lc_class_combinations[:-1]
+
+    with pytest.raises(StatisticsError, match=r"scheme is malformed") as excinfo:
+        decode_transition_areas([{"lc_comb": 1010, "sum": 1.0}], r)
+
+    assert "48 transition codes for 49 class-name pairs" in str(excinfo.value)
+    assert isinstance(excinfo.value.__cause__, ValueError)
+
+
 def test_decode_areas_by_land_cover_flattens_the_nested_groups():
     r = FakeResolved()
     groups = load_fixture("areas_by_land_cover.json")["groups"]
@@ -153,6 +186,24 @@ def test_decode_areas_by_land_cover_rejects_an_unknown_land_cover_code():
         )
 
 
+@pytest.mark.parametrize(
+    "payload,missing",
+    [
+        ([{"groups": [{"lc": 10, "sum": 1.0}]}], "indicator"),
+        ([{"indicator": 1}], "groups"),
+        ([{"indicator": 1, "groups": [{"sum": 1.0}]}], "lc"),
+        ([{"indicator": 1, "groups": [{"lc": 10}]}], "sum"),
+    ],
+)
+def test_decode_areas_by_land_cover_names_a_group_entry_missing_a_field(payload, missing):
+    """All four fields the nested payload is read by, guarded at both levels."""
+    with pytest.raises(StatisticsError, match=rf"no {missing!r} field") as excinfo:
+        decode_areas_by_land_cover(payload, FakeResolved(), layer=IndicatorLayer.SOC)
+
+    assert "areas by land cover for soc" in str(excinfo.value)
+    assert isinstance(excinfo.value.__cause__, KeyError)
+
+
 def test_pivot_areas_by_land_cover_sums_into_a_class_matrix():
     r = FakeResolved()
     groups = load_fixture("areas_by_land_cover.json")["groups"]
@@ -225,6 +276,21 @@ def test_decode_zonal_areas_adds_a_column_for_a_class_no_zone_reported():
 
     assert "Class_4" in gdf.columns
     assert list(gdf["Extra"]) == [0.0, 0.0]
+
+
+def test_decode_zonal_areas_adds_the_label_columns_in_table_order():
+    """The named columns land in ``labels`` iteration order, not sorted by code.
+
+    That is the mechanism which makes ``_ZONAL_LABELS``' own (legacy) order the field
+    order of the shapefile Task 18 writes, so it is pinned here independently of that
+    table's contents.
+    """
+    geojson = load_fixture("zonal_features.json")
+
+    gdf = decode_zonal_areas(geojson, labels={3: "Improve", 0: "NoData", 1: "Degrade"})
+
+    named = [c for c in gdf.columns if c in {"Improve", "NoData", "Degrade"}]
+    assert named == ["Improve", "NoData", "Degrade"]
 
 
 def test_decode_zonal_areas_without_labels_keeps_the_raw_class_columns():
