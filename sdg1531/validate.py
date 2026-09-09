@@ -9,6 +9,7 @@ the scattered ``alert.check_input`` chain at ``input_tile.py:245-330`` and the
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -20,6 +21,7 @@ from sdg1531.catalog import (
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     CustomLandCoverSource,
+    FixedClimate,
     PrecomputedViAsset,
     RunSpec,
     SensorSelection,
@@ -177,6 +179,29 @@ def _trajectory_problems(spec: RunSpec) -> tuple[Problem, ...]:
             field="trajectory",
             code="unsupported_trajectory",
             message="The water use efficiency trajectory is not implemented.",
+            fatal=True,
+        ),
+    )
+
+
+def _climate_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    """The custom slider's real domain (``climate_regime.py:29``, ``max=1,
+    step=0.01``) is ``[0, 1]``, but nothing in the legacy ever range-checks
+    ``conversion_coef`` — only the widget's bounds constrain it, and a spec
+    read from disk (``RunSpec.from_dict``) does not go through the widget at
+    all. ``nan``/``inf`` are rejected here regardless, since neither can
+    describe a real conversion factor and ``sdg1531.naming.run_label`` making
+    the label total over them is a survivability fix, not a licence to accept
+    them as a spec.
+    """
+    climate = spec.climate
+    if not isinstance(climate, FixedClimate) or math.isfinite(climate.coefficient):
+        return ()
+    return (
+        Problem(
+            field="climate.coefficient",
+            code="non_finite_climate_coefficient",
+            message="The climate conversion coefficient must be a finite number.",
             fatal=True,
         ),
     )
@@ -362,6 +387,7 @@ _CHECKS = (
     _state_period_problems,
     _vi_source_problems,
     _trajectory_problems,
+    _climate_problems,
     _land_cover_problems,
     _transition_matrix_problems,
     _aoi_problems,

@@ -1,5 +1,6 @@
 """sdg1531.validate — the total validator (spec §4 "two total functions", §7)."""
 
+import math
 from dataclasses import replace
 
 from _subprocess import run_python
@@ -13,8 +14,10 @@ from sdg1531.spec import (
     Compatibility,
     CustomLandCoverSource,
     EsaCciSource,
+    FixedClimate,
     Period,
     PeriodOverride,
+    PerPixelClimate,
     PrecomputedViAsset,
     RunSpec,
     SensorSelection,
@@ -179,6 +182,22 @@ def test_every_other_trajectory_is_accepted():
         if trajectory is Trajectory.S_RES_TREND:
             continue
         assert "unsupported_trajectory" not in codes(BASE.evolve(trajectory=trajectory))
+
+
+def test_non_finite_climate_coefficient_is_rejected():
+    for coefficient in (math.nan, math.inf, -math.inf):
+        spec = BASE.evolve(climate=FixedClimate(coefficient))
+        problem = only(spec, "non_finite_climate_coefficient")
+        assert problem.field == "climate.coefficient"
+        assert problem.fatal is True
+
+
+def test_finite_and_per_pixel_climates_are_accepted():
+    # the legacy never range-checks conversion_coef beyond the widget's own
+    # bounds (climate_regime.py:29, [0, 1]), and nothing blocks a value
+    # outside that range either - only nan/inf are rejected here.
+    for climate in (PerPixelClimate(), FixedClimate(0.58), FixedClimate(-5.0), FixedClimate(5.0)):
+        assert "non_finite_climate_coefficient" not in codes(BASE.evolve(climate=climate))
 
 
 def test_half_custom_land_cover_is_a_warning():
@@ -507,6 +526,21 @@ land_cover_sources = st.one_of(
         scheme=st.one_of(st.none(), schemes),
     ),
 )
+climates = st.one_of(
+    st.just(PerPixelClimate()),
+    st.builds(
+        FixedClimate,
+        # nan/+-inf included so the fuzz can prove _climate_problems handles
+        # them without raising, not just that it rejects them (see the
+        # explicit test_non_finite_climate_coefficient_is_rejected for that).
+        coefficient=st.one_of(
+            st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False),
+            st.just(math.nan),
+            st.just(math.inf),
+            st.just(-math.inf),
+        ),
+    ),
+)
 run_specs = st.builds(
     RunSpec,
     periods=sub_periods,
@@ -514,6 +548,7 @@ run_specs = st.builds(
     trajectory=st.sampled_from(list(Trajectory)),
     transition_matrix=matrices,
     land_cover=land_cover_sources,
+    climate=climates,
     aoi=st.one_of(
         st.none(),
         st.builds(
