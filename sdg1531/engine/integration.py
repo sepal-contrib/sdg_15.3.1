@@ -9,6 +9,15 @@ rather than corrected.
 ResolvedSpec fields read here:
     integration_period, spec.vi_source, spec.vegetation_index, spec.threshold,
     spec.compatibility.derived_vi_msvi_uses_evi_asset
+
+EXPECTED_DIVERGENCES note: the rungs that consume ``spec.threshold`` (MODIS,
+Sentinel 2, the Landsat sensors, Derived VI Landsat) narrow it with
+``_require_float`` and raise ``SpecError`` if it is unset. That check has NO
+legacy counterpart -- ``vi_threshold`` (integration.py:410-415) calls
+``img.gt(threshold)`` unconditionally and would pass a Python ``None``
+straight into the ``ee`` graph. Task 17's parity harness should expect this
+module to raise where a legacy run with an unset threshold would instead
+build a graph that fails differently (or not at all, client-side).
 """
 
 from __future__ import annotations
@@ -34,6 +43,9 @@ __all__ = ["build_climate_collection", "build_vi_collection"]
 
 # The ladder's membership sets, from integration.py:45, :81-83.
 _MODIS_VI_SENSORS = ("MODIS MOD13Q1", "MODIS MYD13Q1")
+# Also the membership list `cloud_mask` (integration.py:248) and
+# `apply_scale_factor` (:292) test against -- the same three legacy call
+# sites, one tuple. Changing it moves all three behaviours at once.
 _LANDSAT_SR_SENSORS = (
     "Landsat 4",
     "Landsat 5",
@@ -379,7 +391,12 @@ def build_vi_collection(r: ResolvedSpec, ctx: ExecutionContext) -> ee.ImageColle
     period_end = _require_int(r.integration_period.end, "integration_period.end")
     sensor_names = tuple(source.names)
     index = r.spec.vegetation_index
-    threshold = _require_float(r.spec.threshold, "spec.threshold")
+    # Not narrowed here: Terra NPP never reads a threshold (integration.py:
+    # 134-142 -- process_terra_npp takes no threshold argument), so narrowing
+    # this early would raise on a Terra NPP spec the legacy ran successfully.
+    # Each rung that actually consumes `threshold` narrows it itself, at the
+    # point of consumption.
+    threshold = r.spec.threshold
 
     # transcribed from integration.py:41-43
     ee_asset_list: list[Any] = [SENSORS[name].collection_id for name in sensor_names]
@@ -443,11 +460,12 @@ def _process_modis(
     sensor_list: Sequence[str],
     ee_asset_list: Sequence[Any],
     index: VegetationIndex,
-    threshold: float,
+    threshold: float | None,
     period_start: int,
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:98-131."""
+    threshold = _require_float(threshold, "spec.threshold")
     modis_coll_ = ee.ImageCollection(ee_asset_list[0]).filterDate(
         f"{period_start}-01-01", f"{period_end}-12-31"
     )
@@ -497,11 +515,12 @@ def _process_landsat_sensors(
     sensor_list: Sequence[str],
     ee_asset_list: Sequence[Any],
     index: VegetationIndex,
-    threshold: float,
+    threshold: float | None,
     period_start: int,
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:146-175."""
+    threshold = _require_float(threshold, "spec.threshold")
     i_img_coll = ee.ImageCollection([])
 
     for sensor, asset_id in zip(sensor_list, ee_asset_list, strict=True):
@@ -527,11 +546,12 @@ def _process_sentinel2(
     sensor: str,
     ee_asset_id: str,
     index: VegetationIndex,
-    threshold: float,
+    threshold: float | None,
     period_start: int,
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:179-203."""
+    threshold = _require_float(threshold, "spec.threshold")
     i_img_coll = (
         ee.ImageCollection(ee_asset_id)
         .filterBounds(aoi)
@@ -550,11 +570,12 @@ def _process_sentinel2(
 def _process_landsat_derived_vi(
     aoi: ee.FeatureCollection,
     asset_id: str,
-    threshold: float,
+    threshold: float | None,
     period_start: int,
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:206-214."""
+    threshold = _require_float(threshold, "spec.threshold")
     img_coll = (
         ee.ImageCollection(asset_id)
         .filterBounds(aoi)

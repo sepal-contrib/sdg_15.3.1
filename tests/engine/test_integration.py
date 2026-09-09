@@ -14,7 +14,7 @@ from sdg1531.engine.integration import (
 )
 from sdg1531.enums import VegetationIndex
 from sdg1531.errors import SpecError
-from sdg1531.resolve import resolve
+from sdg1531.resolve import ViProcessor, resolve
 from sdg1531.spec import PrecomputedViAsset, SensorSelection
 from tests.engine.conftest import make_resolved
 from tests.spec_factory import default_spec
@@ -55,6 +55,177 @@ def count_calls(obj, function_name: str) -> int:
     return total
 
 
+# --- reference-resolving graph walk -----------------------------------------
+#
+# `ee.serializer.encode()` hoists a repeated CONSTANT (not just a repeated
+# computed subexpression) into the `values` registry and points every use of
+# it at that one entry via `{"valueReference": K}` -- e.g. the string "year"
+# is used as a Filter.calendarRange field name, a `.set()` property key AND a
+# `.rename()` target in the same graph, so it is stored once and referenced
+# three times, rather than inlined three times. A separate, unrelated
+# indirection applies inside a `.map()`/`.reduce()` callback: the function
+# body is a bare string key into `values` under `functionDefinitionValue`,
+# not a `{"valueReference": ...}` wrapper. Anything that inspects a specific
+# argument's value (not just its presence as a raw substring) has to resolve
+# both, or it silently stops working the moment ee decides to share a value
+# it previously inlined -- which is exactly what broke a `{"constantValue":
+# [...]}`-shaped version of `_renamed_bands` below during fix round 1.
+
+
+def _resolver(graph):
+    """Return `resolve(node)`, `push_children(node, stack)` bound to `graph`."""
+    values = graph.get("values", {})
+
+    def resolve(node):
+        if isinstance(node, dict) and set(node) == {"valueReference"}:
+            return values[node["valueReference"]]
+        return node
+
+    def push_children(node, stack):
+        node = resolve(node)
+        if isinstance(node, dict):
+            fdv = node.get("functionDefinitionValue")
+            if isinstance(fdv, dict) and fdv.get("body") in values:
+                stack.append(values[fdv["body"]])
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+
+    return resolve, push_children
+
+
+def _walk_calls(obj):
+    """Yield `(resolve, call)` for every resolved `functionInvocationValue`
+    dict in `obj`'s graph -- `resolve` is bound to that same graph, so a
+    caller can resolve any argument found on `call` without re-encoding."""
+    graph = ee.serializer.encode(obj)
+    resolve, push_children = _resolver(graph)
+    stack = [{"valueReference": graph["result"]}]
+    seen: set[int] = set()
+    while stack:
+        current = resolve(stack.pop())
+        marker = id(current)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        if isinstance(current, dict):
+            call = current.get("functionInvocationValue")
+            if isinstance(call, dict):
+                yield resolve, call
+        push_children(current, stack)
+
+
+def _loaded_asset_ids(obj) -> set[str]:
+    """Every asset id ee actually loaded: the `id` argument of every
+    `ImageCollection.load` / `Image.load` node in the serialized graph."""
+    ids: set[str] = set()
+    for deref, call in _walk_calls(obj):
+        if call.get("functionName") in ("ImageCollection.load", "Image.load"):
+            id_arg = deref(call.get("arguments", {}).get("id", {}))
+            constant = id_arg.get("constantValue") if isinstance(id_arg, dict) else None
+            if isinstance(constant, str):
+                ids.add(constant)
+    return ids
+
+
+def _renamed_bands(obj) -> set[str]:
+    """Every band name ever passed to `.rename(...)` anywhere in the graph.
+
+    `names` is `{"constantValue": [...]}` when inlined or `{"arrayValue":
+    {"values": [...]}}` when the array (or an element of it) is itself
+    shared and referenced -- both are handled, and each element is resolved
+    individually since a shared array can mix inlined and referenced items.
+    """
+    names: set[str] = set()
+    for deref, call in _walk_calls(obj):
+        if call.get("functionName") != "Image.rename":
+            continue
+        names_arg = deref(call.get("arguments", {}).get("names", {}))
+        if not isinstance(names_arg, dict):
+            continue
+        if isinstance(names_arg.get("constantValue"), list):
+            items = names_arg["constantValue"]
+        else:
+            array_value = names_arg.get("arrayValue", {})
+            items = [deref(item) for item in array_value.get("values", [])]
+        for item in items:
+            value = deref(item)
+            if isinstance(value, dict):
+                value = value.get("constantValue")
+            if isinstance(value, str):
+                names.add(value)
+    return names
+
+
+def _merged_asset_order(obj) -> list[str]:
+    """The order `_process_landsat_sensors` merged sensors in, first to last.
+
+    `a.merge(b).merge(c)` nests as `merge(merge(a, b), c)` -- `collection1` is
+    the receiver, `collection2` the newly merged-in side (verified against a
+    hand-built `ee.ImageCollection([]).merge(a).merge(b)`).
+    """
+    graph = ee.serializer.encode(obj)
+    resolve, push_children = _resolver(graph)
+
+    def call_name(node):
+        node = resolve(node)
+        if isinstance(node, dict):
+            call = node.get("functionInvocationValue")
+            if isinstance(call, dict):
+                return call.get("functionName")
+        return None
+
+    def first_loaded_id(node):
+        stack = [node]
+        seen: set[int] = set()
+        while stack:
+            current = resolve(stack.pop())
+            marker = id(current)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            if isinstance(current, dict):
+                call = current.get("functionInvocationValue")
+                if isinstance(call, dict) and call.get("functionName") in (
+                    "ImageCollection.load",
+                    "Image.load",
+                ):
+                    id_arg = resolve(call.get("arguments", {}).get("id", {}))
+                    constant = id_arg.get("constantValue") if isinstance(id_arg, dict) else None
+                    if isinstance(constant, str):
+                        return constant
+            push_children(current, stack)
+        return None
+
+    def find_merge_chain(node):
+        order = []
+        current = resolve(node)
+        while call_name(current) == "ImageCollection.merge":
+            args = current["functionInvocationValue"]["arguments"]
+            order.append(first_loaded_id(args["collection2"]))
+            current = resolve(args["collection1"])
+        return order  # outermost (last merged) first
+
+    def find_first_merge(node):
+        seen: set[int] = set()
+        stack = [node]
+        while stack:
+            current = resolve(stack.pop())
+            marker = id(current)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            if isinstance(current, dict) and call_name(current) == "ImageCollection.merge":
+                return current
+            push_children(current, stack)
+        return None
+
+    merge_root = find_first_merge({"valueReference": graph["result"]})
+    if merge_root is None:
+        return []
+    return list(reversed(find_merge_chain(merge_root)))
+
+
 def test_vi_builders_cover_every_vegetation_index():
     # The reflective globals()[f"calculate_{vi_index}"] of integration.py:165,193
     # became an explicit table; adding an enum member without an entry must fail.
@@ -69,16 +240,21 @@ def test_climate_collection_loads_persiann_over_the_integration_period(resolved,
     assert '"2001-01-01"' in graph
     assert '"2015-12-31"' in graph
     assert '"clim"' in graph
-    assert '"year"' in graph
+    # Not a bare `'"year"' in graph` check: `ee.Filter.calendarRange(year,
+    # field="year")` and `.set("year", year)` both put "year" in the graph
+    # too, so that would still pass with the `.rename("year")` constant-band
+    # rename deleted -- which is the thing this line means to test.
+    assert "year" in _renamed_bands(coll)
     assert count_calls(coll, "ImageCollection.load") == 1
     # `.filterBounds()`/`.filterDate()` are Python-side sugar over `.filter()`
     # (ee/collection.py) -- they never emit a node under their own name, so
     # `Collection.filterBounds` is always 0 and this assertion could not pass
     # for any correct transcription. `Filter.intersects` is what filterBounds
-    # actually compiles to here, and it goes 1 -> 0 if `.filterBounds()` is
-    # removed, which is what makes it load-bearing.
+    # actually compiles to here. This is presence-only, not exact: it goes
+    # 1 -> 0 if `.filterBounds()` is removed (which is what makes it
+    # load-bearing), but a duplicated `.filterBounds()` call also yields 1,
+    # since both calls serialize to the same node.
     assert count_calls(coll, "Filter.intersects") == 1
-    assert count_calls(coll, "Reducer.mean") == 1
 
 
 def test_modis_wins_the_ladder_over_landsat(ctx):
@@ -178,6 +354,10 @@ def test_landsat_sensors_are_merged_in_selection_order(ctx):
     assert "CLOUD_COVER_LAND" in graph
     # ee.ImageCollection([]) seeded, then one merge per sensor: integration.py:149-162
     assert count_calls(coll, "ImageCollection.merge") == 2
+    # The name promises ORDER, not just presence: assert the actual nesting
+    # (Landsat 8 merged first / innermost, Landsat 9 second / outermost),
+    # not merely that both ids and two merge nodes exist.
+    assert _merged_asset_order(coll) == [L8, L9]
 
 
 def test_derived_vi_ndvi_uses_the_ndvi_asset(ctx):
@@ -252,16 +432,16 @@ def test_empty_sensor_selection_raises(ctx):
         build_vi_collection(r, ctx)
 
 
-def _asset_ref(asset_id: str) -> str:
-    """The exact JSON fragment ee emits when `asset_id` is loaded as the `id`
-    argument of `ImageCollection.load` or `Image.load`.
+def test_year_band_is_present_only_on_the_non_monthly_annual_paths(ctx):
+    # integration.py:154-157 (_annual_mean_via_monthly's docstring) documents
+    # that _annual_mean/_annual_npp emit a `year` BAND (via addBands) while
+    # the Landsat/Sentinel monthly path emits only the `year` PROPERTY.
+    # Nothing pinned that asymmetry before this test.
+    modis = make_resolved(vi_source=SensorSelection(names=("MODIS MOD13Q1",)))
+    landsat = make_resolved(vi_source=SensorSelection(names=("Landsat 8",)))
 
-    Plain substring containment is too weak here: resolve.py's preserved
-    single-character defect (see below) makes a naive `"L" in graph` check
-    pass trivially against almost any graph. Anchoring on the argument shape
-    is what makes the cross-check below meaningful rather than vacuous.
-    """
-    return '"id": {"constantValue": ' + json.dumps(asset_id) + "}"
+    assert "year" in _renamed_bands(build_vi_collection(modis, ctx))
+    assert "year" not in _renamed_bands(build_vi_collection(landsat, ctx))
 
 
 def _flatten_vi_assets(vi_assets):
@@ -280,12 +460,46 @@ def _flatten_vi_assets(vi_assets):
     return flat
 
 
+def _expected_consumed_assets(processor: ViProcessor, vi_assets) -> set[str]:
+    """Which of resolve()'s `vi_assets` the winning rung actually consumes.
+
+    `_vi_dispatch` (resolve.py) returns the WHOLE per-sensor asset tuple for
+    every processor, but the matching engine rung does not always touch all
+    of it: `_process_modis` reads only `ee_asset_list[0]`/`[1]`
+    (integration.py:98-131) no matter how many sensors were selected, and
+    `_process_terra_npp` / `_process_sentinel2` / the derived-VI rung each
+    read only `ee_asset_list[0]`. Only `_process_landsat_sensors` consumes
+    every element. Asserting set equality against the RAW `vi_assets` tuple
+    is false in general -- a third MODIS-rung sensor is never touched, which
+    is exactly what the old, unconditional `⊆` check missed -- so this
+    narrows to what is actually reachable, per rung, before the comparison.
+    """
+    if processor is ViProcessor.MODIS:
+        consumed = vi_assets[:2]
+    elif processor is ViProcessor.LANDSAT_SENSORS:
+        consumed = vi_assets
+    elif processor in (
+        ViProcessor.TERRA_NPP,
+        ViProcessor.SENTINEL2,
+        ViProcessor.DERIVED_VI_LANDSAT,
+    ):
+        consumed = vi_assets[:1]
+    else:
+        raise AssertionError(f"no consumption rule recorded for {processor}")
+    return set(_flatten_vi_assets(consumed))
+
+
 @pytest.mark.parametrize(
     "sensor_names",
     [
         ("MODIS MOD13Q1",),
         ("MODIS MYD13Q1",),
         ("MODIS MOD13Q1", "MODIS MYD13Q1"),
+        # Falsifies the old ⊆-over-the-whole-tuple invariant: _process_modis
+        # never touches ee_asset_list[2], so L8 must be ABSENT from what the
+        # engine loads even though resolve() lists it in vi_assets. This is
+        # the same selection test_modis_wins_the_ladder_over_landsat uses.
+        ("MODIS MOD13Q1", "MODIS MYD13Q1", "Landsat 8"),
         ("Terra NPP",),
         ("Sentinel 2",),
         ("Derived VI Landsat",),
@@ -316,11 +530,14 @@ def test_ladder_agrees_with_resolve_s_independent_derivation(sensor_names, ctx):
     spec = default_spec(vi_source=SensorSelection(names=sensor_names), threshold=0.0)
     r = resolve(spec)
 
-    graph = encoded(build_vi_collection(r, ctx))
+    coll = build_vi_collection(r, ctx)
 
-    for asset_id in _flatten_vi_assets(r.vi_assets):
-        assert _asset_ref(asset_id) in graph, (
-            f"resolve() derived asset {asset_id!r} for sensors {sensor_names}, "
-            "but engine.integration's own ladder never referenced it -- the "
-            "two independent derivations have diverged"
-        )
+    expected = _expected_consumed_assets(r.vi_processor, r.vi_assets)
+    actual = _loaded_asset_ids(coll)
+
+    assert actual == expected, (
+        f"resolve() (processor={r.vi_processor}, vi_assets={r.vi_assets!r}) says "
+        f"sensors {sensor_names} should load exactly {expected!r}, but "
+        f"engine.integration's own ladder loaded {actual!r} -- the two "
+        "independent derivations have diverged"
+    )

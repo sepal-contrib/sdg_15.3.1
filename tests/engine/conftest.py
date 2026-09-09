@@ -45,8 +45,19 @@ def make_resolved(**overrides):
     for key, value in overrides.items():
         if key in vars(spec):
             setattr(spec, key, value)
-        else:
+        elif key in vars(resolved):
             setattr(resolved, key, value)
+        else:
+            # Deliberate override of the plan text (task-10-fixes.md, Minor
+            # 7): a typo'd override key used to route silently to `resolved`
+            # via `setattr`, leaving the test running against the untouched
+            # default instead of failing. This file is shared by Tasks
+            # 11-17, so catching that here once is cheaper than debugging a
+            # silently-green test six tasks later.
+            raise AttributeError(
+                f"make_resolved() got an unknown override {key!r}; not an "
+                "attribute of the stub's spec or resolved namespace"
+            )
     return resolved
 
 
