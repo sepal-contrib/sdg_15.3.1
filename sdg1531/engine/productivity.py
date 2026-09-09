@@ -16,10 +16,23 @@ discarded and the expression encodes as ``Filter.and([lte(end)])`` -- **the
 start bound never reaches the graph**, and each of these four periods is open
 at its lower end. The legacy spells it exactly this way (productivity.py:
 430-432, :465-470, :532-537, :119-123), so reproducing it is what D9 requires;
-``test_year_filters_drop_their_lower_bound`` pins it so that a later "fix" to
-``ee.Filter.And(gte, lte)`` -- which WOULD change the graph and break parity --
-cannot land silently. Any real fix belongs in a phase-2 change with its own
-golden-graph update, not here.
+``test_year_filters_silently_drop_their_lower_bound`` pins it so that a later
+"fix" to ``ee.Filter.And(gte, lte)`` -- which WOULD change the graph and break
+parity -- cannot land silently.
+
+A phase-2 fix must repair TWO stacked errors, not one. The collection those
+filters run against starts at the ENVELOPE of all four periods
+(``resolve.py``'s ``_integration_period``, from integration.py:31-40 and
+:10-19), so a discarded lower bound makes the series ``[envelope_start, end]``.
+All three trend methods then reduce that series with
+``ee.Reducer.kendallsCorrelation()`` and scale the tau by ``z_coefficient(n)``
+with ``n = end - start + 1`` computed from the DECLARED start (:193-199,
+:250-256, :284-290). So the series covers the wrong span AND the significance
+normalisation does not match the span it covers -- two independent errors in
+one expression, feeding the +-1.96 / +-1.28 ladders directly. Repairing only
+the filter leaves ``n`` correct by accident, and only when the trend window
+happens to start at the envelope start. Both belong in the same phase-2 change,
+with its own golden-graph update, not here.
 
 ResolvedSpec fields read here:
     spec.trajectory, spec.lceu, trend, state, performance,

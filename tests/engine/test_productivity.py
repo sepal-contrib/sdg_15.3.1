@@ -268,34 +268,43 @@ def _where_chain(obj, branches=()):
     return steps
 
 
-def _test_constants(node, deref):
-    """The constants a where-test compares against, left to right.
+def _test_comparisons(node, deref):
+    """`[(comparison function, threshold), ...]` for a where-test, left to right.
 
     Recurses through `Image.and`/`Image.or` so a two-sided band reports both of
-    its thresholds, and reads only the RIGHT operand of a comparison -- the left
-    is the z-score subtree, whose own constants are not thresholds.
+    its comparisons, and reads only the RIGHT operand of each comparison -- the
+    left is the z-score subtree, whose own constants are not thresholds.
+
+    Reading the OPERATOR and not merely the constant is the point: a two-sided
+    step's head node is `Image.and`, so a helper that stopped there would treat
+    the comparison as a leaf and `z_score.lt(-1.28).And(...)` ->
+    `z_score.gt(-1.28).And(...)` -- a direction flip that moves class 2 onto
+    essentially every pixel above -1.28 -- would be invisible.
     """
     call = _call(node)
     if call is None:
         return []
     args = call.get("arguments", {})
-    if call.get("functionName") in ("Image.and", "Image.or"):
-        return _test_constants(deref(args["image1"]), deref) + _test_constants(
+    name = call.get("functionName")
+    if name in ("Image.and", "Image.or"):
+        return _test_comparisons(deref(args["image1"]), deref) + _test_comparisons(
             deref(args["image2"]), deref
         )
     constant = _image_constant(deref(args.get("image2", {})), deref)
-    return [] if constant is None else [constant]
+    return [] if constant is None else [(name, constant)]
 
 
-def _where_thresholds(obj, branches=()):
-    """`[(thresholds of each step's test), ...]` for one where spine.
+def _where_tests(obj, branches=()):
+    """`[((comparison, threshold), ...), ...]` for one where spine, innermost first.
 
-    `_where_chain` reads each step's test function and the class it assigns;
-    this reads the numbers it compares against. Together they pin every token of
-    a classification ladder.
+    `_where_chain` reads each step's head function -- the combinator -- and the
+    class it assigns; this reads the comparison and the threshold on each side
+    of that head. Between them they pin the step order, the combinator, every
+    comparison operator, every threshold and every assigned class of a
+    classification ladder.
     """
     deref, calls = _where_calls(obj, branches)
-    return [tuple(_test_constants(deref(call["arguments"]["test"]), deref)) for call in calls]
+    return [tuple(_test_comparisons(deref(call["arguments"]["test"]), deref)) for call in calls]
 
 
 def _windows_in(node, deref, graph):
@@ -342,28 +351,42 @@ def _stddev_windows(obj):
 
 
 def _year_bounds(obj):
-    """`{(function, field, value)}` for every `Filter.lessThan` / `greaterThan`.
+    """`{(wrapper, comparison, field, value)}` for every year bound in the graph.
 
     `ee.Filter.gte(f, v)` encodes as `Filter.not(Filter.lessThan(f, v))` and
     `.lte(f, v)` as `Filter.not(Filter.greaterThan(f, v))`, so those two names
-    are where a year bound actually lands.
+    are where a bound actually lands -- but the NEGATION is what separates `gte`
+    from `lt` and `lte` from `gt`. Reading the comparison leaf alone cannot tell
+    them apart, so `wrapper` records whether the leaf was inside a `Filter.not`:
+    `("Filter.not", "Filter.greaterThan", "year", 2012)` is `lte("year", 2012)`,
+    while the same tuple with `wrapper=None` would be `gt("year", 2012)` -- a
+    direction flip that selects the empty set rather than the period.
     """
-    bounds = set()
     deref, graph, root = _root(obj)
+    negated: set[int] = set()
+    comparisons = []
     for current in _walk(root, deref, graph):
         call = _call(current)
         name = call.get("functionName") if call else None
-        if name not in ("Filter.lessThan", "Filter.greaterThan"):
-            continue
-        args = call["arguments"]
-        bounds.add(
-            (
-                name,
-                deref(args["leftField"]).get("constantValue"),
-                deref(args["rightValue"]).get("constantValue"),
+        if name == "Filter.not":
+            negated.add(id(deref(call["arguments"]["filter"])))
+        elif name in ("Filter.lessThan", "Filter.greaterThan"):
+            args = call["arguments"]
+            comparisons.append(
+                (
+                    current,
+                    name,
+                    deref(args["leftField"]).get("constantValue"),
+                    deref(args["rightValue"]).get("constantValue"),
+                )
             )
-        )
-    return bounds
+    # resolved after the walk, not during it: a node is yielded before its
+    # children, so the wrapper is always seen first, but deferring keeps that
+    # from being load-bearing.
+    return {
+        ("Filter.not" if id(node) in negated else None, name, field, value)
+        for node, name, field, value in comparisons
+    }
 
 
 def _subtract_operand_heads(obj):
@@ -615,19 +638,23 @@ def test_trajectory_ladders_assign_the_kendall_classes_at_the_kendall_thresholds
         ("Image.and", 4),
         ("Image.gt", 5),
     ]
-    assert _where_thresholds(img, branches=("dstImg",)) == [
-        (-1.96,),
-        (-1.28, -1.96),
-        (-1.28, 1.28),
-        (1.28, 1.96),
-        (1.96,),
+    assert _where_tests(img, branches=("dstImg",)) == [
+        (("Image.lt", -1.96),),
+        (("Image.lt", -1.28), ("Image.gte", -1.96)),
+        (("Image.gte", -1.28), ("Image.lte", 1.28)),
+        (("Image.gt", 1.28), ("Image.lte", 1.96)),
+        (("Image.gt", 1.96),),
     ]
     assert _where_chain(img, branches=("srcImg",)) == [
         ("Image.lt", 1),
         ("Image.and", 2),
         ("Image.gt", 3),
     ]
-    assert _where_thresholds(img, branches=("srcImg",)) == [(-1.96,), (-1.96, 1.96), (1.96,)]
+    assert _where_tests(img, branches=("srcImg",)) == [
+        (("Image.lt", -1.96),),
+        (("Image.gte", -1.96), ("Image.lte", 1.96)),
+        (("Image.gt", 1.96),),
+    ]
 
 
 def test_vi_trend_multiplies_the_tau_by_the_z_coefficient():
@@ -645,7 +672,7 @@ def test_trajectory_filters_on_the_trend_period_upper_bound_only():
     # test_year_filters_silently_drop_their_lower_bound.
     img = trajectory_for(Trajectory.NDVI_TREND)
 
-    assert _year_bounds(img) == {("Filter.greaterThan", "year", 2010)}
+    assert _year_bounds(img) == {("Filter.not", "Filter.greaterThan", "year", 2010)}
 
 
 def test_year_filters_silently_drop_their_lower_bound(ctx):
@@ -661,7 +688,7 @@ def test_year_filters_silently_drop_their_lower_bound(ctx):
     performance = build_performance(resolved_spec(lceu=Lceu.GAES), ctx, fake_vi_collection())
 
     for img in (trajectory, performance):
-        assert not [bound for bound in _year_bounds(img) if bound[0] == "Filter.lessThan"]
+        assert not [bound for bound in _year_bounds(img) if bound[1] == "Filter.lessThan"]
 
 
 def test_ndvi_trend_never_touches_the_climate_collection():
@@ -756,7 +783,7 @@ def test_performance_filters_on_the_performance_period_upper_bound_only(ctx):
     # see test_year_filters_silently_drop_their_lower_bound.
     img = build_performance(resolved_spec(lceu=Lceu.GAES), ctx, fake_vi_collection())
 
-    assert _year_bounds(img) == {("Filter.greaterThan", "year", 2012)}
+    assert _year_bounds(img) == {("Filter.not", "Filter.greaterThan", "year", 2012)}
 
 
 def test_performance_stays_server_side_through_remap(ctx):
@@ -777,10 +804,17 @@ def test_performance_groups_by_the_ecological_unit_not_by_ndvi(ctx):
     # operands groups by NDVI and takes the 90th percentile of the unit codes:
     # it builds cleanly, keeps every count and band name, and is silently wrong.
     img = build_performance(resolved_spec(lceu=Lceu.GAES), ctx, fake_vi_collection())
+    graph = encoded(img)
 
     dst_assets, src_assets = _addbands_operand_assets(img)
     assert dst_assets == set()  # the NDVI mean, from the stand-in collection
     assert src_assets == {GAES}  # the ecological unit raster
+    # The operand order and groupField are only meaningful together: grouping by
+    # band 0 reaches the same wrong answer from the other half of the pair, and
+    # `Reducer.percentile == 1` counts the node without reading which percentile
+    # it takes. Closing braces per this file's bare-substring discipline.
+    assert '"groupField": {"constantValue": 1}' in graph
+    assert '"percentiles": {"constantValue": [90]}' in graph
 
 
 def test_performance_names_and_types_its_band(ctx):
@@ -862,19 +896,23 @@ def test_state_ladders_assign_the_kendall_classes_at_the_kendall_thresholds():
         ("Image.and", 4),
         ("Image.gt", 5),
     ]
-    assert _where_thresholds(img, branches=("dstImg",)) == [
-        (-1.96,),
-        (-1.28, -1.96),
-        (-1.28, 1.28),
-        (1.28, 1.96),
-        (1.96,),
+    assert _where_tests(img, branches=("dstImg",)) == [
+        (("Image.lt", -1.96),),
+        (("Image.lt", -1.28), ("Image.gte", -1.96)),
+        (("Image.gte", -1.28), ("Image.lte", 1.28)),
+        (("Image.gt", 1.28), ("Image.lte", 1.96)),
+        (("Image.gt", 1.96),),
     ]
     assert _where_chain(img, branches=("srcImg",)) == [
         ("Image.lt", 1),
         ("Image.and", 2),
         ("Image.gt", 3),
     ]
-    assert _where_thresholds(img, branches=("srcImg",)) == [(-1.96,), (-1.96, 1.96), (1.96,)]
+    assert _where_tests(img, branches=("srcImg",)) == [
+        (("Image.lt", -1.96),),
+        (("Image.gte", -1.96), ("Image.lte", 1.96)),
+        (("Image.gt", 1.96),),
+    ]
 
 
 def test_build_state_requires_a_resolved_state_period():
