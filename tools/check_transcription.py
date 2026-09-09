@@ -5,7 +5,19 @@ Tier-0 isolation guard forbids the suite from doing. Run it from the repo root:
 
     python tools/check_transcription.py
 
-Exits 0 and prints one ``OK`` line per constant, or raises on the first mismatch.
+Exits 0 and prints one ``OK`` line per constant checked, or raises on the first
+mismatch — value OR type. ``==`` alone would let ``1 == 1.0`` or ``True == 1``
+through unnoticed; tables.py:155-158 needs the encoded floats bit-identical, so
+type drift is exactly the edit class this has to catch (see ``_same``).
+
+What this does NOT cover: everything sourced from component/parameter/ui.py
+(``CLIMATE_COEFFICIENTS``, ``JRC_SEASONALITY_TICKS``, ``DISABLED_TRAJECTORIES``,
+``tables.DEFAULT_LC_COLORS``, and every value in ``sdg1531.enums``) and from
+component/model/indicator_model.py (``IndicatorLayer``'s order). ui.py imports
+ipyvuetify and component.message, so ``_load()`` cannot execute it standalone;
+those transcriptions were checked by hand during review, not by this script.
+``TABLES_UNREACHABLE`` below names the tables-side half of that gap so it stays
+visible instead of silently passing as "checked".
 """
 
 from __future__ import annotations
@@ -19,7 +31,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from sdg1531.catalog import SENSORS  # noqa: E402
+from sdg1531 import tables  # noqa: E402 — module object, for tables.__all__ below
+from sdg1531.catalog import (  # noqa: E402
+    ASSETS,
+    INT16_MIN,
+    L4_START,
+    LAND_COVER_FIRST_YEAR,
+    LAND_COVER_MAX_YEAR,
+    SENSORS,
+    z_coefficient,
+)
 from sdg1531.tables import (  # noqa: E402
     C_CONVERSION_FACTOR,
     CLIMATE_CONVERSION_MATRIX,
@@ -38,6 +59,35 @@ from sdg1531.tables import (  # noqa: E402
     TRANSLATION_MATRIX,
 )
 
+# Every name in tables.__all__ must land in exactly one of these two sets:
+# TABLES_VERIFIED is cross-checked against the legacy source in main() below;
+# TABLES_UNREACHABLE names what this script cannot reach, and why, instead of
+# letting it slip through unmentioned. A name in neither is a bug in this
+# script — main() asserts that before it checks anything.
+TABLES_VERIFIED = frozenset(
+    {
+        "CLIMATE_CONVERSION_MATRIX",
+        "C_CONVERSION_FACTOR",
+        "DEFAULT_LC_CLASS_NAMES",
+        "DEFAULT_LC_CODES",
+        "DEFAULT_TRANSITION_MATRIX",
+        "DEGRADATION_LABELS",
+        "ESA_LC_CLASSES",
+        "INPUT_FACTOR",
+        "IPCC_TRANSITION_CODES",
+        "MANAGEMENT_FACTOR",
+        "PROD_PERFORMANCE_LABELS",
+        "PROD_STATE_5_LABELS",
+        "PROD_TREND_5_LABELS",
+        "RECLASSIFICATION_MATRIX",
+        "TRANSLATION_MATRIX",
+    }
+)
+# DEFAULT_LC_COLORS is keyed on component/parameter/ui.py's cm.classes.* strings
+# (ui.py:61-69). ui.py imports ipyvuetify and component.message, so _load()
+# cannot execute it standalone; checked by hand during review, not here.
+TABLES_UNREACHABLE = frozenset({"DEFAULT_LC_COLORS"})
+
 
 def _load(name: str, relative: str) -> ModuleType:
     """Execute a legacy module straight from its path, bypassing ``component``."""
@@ -49,13 +99,49 @@ def _load(name: str, relative: str) -> ModuleType:
     return module
 
 
+def _load_computation() -> ModuleType | None:
+    """``computation.py`` needs numpy; skip loudly rather than fail if it's absent."""
+    try:
+        import numpy  # noqa: F401
+    except ImportError:
+        return None
+    return _load("legacy_computation", "component/parameter/computation.py")
+
+
+def _same(port: object, legacy: object) -> bool:
+    """Structural equality that also catches type drift a bare ``==`` would miss.
+
+    Floats compare by ``float.hex()`` rather than ``==`` (parity must be
+    bit-identical, not just numerically equal); containers recurse element-wise
+    with an exact ``type(...) is type(...)`` check first, so ``1`` vs ``1.0`` or
+    ``True`` vs ``1`` fail instead of quietly passing.
+    """
+    if type(port) is not type(legacy):
+        return False
+    if isinstance(port, float):
+        return float.hex(port) == float.hex(legacy)
+    if isinstance(port, (list, tuple)):
+        return len(port) == len(legacy) and all(
+            _same(p, u) for p, u in zip(port, legacy, strict=True)
+        )
+    if isinstance(port, dict):
+        return set(port) == set(legacy) and all(_same(port[k], legacy[k]) for k in port)
+    return bool(port == legacy)
+
+
 def _check(name: str, port: object, legacy: object) -> None:
-    if port != legacy:
+    if not _same(port, legacy):
         raise AssertionError(f"{name}\n  port  : {port!r}\n  legacy: {legacy!r}")
     print("OK  ", name)
 
 
 def main() -> int:
+    uncategorized = set(tables.__all__) - TABLES_VERIFIED - TABLES_UNREACHABLE
+    assert not uncategorized, (
+        f"tables.__all__ has a name this script neither checks nor excuses: {uncategorized!r}. "
+        "Add a _check() call for it, or add it to TABLES_UNREACHABLE with a reason."
+    )
+
     matrix = _load("legacy_matrix", "component/parameter/matrix.py")
     sensor = _load("legacy_sensor", "component/parameter/sensor.py")
 
@@ -77,6 +163,26 @@ def main() -> int:
     _check("state5", dict(PROD_STATE_5_LABELS), matrix.prod_state_5_class)
     _check("performance", dict(PROD_PERFORMANCE_LABELS), matrix.prod_performance_class)
 
+    legacy_assets = {
+        "precipitation": sensor.precipitation,
+        "land_cover_ic": sensor.land_cover_ic,
+        "jrc_water": sensor.jrc_water,
+        "soil_taxonomy": sensor.soil_taxonomy,
+        "soc": sensor.soc,
+        "ipcc_climate_zones": sensor.ipcc_climate_zones,
+        "wte": sensor.wte,
+        "gaes": sensor.gaes,
+        "aez": sensor.aez,
+        "hru": sensor.hru,
+    }
+    _check("assets", dict(ASSETS), legacy_assets)
+    _check("l4_start", L4_START, sensor.L4_start)
+    _check("land_cover_first_year", LAND_COVER_FIRST_YEAR, sensor.land_cover_first_year)
+    _check("land_cover_max_year", LAND_COVER_MAX_YEAR, sensor.land_cover_max_year)
+
+    # key order is load-bearing (catalog.py:45-46): a dropped or reordered sensor
+    # must fail here, not just a changed value for a sensor that's still present
+    _check("sensor_keys", list(SENSORS), list(sensor.sensors))
     for name, info in SENSORS.items():
         collection = info.collection_id
         port = [
@@ -87,7 +193,22 @@ def main() -> int:
         ]
         _check(f"sensor:{name}", port, sensor.sensors[name])
 
-    print("all transcriptions match")
+    computation = _load_computation()
+    if computation is None:
+        print("SKIP  int16_min, z_coefficient — numpy is not installed")
+    else:
+        _check("int16_min", INT16_MIN, computation.int_16_min)
+        for n in (4, 5, 10, 23, 40):
+            _check(f"z_coefficient({n})", z_coefficient(n), computation.z_coefficient(n))
+
+    print(
+        f"checked {len(TABLES_VERIFIED)} tables + {len(SENSORS)} sensors (keys and "
+        "values) + assets + year bounds + int16_min + z_coefficient against the "
+        "legacy source — all match. NOT checked here (ui.py cannot be imported "
+        "standalone): tables.DEFAULT_LC_COLORS, catalog.CLIMATE_COEFFICIENTS, "
+        "catalog.JRC_SEASONALITY_TICKS, catalog.DISABLED_TRAJECTORIES, and every "
+        "sdg1531.enums value."
+    )
     return 0
 
 

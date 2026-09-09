@@ -1,5 +1,10 @@
-"""The constants layer is a transcription of component/parameter/*. Every value here
-is asserted against the legacy source, not against itself."""
+"""The constants layer is a transcription of component/parameter/*.
+
+Every assertion here is against a hardcoded literal, pinning the port's shape and
+values in place — it does not re-derive them from the legacy source. The
+against-legacy comparison lives in tools/check_transcription.py, which imports
+component/parameter/matrix.py and sensor.py directly and diffs them against
+sdg1531.tables and sdg1531.catalog."""
 
 from __future__ import annotations
 
