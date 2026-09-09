@@ -357,6 +357,12 @@ def test_an_empty_sensor_selection_raises():
         resolve(default_spec(vi_source=SensorSelection(())))
 
 
+def test_unknown_sensor_name_raises_spec_error_not_keyerror():
+    # An out-of-catalog name would otherwise escape SENSORS[key] as a bare KeyError.
+    with pytest.raises(SpecError):
+        resolve(default_spec(vi_source=SensorSelection(("Not A Sensor",))))
+
+
 CUSTOM_SCHEME = LandCoverScheme(
     start_names=("Forest", "Crops", "Water"),
     start_codes=(3, 1, 2),
