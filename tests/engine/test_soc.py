@@ -155,7 +155,13 @@ def transition_scales(image):
 
 
 def select_indices(image):
-    """Every band index passed to `.select(...)` anywhere in the graph."""
+    """The SET of band indices passed to `.select(...)` anywhere in the graph.
+
+    A population, with no multiplicity and no idea which site contributed what: two
+    sites reading `soc_images.select(year_index)` mean shifting either one alone
+    leaves this set unchanged. Good only for "nothing ELSE is selected"; the
+    per-site indices are `stack_terms()`'s job.
+    """
     deref, graph, root = _root(image)
     indices = set()
     for node in _walk(root, deref, graph):
@@ -164,6 +170,118 @@ def select_indices(image):
             continue
         indices.update(_scalar_list_arg(deref(call["arguments"]["bandSelectors"]), deref))
     return indices
+
+
+def band_index(node, deref):
+    """The single band index of an `Image.select` node."""
+    call = _call(deref(node))
+    assert call is not None and call.get("functionName") == "Image.select", call
+    selectors = _scalar_list_arg(deref(call["arguments"]["bandSelectors"]), deref)
+    assert len(selectors) == 1, selectors
+    return selectors[0]
+
+
+def soc_stack(image):
+    """The `soc_images` `addBands` chain, base first (:89, :157).
+
+    `a.addBands(b).addBands(c)` nests as `addBands(addBands(a, b), c)`, so the chain
+    is walked through `dstImg` and reversed. `lc_images` is accumulated but never
+    referenced, so it is never serialized and the longest chain in the graph is
+    `soc_images`' -- which is itself the check that `lc_images` stayed dead.
+    """
+    deref, graph, root = _root(image)
+
+    def chain(node):
+        bands, current = [], deref(node)
+        while (call := _call(current)) is not None and call.get("functionName") == "Image.addBands":
+            bands.append(deref(call["arguments"]["srcImg"]))
+            current = deref(call["arguments"]["dstImg"])
+        bands.append(current)
+        return list(reversed(bands))
+
+    chains = [
+        chain(node)
+        for node in _walk(root, deref, graph)
+        if (call := _call(node)) is not None and call.get("functionName") == "Image.addBands"
+    ]
+    return max(chains, key=len)
+
+
+def where_rungs(node, deref):
+    """The `Image.where` nodes on `node`'s receiver spine, outermost first."""
+    return [
+        current
+        for current in _spine(deref(node), deref, _RECEIVER_ARG)
+        if (call := _call(current)) is not None and call.get("functionName") == "Image.where"
+    ]
+
+
+def stack_terms(image):
+    """`{band position: (soc_final index, change base index, factored index, rungs)}`.
+
+    Reads each `soc_images.select(...)` at ITS OWN SITE (:143, :146 and :153 are three
+    separate uses of `year_index`) and, as `rungs`, how many `.where()` calls that
+    band's `organic_carbon_change` was built through. The rung count is what shows the
+    accumulator is CARRIED: :141-151 adds two `.where()` per iteration to the previous
+    iteration's image, so band p is built through 2*(p-1) of them. A loop that rebuilt
+    the accumulator from the first block each pass would produce the same node count,
+    the same gates and the same values -- and a constant rung count.
+    """
+    deref, _graph, _root_node = _root(image)
+    terms = {}
+    for position, node in enumerate(soc_stack(image)):
+        call = _call(node)
+        if call is None or call.get("functionName") != "Image.subtract":
+            continue
+        accumulator = deref(call["arguments"]["image2"])
+        rungs = where_rungs(accumulator, deref)
+
+        if position == 1:
+            # :84 `soc.subtract(organic_carbon_change)` -- the masked grid itself,
+            # not a `select`, and the first block's change is not a `where` at all.
+            terms[position] = (None, None, None, len(rungs))
+            continue
+
+        # rungs[0] is `.where(gt(20), 0)`; rungs[1] is this iteration's own update.
+        update = _call(rungs[1])
+        divide = _call(deref(update["arguments"]["value"]))
+        inner = _call(deref(divide["arguments"]["image1"]))
+        factored = deref(inner["arguments"]["image2"])
+        while (chain := _call(factored)) is not None and chain["functionName"] == "Image.multiply":
+            factored = deref(chain["arguments"]["image1"])
+
+        terms[position] = (
+            band_index(call["arguments"]["image1"], deref),
+            band_index(inner["arguments"]["image1"], deref),
+            band_index(factored, deref),
+            len(rungs),
+        )
+    return terms
+
+
+def transition_depths(image):
+    """`(sorted where-rung counts, the deepest chain's terminal function)`.
+
+    `lc_transition` at each block, read off the receiver of every remap through
+    C_CONVERSION_FACTOR. :115 wraps the PREVIOUS block's image in one more `.where()`,
+    so the counts must be 0, 1, ... one per block, all bottoming out at the first
+    pair's `Image.add`.
+    """
+    deref, graph, root = _root(image)
+    transitions = [
+        deref(call["arguments"]["image"])
+        for node in _walk(root, deref, graph)
+        if (call := _call(node)) is not None
+        and call.get("functionName") == "Image.remap"
+        and tuple(_scalar_list_arg(deref(call["arguments"]["to"]), deref))
+        == tuple(C_CONVERSION_FACTOR)
+    ]
+    deepest = max(transitions, key=lambda node: len(where_rungs(node, deref)))
+    terminal = _spine(deepest, deref, _RECEIVER_ARG)[-1]
+    return (
+        sorted(len(where_rungs(node, deref)) for node in transitions),
+        (_call(terminal) or {}).get("functionName"),
+    )
 
 
 def remap_tables(image):
@@ -376,23 +494,70 @@ def test_the_collection_is_filtered_to_the_soc_period_not_the_land_cover_one():
     assert (SOC_START, SOC_END) in _calendar_windows(root, deref, graph)
 
 
-def test_every_cci_year_in_the_period_is_filtered_exactly_once():
+def test_every_cci_year_in_the_period_is_filtered_and_nothing_outside_it():
     """:31-47 and :96-106 -- the two blocks between them touch every year from the
-    start to the end inclusive, and nothing outside it."""
+    start to the end inclusive, and nothing outside it.
+
+    Not "exactly once": this is a SET of windows, which carries no multiplicity, and
+    a post-CSE graph collapses a repeated filter into one node anyway.
+    """
     deref, graph, root = _root(soc_image())
     degenerate = {w for w in _calendar_windows(root, deref, graph) if w[0] == w[1]}
 
     assert degenerate == {(year, year) for year in range(SOC_START, SOC_END + 1)}
 
 
-def test_the_band_indices_follow_year_minus_start():
-    """:139 `year_index = year - p_soc_t_start`, :143 / :153 `soc_images.select(...)`,
-    and :161 `select(lc_year_end - p_soc_t_start)`. Both ends are pinned at once:
-    dropping the first loop index or shifting it by one leaves a gap in this set."""
+def test_each_band_reads_its_own_year_index_at_every_site():
+    """:139 `year_index = year - p_soc_t_start`, read at THREE separate sites -- :143
+    and :146 inside the change term, and :153 for `soc_final`.
+
+    Asserted per site. A set union over the graph cannot do this: shifting one of the
+    three by -1 leaves the union unchanged, because the other two still contribute
+    the index it dropped. Band p of `soc_images` is built from band p-1, so all three
+    sites must read p-1 for every p.
+    """
+    terms = stack_terms(soc_image())
+    expected = {1: (None, None, None, 0)}
+    expected.update(
+        {
+            position: (position - 1, position - 1, position - 1, 2 * (position - 1))
+            for position in range(2, len(LOOP_YEARS) + 2)
+        }
+    )
+
+    assert terms == expected
+
+
+def test_no_band_outside_the_stack_is_selected():
+    """:161 `select(lc_year_end - p_soc_t_start)` and :162 `select(0)`, plus the loop's
+    own indices. A population check, and only that -- it says nothing about which site
+    read what, which is why the test above exists."""
     expected = {0, SOC_END - SOC_START}
     expected.update(year - SOC_START for year in LOOP_YEARS)
 
     assert select_indices(soc_image()) == expected
+
+
+def test_the_carbon_change_accumulator_is_carried_across_iterations():
+    """:141-151. `organic_carbon_change` on the right-hand side is the PREVIOUS
+    iteration's image, not a fresh one: each pass wraps it in two more `.where()`
+    calls, so the depths must climb 0, 2, 4, ... A loop that rebuilt it from the first
+    block every pass emits the same nodes, the same gates and the same values, and is
+    invisible to every count in this file."""
+    depths = [rungs for *_indices, rungs in stack_terms(soc_image()).values()]
+
+    assert depths == [2 * step for step in range(len(LOOP_YEARS) + 1)]
+
+
+def test_the_transition_code_is_carried_across_iterations():
+    """:115. `lc_transition` is likewise carried -- each pass wraps the previous
+    block's image in one more `.where()`, and every chain bottoms out at the first
+    pair's `Image.add` (:50). This is what makes the D13 damage cumulative: a pixel
+    that changed in year 3 keeps its scale-10 code for every later year."""
+    depths, terminal = transition_depths(soc_image())
+
+    assert depths == list(range(BLOCKS))
+    assert terminal == "Image.add"
 
 
 # --- the soc grid --------------------------------------------------------------

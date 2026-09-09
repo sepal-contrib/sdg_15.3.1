@@ -34,9 +34,13 @@ Three things a reader will want to change here and must not, in phase 1:
   ``lt(10)`` into ``lte(10)`` would close a hole the published results have.
 
 ResolvedSpec fields read here:
-    soc_year_start (deliberately UNCLAMPED -- :16 passes the raw period start into
-    ``calendarRange`` while :12-14 clamps only the end), soc_year_end_esa,
-    spec.climate, spec.compatibility.soc_subsequent_transition_scale
+    soc_year_start (unclamped BY DEFAULT -- :16 passes the raw period start into
+    ``calendarRange`` while :12-14 clamps only the end. The asymmetry is Task 5's to
+    apply, and ``resolve()`` gates it on
+    :attr:`~sdg1531.spec.Compatibility.clamp_soc_start_year`, default ``False``; with
+    that flag set the start is clamped like the end and this module is none the
+    wiser), soc_year_end_esa, spec.climate,
+    spec.compatibility.soc_subsequent_transition_scale
 
 EXPECTED_DIVERGENCES note -- two divergences from the legacy, both in the climate
 dispatch. Task 17's parity harness must carry both:
@@ -130,7 +134,7 @@ def build_soil_organic_carbon(r: ResolvedSpec, ctx: ExecutionContext) -> ee.Imag
     soc = ee.Image(ASSETS["soc"]).clip(ctx.bounds)  # :9
     soc = soc.updateMask(soc.neq(INT16_MIN))  # :10
 
-    soc_year_start = r.soc_year_start  # :16 -- raw, NOT clamped
+    soc_year_start = r.soc_year_start  # :16 -- raw unless clamp_soc_start_year
     lc_year_end = r.soc_year_end_esa  # :12-14 -- clamped to the CCI range
     subsequent_scale = r.spec.compatibility.soc_subsequent_transition_scale
 

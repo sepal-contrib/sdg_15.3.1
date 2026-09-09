@@ -156,15 +156,6 @@ def band_subtree(stack, band):
     return deref, graph, found[0]
 
 
-def calendar_windows(deref, graph, node):
-    """`{(start, end)}` for every `Filter.calendarRange` under `node`.
-
-    Argument-order shim over the shared walker so the `*band_subtree(...)` call
-    sites below read left to right.
-    """
-    return _calendar_windows(node, deref, graph)
-
-
 def remaps_on_spine(deref, node):
     """`[(from, to)]` for every `Image.remap` on `node`'s receiver spine, outermost first."""
     found = []
@@ -239,8 +230,10 @@ def test_each_cci_image_filters_on_its_own_year():
     year merely appeared somewhere else."""
     stack = stack_for().stack
 
-    assert calendar_windows(*band_subtree(stack, "start")) == {(LC_START, LC_START)}
-    assert calendar_windows(*band_subtree(stack, "end")) == {(LC_END, LC_END)}
+    deref, graph, node = band_subtree(stack, "start")
+    assert _calendar_windows(node, deref, graph) == {(LC_START, LC_START)}
+    deref, graph, node = band_subtree(stack, "end")
+    assert _calendar_windows(node, deref, graph) == {(LC_END, LC_END)}
 
 
 def test_the_cci_years_are_clamped_to_the_collection_s_own_range():
@@ -253,8 +246,10 @@ def test_the_cci_years_are_clamped_to_the_collection_s_own_range():
     ctx = ExecutionContext.from_feature_collection(ee.FeatureCollection("users/test/aoi"), 250)
     stack = build_land_cover(r, ctx).stack
 
-    assert calendar_windows(*band_subtree(stack, "start")) == {(1992, 1992)}
-    assert calendar_windows(*band_subtree(stack, "end")) == {(2022, 2022)}
+    deref, graph, node = band_subtree(stack, "start")
+    assert _calendar_windows(node, deref, graph) == {(1992, 1992)}
+    deref, graph, node = band_subtree(stack, "end")
+    assert _calendar_windows(node, deref, graph) == {(2022, 2022)}
 
 
 @pytest.mark.parametrize("band", ["start", "end"])
@@ -381,5 +376,7 @@ def test_the_cci_years_come_from_the_land_cover_sub_period_not_the_overall_one()
     ctx = ExecutionContext.from_feature_collection(ee.FeatureCollection("users/test/aoi"), 250)
     stack = build_land_cover(r, ctx).stack
 
-    assert calendar_windows(*band_subtree(stack, "start")) == {(1995, 1995)}
-    assert calendar_windows(*band_subtree(stack, "end")) == {(2010, 2010)}
+    deref, graph, node = band_subtree(stack, "start")
+    assert _calendar_windows(node, deref, graph) == {(1995, 1995)}
+    deref, graph, node = band_subtree(stack, "end")
+    assert _calendar_windows(node, deref, graph) == {(2010, 2010)}
