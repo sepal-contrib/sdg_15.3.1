@@ -14,8 +14,22 @@ from types import SimpleNamespace
 import pytest
 
 from sdg1531.enums import Lceu, Trajectory, VegetationIndex
-from sdg1531.spec import Compatibility, Period, SensorSelection
+from sdg1531.spec import (
+    Compatibility,
+    EsaCciSource,
+    JrcSeasonalityMask,
+    Period,
+    SensorSelection,
+)
 from sdg1531.truth_table import PRODUCTIVITY_GPGV2
+
+# Stand-ins for the two land-cover remap tables. Deliberately short and
+# deliberately unlike each other: the real values are a 49-entry transition-code
+# list and a 49-entry -1/0/1 matrix, so a builder that swapped the two arguments
+# of `landcover_transition.remap(...)` would still emit a plausible graph. These
+# make the swap visible. tests/test_resolve.py owns the real derivation.
+STUB_CLASS_COMBINATIONS = (1010, 2030, 4070)
+STUB_TRANS_MATRIX_FLATTEN = (0, -1, 1)
 
 
 def make_resolved(**overrides):
@@ -26,6 +40,8 @@ def make_resolved(**overrides):
         threshold=0.0,
         trajectory=Trajectory.NDVI_TREND,
         lceu=Lceu.GAES,
+        land_cover=EsaCciSource(),
+        water_mask=JrcSeasonalityMask(threshold=6),
         compatibility=Compatibility(),
     )
     resolved = SimpleNamespace(
@@ -38,6 +54,8 @@ def make_resolved(**overrides):
         soc_period=Period(2001, 2015),
         lc_year_start_esa=2001,
         lc_year_end_esa=2015,
+        lc_class_combinations=STUB_CLASS_COMBINATIONS,
+        trans_matrix_flatten=STUB_TRANS_MATRIX_FLATTEN,
         analysis_scale=250,
         zonal_scale=300,
         productivity_table=PRODUCTIVITY_GPGV2,
