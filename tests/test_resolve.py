@@ -8,10 +8,17 @@ soil_organic_carbon.py:12-16.
 from __future__ import annotations
 
 import pytest
+from spec_factory import default_spec
 
 from sdg1531.resolve import resolve
-from sdg1531.spec import Period, PeriodOverride, SubPeriods
-from spec_factory import default_spec
+from sdg1531.spec import (
+    Compatibility,
+    Period,
+    PeriodOverride,
+    PrecomputedViAsset,
+    SensorSelection,
+    SubPeriods,
+)
 
 SUB_PERIODS = ("trend", "state", "performance", "land_cover", "soc")
 RESOLVED_FIELD = {
@@ -30,7 +37,8 @@ def _legacy_endpoint(override_value, base_value):
     return base_value
 
 
-def _periods(sub_period, override, base=Period(start=2000, end=2020)):
+def _periods(sub_period, override, base: Period | None = None):
+    base = base if base is not None else Period(start=2000, end=2020)
     overrides = {name: PeriodOverride(None, None) for name in SUB_PERIODS}
     overrides[sub_period] = override
     return SubPeriods(overall=base, **overrides)
@@ -42,9 +50,7 @@ def _periods(sub_period, override, base=Period(start=2000, end=2020)):
 )
 def test_sub_period_endpoints_fall_back_one_by_one(sub_period, start_set, end_set):
     base = Period(start=2000, end=2020)
-    override = PeriodOverride(
-        start=2005 if start_set else None, end=2015 if end_set else None
-    )
+    override = PeriodOverride(start=2005 if start_set else None, end=2015 if end_set else None)
     r = resolve(default_spec(periods=_periods(sub_period, override, base)))
 
     assert getattr(r, RESOLVED_FIELD[sub_period]) == Period(
@@ -60,3 +66,89 @@ def test_zero_endpoint_falls_back_like_legacy_truthiness():
     # indicator_model.py:82-87 — `if self.trend_start:` treats 0 as unset.
     r = resolve(default_spec(periods=_periods("trend", PeriodOverride(0, 0))))
     assert r.trend == Period(start=2000, end=2020)
+
+
+CCI_CLAMP_CASES = [
+    (1980, 1992),
+    (1991, 1992),
+    (1992, 1992),
+    (2000, 2000),
+    (2022, 2022),
+    (2023, 2022),
+    (2030, 2022),
+]
+
+
+@pytest.mark.parametrize("year,expected", CCI_CLAMP_CASES)
+def test_land_cover_years_are_clamped_to_the_cci_range(year, expected):
+    # indicator_model.py:156-168
+    r = resolve(default_spec(periods=_periods("land_cover", PeriodOverride(year, year))))
+    assert r.land_cover_period == Period(start=year, end=year)
+    assert r.lc_year_start_esa == expected
+    assert r.lc_year_end_esa == expected
+
+
+@pytest.mark.parametrize("year,expected", CCI_CLAMP_CASES)
+def test_soc_start_is_raw_while_soc_end_is_clamped(year, expected):
+    # soil_organic_carbon.py:12-16 — only the end year is clamped.
+    r = resolve(default_spec(periods=_periods("soc", PeriodOverride(year, year))))
+    assert r.soc_year_start == year
+    assert r.soc_year_end_esa == expected
+
+
+@pytest.mark.parametrize("year,expected", CCI_CLAMP_CASES)
+def test_clamp_soc_start_year_flag_flips_the_asymmetry(year, expected):
+    r = resolve(
+        default_spec(
+            periods=_periods("soc", PeriodOverride(year, year)),
+            compatibility=Compatibility(clamp_soc_start_year=True),
+        )
+    )
+    assert r.soc_year_start == expected
+    assert r.soc_year_end_esa == expected
+
+
+def test_analysis_scale_comes_from_the_first_selected_sensor():
+    # indicator_model.py:74-76
+    r = resolve(default_spec(vi_source=SensorSelection(("Landsat 8", "Landsat 9"))))
+    assert r.analysis_scale == 30
+
+
+def test_precomputed_vi_asset_carries_its_own_scale():
+    r = resolve(default_spec(vi_source=PrecomputedViAsset(asset_id="users/x/vi", scale=125)))
+    assert r.analysis_scale == 125
+    assert r.zonal_scale == 300
+
+
+def test_zonal_scale_differs_from_analysis_scale_for_sentinel_2():
+    # run_15_3_1.py:324 — deliberately not the analysis scale.
+    r = resolve(default_spec(vi_source=SensorSelection(("Sentinel 2",))))
+    assert r.analysis_scale == 10
+    assert r.zonal_scale == 100
+    assert r.zonal_scale != r.analysis_scale
+
+
+@pytest.mark.parametrize(
+    "sensor,analysis_scale",
+    [("MODIS MOD13Q1", 250), ("Terra NPP", 250), ("Landsat 8", 30)],
+)
+def test_zonal_scale_is_300_without_sentinel_2(sensor, analysis_scale):
+    r = resolve(default_spec(vi_source=SensorSelection((sensor,))))
+    assert r.analysis_scale == analysis_scale
+    assert r.zonal_scale == 300
+
+
+def test_integration_period_excludes_land_cover_and_soc():
+    # integration.py:11-19 and :32-40 — only overall/trend/state/performance.
+    periods = SubPeriods(
+        overall=Period(start=2005, end=2015),
+        trend=PeriodOverride(2003, 2016),
+        state=PeriodOverride(None, None),
+        performance=PeriodOverride(2001, None),
+        land_cover=PeriodOverride(1995, 2020),
+        soc=PeriodOverride(1993, 2021),
+    )
+    r = resolve(default_spec(periods=periods))
+    assert r.integration_period == Period(start=2001, end=2016)
+    assert r.land_cover_period == Period(start=1995, end=2020)
+    assert r.soc_period == Period(start=1993, end=2021)
