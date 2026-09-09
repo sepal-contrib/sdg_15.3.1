@@ -80,10 +80,45 @@ def test_filesystem_access_is_rejected() -> None:
     assert "filesystem" in _rules(src)
 
 
+@pytest.mark.parametrize("expr", ["open(p)", "p.open()"])
+def test_open_is_rejected_in_both_call_forms(expr: str) -> None:
+    # open() was only banned as a bare call; Path(...).open() passed all four guards
+    src = f'__all__ = ["f"]\ndef f(p):\n    return {expr}\n'
+    assert "filesystem" in _rules(src)
+
+
+def test_unrelated_attribute_call_is_not_flagged_as_filesystem() -> None:
+    src = '__all__ = ["f"]\ndef f(d):\n    return d.items()\n'
+    assert "filesystem" not in _rules(src)
+
+
+def test_urlopen_attribute_form_is_rejected_like_the_bare_call() -> None:
+    src = '__all__ = ["f"]\ndef f(request, url):\n    return request.urlopen(url)\n'
+    assert "banned-call" in _rules(src)
+
+
+def test_similarly_named_attribute_is_not_treated_as_urlopen() -> None:
+    src = '__all__ = ["f"]\ndef f(request, url):\n    return request.urlopen_all(url)\n'
+    assert "banned-call" not in _rules(src)
+
+
 def test_export_module_may_write_a_temp_shapefile() -> None:
     src = '__all__ = ["f"]\ndef f(gdf, path):\n    gdf.to_file(path)\n'
     assert "filesystem" not in _rules(src, rel_path="sdg1531/export.py")
     assert "filesystem" in _rules(src, rel_path="sdg1531/stats/decode.py")
+
+
+def test_export_module_may_read_back_the_zipped_bytes() -> None:
+    src = '__all__ = ["f"]\ndef f(path):\n    return path.read_bytes()\n'
+    assert "filesystem" not in _rules(src, rel_path="sdg1531/export.py")
+    assert "filesystem" in _rules(src, rel_path="sdg1531/stats/decode.py")
+
+
+def test_export_module_exemption_does_not_cover_every_filesystem_call() -> None:
+    # the exemption is for the to_file/read_bytes round trip only (spec D12), not a
+    # blanket pass for sdg1531/export.py
+    src = '__all__ = ["f"]\nfrom pathlib import Path\ndef f():\n    return Path.home()\n'
+    assert "filesystem" in _rules(src, rel_path="sdg1531/export.py")
 
 
 def test_module_level_call_is_rejected() -> None:
@@ -132,10 +167,91 @@ def test_dunder_all_is_never_a_mutable_state_violation(dunder_all: str) -> None:
     assert "module-level-mutable" not in _rules(src)
 
 
+def test_dunder_slots_is_never_a_mutable_state_violation() -> None:
+    src = '__all__ = ["C"]\nclass C:\n    __slots__ = ["a", "b"]\n'
+    assert "module-level-mutable" not in _rules(src)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "defaultdict(list)",
+        "OrderedDict()",
+        "collections.OrderedDict()",
+        "Counter()",
+        "deque()",
+        "bytearray()",
+    ],
+)
+def test_module_level_mutable_factory_is_rejected(value: str) -> None:
+    # dict/list/set covered the literal-producing builtins but missed the stdlib
+    # factories that produce the same kind of shared, writable container
+    src = (
+        '__all__ = ["T"]\n'
+        "import collections\n"
+        "from collections import Counter, OrderedDict, defaultdict, deque\n"
+        f"T = {value}\n"
+    )
+    assert "module-level-mutable" in _rules(src)
+
+
+def test_namedtuple_factory_is_not_flagged_as_mutable() -> None:
+    src = '__all__ = ["Point"]\nfrom collections import namedtuple\nPoint = namedtuple("Point", ["x", "y"])\n'
+    assert "module-level-mutable" not in _rules(src)
+
+
+def test_sorted_call_is_rejected_as_module_level_mutable() -> None:
+    src = '__all__ = ["T"]\nT = sorted([3, 1, 2])\n'
+    assert "module-level-mutable" in _rules(src)
+
+
+def test_dict_union_binop_is_rejected_as_module_level_mutable() -> None:
+    src = '__all__ = ["T"]\nT = {"a": 1} | {"b": 2}\n'
+    assert "module-level-mutable" in _rules(src)
+
+
+def test_numeric_binop_is_not_flagged_as_mutable() -> None:
+    src = '__all__ = ["T"]\nT = 1 + 2\n'
+    assert "module-level-mutable" not in _rules(src)
+
+
+def test_tuple_unpacked_module_level_mutables_are_rejected() -> None:
+    src = '__all__ = ["A", "B"]\nA, B = {}, []\n'
+    assert "module-level-mutable" in _rules(src)
+
+
+def test_tuple_unpacked_immutables_are_not_flagged() -> None:
+    src = '__all__ = ["A", "B"]\nA, B = (1, 2), (3, 4)\n'
+    assert "module-level-mutable" not in _rules(src)
+
+
+def test_mutable_class_attribute_is_rejected() -> None:
+    # a top-level class's own attribute dict is shared across every instance and
+    # every importer for the process lifetime — the same defect as a module global
+    src = '__all__ = ["C"]\nclass C:\n    DEFAULTS = {}\n'
+    assert "module-level-mutable" in _rules(src)
+
+
+def test_immutable_class_attribute_is_not_flagged() -> None:
+    src = '__all__ = ["C"]\nclass C:\n    DEFAULTS = (1, 2)\n'
+    assert "module-level-mutable" not in _rules(src)
+
+
 def test_apply_truth_table_outside_engine_is_rejected() -> None:
     src = '__all__ = ["f"]\ndef f(imgs, table):\n    return apply_truth_table(imgs, table, "b")\n'
     assert "truth-table-leak" in _rules(src, rel_path="sdg1531/stats/requests.py")
     assert "truth-table-leak" not in _rules(src, rel_path="sdg1531/engine/indicator.py")
+
+
+def test_apply_truth_table_is_allowed_in_single_module_engine_spelling() -> None:
+    src = '__all__ = ["f"]\ndef f(imgs, table):\n    return apply_truth_table(imgs, table, "b")\n'
+    assert "truth-table-leak" not in _rules(src, rel_path="sdg1531/engine.py")
+
+
+def test_engine_prefix_match_does_not_leak_into_similarly_named_module() -> None:
+    # a naive "startswith sdg1531/engine" would also swallow sdg1531/engineering.py
+    src = '__all__ = ["f"]\ndef f(imgs, table):\n    return apply_truth_table(imgs, table, "b")\n'
+    assert "truth-table-leak" in _rules(src, rel_path="sdg1531/engineering.py")
 
 
 def test_replacing_a_resolved_spec_is_rejected() -> None:
@@ -146,3 +262,36 @@ def test_replacing_a_resolved_spec_is_rejected() -> None:
         "    return replace(resolved, analysis_scale=30)\n"
     )
     assert "resolved-replace" in _rules(src)
+
+
+def test_replacing_a_resolved_spec_by_longer_name_is_rejected() -> None:
+    src = (
+        '__all__ = ["f"]\n'
+        "from dataclasses import replace\n"
+        "def f(resolved_spec):\n"
+        "    return replace(resolved_spec, analysis_scale=30)\n"
+    )
+    assert "resolved-replace" in _rules(src)
+
+
+def test_replacing_a_resolved_spec_via_attribute_access_is_rejected() -> None:
+    # ResolvedSpec is normally threaded through as an instance attribute, not a bare
+    # local, and the old rule only ever matched an ast.Name
+    src = (
+        '__all__ = ["f"]\n'
+        "from dataclasses import replace\n"
+        "class C:\n"
+        "    def f(self):\n"
+        "        return replace(self.resolved, analysis_scale=30)\n"
+    )
+    assert "resolved-replace" in _rules(src)
+
+
+def test_replacing_an_unrelated_object_is_not_flagged() -> None:
+    src = (
+        '__all__ = ["f"]\n'
+        "from dataclasses import replace\n"
+        "def f(config):\n"
+        "    return replace(config, scale=30)\n"
+    )
+    assert "resolved-replace" not in _rules(src)
