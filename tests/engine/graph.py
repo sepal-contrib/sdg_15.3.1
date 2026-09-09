@@ -197,6 +197,52 @@ def _renamed_bands(obj):
     return names
 
 
+# --- receiver spines ----------------------------------------------------------
+#
+# Following a node's RECEIVER argument is what makes a spine-based assertion
+# CSE-immune: the serializer collapses structurally identical subtrees, so a
+# COUNT cannot see a duplicated operation, but a spine is the graph's own nesting
+# and reordering two chained calls reorders it.
+#
+# Which argument holds the receiver is per-function and has to be read off the
+# encoder (`Image.uint16` spells it `value`, `Image.remap` and `Image.selfMask`
+# `image`, most of the rest `input`), so the table is a PARAMETER: each test file
+# keeps its own, listing exactly the functions its chains walk through. A shared
+# table would silently walk through a function the caller never meant to follow.
+
+
+def _spine(node, deref, receiver_arg):
+    """The nodes on `node`'s receiver spine, outermost first.
+
+    `receiver_arg` maps a function name to the argument holding its receiver; the
+    walk stops at the first node whose function is absent from it.
+    """
+    chain = []
+    current = deref(node)
+    while True:
+        chain.append(current)
+        call = _call(current)
+        name = call.get("functionName") if call else None
+        if name not in receiver_arg or receiver_arg[name] not in call.get("arguments", {}):
+            return chain
+        current = deref(call["arguments"][receiver_arg[name]])
+
+
+def _spine_functions(node, deref, receiver_arg):
+    """The function names on `node`'s receiver spine, outermost first."""
+    return [(_call(n) or {}).get("functionName") for n in _spine(node, deref, receiver_arg)]
+
+
+def _spine_band(node, deref, receiver_arg):
+    """The band name of the outermost `Image.rename` on `node`'s receiver spine."""
+    for current in _spine(node, deref, receiver_arg):
+        call = _call(current)
+        if call and call.get("functionName") == "Image.rename":
+            names = _string_list_arg(deref(call["arguments"]["names"]), deref)
+            return names[0] if len(names) == 1 else names
+    return None
+
+
 def _loaded_assets_in(node, deref, graph):
     """Every asset id loaded under `node`."""
     ids = set()

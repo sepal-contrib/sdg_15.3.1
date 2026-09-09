@@ -59,7 +59,7 @@ CUSTOM = CustomLandCoverSource(
 ASSET_MASK = AssetBandMask(asset_id=WATER_ASSET, band="occurrence")
 
 
-def water_for(source, mask, ctx):
+def water_for(source, mask):
     """The `water` band for one (land-cover source, water-mask arm) pair.
 
     `cci_raw` and `cci_remapped` are two distinguishable assets, and each carries
@@ -69,7 +69,6 @@ def water_for(source, mask, ctx):
     r = make_resolved(land_cover=source, water_mask=mask)
     return build_water_mask(
         r,
-        ctx,
         cci_raw=ee.Image(RAW).rename("landcover_end"),
         cci_remapped=ee.Image(REMAPPED).rename("end"),
     )
@@ -134,6 +133,11 @@ BRANCHES = [
     # custom+70 must NOT fall through to branch 2.
     ("branch 1: custom + pixel 70", CUSTOM, PixelValueMask(IPCC_WATER_CODE), {REMAPPED}),
     ("branch 1: custom + pixel 33", CUSTOM, PixelValueMask(33), {REMAPPED}),
+    # The dropped `water_mask_pixel > 9` guard (module note, divergence 4). The
+    # legacy sent this to branch 4; the union sends it to branch 1. Pinned so a
+    # future repair -- reinstating the guard, or bounding PixelValueMask.value --
+    # cannot land silently.
+    ("branch 1: custom + pixel 5", CUSTOM, PixelValueMask(5), {REMAPPED}),
     ("branch 3: custom + asset band", CUSTOM, ASSET_MASK, {WATER_ASSET}),
     ("branch 4: custom + jrc", CUSTOM, JrcSeasonalityMask(6), {JRC}),
 ]
@@ -143,63 +147,67 @@ BRANCHES = [
     ("source", "mask", "expected_assets"),
     [pytest.param(*case[1:], id=case[0]) for case in BRANCHES],
 )
-def test_each_branch_reads_exactly_one_image(source, mask, expected_assets, ctx):
+def test_each_branch_reads_exactly_one_image(source, mask, expected_assets):
     """Set equality, not membership: it fails both when a branch reads the wrong
     image and when it reads an extra one it should have left alone."""
-    assert _loaded_asset_ids(water_for(source, mask, ctx)) == expected_assets
+    assert _loaded_asset_ids(water_for(source, mask)) == expected_assets
 
 
 @pytest.mark.parametrize(
     ("source", "mask", "_assets"),
     [pytest.param(*case[1:], id=case[0]) for case in BRANCHES],
 )
-def test_every_branch_names_its_result_water(source, mask, _assets, ctx):
-    assert outer_rename(water_for(source, mask, ctx)) == ["water"]
+def test_every_branch_names_its_result_water(source, mask, _assets):
+    assert outer_rename(water_for(source, mask)) == ["water"]
 
 
 @pytest.mark.parametrize(
     ("source", "mask", "_assets"),
     [pytest.param(*case[1:], id=case[0]) for case in BRANCHES],
 )
-def test_every_branch_self_masks_exactly_once(source, mask, _assets, ctx):
+def test_every_branch_self_masks_exactly_once(source, mask, _assets):
     """One `.selfMask()` per branch (land_cover.py:61, :66, :71, :79) and none in
     the stand-ins, so the distinct-node count is exactly 1 on every branch."""
-    assert count_calls(water_for(source, mask, ctx), "Image.selfMask") == 1
+    assert count_calls(water_for(source, mask), "Image.selfMask") == 1
 
 
-def test_the_esa_pixel_branch_tests_the_raw_image_against_a_hardcoded_210(ctx):
+def test_the_esa_pixel_branch_tests_the_raw_image_against_a_hardcoded_210():
     """land_cover.py:65-66. The configured pixel value (70) reaches NOTHING: the
     legacy uses it only as the branch condition and compares against 210."""
-    water = water_for(ESA, PixelValueMask(IPCC_WATER_CODE), ctx)
+    water = water_for(ESA, PixelValueMask(IPCC_WATER_CODE))
 
     assert comparisons(water) == {("Image.eq", CCI_WATER_CLASS)}
     assert IPCC_WATER_CODE not in _image_constants(water)
 
 
-@pytest.mark.parametrize("pixel", [IPCC_WATER_CODE, 33])
-def test_the_custom_pixel_branch_tests_the_remapped_image_against_the_configured_value(pixel, ctx):
+@pytest.mark.parametrize("pixel", [IPCC_WATER_CODE, 33, 5])
+def test_the_custom_pixel_branch_tests_the_remapped_image_against_the_configured_value(pixel):
     """land_cover.py:58-63, and the precedence that goes with it: a custom source
-    takes this branch even at pixel 70, so 210 never appears."""
-    water = water_for(CUSTOM, PixelValueMask(pixel), ctx)
+    takes this branch even at pixel 70, so 210 never appears.
+
+    Pixel 5 is the dropped `water_mask_pixel > 9` guard (module note, divergence
+    4): the legacy compared it and fell through to the JRC branch, so `Image.eq`
+    against 5 is the divergence made visible."""
+    water = water_for(CUSTOM, PixelValueMask(pixel))
 
     assert comparisons(water) == {("Image.eq", pixel)}
     assert CCI_WATER_CLASS not in _image_constants(water)
 
 
 @pytest.mark.parametrize("threshold", [6, 8])
-def test_the_jrc_branch_keeps_seasonality_at_or_above_the_threshold(threshold, ctx):
+def test_the_jrc_branch_keeps_seasonality_at_or_above_the_threshold(threshold):
     """land_cover.py:74-81. Two thresholds, so the value is read rather than
     hardcoded, and the operator is pinned with it: `.gte` -> `.gt` would drop
     every pixel sitting exactly on the threshold."""
-    water = water_for(ESA, JrcSeasonalityMask(threshold), ctx)
+    water = water_for(ESA, JrcSeasonalityMask(threshold))
 
     assert comparisons(water) == {("Image.gte", threshold)}
     assert _selected_bands(water) == {"seasonality"}
 
 
-def test_the_asset_branch_selects_the_named_band_and_compares_nothing(ctx):
+def test_the_asset_branch_selects_the_named_band_and_compares_nothing():
     """land_cover.py:67-73 -- `.select(band).selfMask()`, with no threshold at all."""
-    water = water_for(ESA, AssetBandMask(asset_id=WATER_ASSET, band="occurrence"), ctx)
+    water = water_for(ESA, AssetBandMask(asset_id=WATER_ASSET, band="occurrence"))
 
     assert _selected_bands(water) == {"occurrence"}
     assert comparisons(water) == set()
@@ -209,17 +217,17 @@ def test_the_asset_branch_selects_the_named_band_and_compares_nothing(ctx):
 
 
 @pytest.mark.parametrize("pixel", [33, 10, 71])
-def test_a_pixel_value_mask_over_esa_cci_rejects_a_non_water_code(pixel, ctx):
+def test_a_pixel_value_mask_over_esa_cci_rejects_a_non_water_code(pixel):
     """land_cover.py:65 tests `== 70` exactly, so every other value fell silently
     through to the JRC branch and built a mask the user never asked for. A
     non-exhaustive dispatch must now raise."""
     with pytest.raises(SpecError, match="IPCC water code"):
-        water_for(ESA, PixelValueMask(pixel), ctx)
+        water_for(ESA, PixelValueMask(pixel))
 
 
-def test_an_unset_water_mask_is_rejected(ctx):
+def test_an_unset_water_mask_is_rejected():
     """`RunSpec.water_mask` is `WaterMaskSpec | None`. The legacy else-branch
     swallowed the unset case and reached for `model.seasonality`; here there is no
     threshold to reach for."""
     with pytest.raises(SpecError, match="unsupported water mask"):
-        water_for(ESA, None, ctx)
+        water_for(ESA, None)

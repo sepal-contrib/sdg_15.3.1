@@ -36,7 +36,11 @@ from tests.engine.graph import (
     _call,
     _image_constant,
     _loaded_asset_ids,
+    _loaded_assets_in,
     _root,
+    _spine,
+    _spine_band,
+    _spine_functions,
     _string_list_arg,
     _walk,
 )
@@ -66,9 +70,9 @@ def stack_for(**overrides):
 
 # --- graph helpers ------------------------------------------------------------
 
-# The argument each node carries its RECEIVER in, verified against the encoder:
-# `Image.uint16` spells it `value`, `Image.remap` and `Image.selfMask` `image`,
-# the rest `input`.
+# The argument each node on THIS module's chains carries its receiver in, verified
+# against the encoder. Passed to the shared spine walkers; test_productivity.py
+# keeps its own table, which lists a different set of functions.
 _RECEIVER_ARG = {
     "Image.rename": "input",
     "Image.uint16": "value",
@@ -79,37 +83,16 @@ _RECEIVER_ARG = {
 }
 
 
-def _spine(node, deref):
-    """The nodes on `node`'s receiver spine, outermost first.
-
-    Following the RECEIVER rather than counting nodes is what makes these
-    assertions CSE-immune: the serializer collapses structurally identical
-    subtrees, so a count cannot see a duplicated operation, but a spine is the
-    graph's own nesting and reordering two calls reorders it.
-    """
-    chain = []
-    current = deref(node)
-    while True:
-        chain.append(current)
-        call = _call(current)
-        name = call.get("functionName") if call else None
-        if name not in _RECEIVER_ARG or _RECEIVER_ARG[name] not in call.get("arguments", {}):
-            return chain
-        current = deref(call["arguments"][_RECEIVER_ARG[name]])
+def spine(node, deref):
+    return _spine(node, deref, _RECEIVER_ARG)
 
 
-def _spine_functions(node, deref):
-    return [(_call(n) or {}).get("functionName") for n in _spine(node, deref)]
+def spine_functions(node, deref):
+    return _spine_functions(node, deref, _RECEIVER_ARG)
 
 
-def _spine_band(node, deref):
-    """The band name of the outermost `Image.rename` on `node`'s receiver spine."""
-    for current in _spine(node, deref):
-        call = _call(current)
-        if call and call.get("functionName") == "Image.rename":
-            names = _string_list_arg(deref(call["arguments"]["names"]), deref)
-            return names[0] if len(names) == 1 else names
-    return None
+def spine_band(node, deref):
+    return _spine_band(node, deref, _RECEIVER_ARG)
 
 
 def band_order(stack):
@@ -126,9 +109,9 @@ def band_order(stack):
         call = _call(node)
         if call and call.get("functionName") == "Image.addBands":
             walk(call["arguments"]["dstImg"])
-            bands.append(_spine_band(call["arguments"]["srcImg"], deref))
+            bands.append(spine_band(call["arguments"]["srcImg"], deref))
         else:
-            bands.append(_spine_band(node, deref))
+            bands.append(spine_band(node, deref))
 
     walk({"valueReference": graph["result"]})
     return bands
@@ -145,9 +128,9 @@ def stack_operands(stack):
         if call and call.get("functionName") == "Image.addBands":
             walk(call["arguments"]["dstImg"])
             src = deref(call["arguments"]["srcImg"])
-            operands[_spine_band(src, deref)] = _spine_functions(src, deref)
+            operands[spine_band(src, deref)] = spine_functions(src, deref)
         else:
-            operands[_spine_band(node, deref)] = _spine_functions(node, deref)
+            operands[spine_band(node, deref)] = spine_functions(node, deref)
 
     walk({"valueReference": graph["result"]})
     return operands
@@ -189,7 +172,7 @@ def calendar_windows(deref, graph, node):
 def remaps_on_spine(deref, node):
     """`[(from, to)]` for every `Image.remap` on `node`'s receiver spine, outermost first."""
     found = []
-    for current in _spine(node, deref):
+    for current in spine(node, deref):
         call = _call(current)
         if call is None or call.get("functionName") != "Image.remap":
             continue
@@ -201,20 +184,6 @@ def remaps_on_spine(deref, node):
             )
         )
     return found
-
-
-def assets_under(deref, graph, node):
-    """Every asset id loaded under `node` -- the per-band counterpart of
-    `_loaded_asset_ids`, which only ever sees a whole graph."""
-    ids = set()
-    for current in _walk(node, deref, graph):
-        call = _call(current)
-        if call is None or call.get("functionName") not in ("Image.load", "ImageCollection.load"):
-            continue
-        value = deref(call.get("arguments", {}).get("id", {}))
-        if isinstance(value, dict) and isinstance(value.get("constantValue"), str):
-            ids.add(value["constantValue"])
-    return ids
 
 
 # --- the stack ----------------------------------------------------------------
@@ -301,7 +270,7 @@ def test_each_cci_image_is_clipped_to_the_aoi_bounding_box(band):
 
     clips = [
         call
-        for current in _spine(node, deref)
+        for current in spine(node, deref)
         if (call := _call(current)) is not None and call.get("functionName") == "Image.clip"
     ]
     assert len(clips) == 1
@@ -328,7 +297,7 @@ def test_custom_source_uses_the_user_assets_raw():
 
     for band, asset in (("start", CUSTOM.start_asset), ("end", CUSTOM.end_asset)):
         deref, graph, node = band_subtree(stack, band)
-        assert assets_under(deref, graph, node) == {asset}
+        assert _loaded_assets_in(node, deref, graph) == {asset}
         assert remaps_on_spine(deref, node) == []
 
 
@@ -358,8 +327,8 @@ def test_transition_is_the_start_map_times_one_hundred_plus_the_end_map():
     assert multiply["functionName"] == "Image.multiply"
     assert _image_constant(deref(multiply["arguments"]["image2"]), deref) == 100
 
-    assert _spine_band(multiply["arguments"]["image1"], deref) == "start"
-    assert _spine_band(add["arguments"]["image2"], deref) == "end"
+    assert spine_band(multiply["arguments"]["image1"], deref) == "start"
+    assert spine_band(add["arguments"]["image2"], deref) == "end"
 
 
 def test_degradation_remaps_the_scheme_tables_then_the_byte_convention():
@@ -393,9 +362,12 @@ def test_the_esa_water_branch_reads_the_raw_end_image_not_the_remapped_one():
         for node in _walk(root, deref, graph)
         if (call := _call(node)) is not None and call.get("functionName") == "Image.eq"
     ]
+    # exactly 1: the water mask is the only branch in the whole stack that
+    # compares anything, and its pixel-value arm emits a single `Image.eq`. The
+    # two remaps and the multiply/add carry no comparison. Guards the [0] below.
     assert len(eq_nodes) == 1
 
-    assert _spine_band(eq_nodes[0]["arguments"]["image1"], deref) == "landcover_end"
+    assert spine_band(eq_nodes[0]["arguments"]["image1"], deref) == "landcover_end"
 
 
 # --- the real resolve() -------------------------------------------------------

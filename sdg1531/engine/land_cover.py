@@ -27,29 +27,39 @@ ResolvedSpec fields read here:
     spec.land_cover, spec.water_mask, lc_year_start_esa, lc_year_end_esa,
     lc_class_combinations, trans_matrix_flatten
 
-EXPECTED_DIVERGENCES note -- three raises in this module have NO legacy
-counterpart, and Task 17's parity harness must carry all three:
+EXPECTED_DIVERGENCES note -- four divergences from the legacy, spread over four
+``raise`` statements and one dropped guard. Task 17's parity harness must carry
+all four:
 
-1. A :class:`~sdg1531.spec.PixelValueMask` over
+1. **No legacy counterpart.** A :class:`~sdg1531.spec.PixelValueMask` over
    :class:`~sdg1531.spec.EsaCciSource` whose value is not the IPCC water code 70
    raises ``SpecError``. land_cover.py:65 tests ``water_mask_pixel == 70``
    exactly, so any other value falls silently through to the JRC seasonality
    branch and builds a mask the user never asked for.
-2. An unset ``spec.water_mask`` (the field is ``WaterMaskSpec | None``) raises
-   ``SpecError``. The legacy else-branch (land_cover.py:74-81) catches this case
-   too and reaches for ``model.seasonality``, so an unconfigured mask silently
-   became a JRC one there; here there is no threshold to reach for.
-3. An unrecognised ``spec.land_cover`` or ``spec.water_mask`` arm raises
-   ``SpecError``. Both are closed unions, so neither is reachable through the
-   public API; the legacy if/elif/else has no equivalent arm at all.
-
-One further divergence changes the graph shape rather than raising: legacy
-branch 1 is guarded by ``model.water_mask_pixel > 9`` (land_cover.py:58) against
-a trait that defaults to ``None``, which would raise ``TypeError`` on the
-comparison. The tagged union carries that decision instead, so the guard is
-gone. Every IPCC code the scheme emits is 10 or above, so the two agree on all
-representable input; they part only for a pixel value of 9 or less, which the
-legacy routed to the JRC branch and which the union routes to branch 1.
+2. **Behaviour-changing, not counterpart-free.** An unset ``spec.water_mask``
+   (the field is ``WaterMaskSpec | None``) raises ``SpecError`` where the legacy
+   else-branch (land_cover.py:74-81) caught the same case and built a JRC mask
+   from ``model.seasonality``. There is no threshold here to fall back on.
+   ``sdg1531.validate`` now reports an unset mask as a fatal ``Problem``, so this
+   is no longer reachable through the public API; the raise stays as the
+   total-dispatch backstop for headless replay and for Task 17's harness, neither
+   of which is obliged to call ``validate()``.
+3. **No legacy counterpart.** An unrecognised ``spec.land_cover`` or
+   ``spec.water_mask`` arm raises ``SpecError``. Both are closed unions, so
+   neither is reachable through the public API; the legacy if/elif/else has no
+   equivalent arm at all.
+4. **Behaviour-changing, and it changes the graph rather than raising.** Legacy
+   branch 1 is guarded by ``model.water_mask_pixel > 9`` (land_cover.py:58)
+   against a trait that defaults to ``None``, which would raise ``TypeError`` on
+   the comparison. The tagged union carries that decision instead, so the guard
+   is gone. ``PixelValueMask.value`` is an unconstrained ``int`` and
+   ``validate()`` does not bound it, so a custom source with a value of 9 or less
+   is representable and takes branch 1 here where the legacy took branch 4 -- a
+   different graph, silently. Pinned by the ``custom + pixel 5`` row of
+   ``tests/engine/test_water_mask.py``'s branch table so a future repair cannot
+   land unnoticed. Every IPCC code the default scheme emits is 10 or above, so
+   the two agree on every value that scheme can produce; the union can hold more
+   than the scheme emits.
 """
 
 from __future__ import annotations
@@ -106,16 +116,15 @@ class LandCoverMaps:
 
 def build_water_mask(
     r: ResolvedSpec,
-    ctx: ExecutionContext,
     *,
     cci_raw: ee.Image,
     cci_remapped: ee.Image,
 ) -> ee.Image:
     """Build the ``water`` band (land_cover.py:57-81).
 
-    Reads ``r.spec.water_mask`` and ``r.spec.land_cover``. ``ctx`` is accepted for
-    signature uniformity across the engine and is deliberately unused: the legacy
-    asset and JRC branches clip nothing (land_cover.py:67-81).
+    Reads ``r.spec.water_mask`` and ``r.spec.land_cover``. Takes no
+    :class:`ExecutionContext`: none of the four branches clips, and the legacy
+    passes no geometry into any of them (land_cover.py:58-81).
 
     Needs both CCI images because the branches disagree about which one they test:
     the custom-source branch tests the *remapped* end image, the ESA branch tests
@@ -205,9 +214,7 @@ def build_land_cover(r: ResolvedSpec, ctx: ExecutionContext) -> LandCoverMaps:
         raise SpecError(f"unsupported land cover source: {source!r}")
 
     # :57-81 -- built here, before the transition image, as in the legacy order.
-    water_body = build_water_mask(
-        r, ctx, cci_raw=landcover_end, cci_remapped=landcover_end_remapped
-    )
+    water_body = build_water_mask(r, cci_raw=landcover_end, cci_remapped=landcover_end_remapped)
 
     # :84-88 -- the START map carries the leading two digits.
     landcover_transition = (
