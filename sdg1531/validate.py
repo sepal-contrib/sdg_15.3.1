@@ -292,6 +292,27 @@ def _land_cover_problems(spec: RunSpec) -> tuple[Problem, ...]:
     return tuple(problems)
 
 
+def _water_mask_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    """One of the three water-mask arms must be chosen; there is no default.
+
+    The legacy else-branch (land_cover.py:74-81) swallowed an unset mask into a JRC
+    one built from ``model.seasonality``, so the form never had to ask. The tagged
+    union carries no threshold to fall back on, so ``engine.land_cover`` raises
+    instead — and a form-completeness problem that surfaces as an exception several
+    seconds into a run is what this module exists to prevent.
+    """
+    if spec.water_mask is not None:
+        return ()
+    return (
+        Problem(
+            field="water_mask",
+            code="missing_water_mask",
+            message="Select a water mask.",
+            fatal=True,
+        ),
+    )
+
+
 def _matrix_shape_defect(
     rows: tuple[tuple[int, ...], ...], expected_rows: int, expected_cols: int
 ) -> str | None:
@@ -389,6 +410,7 @@ _CHECKS = (
     _trajectory_problems,
     _climate_problems,
     _land_cover_problems,
+    _water_mask_problems,
     _transition_matrix_problems,
     _aoi_problems,
 )

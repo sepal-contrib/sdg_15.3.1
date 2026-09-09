@@ -11,13 +11,16 @@ from sdg1531.enums import Trajectory
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     AssetAoi,
+    AssetBandMask,
     Compatibility,
     CustomLandCoverSource,
     EsaCciSource,
     FixedClimate,
+    JrcSeasonalityMask,
     Period,
     PeriodOverride,
     PerPixelClimate,
+    PixelValueMask,
     PrecomputedViAsset,
     RunSpec,
     SensorSelection,
@@ -222,6 +225,25 @@ def test_fully_custom_land_cover_is_silent():
         )
     )
     assert validate(spec) == ()
+
+
+def test_an_unset_water_mask_is_fatal_and_anchored():
+    # RunSpec.water_mask is `WaterMaskSpec | None` and from_json maps a null
+    # straight to None, so this is reachable without the widget. Left unchecked it
+    # passes a total validate() and then raises SpecError mid-run in
+    # engine.land_cover, which is exactly what this module exists to prevent.
+    problem = only(BASE.evolve(water_mask=None), "missing_water_mask")
+    assert problem.field == "water_mask"
+    assert problem.fatal is True
+
+
+def test_each_water_mask_arm_is_accepted():
+    for mask in (
+        JrcSeasonalityMask(threshold=8),
+        PixelValueMask(value=70),
+        AssetBandMask(asset_id="users/someone/water", band="occurrence"),
+    ):
+        assert validate(BASE.evolve(water_mask=mask)) == ()
 
 
 def test_missing_custom_land_cover_assets_are_reported_per_field():
