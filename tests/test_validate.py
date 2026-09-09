@@ -2,11 +2,15 @@
 
 from dataclasses import replace
 
+from sdg1531.enums import Trajectory
+from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     AssetAoi,
     Compatibility,
+    CustomLandCoverSource,
     Period,
     PeriodOverride,
+    PrecomputedViAsset,
     RunSpec,
     SensorSelection,
     SubPeriods,
@@ -136,3 +140,76 @@ def test_short_state_period_is_a_warning_not_an_error():
 
 def test_four_year_state_period_is_accepted():
     assert "state_period_too_short" not in codes(BASE.evolve(periods=state(start=2012, end=2015)))
+
+
+def scheme(matrix: TransitionMatrix | None = None) -> LandCoverScheme:
+    # Stands in for a parsed CSV, so is_custom is True. It is a stored field, not
+    # something resolve() re-derives from the source arm, so it is set here.
+    return LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Cropland"),
+        end_codes=(10, 30),
+        matrix=matrix if matrix is not None else TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+
+
+def test_precomputed_vi_is_rejected():
+    spec = BASE.evolve(vi_source=PrecomputedViAsset("users/someone/vi", 30))
+    problem = only(spec, "unsupported_vi_source")
+    assert problem.field == "vi_source"
+    assert problem.fatal is True
+    assert "missing_sensors" not in codes(spec)
+
+
+def test_s_res_trend_is_rejected():
+    problem = only(BASE.evolve(trajectory=Trajectory.S_RES_TREND), "unsupported_trajectory")
+    assert problem.field == "trajectory"
+    assert problem.fatal is True
+
+
+def test_every_other_trajectory_is_accepted():
+    for trajectory in Trajectory:
+        if trajectory is Trajectory.S_RES_TREND:
+            continue
+        assert "unsupported_trajectory" not in codes(BASE.evolve(trajectory=trajectory))
+
+
+def test_half_custom_land_cover_is_a_warning():
+    # land_cover.py:40 takes the custom branch on the two assets alone, while
+    # indicator_model.py:232 needs the CSV before it uses the custom vocabulary.
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start", end_asset="users/someone/end"
+        )
+    )
+    problem = only(spec, "half_custom_land_cover")
+    assert problem.field == "land_cover.scheme"
+    assert problem.fatal is False
+
+
+def test_fully_custom_land_cover_is_silent():
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=scheme(),
+        )
+    )
+    assert validate(spec) == ()
+
+
+def test_missing_custom_land_cover_assets_are_reported_per_field():
+    # both asset fields are required, so an unselected asset is the empty string
+    # a half-filled form carries, not a missing constructor argument.
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(start_asset="", end_asset="users/someone/end")
+    )
+    problem = only(spec, "missing_custom_land_cover_asset")
+    assert problem.field == "land_cover.start_asset"
+    assert problem.fatal is True
+
+    both = BASE.evolve(land_cover=CustomLandCoverSource(start_asset="", end_asset=""))
+    fields = [p.field for p in validate(both) if p.code == "missing_custom_land_cover_asset"]
+    assert fields == ["land_cover.start_asset", "land_cover.end_asset"]

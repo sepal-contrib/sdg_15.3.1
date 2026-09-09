@@ -11,8 +11,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sdg1531.catalog import LAND_COVER_FIRST_YEAR, LAND_COVER_MAX_YEAR
-from sdg1531.spec import RunSpec, SensorSelection
+from sdg1531.catalog import (
+    DISABLED_TRAJECTORIES,
+    LAND_COVER_FIRST_YEAR,
+    LAND_COVER_MAX_YEAR,
+)
+from sdg1531.spec import (
+    CustomLandCoverSource,
+    PrecomputedViAsset,
+    RunSpec,
+    SensorSelection,
+)
 
 __all__ = ["Problem", "validate"]
 
@@ -124,10 +133,21 @@ def _state_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
 
 
 def _vi_source_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    source = spec.vi_source
+    if isinstance(source, PrecomputedViAsset):
+        # integration.py:80 read a trait that never existed; the arm is offered
+        # as data but no UI sets it yet (spec §7).
+        return (
+            Problem(
+                field="vi_source",
+                code="unsupported_vi_source",
+                message="Pre-computed vegetation index assets are not supported yet.",
+                fatal=True,
+            ),
+        )
     # input_tile.py:254 — `check_input(self.model.sensors, "no sensors")`. `None`
     # is RunSpec's actual default (spec.py) and is the same "nothing chosen yet"
     # state as an empty SensorSelection, so both are reported under one field.
-    source = spec.vi_source
     if source is None or (isinstance(source, SensorSelection) and not source.names):
         return (
             Problem(
@@ -138,6 +158,61 @@ def _vi_source_problems(spec: RunSpec) -> tuple[Problem, ...]:
             ),
         )
     return ()
+
+
+def _trajectory_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    # productivity.py:42-43 raises a bare NameError; parameter/ui.py:34 already
+    # marks the option disabled.
+    if spec.trajectory not in DISABLED_TRAJECTORIES:
+        return ()
+    return (
+        Problem(
+            field="trajectory",
+            code="unsupported_trajectory",
+            message="The water use efficiency trajectory is not implemented.",
+            fatal=True,
+        ),
+    )
+
+
+def _land_cover_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    source = spec.land_cover
+    if not isinstance(source, CustomLandCoverSource):
+        return ()
+    problems: list[Problem] = []
+    if not source.start_asset:
+        problems.append(
+            Problem(
+                field="land_cover.start_asset",
+                code="missing_custom_land_cover_asset",
+                message="Select the start land cover asset.",
+                fatal=True,
+            )
+        )
+    if not source.end_asset:
+        problems.append(
+            Problem(
+                field="land_cover.end_asset",
+                code="missing_custom_land_cover_asset",
+                message="Select the end land cover asset.",
+                fatal=True,
+            )
+        )
+    if source.start_asset and source.end_asset and source.scheme is None:
+        # land_cover.py:40 vs indicator_model.py:232
+        problems.append(
+            Problem(
+                field="land_cover.scheme",
+                code="half_custom_land_cover",
+                message=(
+                    "Custom land cover assets are set without a transition matrix "
+                    "file, so their pixel codes are remapped through the default "
+                    "IPCC vocabulary."
+                ),
+                fatal=False,
+            )
+        )
+    return tuple(problems)
 
 
 def _aoi_problems(spec: RunSpec) -> tuple[Problem, ...]:
@@ -159,6 +234,8 @@ _CHECKS = (
     _soc_period_problems,
     _state_period_problems,
     _vi_source_problems,
+    _trajectory_problems,
+    _land_cover_problems,
     _aoi_problems,
 )
 
