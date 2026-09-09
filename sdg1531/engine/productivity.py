@@ -32,15 +32,20 @@ import ee
 
 from sdg1531.catalog import ASSETS, z_coefficient
 from sdg1531.engine._typing import as_collection, as_element, as_image
+from sdg1531.engine.apply import apply_truth_table
 from sdg1531.enums import Lceu, Trajectory
 from sdg1531.errors import SpecError
 from sdg1531.tables import ESA_LC_CLASSES, RECLASSIFICATION_MATRIX
 
 if TYPE_CHECKING:  # typing only -- no runtime dependency on resolve/context
+    from sdg1531.engine.context import ExecutionContext
     from sdg1531.resolve import ResolvedSpec
 
 __all__ = [
     "build_lc_ecological_units",
+    "build_performance",
+    "build_productivity",
+    "build_state",
     "build_trajectory",
 ]
 
@@ -351,3 +356,166 @@ def build_trajectory(
     )
 
     return as_image(five_levels_trajectory.addBands(trajectory))
+
+
+def build_performance(r: ResolvedSpec, ctx: ExecutionContext, vi: ee.ImageCollection) -> ee.Image:
+    """Local productivity relative to similar ecological units.
+
+    Transcribed from productivity.py:77-174 (``productivity_performance``).
+    The legacy also took ``climate_yearly_integration`` and never used it; that
+    parameter is dropped. Reads r.spec.lceu, r.performance, r.analysis_scale.
+    """
+    performance_start = _require_int(r.performance.start, "performance.start")
+    performance_end = _require_int(r.performance.end, "performance.end")
+
+    lc_eco_functional_unit = build_lc_ecological_units(r)
+
+    # compute mean ndvi for the period
+    nvdi_yearly_integration_fltr = vi.filter(
+        ee.Filter.gte("year", performance_start).And(ee.Filter.lte("year", performance_end))
+    )
+    ndvi_mean = nvdi_yearly_integration_fltr.select("vi").reduce(ee.Reducer.mean()).rename(["vi"])
+
+    # fill the gaps in lceu with a negative value to prevent masking. NOT
+    # unmask(-1): where() treats 0 as false, so a genuine 0 becomes -1 too.
+    lc_eco_functional_unit_filled = ee.Image(-1).where(
+        lc_eco_functional_unit, lc_eco_functional_unit
+    )
+
+    # create a 2 band raster to compute 90th percentile per ecoregion
+    ndvi_id = ndvi_mean.addBands(lc_eco_functional_unit_filled)
+
+    # compute 90th percentile by unit
+    percentile_90 = ndvi_id.reduceRegion(
+        reducer=ee.Reducer.percentile([90]).group(groupField=1, groupName="code"),
+        geometry=ctx.geometry,
+        scale=r.analysis_scale,
+        bestEffort=True,
+        maxPixels=1e15,
+    )
+
+    # Extract the cluster IDs and the 90th percentile -- server-side throughout
+    groups = ee.List(percentile_90.get("groups"))
+    ids = groups.map(lambda d: ee.Dictionary(d).get("code"))
+    percentile = groups.map(lambda d: ee.Dictionary(d).get("p90"))
+
+    # remap the similar ecoregion raster using their 90th percentile value
+    ecoregion_90th_percentile = lc_eco_functional_unit_filled.remap(ids, percentile)
+    # set a very small number to 0 valued pixels to prevent masking
+    ecoregion_90th_percentile_v2 = ecoregion_90th_percentile.where(
+        ecoregion_90th_percentile.eq(0), 0.001
+    )
+
+    # compute the ratio of observed ndvi to 90th for that class
+    observed_ratio = ndvi_mean.divide(ecoregion_90th_percentile_v2)
+
+    # create final degradation output layer (0 is background), 2 is not
+    # degreaded, 1 is degraded. The two conditions OVERLAP at exactly 0.5 and
+    # the later .where() wins, so a ratio of exactly 0.5 is degraded; the order
+    # of these two lines is behaviour, not style.
+    performance = (
+        ee.Image(0)
+        .where(observed_ratio.gte(0.5), 2)
+        .where(observed_ratio.lte(0.5), 1)
+        .rename("performance")
+        .uint8()
+    )
+
+    return as_image(performance)
+
+
+def build_state(r: ResolvedSpec, vi: ee.ImageCollection) -> ee.Image:
+    """Recent productivity against the pixel's own baseline.
+
+    Transcribed from productivity.py:177-249 (``productivity_state``); its
+    unused ``aoi_model`` and ``output`` parameters are dropped. Reads r.state.
+    Note :198-200's baseline window is [start, end - 3], so a state period
+    shorter than four years yields an all-masked z-score; validate() reports
+    that as a warning rather than rejecting it.
+    """
+    state_start = _require_int(r.state.start, "state.start")
+    state_end = _require_int(r.state.end, "state.end")
+
+    # Filter the annual data of three most recent years
+    recent_yaers_filter = ee.Filter.rangeContains("year", state_end - 2, state_end)
+    previous_year_filter = ee.Filter.rangeContains("year", state_start, state_end - 3)
+
+    # compute mean ndvi for the baseline and target period period
+    recent_vi_xbar = (
+        vi.filter(recent_yaers_filter).select("vi").reduce(ee.Reducer.mean()).rename(["vi"])
+    )
+
+    previous_vi_mu = (
+        vi.filter(previous_year_filter).select("vi").reduce(ee.Reducer.mean()).rename(["vi"])
+    )
+
+    previous_vi_sigma = (
+        vi.filter(previous_year_filter).select("vi").reduce(ee.Reducer.stdDev()).rename(["vi"])
+    )
+    # sqrt(3) is hardcoded rather than derived from the recent-year count; it
+    # is right only because that window happens to be three years wide.
+    z_score = recent_vi_xbar.subtract(previous_vi_mu).divide(
+        previous_vi_sigma.divide(ee.Number(3).sqrt())
+    )
+
+    five_levels_state = (
+        ee.Image(0)
+        .where(z_score.lt(-1.96), 1)
+        .where(z_score.lt(-1.28).And(z_score.gte(-1.96)), 2)
+        .where(z_score.gte(-1.28).And(z_score.lte(1.28)), 3)
+        .where(z_score.gt(1.28).And(z_score.lte(1.96)), 4)
+        .where(z_score.gt(1.96), 5)
+        .rename("state_5_levels")
+        .uint8()
+    )
+
+    state = (
+        ee.Image(0)
+        .where(z_score.lt(-1.96), 1)
+        .where(z_score.gte(-1.96).And(z_score.lte(1.96)), 2)
+        .where(z_score.gt(1.96), 3)
+        .rename("state")
+        .uint8()
+    )
+
+    return as_image(five_levels_state.addBands(state))
+
+
+def build_productivity(
+    r: ResolvedSpec,
+    *,
+    trajectory: ee.Image,
+    state: ee.Image,
+    performance: ee.Image,
+) -> ee.Image:
+    """Collapse trajectory, state and performance into the productivity class.
+
+    Transcribed from productivity.py:252-334 (``productivity_final``, GPGv2)
+    and :337-419 (``productivity_final_GPG1``): the two 18-rule ``.where()``
+    chains are now one ordered TruthTable, chosen in resolve() and emitted by
+    apply_truth_table, so the node order -- and therefore the encoded graph --
+    is unchanged. Reads r.productivity_table.
+
+    apply_truth_table neither selects nor casts. The three single-band inputs
+    are selected here, in rule-input order (trajectory, state, performance),
+    exactly as productivity.py:253-255 does once and reuses, and the uint8 cast
+    of :334 is applied to the result.
+
+    The three images are KEYWORD-ONLY on purpose. That order is the order the
+    rule conditions AND them in (:259), but the legacy signature and its only
+    call site are both (trajectory, PERFORMANCE, STATE) -- productivity.py:252
+    and run_15_3_1.py:185-190 -- so the two middle arguments are inverted with
+    respect to the code this is transcribed from. `ee` is lazy, so a positional
+    swap would build a clean graph and only misclassify at evaluation time.
+    """
+    return as_image(
+        apply_truth_table(
+            (
+                trajectory.select("trajectory"),
+                state.select("state"),
+                performance.select("performance"),
+            ),
+            r.productivity_table,
+            "productivity",  # productivity.py:331
+        ).uint8()  # productivity.py:334
+    )
