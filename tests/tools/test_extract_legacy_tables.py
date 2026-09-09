@@ -5,6 +5,7 @@ strict: any construct it does not recognise is an error, never a silent skip.
 """
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -99,9 +100,27 @@ def test_band_is_the_rename_argument_or_none(extracted):
 
 
 def test_chain_line_numbers_are_recorded(extracted):
+    """Incidental guard: catches an inserted/deleted rule, not a same-length value
+    edit. `test_fixture_is_regenerated_from_source` below is the real guard against
+    the fixture going stale.
+    """
     assert _table(extracted, "productivity_final")["chain_lines"] == [257, 332]
     assert _table(extracted, "productivity_final_GPG1")["chain_lines"] == [342, 417]
     assert _table(extracted, "indicator_15_3_1")["chain_lines"] == [377, 409]
+
+
+def test_fixture_is_regenerated_from_source(extracted):
+    """The committed fixture must equal a fresh extraction, rule for rule.
+
+    Every other test here spot-checks a handful of rules (counts, the first six,
+    the last three, chain_lines); none of that would notice a single mid-chain
+    rule's value being edited in place. This compares all 66 rules of all three
+    tables, so `sdg1531/truth_table.py`'s parity with the committed JSON
+    (asserted in tests/test_truth_table.py) is actually parity with source, not
+    just with a JSON file that quietly went stale.
+    """
+    committed = json.loads((REPO_ROOT / "tests" / "fixtures" / "legacy_tables.json").read_text())
+    assert extracted == committed
 
 
 def test_unknown_predicate_is_an_error_not_a_silent_skip(tool):

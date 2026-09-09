@@ -8,6 +8,14 @@ can be diffed against the original mechanically.
 Encoding: an operand `img.eq(k)` becomes the pair (name, k); `img.lt(1)` — used
 only by run_15_3_1.py:406-408 — becomes (name, 0). Nothing else is accepted.
 
+The output is committed to `tests/fixtures/legacy_tables.json` so this evidence of
+correctness survives `component/` eventually being deleted. Its faithfulness to
+source is not assumed: `tests/tools/test_extract_legacy_tables.py`'s
+`test_fixture_is_regenerated_from_source` re-runs this tool against the live
+legacy files on every test run and fails the moment the committed JSON and the
+source disagree — so re-run this script and re-commit the fixture whenever one
+of the three legacy chains changes.
+
 Run:  python tools/extract_legacy_tables.py --out tests/fixtures/legacy_tables.json
 """
 
@@ -16,6 +24,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import warnings
 from pathlib import Path
 
 TARGETS = (
@@ -86,7 +95,12 @@ def _unwind_and(node: ast.AST) -> list[ast.AST]:
 
 def extract_chain(source: str, function_name: str) -> dict:
     """Extract one `.where()` chain from `source` by function name."""
-    tree = ast.parse(source)
+    with warnings.catch_warnings():
+        # productivity.py:186 has an unescaped LaTeX docstring (`$$\mu = ...$$`),
+        # a pre-existing legacy defect this tool must not touch or paper over
+        # anywhere else; suppressed only for this one parse.
+        warnings.simplefilter("ignore", SyntaxWarning)
+        tree = ast.parse(source)
     func = _find_function(tree, function_name)
     assign = _find_chain(func)
 
@@ -143,6 +157,10 @@ def extract_chain(source: str, function_name: str) -> dict:
         "band": band,
         "rules": rules,
         "function_lines": [func.lineno, func.end_lineno],
+        # Incidental guard, not the real one: catches a rule being inserted or
+        # deleted (the chain's line span shifts), but a same-length edit to a
+        # rule's value or class leaves these lines untouched. The guard that
+        # actually catches a value edit is test_fixture_is_regenerated_from_source.
         "chain_lines": [assign.lineno, assign.end_lineno],
     }
 
