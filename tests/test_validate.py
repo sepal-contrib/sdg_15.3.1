@@ -2,12 +2,17 @@
 
 from dataclasses import replace
 
+from _subprocess import run_python
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+
 from sdg1531.enums import Trajectory
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     AssetAoi,
     Compatibility,
     CustomLandCoverSource,
+    EsaCciSource,
     Period,
     PeriodOverride,
     PrecomputedViAsset,
@@ -245,3 +250,94 @@ def test_subset_check_rejects_an_unknown_pixel_value():
     assert [p.code for p in problems] == ["custom_lc_codes_not_subset"]
     assert problems[0].field == "land_cover.end_asset"
     assert "99" in problems[0].message
+
+
+SENSOR_NAMES = ["MODIS MOD13Q1", "Sentinel 2", "Landsat 8", "Derived VI Landsat"]
+
+years = st.one_of(st.none(), st.integers(min_value=1900, max_value=2100))
+base_periods = st.builds(Period, start=years, end=years)
+overrides = st.builds(PeriodOverride, start=years, end=years)
+sub_periods = st.builds(
+    SubPeriods,
+    overall=base_periods,
+    trend=overrides,
+    state=overrides,
+    performance=overrides,
+    land_cover=overrides,
+    soc=overrides,
+)
+matrices = (
+    st.lists(
+        st.lists(st.integers(min_value=-3, max_value=3), min_size=1, max_size=3).map(tuple),
+        min_size=1,
+        max_size=3,
+    )
+    .map(tuple)
+    .map(TransitionMatrix)
+)
+schemes = st.builds(
+    LandCoverScheme,
+    start_names=st.just(("Forest", "Cropland")),
+    start_codes=st.just((10, 30)),
+    end_names=st.just(("Forest", "Cropland")),
+    end_codes=st.just((10, 30)),
+    matrix=matrices,
+    is_custom=st.booleans(),
+)
+vi_sources = st.one_of(
+    st.none(),
+    st.builds(
+        SensorSelection,
+        names=st.lists(st.sampled_from(SENSOR_NAMES), max_size=3).map(tuple),
+    ),
+    st.builds(
+        PrecomputedViAsset,
+        asset_id=st.text(max_size=8),
+        scale=st.integers(min_value=1, max_value=300),
+    ),
+)
+land_cover_sources = st.one_of(
+    st.just(EsaCciSource()),
+    st.builds(
+        CustomLandCoverSource,
+        # both asset fields are required strings; "" is the half-filled form
+        start_asset=st.sampled_from(("", "users/someone/start")),
+        end_asset=st.sampled_from(("", "users/someone/end")),
+        scheme=st.one_of(st.none(), schemes),
+    ),
+)
+run_specs = st.builds(
+    RunSpec,
+    periods=sub_periods,
+    vi_source=vi_sources,
+    trajectory=st.sampled_from(list(Trajectory)),
+    transition_matrix=matrices,
+    land_cover=land_cover_sources,
+    aoi=st.one_of(
+        st.none(),
+        st.builds(
+            AssetAoi,
+            asset_id=st.just("users/someone/aoi"),
+            name=st.just("someone-aoi"),
+        ),
+    ),
+    compatibility=st.builds(Compatibility, clamp_soc_start_year=st.booleans()),
+)
+
+
+@settings(max_examples=300, suppress_health_check=[HealthCheck.too_slow])
+@given(run_specs)
+def test_validate_never_raises(spec):
+    problems = validate(spec)
+    assert isinstance(problems, tuple)
+    assert all(isinstance(problem, Problem) for problem in problems)
+    assert all(isinstance(problem.field, str) and problem.code for problem in problems)
+    assert "internal_error" not in {problem.code for problem in problems}
+
+
+def test_validate_does_not_import_ee():
+    # The JSON half of the domain must stay importable without earthengine-api
+    # (spec §4). Run in a subprocess: the session ee fixture in conftest.py has
+    # already put `ee` in sys.modules for the in-process tests.
+    proc = run_python("import sys, sdg1531.validate; assert 'ee' not in sys.modules")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
