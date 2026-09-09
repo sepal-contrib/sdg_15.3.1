@@ -7,7 +7,11 @@ soil_organic_carbon.py:12-16.
 
 from __future__ import annotations
 
+import json
 import random
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from hypothesis import given
@@ -415,3 +419,57 @@ def test_custom_scheme_colours_are_sampled_by_code_order():
 def test_productivity_table_branch(lookup, table):
     # run_15_3_1.py:184-197 — GPGv2 takes productivity_final, anything else GPG1.
     assert resolve(default_spec(productivity_lookup=lookup)).productivity_table is table
+
+
+GOLDEN = Path(__file__).parent / "golden" / "derived_snapshot_default.json"
+
+
+def test_derived_snapshot_omits_the_spec_and_is_json_serializable():
+    snapshot = resolve(default_spec()).derived_snapshot()
+    assert "spec" not in snapshot
+    assert json.loads(json.dumps(snapshot, sort_keys=True)) == snapshot
+
+
+def test_derived_snapshot_matches_the_committed_golden():
+    golden = json.loads(GOLDEN.read_text())
+
+    # The golden is generated, so pin the values that matter by hand as well.
+    assert golden["analysis_scale"] == 250
+    assert golden["zonal_scale"] == 300
+    assert golden["integration_period"] == {"start": 2000, "end": 2020}
+    assert golden["trend"] == {"start": 2000, "end": 2020}
+    assert golden["soc_period"] == {"start": 2000, "end": 2020}
+    assert golden["lc_year_start_esa"] == 2000
+    assert golden["lc_year_end_esa"] == 2020
+    assert golden["soc_year_start"] == 2000
+    assert golden["soc_year_end_esa"] == 2020
+    assert golden["vi_processor"] == "modis"
+    assert golden["vi_assets"] == ["MODIS/061/MOD13Q1"]
+    assert golden["lc_class_combinations"] == list(IPCC_TRANSITION_CODES)
+    assert golden["lc_palette"] == list(DEFAULT_LC_COLORS.values())
+
+    assert resolve(default_spec()).derived_snapshot() == golden
+
+
+_NO_EE = """
+import sys
+from importlib.abc import MetaPathFinder
+
+
+class _BanEe(MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "ee" or fullname.startswith("ee."):
+            raise ImportError("the JSON half must not import ee")
+        return None
+
+
+sys.meta_path.insert(0, _BanEe())
+import sdg1531.resolve  # noqa: F401
+
+assert "ee" not in sys.modules
+"""
+
+
+def test_resolve_does_not_import_ee():
+    result = subprocess.run([sys.executable, "-c", _NO_EE], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

@@ -8,7 +8,7 @@ import ee.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass
 from enum import Enum
 from types import MappingProxyType
 from typing import Any
@@ -146,6 +146,18 @@ def _scheme(spec: RunSpec) -> LandCoverScheme:
     return LandCoverScheme.default(matrix=spec.transition_matrix)
 
 
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, Enum):
+        return value.value
+    if is_dataclass(value) and not isinstance(value, type):
+        return {key: _json_safe(item) for key, item in asdict(value).items()}
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class ResolvedSpec:
     spec: RunSpec
@@ -169,6 +181,14 @@ class ResolvedSpec:
     productivity_table: TruthTable
     vi_processor: ViProcessor
     vi_assets: tuple[str, ...]
+
+    def derived_snapshot(self) -> dict[str, Any]:
+        """asdict(self) minus `spec`: the complete, diffable golden-fixture surface."""
+        return {
+            field.name: _json_safe(getattr(self, field.name))
+            for field in fields(self)
+            if field.name != "spec"
+        }
 
 
 def resolve(spec: RunSpec) -> ResolvedSpec:
