@@ -77,7 +77,15 @@ class ViProcessor(str, Enum):  # noqa: UP042
     PRECOMPUTED = "precomputed"
 
 
-def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[str, ...]]:
+# integration.py:41-43 — field 0 of each SENSORS record, so "Derived VI Landsat"
+# contributes a (ndvi, evi) pair while every other sensor contributes a bare str. A
+# non-derived rung that wins while "Derived VI Landsat" rides along in the same
+# selection (e.g. alongside a MODIS sensor) passes that pair through unresolved —
+# legacy-faithful (`process_modis` etc. receive the same nested list), not a bug.
+type ViAsset = str | tuple[str, str]
+
+
+def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[ViAsset, ...]]:
     """integration.py:41-94 — an ordered ladder, not a family lookup (spec §6).
 
     The "GEE Asset" rung (:79-80) is dropped as unreachable; PrecomputedViAsset
@@ -90,9 +98,12 @@ def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[str, ...]]:
         raise SpecError("vi_source is not set")  # RunSpec allows this while unfilled
 
     sensors = source.names
-    # integration.py:41-43 — field 0 of each record, so "Derived VI Landsat"
-    # contributes a (ndvi, evi) pair here while every other sensor contributes a str.
-    ee_asset_list: tuple[Any, ...] = tuple(SENSORS[key].collection_id for key in sensors)
+    try:
+        ee_asset_list: tuple[ViAsset, ...] = tuple(SENSORS[key].collection_id for key in sensors)
+    except KeyError as error:
+        # An unknown name would otherwise escape as a bare KeyError - the one path out
+        # of this module that _require_year's SpecError-naming discipline did not cover.
+        raise SpecError(f"{error} is not a known sensor (see sdg1531.catalog.SENSORS)") from error
 
     if MODIS_SENSORS & set(sensors):  # :45
         return ViProcessor.MODIS, ee_asset_list
@@ -180,7 +191,7 @@ class ResolvedSpec:
     lc_color_by_class: Mapping[str, str]
     productivity_table: TruthTable
     vi_processor: ViProcessor
-    vi_assets: tuple[str, ...]
+    vi_assets: tuple[ViAsset, ...]
 
     def derived_snapshot(self) -> dict[str, Any]:
         """asdict(self) minus `spec`: the complete, diffable golden-fixture surface."""

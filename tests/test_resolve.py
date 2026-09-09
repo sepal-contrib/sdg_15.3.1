@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import json
 import random
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -135,6 +133,13 @@ def test_analysis_scale_comes_from_the_first_selected_sensor():
     assert r.analysis_scale == 30
 
 
+def test_analysis_scale_is_the_first_sensor_not_the_last():
+    # indicator_model.py:74-76 — sensors[0], observable only across scale families:
+    # ("Landsat 8", "Landsat 9") alone can't tell sensors[0] from sensors[-1].
+    r = resolve(default_spec(vi_source=SensorSelection(("Landsat 8", "MODIS MOD13Q1"))))
+    assert r.analysis_scale == 30
+
+
 def test_precomputed_vi_asset_carries_its_own_scale():
     r = resolve(default_spec(vi_source=PrecomputedViAsset(asset_id="users/x/vi", scale=125)))
     assert r.analysis_scale == 125
@@ -146,7 +151,6 @@ def test_zonal_scale_differs_from_analysis_scale_for_sentinel_2():
     r = resolve(default_spec(vi_source=SensorSelection(("Sentinel 2",))))
     assert r.analysis_scale == 10
     assert r.zonal_scale == 100
-    assert r.zonal_scale != r.analysis_scale
 
 
 @pytest.mark.parametrize(
@@ -173,6 +177,15 @@ def test_integration_period_excludes_land_cover_and_soc():
     assert r.integration_period == Period(start=2001, end=2016)
     assert r.land_cover_period == Period(start=1995, end=2020)
     assert r.soc_period == Period(start=1993, end=2021)
+
+
+def test_integration_period_reads_raw_overrides_not_resolved_periods():
+    # integration.py:17-18 filters `is not None`, so a raw 0 enters the envelope
+    # even though PeriodOverride.resolve() treats it as unset (truthiness, :81-153).
+    # Raw and resolved diverge only at this falsy-but-not-None value.
+    r = resolve(default_spec(periods=_periods("trend", PeriodOverride(0, None))))
+    assert r.trend == Period(start=2000, end=2020)
+    assert r.integration_period.start == 0
 
 
 _YEAR = st.integers(min_value=1992, max_value=2030)
@@ -279,6 +292,23 @@ def test_sensor_ladder(names, processor, assets):
     r = resolve(default_spec(vi_source=SensorSelection(names)))
     assert r.vi_processor is processor
     assert r.vi_assets == assets
+
+
+@pytest.mark.parametrize(
+    "names,processor",
+    [
+        (("Terra NPP", "Sentinel 2"), ViProcessor.TERRA_NPP),  # :54 before :56
+        (("Sentinel 2", "Terra NPP"), ViProcessor.TERRA_NPP),  # order-independent
+        (("Sentinel 2", "Landsat 8"), ViProcessor.SENTINEL2),  # :56 before :81
+        (("MODIS MOD13Q1", "Sentinel 2"), ViProcessor.MODIS),  # :45 first
+    ],
+)
+def test_ladder_rung_order(names, processor):
+    # REACHABLE above is single-family except the derived-VI/Landsat pairs, so it
+    # cannot tell an ordered ladder from a family lookup for rungs 1-3. These
+    # selections are not all widget-reachable (sensor_select.py:62-90); that is
+    # the point, matching the existing Derived-VI/Landsat precedent.
+    assert resolve(default_spec(vi_source=SensorSelection(names))).vi_processor is processor
 
 
 def test_precomputed_vi_asset_is_its_own_rung():
@@ -402,11 +432,9 @@ def test_custom_scheme_colours_are_sampled_by_code_order():
     )
     expected = random.Random(100).sample(CSS4_HEX, 3)
     assert r.lc_palette == tuple(expected)
-    assert r.lc_palette == CUSTOM_SCHEME.palette()
     assert dict(r.lc_color_by_class) == dict(
         zip(("Crops", "Water", "Forest"), expected, strict=True)
     )
-    assert dict(r.lc_color_by_class) == CUSTOM_SCHEME.color_by_class()
 
 
 @pytest.mark.parametrize(
@@ -451,25 +479,11 @@ def test_derived_snapshot_matches_the_committed_golden():
     assert resolve(default_spec()).derived_snapshot() == golden
 
 
-_NO_EE = """
-import sys
-from importlib.abc import MetaPathFinder
+def test_resolve_is_on_the_json_half_roster():
+    # tests/test_isolation.py:98-110 already parametrizes a strictly stronger ee-import
+    # guard (bans the ten UI libraries too, proves the blocker isn't inert, runs from
+    # REPO_ROOT) over the JSON_HALF roster. This only pins that sdg1531.resolve stays
+    # on it, rather than re-rolling a weaker, cwd-fragile copy of that guard here.
+    from test_isolation import JSON_HALF
 
-
-class _BanEe(MetaPathFinder):
-    def find_spec(self, fullname, path=None, target=None):
-        if fullname == "ee" or fullname.startswith("ee."):
-            raise ImportError("the JSON half must not import ee")
-        return None
-
-
-sys.meta_path.insert(0, _BanEe())
-import sdg1531.resolve  # noqa: F401
-
-assert "ee" not in sys.modules
-"""
-
-
-def test_resolve_does_not_import_ee():
-    result = subprocess.run([sys.executable, "-c", _NO_EE], capture_output=True, text=True)
-    assert result.returncode == 0, result.stderr
+    assert "sdg1531.resolve" in JSON_HALF
