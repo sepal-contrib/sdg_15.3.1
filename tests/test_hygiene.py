@@ -22,7 +22,13 @@ def test_the_walk_actually_found_the_domain() -> None:
     assert len(paths) == len(set(paths)), paths
 
 
-@pytest.mark.parametrize("rel_path,source", iter_domain_sources(), ids=lambda v: v if isinstance(v, str) and v.endswith(".py") else "")
+_DOMAIN_SOURCES = iter_domain_sources()
+# guards this parametrize specifically: an empty list would make the test below pass
+# vacuously even if test_the_walk_actually_found_the_domain were ever deleted or skipped.
+assert _DOMAIN_SOURCES, "iter_domain_sources() found nothing; guard 4 would run over zero files"
+
+
+@pytest.mark.parametrize("rel_path,source", _DOMAIN_SOURCES, ids=lambda v: v if isinstance(v, str) and v.endswith(".py") else "")
 def test_domain_source_is_clean(rel_path: str, source: str) -> None:
     violations = check_source(rel_path, source)
     assert violations == [], "\n".join(str(v) for v in violations)
