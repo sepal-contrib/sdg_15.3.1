@@ -108,6 +108,19 @@ def test_from_list_coerces_strings_to_int() -> None:
     assert m.rows == ((0, -1), (1, 0))
 
 
+def test_constructor_coerces_rows_like_from_list() -> None:
+    """Without this, ``TransitionMatrix(rows=[[...]])`` would be a frozen
+    instance wrapping mutable lists, and ``is_default()`` would then compare
+    ``list != tuple`` and report False for a semantically-default matrix."""
+    lists = [list(row) for row in DEFAULT_TRANSITION_MATRIX]
+    m = TransitionMatrix(rows=lists)  # type: ignore[arg-type]
+
+    assert m.is_default() is True
+    assert m.rows == DEFAULT_TRANSITION_MATRIX
+    assert isinstance(m.rows, tuple)
+    assert all(isinstance(row, tuple) for row in m.rows)
+
+
 # --------------------------------------------------------------------------
 # LandCoverScheme — the default vocabulary
 # --------------------------------------------------------------------------
@@ -127,6 +140,28 @@ def test_default_scheme_accepts_an_edited_matrix() -> None:
     assert s.matrix is edited
     assert s.matrix.is_default() is False
     assert s.start_names == DEFAULT_LC_CLASS_NAMES
+    # editing the matrix must not flip the "did the user supply a CSV" flag
+    assert s.is_custom is False
+
+
+def test_is_custom_alone_switches_palette_not_the_vocabulary_shape() -> None:
+    """``is_custom`` is the single source of truth for the palette/colour branch —
+    nothing may re-derive it from the shape of start_names/start_codes. Build a
+    scheme whose vocabulary looks exactly like a custom (non-IPCC) CSV but with
+    ``is_custom=False``, and confirm palette()/color_by_class() still take the
+    non-custom branch."""
+    custom_shaped = LandCoverScheme(
+        start_names=("Cane", "Apple", "Bean"),
+        start_codes=(30, 10, 20),
+        end_names=("Cane", "Apple", "Bean"),
+        end_codes=(30, 10, 20),
+        matrix=TransitionMatrix.from_list([[0, 1, -1], [-1, 0, 1], [1, -1, 0]]),
+        is_custom=False,
+    )
+    from sdg1531.tables import DEFAULT_LC_COLORS
+
+    assert custom_shaped.palette() == tuple(DEFAULT_LC_COLORS.values())
+    assert custom_shaped.color_by_class() == dict(DEFAULT_LC_COLORS)
 
 
 def test_default_class_combinations_are_the_ipcc_codes() -> None:
@@ -179,6 +214,15 @@ def test_read_matrix_csv_handles_the_crlf_golden(golden_rows: list[list[str]]) -
 def test_read_matrix_csv_returns_plain_strings() -> None:
     rows = read_matrix_csv("a,b\nc,d\n")
     assert rows == [["a", "b"], ["c", "d"]]
+
+
+def test_read_matrix_csv_handles_quoted_commas_and_embedded_newlines() -> None:
+    """The stated reason for going through ``csv`` rather than ``str.splitlines``
+    (module docstring): a quoted field can hide a comma or a newline that must not
+    split the row."""
+    text = 'a,"b, with a comma","c\nspanning two lines"\nd,e,f\n'
+    rows = read_matrix_csv(text)
+    assert rows == [["a", "b, with a comma", "c\nspanning two lines"], ["d", "e", "f"]]
 
 
 # --------------------------------------------------------------------------

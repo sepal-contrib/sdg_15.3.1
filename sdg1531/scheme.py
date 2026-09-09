@@ -62,6 +62,20 @@ class TransitionMatrix:
 
     rows: tuple[tuple[int, ...], ...]
 
+    def __post_init__(self) -> None:
+        """Coerce ``rows`` to a tuple of tuples of ints.
+
+        Without this, ``TransitionMatrix(rows=[[0, -1], [1, 0]])`` is accepted
+        silently: the instance is frozen but its rows are still mutable lists, and
+        :meth:`is_default` then compares ``list != tuple`` and reports False for a
+        semantically-default matrix. ``from_list`` already does the right thing,
+        but nothing forced every caller (Task 5's deserializer among them) through
+        it — this makes the constructor itself safe.
+        """
+        object.__setattr__(
+            self, "rows", tuple(tuple(int(value) for value in row) for row in self.rows)
+        )
+
     @classmethod
     def default(cls) -> TransitionMatrix:
         """transcribed from parameter/matrix.py:1-17."""
@@ -93,7 +107,7 @@ class TransitionMatrix:
         return cls(rows=tuple(tuple(int(value) for value in row) for row in rows))
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LandCoverScheme:
     """The start/end class vocabulary plus the matrix that scores its transitions.
 
@@ -101,6 +115,11 @@ class LandCoverScheme:
     "did the user supply a CSV" question is answered; the legacy asked it six
     times, in six duplicated ``if self.start_lc and self.end_lc and
     self.custom_matrix_file`` tests that could disagree.
+
+    ``kw_only=True``: five fields of the same two shapes (``tuple[str, ...]`` /
+    ``tuple[int, ...]``) invite a transposed positional call that Python's type
+    checker cannot catch. Keyword-only construction is the only thing that makes
+    that mistake fail loudly instead of silently swapping start and end classes.
     """
 
     start_names: tuple[str, ...]
