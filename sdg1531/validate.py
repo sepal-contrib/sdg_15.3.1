@@ -9,6 +9,7 @@ the scattered ``alert.check_input`` chain at ``input_tile.py:245-330`` and the
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from sdg1531.catalog import (
@@ -16,6 +17,7 @@ from sdg1531.catalog import (
     LAND_COVER_FIRST_YEAR,
     LAND_COVER_MAX_YEAR,
 )
+from sdg1531.scheme import LandCoverScheme
 from sdg1531.spec import (
     CustomLandCoverSource,
     PrecomputedViAsset,
@@ -23,7 +25,7 @@ from sdg1531.spec import (
     SensorSelection,
 )
 
-__all__ = ["Problem", "validate"]
+__all__ = ["Problem", "check_custom_lc_codes", "validate"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,3 +258,55 @@ def validate(spec: RunSpec) -> tuple[Problem, ...]:
                 )
             )
     return tuple(problems)
+
+
+def _codes_problem(
+    observed: set[int], expected: set[int], field: str, exact: bool
+) -> tuple[Problem, ...]:
+    if exact:
+        if observed == expected:
+            return ()
+        return (
+            Problem(
+                field=field,
+                code="custom_lc_codes_mismatch",
+                message=(
+                    "The pixel values of the asset do not match the codes of the "
+                    f"transition matrix: asset {sorted(observed)}, "
+                    f"matrix {sorted(expected)}."
+                ),
+                fatal=True,
+            ),
+        )
+    unknown = sorted(observed - expected)
+    if not unknown:
+        return ()
+    return (
+        Problem(
+            field=field,
+            code="custom_lc_codes_not_subset",
+            message=(
+                "The asset contains pixel values that the transition matrix does "
+                f"not define: {unknown}."
+            ),
+            fatal=True,
+        ),
+    )
+
+
+def check_custom_lc_codes(
+    scheme: LandCoverScheme,
+    start_values: Iterable[int],
+    end_values: Iterable[int],
+    exact: bool,
+) -> tuple[Problem, ...]:
+    """Compare observed custom land cover pixel values with the matrix codes.
+
+    The async pre-flight replacing the blocking ``custom_lc_values`` getInfo at
+    ``run_15_3_1.py:418-421``, driven from ``input_tile.py:267-298``. ``exact``
+    is the legacy ``lc_pixel_check`` switch: True demands set equality, False
+    demands a subset.
+    """
+    return _codes_problem(
+        set(start_values), set(scheme.start_codes), "land_cover.start_asset", exact
+    ) + _codes_problem(set(end_values), set(scheme.end_codes), "land_cover.end_asset", exact)

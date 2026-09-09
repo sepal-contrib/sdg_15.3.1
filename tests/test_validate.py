@@ -15,7 +15,7 @@ from sdg1531.spec import (
     SensorSelection,
     SubPeriods,
 )
-from sdg1531.validate import Problem, validate
+from sdg1531.validate import Problem, check_custom_lc_codes, validate
 
 BASE = RunSpec().evolve(
     periods=SubPeriods(overall=Period(2000, 2015)),
@@ -213,3 +213,35 @@ def test_missing_custom_land_cover_assets_are_reported_per_field():
     both = BASE.evolve(land_cover=CustomLandCoverSource(start_asset="", end_asset=""))
     fields = [p.field for p in validate(both) if p.code == "missing_custom_land_cover_asset"]
     assert fields == ["land_cover.start_asset", "land_cover.end_asset"]
+
+
+def test_exact_check_accepts_an_identical_code_set():
+    assert check_custom_lc_codes(scheme(), (30, 10), (10, 30), exact=True) == ()
+
+
+def test_exact_check_rejects_a_strict_subset():
+    # input_tile.py:267-278 — the lc_pixel_check=True branch demands equality.
+    problems = check_custom_lc_codes(scheme(), (10,), (10, 30), exact=True)
+    assert [p.code for p in problems] == ["custom_lc_codes_mismatch"]
+    assert problems[0].field == "land_cover.start_asset"
+    assert problems[0].fatal is True
+
+
+def test_exact_check_reports_both_assets_independently():
+    problems = check_custom_lc_codes(scheme(), (10,), (99,), exact=True)
+    assert [p.field for p in problems] == [
+        "land_cover.start_asset",
+        "land_cover.end_asset",
+    ]
+
+
+def test_subset_check_accepts_a_strict_subset():
+    # input_tile.py:282-298 — the lc_pixel_check=False branch demands a subset.
+    assert check_custom_lc_codes(scheme(), (10,), (), exact=False) == ()
+
+
+def test_subset_check_rejects_an_unknown_pixel_value():
+    problems = check_custom_lc_codes(scheme(), (10, 30), (10, 99), exact=False)
+    assert [p.code for p in problems] == ["custom_lc_codes_not_subset"]
+    assert problems[0].field == "land_cover.end_asset"
+    assert "99" in problems[0].message
