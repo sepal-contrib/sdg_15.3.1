@@ -22,13 +22,17 @@ parity -- cannot land silently.
 
 A phase-2 fix must repair TWO stacked errors, not one. The collection those
 filters run against starts at the ENVELOPE of all four periods
-(``resolve.py``'s ``_integration_period``, from integration.py:31-40 and
-:10-19), so a discarded lower bound makes the series ``[envelope_start, end]``.
+(``resolve.py``'s ``_integration_period``, from integration.py:11-19,
+duplicated verbatim at :32-40), so a discarded lower bound makes the series
+``[envelope_start, end]``.
 All three trend methods then reduce that series with
 ``ee.Reducer.kendallsCorrelation()`` and scale the tau by ``z_coefficient(n)``
-with ``n = end - start + 1`` computed from the DECLARED start (:193-199,
-:250-256, :284-290). So the series covers the wrong span AND the significance
-normalisation does not match the span it covers -- two independent errors in
+with ``n = end - start + 1`` computed from the DECLARED start (see the ``n =``
+line in each of ``_vi_trend``, ``_restrend`` and ``_rain_use_efficiency_trend``
+-- named rather than cited by line, because a line number into THIS file goes
+stale the next time anything above it moves, which is how the citation this
+sentence replaces was born). So the series covers the wrong span AND the
+significance normalisation does not match the span it covers -- two errors in
 one expression, feeding the +-1.96 / +-1.28 ladders directly. Repairing only
 the filter leaves ``n`` correct by accident, and only when the trend window
 happens to start at the envelope start. Both belong in the same phase-2 change,
