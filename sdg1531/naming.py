@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from types import MappingProxyType
 
 from .catalog import SENSORS
@@ -24,7 +24,10 @@ from .spec import (
 
 __all__ = [
     "LAYER_BASENAMES",
+    "asset_path",
+    "layer_basenames",
     "normalize_str",
+    "run_id",
     "run_label",
 ]
 
@@ -122,3 +125,53 @@ def run_label(spec: RunSpec) -> str:
     climate = spec.climate.token  # :310
 
     return f"{start}_{end}_{sensor}_{vegetation_index}_{lceu}_{lc_matrix}_{climate}"  # :312
+
+
+def run_id(spec: RunSpec) -> str:
+    """``run_label`` scrubbed to the character set a GEE asset id accepts."""
+    return normalize_str(run_label(spec))
+
+
+def layer_basenames(spec: RunSpec) -> dict[str, str]:
+    """The asset basename of each of the seven layers, keyed by layer id.
+
+    Takes the spec so call sites stay stable if a basename ever has to vary
+    per run; spec §8's table is currently constant.
+    """
+    del spec
+
+    return dict(LAYER_BASENAMES)
+
+
+def asset_path(
+    root: str,
+    spec: RunSpec,
+    layer: IndicatorLayer | str,
+    taken: Iterable[str] = (),
+) -> str:
+    """The GEE asset id for one layer of one run, avoiding ids already in use.
+
+    ``root`` is the destination folder, ``taken`` the ids the caller already
+    knows about; a collision appends ``_1``, ``_2``, ... to the *id*, never to
+    the layer basename (spec D14).
+
+    Re-running with identical parameters produces an identical run label, so
+    without this every re-run collides. This **reduces** collisions rather than
+    removing them: ``taken`` only covers what the caller listed, two AOIs share
+    a label under one root, and the user can still edit the id in the export
+    dialog. The stock pysepal engine raises ``FileExistsError``
+    (``export_engine.py:327-332``) instead of suffixing, so a collision that
+    slips through still fails loudly at submit time.
+    """
+    basename = layer_basenames(spec)[IndicatorLayer(layer).value]
+    prefix = root.rstrip("/")
+    stem = f"{run_id(spec)}_{basename}"
+    used = {str(identifier) for identifier in taken}
+
+    candidate = f"{prefix}/{stem}"
+    suffix = 1
+    while candidate in used:
+        candidate = f"{prefix}/{stem}_{suffix}"
+        suffix += 1
+
+    return candidate

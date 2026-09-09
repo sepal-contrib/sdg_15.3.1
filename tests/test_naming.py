@@ -1,5 +1,6 @@
 """sdg1531.naming — run labels and GEE asset ids. Pure; no ee, no filesystem."""
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -11,7 +12,13 @@ from hypothesis import strategies as st
 import sdg1531
 from sdg1531 import naming
 from sdg1531.catalog import SENSORS
-from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
+from sdg1531.enums import (
+    IndicatorLayer,
+    Lceu,
+    ProductivityLookup,
+    Trajectory,
+    VegetationIndex,
+)
 from sdg1531.scheme import TransitionMatrix
 from sdg1531.spec import (
     AssetAoi,
@@ -277,3 +284,90 @@ def test_run_label_never_raises(spec):
     label = naming.run_label(spec)
     assert isinstance(label, str)
     assert label != ""
+    assert naming.run_id(spec) == naming.normalize_str(label)
+
+
+def test_run_id_is_the_normalized_label():
+    spec = _spec(lceu=Lceu.CALCULATE, climate=FixedClimate(0.69))
+    identifier = naming.run_id(spec)
+
+    assert identifier == naming.normalize_str(naming.run_label(spec))
+    assert re.fullmatch(r"[A-Za-z\d_-]+", identifier)
+
+
+def test_run_id_survives_an_empty_sensor_token():
+    spec = _spec(vi_source=SensorSelection(names=("Derived VI Landsat",)))
+    assert naming.run_id(spec) == "2000_2015__ndvi_gaes_default_crpix"
+
+
+def test_layer_basenames_covers_every_indicator_layer():
+    names = naming.layer_basenames(_spec())
+
+    assert set(names) == {layer.value for layer in IndicatorLayer}
+    assert names["land_cover"] == "land_cover"
+    assert names["soc"] == "soc"
+    assert names["productivity"] == "productivity_indicator"
+    assert names["productivity_trend"] == "productivity_trend"
+    assert names["productivity_state"] == "productivity_state"
+    assert names["productivity_performance"] == "productivity_performance"
+    assert names["indicator_15_3_1"] == "indicator_15_3_1"
+
+
+def test_layer_basenames_returns_a_fresh_mapping():
+    names = naming.layer_basenames(_spec())
+    names["soc"] = "tampered"
+
+    assert naming.layer_basenames(_spec())["soc"] == "soc"
+
+
+ROOT = "projects/test/assets/sdg"
+STEM = f"{ROOT}/2000_2015_l8_ndvi_gaes_default_crpix"
+
+
+def test_asset_path_composes_root_run_and_basename():
+    assert naming.asset_path(ROOT, _spec(), IndicatorLayer.SOC) == f"{STEM}_soc"
+    assert (
+        naming.asset_path(ROOT, _spec(), IndicatorLayer.PRODUCTIVITY)
+        == f"{STEM}_productivity_indicator"
+    )
+
+
+def test_asset_path_accepts_a_bare_layer_id():
+    assert naming.asset_path(ROOT, _spec(), "soc") == naming.asset_path(
+        ROOT, _spec(), IndicatorLayer.SOC
+    )
+
+
+def test_asset_path_trims_a_trailing_slash_from_root():
+    assert naming.asset_path(f"{ROOT}/", _spec(), IndicatorLayer.SOC) == f"{STEM}_soc"
+
+
+def test_asset_path_suffixes_on_collision():
+    spec = _spec()
+    first = naming.asset_path(ROOT, spec, IndicatorLayer.INDICATOR_15_3_1)
+    second = naming.asset_path(ROOT, spec, IndicatorLayer.INDICATOR_15_3_1, taken=(first,))
+    third = naming.asset_path(ROOT, spec, IndicatorLayer.INDICATOR_15_3_1, taken=(first, second))
+
+    assert first == f"{STEM}_indicator_15_3_1"
+    assert second == f"{first}_1"
+    assert third == f"{first}_2"
+
+
+def test_asset_path_suffix_does_not_rename_the_layer():
+    # "indicator_15_3_1" ends in a digit, so a next_string-style increment
+    # (pysepal scripts/utils.py:184-202) would silently rename the layer.
+    spec = _spec()
+    first = naming.asset_path(ROOT, spec, IndicatorLayer.INDICATOR_15_3_1)
+    bumped = naming.asset_path(ROOT, spec, IndicatorLayer.INDICATOR_15_3_1, taken=[first])
+
+    assert bumped.endswith("indicator_15_3_1_1")
+
+
+def test_asset_path_ignores_unrelated_taken_ids():
+    spec = _spec()
+    unrelated = (f"{STEM}_soc", "projects/other/assets/thing")
+
+    assert (
+        naming.asset_path(ROOT, spec, IndicatorLayer.LAND_COVER, taken=unrelated)
+        == f"{STEM}_land_cover"
+    )
