@@ -19,6 +19,7 @@ import json
 import ee
 import pytest
 from conftest import REPO_ROOT
+from helpers_stats import StubMaps, make_ctx, make_zones
 from spec_factory import default_spec
 
 from sdg1531.engine.context import ExecutionContext
@@ -62,66 +63,6 @@ _RECEIVER_ARG = {
     "Image.addBands": "dstImg",
     "Image.divide": "image1",
 }
-
-
-class _StubLandCover:
-    def __init__(self) -> None:
-        # a DIFFERENT constant per band, so the serializer cannot merge two of them
-        # and an assertion that the request read `transition` cannot be satisfied by
-        # a graph that read `start` (tests/engine/test_indicator.py:85-90)
-        self.stack = ee.Image.constant([1, 2, 3, 4, 5]).rename(
-            ["degradation", "transition", "start", "end", "water"]
-        )
-
-
-class _StubLayer:
-    def __init__(self, image: ee.Image, band: str) -> None:
-        self.image = image
-        self.band = band
-
-
-class _StubMaps:
-    """The three members the requests read: ``land_cover.stack`` and ``layers()``.
-
-    The trend and state images carry BOTH bands, exactly as the real ones do -- the
-    5-level band the statistics select and the 3-class band the export selects. A
-    stub that carried only one of them could not tell the two vocabularies apart.
-    """
-
-    def __init__(self) -> None:
-        self.land_cover = _StubLandCover()
-        self.resolved = None
-        self._layers = {
-            IndicatorLayer.LAND_COVER: _StubLayer(self.land_cover.stack, "degradation"),
-            IndicatorLayer.SOC: _StubLayer(ee.Image.constant(1).rename("soc"), "soc"),
-            IndicatorLayer.PRODUCTIVITY: _StubLayer(
-                ee.Image.constant(2).rename("productivity"), "productivity"
-            ),
-            IndicatorLayer.PRODUCTIVITY_TREND: _StubLayer(
-                ee.Image.constant([1, 2]).rename(["trajectory_5_levels", "trajectory"]),
-                "trajectory",
-            ),
-            IndicatorLayer.PRODUCTIVITY_STATE: _StubLayer(
-                ee.Image.constant([1, 2]).rename(["state_5_levels", "state"]), "state"
-            ),
-            IndicatorLayer.PRODUCTIVITY_PERFORMANCE: _StubLayer(
-                ee.Image.constant(1).rename("performance"), "performance"
-            ),
-            IndicatorLayer.INDICATOR_15_3_1: _StubLayer(
-                ee.Image.constant(3).rename("indicator_15_3_1"), "indicator_15_3_1"
-            ),
-        }
-
-    def layers(self):
-        return dict(self._layers)
-
-
-def make_ctx(scale: int = 300) -> ExecutionContext:
-    """A live-collection context. ``tests/engine/conftest.py``'s ``ctx`` fixture is
-    not reachable from a top-level test module, and the scale has to vary anyway --
-    a fixed one cannot tell ``ctx.analysis_scale`` from a hardcoded 300."""
-    fc = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([0, 0]).buffer(100))])
-    return ExecutionContext.from_feature_collection(fc, scale)
 
 
 @pytest.fixture()
@@ -207,7 +148,7 @@ def _operand_selections(obj):
 
 
 def test_build_transition_areas_groups_on_the_transition_band(ctx):
-    request = build_transition_areas(_StubMaps(), ctx)
+    request = build_transition_areas(StubMaps(), ctx)
 
     assert isinstance(request, ee.Dictionary)
     deref, graph, args = _sole_call(request, "Image.reduceRegion")
@@ -240,7 +181,7 @@ def test_build_transition_areas_groups_on_the_transition_band(ctx):
 def test_build_transition_areas_reduces_at_the_context_scale():
     """:229 passes model.scale; the port passes ctx.analysis_scale, not a constant."""
     deref, _, args = _sole_call(
-        build_transition_areas(_StubMaps(), make_ctx(250)), "Image.reduceRegion"
+        build_transition_areas(StubMaps(), make_ctx(250)), "Image.reduceRegion"
     )
     assert _constant(deref, args["scale"]) == 250
 
@@ -249,7 +190,7 @@ def test_build_transition_areas_reduces_at_the_context_scale():
 
 
 def test_build_areas_by_land_cover_groups_twice_and_selects_the_stats_band(ctx):
-    request = build_areas_by_land_cover(_StubMaps(), ctx, layer=IndicatorLayer.INDICATOR_15_3_1)
+    request = build_areas_by_land_cover(StubMaps(), ctx, layer=IndicatorLayer.INDICATOR_15_3_1)
 
     assert isinstance(request, ee.Dictionary)
     deref, _graph, args = _sole_call(request, "Image.reduceRegion")
@@ -285,7 +226,7 @@ def test_build_areas_by_land_cover_always_counts_against_the_start_classes():
     and its label mapping at :266 is keyed on the start vocabulary regardless."""
     for layer in IndicatorLayer:
         _, landcover = _operand_selections(
-            build_areas_by_land_cover(_StubMaps(), make_ctx(), layer=layer)
+            build_areas_by_land_cover(StubMaps(), make_ctx(), layer=layer)
         )
         assert landcover == {"start"}, layer
 
@@ -299,12 +240,12 @@ def test_build_areas_by_land_cover_always_counts_against_the_start_classes():
 )
 def test_productivity_state_and_trend_statistics_use_the_five_level_band(layer, stats_band):
     """run_15_3_1.py:437-442 counts state and trend on their 5-level bands."""
-    request = build_areas_by_land_cover(_StubMaps(), make_ctx(), layer=layer)
+    request = build_areas_by_land_cover(StubMaps(), make_ctx(), layer=layer)
 
     indicator, landcover = _operand_selections(request)
     assert indicator == {stats_band}
     # the 3-class export band is present ON THE IMAGE and must not be what is counted
-    export_band = _StubMaps().layers()[layer].band
+    export_band = StubMaps().layers()[layer].band
     assert export_band in {"state", "trajectory"}
     assert export_band not in indicator
     assert export_band not in landcover
@@ -339,7 +280,7 @@ def test_every_indicator_layer_has_a_statistics_band_mapping():
     assert set(_STATS_BAND) == set(IndicatorLayer)
 
     for layer in IndicatorLayer:
-        request = build_areas_by_land_cover(_StubMaps(), make_ctx(), layer=layer)
+        request = build_areas_by_land_cover(StubMaps(), make_ctx(), layer=layer)
         assert isinstance(request, ee.Dictionary)
         band = _STATS_BAND[layer]
         indicator, _ = _operand_selections(request)
@@ -465,9 +406,9 @@ def _export_layers():
 
 
 def test_build_zonal_areas_returns_a_mapped_collection():
-    zones = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([0, 0]).buffer(10))])
+    zones = make_zones()
 
-    request = build_zonal_areas(_StubMaps(), zones, scale=100)
+    request = build_zonal_areas(StubMaps(), zones, scale=100)
 
     assert isinstance(request, ee.FeatureCollection)
     assert count_calls(request, "Collection.map") == 1
@@ -495,18 +436,18 @@ def test_build_zonal_areas_returns_a_mapped_collection():
 
 
 def test_build_zonal_areas_uses_the_scale_it_is_given():
-    zones = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([0, 0]).buffer(10))])
+    zones = make_zones()
     deref, _, args = _sole_call(
-        build_zonal_areas(_StubMaps(), zones, scale=300), "Image.reduceRegion"
+        build_zonal_areas(StubMaps(), zones, scale=300), "Image.reduceRegion"
     )
     assert _constant(deref, args["scale"]) == 300
 
 
 def test_build_zonal_areas_counts_the_indicator_layer():
     """:330 passes model.indicator_15_3_1, not one of the sub-indicators."""
-    zones = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([0, 0]).buffer(10))])
+    zones = make_zones()
     deref, graph, args = _sole_call(
-        build_zonal_areas(_StubMaps(), zones, scale=300), "Image.reduceRegion"
+        build_zonal_areas(StubMaps(), zones, scale=300), "Image.reduceRegion"
     )
     added = _added_bands(deref, graph, deref(args["image"]))
     assert added == [set()]  # selected by index, so no band NAME appears
@@ -557,11 +498,11 @@ def test_max_pixels_reaches_every_reducer_as_the_legacy_float():
     sites wrap the value in ``ee.Number`` only because ``ee`` types ``maxPixels`` as
     an integer; this is what pins that the wrapper changed nothing.
     """
-    zones = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([0, 0]).buffer(10))])
+    zones = make_zones()
     requests = [
-        build_transition_areas(_StubMaps(), make_ctx()),
-        build_areas_by_land_cover(_StubMaps(), make_ctx(), layer=IndicatorLayer.SOC),
-        build_zonal_areas(_StubMaps(), zones, scale=300),
+        build_transition_areas(StubMaps(), make_ctx()),
+        build_areas_by_land_cover(StubMaps(), make_ctx(), layer=IndicatorLayer.SOC),
+        build_zonal_areas(StubMaps(), zones, scale=300),
     ]
 
     for request in requests:

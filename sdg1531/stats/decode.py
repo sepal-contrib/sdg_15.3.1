@@ -11,8 +11,8 @@ two tables are written out in full, at the two sites that use them, and are
 deliberately NOT derived from :class:`~sdg1531.engine.indicator.ClassifiedLayer`.
 See ``requests.py``'s docstring for why they must be allowed to disagree.
 
-EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
-harness must carry it:
+EXPECTED_DIVERGENCES note -- two divergences from the legacy. Task 17's parity
+harness must carry both:
 
 1. **Behaviour-changing.** ``zonal_statistics_to_geodataframe``
    (run_15_3_1.py:475-569) prints four progress and failure lines (:485, :543,
@@ -26,6 +26,12 @@ harness must carry it:
    a total loop that adds the column when it is missing (see
    :func:`decode_zonal_areas`), which changes a KeyError-free omission into a
    zero-filled column and nothing else.
+2. **Behaviour-changing.** :func:`decode_distinct_pixel_values` returns the values
+   SORTED; ``custom_lc_values`` (run_15_3_1.py:421-422) returned them in the
+   frequency histogram's own key order. The entry is the ORDER and nothing else --
+   the same integers, the same count. Every legacy consumer wrapped the result in
+   ``set()`` (input_tile.py:271, :273, :286, :291), so no shipped behaviour depended
+   on the order; sorting makes the value deterministic for a caller that does not.
 """
 
 from __future__ import annotations

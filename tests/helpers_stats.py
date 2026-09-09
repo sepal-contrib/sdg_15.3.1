@@ -52,6 +52,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+import ee
+
+from sdg1531.engine.context import ExecutionContext
+from sdg1531.enums import IndicatorLayer
 from sdg1531.scheme import LandCoverScheme
 
 FIXTURES = Path(__file__).parent / "fixtures" / "stats"
@@ -78,3 +82,100 @@ class FakeResolved:
         self.lc_color_by_class = dict(self.scheme.color_by_class())
         self.analysis_scale = 300
         self.zonal_scale = 300
+
+
+class FakeFetcher:
+    """An InfoFetcher that replays canned payloads.
+
+    Proves the Protocol is satisfiable without importing pysepal. ``responses`` is
+    consumed in call order; an entry that is an Exception instance is RETURNED, not
+    raised - that is what pysepal's gee_interface.py:210 does, because it gathers
+    with ``return_exceptions=True``. (Its single-call path re-raises instead, at
+    :203-205; ``test_stats_api.py`` covers that shape too, with a fetcher that
+    raises.)
+    """
+
+    def __init__(self, responses: list[Any]) -> None:
+        self.responses = list(responses)
+        self.calls: list[Any] = []
+
+    async def get_info_async(self, ee_object: Any = None, tag: Any = None) -> Any:
+        self.calls.append(ee_object)
+        if not self.responses:
+            raise AssertionError("FakeFetcher ran out of canned responses")
+        return self.responses.pop(0)
+
+    async def get_info_batch_async(self, ee_objects: list[Any]) -> list[Any]:
+        return [await self.get_info_async(obj) for obj in ee_objects]
+
+
+class StubLandCover:
+    def __init__(self) -> None:
+        # a DIFFERENT constant per band, so the serializer cannot merge two of them
+        # and an assertion that a request read `transition` cannot be satisfied by a
+        # graph that read `start` (tests/engine/test_indicator.py:85-90)
+        self.stack = ee.Image.constant([1, 2, 3, 4, 5]).rename(
+            ["degradation", "transition", "start", "end", "water"]
+        )
+
+
+class StubLayer:
+    def __init__(self, image: ee.Image, band: str) -> None:
+        self.image = image
+        self.band = band
+
+
+class StubMaps:
+    """The three members the stats layer reads: ``resolved``, ``land_cover.stack``
+    and ``layers()``.
+
+    The trend and state images carry BOTH bands, exactly as the real ones do -- the
+    5-level band the statistics select and the 3-class band the export selects. A
+    stub that carried only one of them could not tell the two vocabularies apart.
+
+    ``resolved`` defaults to ``None`` because the request builders must not read it;
+    the api tests, whose decoders do, pass a :class:`FakeResolved`.
+    """
+
+    def __init__(self, resolved: Any = None) -> None:
+        self.land_cover = StubLandCover()
+        self.resolved = resolved
+        self._layers = {
+            IndicatorLayer.LAND_COVER: StubLayer(self.land_cover.stack, "degradation"),
+            IndicatorLayer.SOC: StubLayer(ee.Image.constant(1).rename("soc"), "soc"),
+            IndicatorLayer.PRODUCTIVITY: StubLayer(
+                ee.Image.constant(2).rename("productivity"), "productivity"
+            ),
+            IndicatorLayer.PRODUCTIVITY_TREND: StubLayer(
+                ee.Image.constant([1, 2]).rename(["trajectory_5_levels", "trajectory"]),
+                "trajectory",
+            ),
+            IndicatorLayer.PRODUCTIVITY_STATE: StubLayer(
+                ee.Image.constant([1, 2]).rename(["state_5_levels", "state"]), "state"
+            ),
+            IndicatorLayer.PRODUCTIVITY_PERFORMANCE: StubLayer(
+                ee.Image.constant(1).rename("performance"), "performance"
+            ),
+            IndicatorLayer.INDICATOR_15_3_1: StubLayer(
+                ee.Image.constant(3).rename("indicator_15_3_1"), "indicator_15_3_1"
+            ),
+        }
+
+    def layers(self) -> dict[IndicatorLayer, StubLayer]:
+        return dict(self._layers)
+
+
+def make_ctx(scale: int = 300) -> ExecutionContext:
+    """A live-collection context.
+
+    ``tests/engine/conftest.py``'s ``ctx`` fixture is not reachable from a top-level
+    test module, and the scale has to vary anyway -- a fixed one cannot tell
+    ``ctx.analysis_scale`` from a hardcoded 300.
+    """
+    fc = ee.FeatureCollection([ee.Feature(ee.Geometry.Point([0, 0]).buffer(100))])
+    return ExecutionContext.from_feature_collection(fc, scale)
+
+
+def make_zones() -> ee.FeatureCollection:
+    """A one-feature zone collection for the zonal request."""
+    return ee.FeatureCollection([ee.Feature(ee.Geometry.Point([0, 0]).buffer(10))])
