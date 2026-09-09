@@ -12,7 +12,7 @@ ResolvedSpec fields read here:
 
 EXPECTED_DIVERGENCES note: the rungs that consume ``spec.threshold`` (MODIS,
 Sentinel 2, the Landsat sensors, Derived VI Landsat) narrow it with
-``_require_float`` and raise ``SpecError`` if it is unset. That check has NO
+``require_float`` and raise ``SpecError`` if it is unset. That check has NO
 legacy counterpart -- ``vi_threshold`` (integration.py:410-415) calls
 ``img.gt(threshold)`` unconditionally and would pass a Python ``None``
 straight into the ``ee`` graph. Task 17's parity harness should expect this
@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 import ee
 
 from sdg1531.catalog import ASSETS, SENSORS
-from sdg1531.engine._typing import as_collection, as_element
+from sdg1531.engine._typing import as_collection, as_element, require_float, require_int
 from sdg1531.enums import VegetationIndex
 from sdg1531.errors import SpecError
 from sdg1531.spec import PrecomputedViAsset, SensorSelection
@@ -57,27 +57,6 @@ _LANDSAT_OLD = ("Landsat 4", "Landsat 5", "Landsat 7")
 _LANDSAT_NEW = ("Landsat 8", "Landsat 9")
 
 
-def _require_int(value: int | None, what: str) -> int:
-    """Narrow a resolved Period bound before it reaches an f-string or ee call.
-
-    `Period.start`/`.end` stay `int | None` for the half-filled form (spec.py);
-    `resolve()` guarantees `integration_period` has both set, but nothing in
-    the type system says so, and an unguarded `None` would silently format as
-    the string "None" rather than fail. Mirrors resolve.py's own
-    `_require_year`.
-    """
-    if value is None:
-        raise SpecError(f"{what} must be resolved before the ee graph can be built")
-    return value
-
-
-def _require_float(value: float | None, what: str) -> float:
-    """Narrow `spec.threshold`; see `_require_int`."""
-    if value is None:
-        raise SpecError(f"{what} must be resolved before the ee graph can be built")
-    return value
-
-
 def build_climate_collection(r: ResolvedSpec, ctx: ExecutionContext) -> ee.ImageCollection:
     """Annual mean precipitation, one image per year of the integration period.
 
@@ -85,8 +64,8 @@ def build_climate_collection(r: ResolvedSpec, ctx: ExecutionContext) -> ee.Image
     envelope itself is resolved upstream; integration.py:11-19 recomputed it
     inline.
     """
-    period_start = _require_int(r.integration_period.start, "integration_period.start")
-    period_end = _require_int(r.integration_period.end, "integration_period.end")
+    period_start = require_int(r.integration_period.start, "integration_period.start")
+    period_end = require_int(r.integration_period.end, "integration_period.end")
 
     # transcribed from integration.py:20-25
     precipitation = (
@@ -387,8 +366,8 @@ def build_vi_collection(r: ResolvedSpec, ctx: ExecutionContext) -> ee.ImageColle
     if not isinstance(source, SensorSelection):
         raise SpecError(f"Unsupported VI source: {source!r}")
 
-    period_start = _require_int(r.integration_period.start, "integration_period.start")
-    period_end = _require_int(r.integration_period.end, "integration_period.end")
+    period_start = require_int(r.integration_period.start, "integration_period.start")
+    period_end = require_int(r.integration_period.end, "integration_period.end")
     sensor_names = tuple(source.names)
     index = r.spec.vegetation_index
     # Not narrowed here: Terra NPP never reads a threshold (integration.py:
@@ -465,7 +444,7 @@ def _process_modis(
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:98-131."""
-    threshold = _require_float(threshold, "spec.threshold")
+    threshold = require_float(threshold, "spec.threshold")
     modis_coll_ = ee.ImageCollection(ee_asset_list[0]).filterDate(
         f"{period_start}-01-01", f"{period_end}-12-31"
     )
@@ -520,7 +499,7 @@ def _process_landsat_sensors(
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:146-175."""
-    threshold = _require_float(threshold, "spec.threshold")
+    threshold = require_float(threshold, "spec.threshold")
     i_img_coll = ee.ImageCollection([])
 
     for sensor, asset_id in zip(sensor_list, ee_asset_list, strict=True):
@@ -551,7 +530,7 @@ def _process_sentinel2(
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:179-203."""
-    threshold = _require_float(threshold, "spec.threshold")
+    threshold = require_float(threshold, "spec.threshold")
     i_img_coll = (
         ee.ImageCollection(ee_asset_id)
         .filterBounds(aoi)
@@ -575,7 +554,7 @@ def _process_landsat_derived_vi(
     period_end: int,
 ) -> ee.ImageCollection:
     """Transcribed from integration.py:206-214."""
-    threshold = _require_float(threshold, "spec.threshold")
+    threshold = require_float(threshold, "spec.threshold")
     img_coll = (
         ee.ImageCollection(asset_id)
         .filterBounds(aoi)

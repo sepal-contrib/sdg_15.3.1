@@ -8,17 +8,38 @@ un-segmented per-pixel linear model over the whole trend period
 ``bestEffort=True`` (productivity.py:141-145), which silently coarsens the
 scale on large AOIs.
 
+The sharpest preserved weakness is the year filter that ``_vi_trend``,
+``_restrend``, ``_rain_use_efficiency_trend`` and ``build_performance`` all
+share: ``ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))``.
+``ee.Filter.And`` is a STATICMETHOD (ee/filter.py), so the receiver is silently
+discarded and the expression encodes as ``Filter.and([lte(end)])`` -- **the
+start bound never reaches the graph**, and each of these four periods is open
+at its lower end. The legacy spells it exactly this way (productivity.py:
+430-432, :465-470, :532-537, :119-123), so reproducing it is what D9 requires;
+``test_year_filters_drop_their_lower_bound`` pins it so that a later "fix" to
+``ee.Filter.And(gte, lte)`` -- which WOULD change the graph and break parity --
+cannot land silently. Any real fix belongs in a phase-2 change with its own
+golden-graph update, not here.
+
 ResolvedSpec fields read here:
     spec.trajectory, spec.lceu, trend, state, performance,
     lc_year_start_esa, analysis_scale, productivity_table
 
-EXPECTED_DIVERGENCES note: every Period bound this module consumes is narrowed
-with ``_require_int`` first, which raises ``SpecError`` if it is unset. That
-check has NO legacy counterpart -- productivity.py:196-199 does
-``model.p_state_end - 2`` and :120-122 hands ``model.p_performance_start``
-straight to ``ee.Filter.gte``, so an unset bound would raise a TypeError there
-and build a broken graph here. It follows the precedent
-``engine/integration.py`` set for ``integration_period``.
+EXPECTED_DIVERGENCES note -- four raises in this module have NO legacy
+counterpart, and Task 17's parity harness must carry all four:
+
+1. Every Period bound consumed here (``trend``, ``state``, ``performance``) is
+   narrowed with ``require_int`` (engine/_typing.py), which raises
+   ``SpecError`` if it is unset. The legacy does ``model.p_state_end - 2``
+   (productivity.py:196-199) and hands ``model.p_performance_start`` straight
+   to ``ee.Filter.gte`` (:120-122), so an unset bound raises TypeError there
+   and would build a broken graph here.
+2. An unknown ``Lceu`` raises ``SpecError`` in ``build_lc_ecological_units``;
+   productivity.py:92-116 falls through and raises ``UnboundLocalError``.
+3. An unknown ``Trajectory`` raises ``SpecError`` in ``build_trajectory``;
+   productivity.py:30-51 falls through and leaves ``z_score`` unbound.
+4. ``_s_res_trend_unavailable`` raises ``SpecError`` where productivity.py:
+   41-43 raises a bare ``NameError``.
 """
 
 from __future__ import annotations
@@ -31,7 +52,7 @@ from typing import TYPE_CHECKING
 import ee
 
 from sdg1531.catalog import ASSETS, z_coefficient
-from sdg1531.engine._typing import as_collection, as_element, as_image
+from sdg1531.engine._typing import as_collection, as_element, as_image, require_int
 from sdg1531.engine.apply import apply_truth_table
 from sdg1531.enums import Lceu, Trajectory
 from sdg1531.errors import SpecError
@@ -48,20 +69,6 @@ __all__ = [
     "build_state",
     "build_trajectory",
 ]
-
-
-def _require_int(value: int | None, what: str) -> int:
-    """Narrow a resolved Period bound before it is used as a number.
-
-    `Period.start`/`.end` stay `int | None` for the half-filled form (spec.py);
-    `resolve()` guarantees the three productivity periods have both set, but
-    nothing in the type system says so. Mirrors `engine/integration.py`'s
-    helper of the same name -- duplicated rather than shared, so neither engine
-    module depends on the other's privates.
-    """
-    if value is None:
-        raise SpecError(f"{what} must be resolved before the ee graph can be built")
-    return value
 
 
 def _lceu_static(asset_key: str) -> Callable[[ResolvedSpec], ee.Image]:
@@ -329,8 +336,8 @@ def build_trajectory(
     except KeyError:
         raise SpecError(f"Unsupported trajectory method: {r.spec.trajectory}") from None
 
-    trend_start = _require_int(r.trend.start, "trend.start")
-    trend_end = _require_int(r.trend.end, "trend.end")
+    trend_start = require_int(r.trend.start, "trend.start")
+    trend_end = require_int(r.trend.end, "trend.end")
 
     z_score = builder(trend_start, trend_end, vi, climate)
 
@@ -365,8 +372,8 @@ def build_performance(r: ResolvedSpec, ctx: ExecutionContext, vi: ee.ImageCollec
     The legacy also took ``climate_yearly_integration`` and never used it; that
     parameter is dropped. Reads r.spec.lceu, r.performance, r.analysis_scale.
     """
-    performance_start = _require_int(r.performance.start, "performance.start")
-    performance_end = _require_int(r.performance.end, "performance.end")
+    performance_start = require_int(r.performance.start, "performance.start")
+    performance_end = require_int(r.performance.end, "performance.end")
 
     lc_eco_functional_unit = build_lc_ecological_units(r)
 
@@ -385,7 +392,11 @@ def build_performance(r: ResolvedSpec, ctx: ExecutionContext, vi: ee.ImageCollec
     # create a 2 band raster to compute 90th percentile per ecoregion
     ndvi_id = ndvi_mean.addBands(lc_eco_functional_unit_filled)
 
-    # compute 90th percentile by unit
+    # compute 90th percentile by unit. `ctx` supplies the geometry only: the
+    # scale is read off the ResolvedSpec because the legacy reads model.scale
+    # (productivity.py:144), and D9 keeps it there. ExecutionContext carries its
+    # own analysis_scale that nothing in sdg1531/ reads -- deliberately not used
+    # here, so Tasks 12-17 do not each re-decide which copy is authoritative.
     percentile_90 = ndvi_id.reduceRegion(
         reducer=ee.Reducer.percentile([90]).group(groupField=1, groupName="code"),
         geometry=ctx.geometry,
@@ -433,8 +444,8 @@ def build_state(r: ResolvedSpec, vi: ee.ImageCollection) -> ee.Image:
     shorter than four years yields an all-masked z-score; validate() reports
     that as a warning rather than rejecting it.
     """
-    state_start = _require_int(r.state.start, "state.start")
-    state_end = _require_int(r.state.end, "state.end")
+    state_start = require_int(r.state.start, "state.start")
+    state_end = require_int(r.state.end, "state.end")
 
     # Filter the annual data of three most recent years
     recent_yaers_filter = ee.Filter.rangeContains("year", state_end - 2, state_end)
