@@ -103,7 +103,7 @@ def _module_exists(dotted: str) -> bool:
     ],
 )
 def test_json_half_imports_without_ee(name: str) -> None:
-    proc = run_python(_SCRIPT.format(banned=BANNED_UI + ("ee",), targets=(name,)))
+    proc = run_python(_SCRIPT.format(banned=(*BANNED_UI, "ee"), targets=(name,)))
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 

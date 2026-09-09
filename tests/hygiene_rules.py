@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from pathlib import Path
 
 from conftest import REPO_ROOT
 
@@ -115,7 +114,7 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
         isinstance(n, (ast.Assign, ast.AnnAssign))
         and any(
             isinstance(t, ast.Name) and t.id == "__all__"
-            for t in ((n.targets if isinstance(n, ast.Assign) else [n.target]))
+            for t in (n.targets if isinstance(n, ast.Assign) else [n.target])
         )
         for n in tree.body
     )
@@ -168,9 +167,8 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
                 if isinstance(first, ast.Name) and first.id in RESOLVED_NAMES:
                     add(node, "resolved-replace", "a ResolvedSpec is obtained only from resolve()")
 
-        if isinstance(node, ast.Name) and node.id == "apply_truth_table":
-            if not rel_path.startswith(ENGINE_PREFIX):
-                add(node, "truth-table-leak", "apply_truth_table is engine-private")
+        if isinstance(node, ast.Name) and node.id == "apply_truth_table" and not rel_path.startswith(ENGINE_PREFIX):
+            add(node, "truth-table-leak", "apply_truth_table is engine-private")
 
     return out
 
