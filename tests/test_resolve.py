@@ -7,22 +7,35 @@ soil_organic_carbon.py:12-16.
 
 from __future__ import annotations
 
+import random
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from spec_factory import default_spec
 
-from sdg1531.enums import VegetationIndex
+from sdg1531.enums import ProductivityLookup, VegetationIndex
 from sdg1531.errors import SpecError
+from sdg1531.palette import CSS4_HEX
 from sdg1531.resolve import ViProcessor, resolve
+from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     Compatibility,
+    CustomLandCoverSource,
+    EsaCciSource,
     Period,
     PeriodOverride,
     PrecomputedViAsset,
     SensorSelection,
     SubPeriods,
 )
+from sdg1531.tables import (
+    DEFAULT_LC_CLASS_NAMES,
+    DEFAULT_LC_CODES,
+    DEFAULT_LC_COLORS,
+    IPCC_TRANSITION_CODES,
+)
+from sdg1531.truth_table import PRODUCTIVITY_GPGV1, PRODUCTIVITY_GPGV2
 
 SUB_PERIODS = ("trend", "state", "performance", "land_cover", "soc")
 RESOLVED_FIELD = {
@@ -308,3 +321,97 @@ def test_derived_vi_evi_is_unaffected_by_the_msvi_flag():
 def test_an_empty_sensor_selection_raises():
     with pytest.raises(SpecError):
         resolve(default_spec(vi_source=SensorSelection(())))
+
+
+CUSTOM_SCHEME = LandCoverScheme(
+    start_names=("Forest", "Crops", "Water"),
+    start_codes=(3, 1, 2),
+    end_names=("Forest", "Crops", "Water"),
+    end_codes=(3, 1, 2),
+    matrix=TransitionMatrix(rows=((0, 1, -1), (1, 0, -1), (-1, -1, 0))),
+    is_custom=True,
+)
+
+
+def test_default_land_cover_uses_the_default_vocabulary():
+    r = resolve(default_spec(land_cover=EsaCciSource()))
+    assert r.scheme.start_names == DEFAULT_LC_CLASS_NAMES
+    assert r.scheme.end_names == DEFAULT_LC_CLASS_NAMES
+    assert r.scheme.start_codes == DEFAULT_LC_CODES
+    assert r.scheme.is_custom is False
+    assert r.lc_class_combinations == IPCC_TRANSITION_CODES
+    assert r.trans_matrix_flatten == TransitionMatrix.default().flatten()
+    assert dict(r.lc_color_by_class) == dict(DEFAULT_LC_COLORS)
+    assert r.lc_palette == tuple(DEFAULT_LC_COLORS.values())
+
+
+def test_half_custom_uses_the_default_vocabulary():
+    # land_cover.py:40 takes the custom-asset branch on the two assets alone, while
+    # indicator_model.py:183-242 needs the CSV too. Precedence stated once here.
+    r = resolve(
+        default_spec(
+            land_cover=CustomLandCoverSource(
+                start_asset="users/x/lc_start", end_asset="users/x/lc_end", scheme=None
+            )
+        )
+    )
+    assert r.scheme.start_names == DEFAULT_LC_CLASS_NAMES
+    assert r.scheme.is_custom is False
+    assert r.lc_class_combinations == IPCC_TRANSITION_CODES
+    assert r.trans_matrix_flatten == TransitionMatrix.default().flatten()
+    assert dict(r.lc_color_by_class) == dict(DEFAULT_LC_COLORS)
+
+
+def test_the_edited_default_matrix_reaches_trans_matrix_flatten():
+    # indicator_model.py:231-242, else branch — the flatten of model.transition_matrix.
+    edited = TransitionMatrix(rows=((0, 1), (-1, 0)))
+    r = resolve(default_spec(transition_matrix=edited))
+    assert r.trans_matrix_flatten == (0, 1, -1, 0)
+
+
+def test_custom_scheme_drives_the_whole_vocabulary():
+    r = resolve(
+        default_spec(
+            land_cover=CustomLandCoverSource(
+                start_asset="users/x/lc_start",
+                end_asset="users/x/lc_end",
+                scheme=CUSTOM_SCHEME,
+            ),
+            transition_matrix=TransitionMatrix(rows=((0, 0), (0, 0))),
+        )
+    )
+    assert r.scheme is CUSTOM_SCHEME
+    # indicator_model.py:221-227 — int(str(start) + str(end)), start-major. Built by
+    # LandCoverScheme.class_combinations (Task 3); resolve() only reads it through.
+    assert r.lc_class_combinations == (33, 31, 32, 13, 11, 12, 23, 21, 22)
+    assert r.lc_class_combinations == CUSTOM_SCHEME.class_combinations
+    # :231-238 — the CSV matrix wins over model.transition_matrix.
+    assert r.trans_matrix_flatten == (0, 1, -1, 1, 0, -1, -1, -1, 0)
+
+
+def test_custom_scheme_colours_are_sampled_by_code_order():
+    # indicator_model.py:244-266 — seed(100), sample(cnames), classes sorted by code.
+    # LandCoverScheme.palette()/.color_by_class() (Task 3) own that sampling; this
+    # pins that resolve() surfaces them unchanged.
+    r = resolve(
+        default_spec(land_cover=CustomLandCoverSource("users/x/a", "users/x/b", CUSTOM_SCHEME))
+    )
+    expected = random.Random(100).sample(CSS4_HEX, 3)
+    assert r.lc_palette == tuple(expected)
+    assert r.lc_palette == CUSTOM_SCHEME.palette()
+    assert dict(r.lc_color_by_class) == dict(
+        zip(("Crops", "Water", "Forest"), expected, strict=True)
+    )
+    assert dict(r.lc_color_by_class) == CUSTOM_SCHEME.color_by_class()
+
+
+@pytest.mark.parametrize(
+    "lookup,table",
+    [
+        (ProductivityLookup.GPGV2, PRODUCTIVITY_GPGV2),
+        (ProductivityLookup.GPGV1, PRODUCTIVITY_GPGV1),
+    ],
+)
+def test_productivity_table_branch(lookup, table):
+    # run_15_3_1.py:184-197 — GPGv2 takes productivity_final, anything else GPG1.
+    assert resolve(default_spec(productivity_lookup=lookup)).productivity_table is table

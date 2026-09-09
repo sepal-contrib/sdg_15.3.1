@@ -7,14 +7,18 @@ import ee.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
 from sdg1531.catalog import LAND_COVER_FIRST_YEAR, LAND_COVER_MAX_YEAR, SENSORS
-from sdg1531.enums import VegetationIndex
+from sdg1531.enums import ProductivityLookup, VegetationIndex
 from sdg1531.errors import SpecError
-from sdg1531.spec import Period, PrecomputedViAsset, RunSpec, SensorSelection
+from sdg1531.scheme import LandCoverScheme
+from sdg1531.spec import CustomLandCoverSource, Period, PrecomputedViAsset, RunSpec, SensorSelection
+from sdg1531.truth_table import PRODUCTIVITY_GPGV1, PRODUCTIVITY_GPGV2, TruthTable
 
 __all__ = ["ResolvedSpec", "ViProcessor", "resolve"]
 
@@ -119,6 +123,29 @@ def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[str, ...]]:
     raise SpecError("No valid sensor type found in the model.")  # :93-94
 
 
+def _scheme(spec: RunSpec) -> LandCoverScheme:
+    """indicator_model.py:183-242 — the custom branch needs both assets AND the CSV.
+
+    Six properties repeat that test today; it is stated once here (spec §7,
+    half-custom land cover). A `CustomLandCoverSource` whose CSV has not been
+    parsed is half-custom: it falls back to the default vocabulary, carrying the
+    run's (possibly edited) transition matrix.
+
+    This picks *which* `LandCoverScheme` the run uses; it never decides whether
+    that scheme is custom. `is_custom` is a stored field written once at
+    construction — `False` by `LandCoverScheme.default()`, `True` by
+    `parse_custom_matrix_csv` (Task 3) — and carried through `RunSpec.to_dict()`
+    / `from_dict()` (Task 4). An attached scheme is passed through untouched, so
+    `scheme.is_custom` stays the one answer to "did the user supply a CSV" and
+    `palette()` / `color_by_class()` cannot disagree with this function.
+    """
+    source = spec.land_cover
+    attached = source.scheme if isinstance(source, CustomLandCoverSource) else None
+    if attached is not None:
+        return attached
+    return LandCoverScheme.default(matrix=spec.transition_matrix)
+
+
 @dataclass(frozen=True, slots=True)
 class ResolvedSpec:
     spec: RunSpec
@@ -134,6 +161,12 @@ class ResolvedSpec:
     lc_year_end_esa: int
     soc_year_start: int
     soc_year_end_esa: int
+    scheme: LandCoverScheme
+    lc_class_combinations: tuple[int, ...]
+    trans_matrix_flatten: tuple[int, ...]
+    lc_palette: tuple[str, ...]
+    lc_color_by_class: Mapping[str, str]
+    productivity_table: TruthTable
     vi_processor: ViProcessor
     vi_assets: tuple[str, ...]
 
@@ -162,6 +195,8 @@ def resolve(spec: RunSpec) -> ResolvedSpec:
     soc_start = _require_year(soc_period.start, "soc.start")
     soc_year_start = _clamp_cci(soc_start) if spec.compatibility.clamp_soc_start_year else soc_start
 
+    scheme = _scheme(spec)
+
     return ResolvedSpec(
         spec=spec,
         analysis_scale=analysis_scale,
@@ -177,6 +212,20 @@ def resolve(spec: RunSpec) -> ResolvedSpec:
         soc_year_start=soc_year_start,
         # soil_organic_carbon.py:12-14
         soc_year_end_esa=_clamp_cci(_require_year(soc_period.end, "soc.end")),
+        scheme=scheme,
+        # indicator_model.py:221-227, via LandCoverScheme.class_combinations.
+        lc_class_combinations=scheme.class_combinations,
+        # :231-242 — the custom CSV matrix, else the (possibly edited) run matrix.
+        trans_matrix_flatten=scheme.matrix.flatten(),
+        # :244-266 — the seeded sampling and the code-ordered zip live in Task 3.
+        lc_palette=scheme.palette(),
+        lc_color_by_class=MappingProxyType(scheme.color_by_class()),
+        # run_15_3_1.py:184-197
+        productivity_table=(
+            PRODUCTIVITY_GPGV2
+            if spec.productivity_lookup is ProductivityLookup.GPGV2
+            else PRODUCTIVITY_GPGV1
+        ),
         vi_processor=vi_processor,
         vi_assets=vi_assets,
     )
