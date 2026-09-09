@@ -220,6 +220,68 @@ def test_missing_custom_land_cover_assets_are_reported_per_field():
     assert fields == ["land_cover.start_asset", "land_cover.end_asset"]
 
 
+# Two of the three legal values, and one foreign value, both built off the real
+# 7x7 default matrix (49 cells) rather than a toy 2x2 — the top-level
+# `transition_matrix` field has no vocabulary of its own, it is only ever meant
+# to pair with the built-in 7-class IPCC scheme, so a differently-shaped matrix
+# would trip the *shape* rule below and make these value-range tests ambiguous.
+TWO_VALUED_DEFAULT = TransitionMatrix(
+    tuple(tuple(0 if v == 1 else v for v in row) for row in TransitionMatrix.default().rows)
+)
+FOREIGN_VALUE_DEFAULT = TransitionMatrix.default().with_cell(0, 1, 2)
+
+
+def test_two_valued_matrix_is_accepted():
+    # input_tile.py:310 used set equality and rejected this matrix; validate()
+    # uses a subset test instead.
+    assert "invalid_transition_matrix" not in codes(
+        BASE.evolve(transition_matrix=TWO_VALUED_DEFAULT)
+    )
+
+
+def test_matrix_with_a_foreign_value_is_fatal():
+    problem = only(
+        BASE.evolve(transition_matrix=FOREIGN_VALUE_DEFAULT), "invalid_transition_matrix"
+    )
+    assert problem.field == "transition_matrix"
+    assert problem.fatal is True
+
+
+def test_custom_scheme_matrix_is_checked_under_its_own_field():
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=scheme(TransitionMatrix(((0, 2), (-1, 0)))),
+        )
+    )
+    problem = only(spec, "invalid_transition_matrix")
+    assert problem.field == "land_cover.scheme.matrix"
+
+
+def test_ragged_transition_matrix_is_fatal():
+    # TransitionMatrix performs no shape validation on its own (Task 3); a
+    # matrix whose flattened length doesn't match its scheme's code count feeds
+    # land_cover.py's remap the wrong number of values — a GEE arity error at
+    # runtime rather than one caught at construction.
+    ragged = TransitionMatrix(((0, -1, 1), (-1, 0)))
+    problem = only(BASE.evolve(transition_matrix=ragged), "invalid_transition_matrix")
+    assert problem.field == "transition_matrix"
+    assert problem.fatal is True
+
+
+def test_undersized_custom_scheme_matrix_is_fatal():
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=scheme(TransitionMatrix(((0, -1),))),  # 1x2, the scheme needs 2x2
+        )
+    )
+    problem = only(spec, "invalid_transition_matrix")
+    assert problem.field == "land_cover.scheme.matrix"
+
+
 def test_exact_check_accepts_an_identical_code_set():
     assert check_custom_lc_codes(scheme(), (30, 10), (10, 30), exact=True) == ()
 

@@ -17,15 +17,20 @@ from sdg1531.catalog import (
     LAND_COVER_FIRST_YEAR,
     LAND_COVER_MAX_YEAR,
 )
-from sdg1531.scheme import LandCoverScheme
+from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     CustomLandCoverSource,
     PrecomputedViAsset,
     RunSpec,
     SensorSelection,
 )
+from sdg1531.tables import DEFAULT_LC_CODES
 
 __all__ = ["Problem", "check_custom_lc_codes", "validate"]
+
+# The top-level `transition_matrix` field has no vocabulary of its own — it only
+# ever pairs with the built-in 7-class IPCC scheme (Task 3's default()).
+_DEFAULT_TRANSITION_MATRIX_SIZE = len(DEFAULT_LC_CODES) ** 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +222,58 @@ def _land_cover_problems(spec: RunSpec) -> tuple[Problem, ...]:
     return tuple(problems)
 
 
+def _matrix_problems(
+    matrix: TransitionMatrix, field: str, expected_size: int
+) -> tuple[Problem, ...]:
+    problems: list[Problem] = []
+    flat = matrix.flatten()
+
+    # input_tile.py:310 tested `{1, 0, -1} != set(flatten)`, which rejects a
+    # legitimate matrix using only two of the three values. Relaxed to a subset.
+    foreign = sorted(set(flat) - {-1, 0, 1})
+    if foreign:
+        problems.append(
+            Problem(
+                field=field,
+                code="invalid_transition_matrix",
+                message=f"The transition matrix may only contain -1, 0 and 1; found {foreign}.",
+                fatal=True,
+            )
+        )
+
+    if len(flat) != expected_size:
+        # TransitionMatrix performs no shape validation of its own (Task 3); a
+        # ragged or wrongly-sized matrix reaches land_cover.py's remap and fails
+        # there with a GEE arity error instead of at construction.
+        problems.append(
+            Problem(
+                field=field,
+                code="invalid_transition_matrix",
+                message=(
+                    f"The transition matrix has {len(flat)} cells; the land cover "
+                    f"vocabulary it must score needs exactly {expected_size}."
+                ),
+                fatal=True,
+            )
+        )
+
+    return tuple(problems)
+
+
+def _transition_matrix_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    problems = list(
+        _matrix_problems(
+            spec.transition_matrix, "transition_matrix", _DEFAULT_TRANSITION_MATRIX_SIZE
+        )
+    )
+    source = spec.land_cover
+    if isinstance(source, CustomLandCoverSource) and source.scheme is not None:
+        scheme = source.scheme
+        expected = len(scheme.start_codes) * len(scheme.end_codes)
+        problems.extend(_matrix_problems(scheme.matrix, "land_cover.scheme.matrix", expected))
+    return tuple(problems)
+
+
 def _aoi_problems(spec: RunSpec) -> tuple[Problem, ...]:
     # input_tile.py:248 — `check_input(self.aoi_model.name, cm.error.no_aoi)`
     if spec.aoi is None:
@@ -238,6 +295,7 @@ _CHECKS = (
     _vi_source_problems,
     _trajectory_problems,
     _land_cover_problems,
+    _transition_matrix_problems,
     _aoi_problems,
 )
 
