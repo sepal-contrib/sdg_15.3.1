@@ -45,6 +45,7 @@ from sdg1531.tables import (
 from tests.engine.graph import (
     _call,
     _loaded_asset_ids,
+    _renamed_bands,
     _root,
     _scalar_list_arg,
     _spine,
@@ -166,9 +167,8 @@ def test_build_transition_areas_groups_on_the_transition_band(ctx):
     assert _added_bands(deref, graph, image) == [{"transition"}]
     assert count_calls(request, "Image.selfMask") == 1
     divide = _call(_spine(image, deref, _RECEIVER_ARG)[1])
-    assert _constant(deref, _call(deref(divide["arguments"]["image2"]))["arguments"]["value"]) == (
-        10000
-    )
+    denominator = _call(deref(divide["arguments"]["image2"]))
+    assert _constant(deref, denominator["arguments"]["value"]) == 10000  # m2 -> hectares
 
     # :228-232
     assert _call(deref(args["geometry"]))["functionName"] == "Geometry.bounds"
@@ -244,9 +244,14 @@ def test_productivity_state_and_trend_statistics_use_the_five_level_band(layer, 
 
     indicator, landcover = _operand_selections(request)
     assert indicator == {stats_band}
-    # the 3-class export band is present ON THE IMAGE and must not be what is counted
-    export_band = StubMaps().layers()[layer].band
-    assert export_band in {"state", "trajectory"}
+
+    # Task 14's 3-class export band is on the very same image -- it appears in the
+    # graph, under the .rename() that put it there -- and is deliberately not what
+    # gets counted. Both halves matter: without the first, "not selected" would also
+    # be satisfied by an image that never carried the band at all.
+    export_band = _export_layers()[layer].band
+    assert export_band != stats_band
+    assert export_band in _renamed_bands(request)
     assert export_band not in indicator
     assert export_band not in landcover
 
