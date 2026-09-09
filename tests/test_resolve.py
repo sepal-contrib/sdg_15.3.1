@@ -8,6 +8,8 @@ soil_organic_carbon.py:12-16.
 from __future__ import annotations
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 from spec_factory import default_spec
 
 from sdg1531.resolve import resolve
@@ -152,3 +154,63 @@ def test_integration_period_excludes_land_cover_and_soc():
     assert r.integration_period == Period(start=2001, end=2016)
     assert r.land_cover_period == Period(start=1995, end=2020)
     assert r.soc_period == Period(start=1993, end=2021)
+
+
+_YEAR = st.integers(min_value=1992, max_value=2030)
+_OVERRIDE = st.tuples(st.none() | _YEAR, st.none() | _YEAR)
+
+
+@given(
+    overall_start=_YEAR,
+    overall_end=_YEAR,
+    trend=_OVERRIDE,
+    state=_OVERRIDE,
+    performance=_OVERRIDE,
+    land_cover=_OVERRIDE,
+    soc=_OVERRIDE,
+)
+def test_integration_period_is_the_minimal_envelope_of_four(
+    overall_start, overall_end, trend, state, performance, land_cover, soc
+):
+    periods = SubPeriods(
+        overall=Period(start=overall_start, end=overall_end),
+        trend=PeriodOverride(*trend),
+        state=PeriodOverride(*state),
+        performance=PeriodOverride(*performance),
+        land_cover=PeriodOverride(*land_cover),
+        soc=PeriodOverride(*soc),
+    )
+    r = resolve(default_spec(periods=periods))
+    covered = (Period(overall_start, overall_end), r.trend, r.state, r.performance)
+
+    # contains all four
+    assert all(r.integration_period.start <= q.start for q in covered)
+    assert all(q.end <= r.integration_period.end for q in covered)
+    # and is minimal
+    assert r.integration_period.start == min(q.start for q in covered)
+    assert r.integration_period.end == max(q.end for q in covered)
+
+
+@given(land_cover=_OVERRIDE, soc=_OVERRIDE)
+def test_land_cover_and_soc_never_move_the_integration_envelope(land_cover, soc):
+    base = SubPeriods(
+        overall=Period(start=2005, end=2015),
+        trend=PeriodOverride(2004, 2016),
+        state=PeriodOverride(None, None),
+        performance=PeriodOverride(None, None),
+        land_cover=PeriodOverride(None, None),
+        soc=PeriodOverride(None, None),
+    )
+    widened = SubPeriods(
+        overall=base.overall,
+        trend=base.trend,
+        state=base.state,
+        performance=base.performance,
+        land_cover=PeriodOverride(*land_cover),
+        soc=PeriodOverride(*soc),
+    )
+    assert (
+        resolve(default_spec(periods=widened)).integration_period
+        == resolve(default_spec(periods=base)).integration_period
+        == Period(start=2004, end=2016)
+    )
