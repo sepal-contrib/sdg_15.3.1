@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
-import ee
 import pytest
 
 from sdg1531.engine.integration import (
@@ -17,6 +14,15 @@ from sdg1531.errors import SpecError
 from sdg1531.resolve import ViProcessor, resolve
 from sdg1531.spec import PrecomputedViAsset, SensorSelection
 from tests.engine.conftest import make_resolved
+from tests.engine.graph import (
+    _call,
+    _deref_for,
+    _loaded_asset_ids,
+    _renamed_bands,
+    _walk,
+    count_calls,
+    encoded,
+)
 from tests.spec_factory import default_spec
 
 MODIS_MOD = "MODIS/061/MOD13Q1"
@@ -29,134 +35,6 @@ DERIVED_NDVI = "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NDVI"
 DERIVED_EVI = "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_EVI"
 
 
-def encoded(obj) -> str:
-    """The serialized graph as one string, for substring assertions."""
-    return json.dumps(ee.serializer.encode(obj), sort_keys=True)
-
-
-def count_calls(obj, function_name: str) -> int:
-    """Count DISTINCT nodes invoking `function_name`.
-
-    The ee serializer collapses structurally identical subtrees into a single
-    scope entry, so this counts distinct nodes, not textual occurrences.
-    """
-    graph = ee.serializer.encode(obj)
-    total = 0
-    stack = [graph]
-    while stack:
-        node = stack.pop()
-        if isinstance(node, dict):
-            call = node.get("functionInvocationValue")
-            if isinstance(call, dict) and call.get("functionName") == function_name:
-                total += 1
-            stack.extend(node.values())
-        elif isinstance(node, list):
-            stack.extend(node)
-    return total
-
-
-# --- reference-resolving graph walk -----------------------------------------
-#
-# `ee.serializer.encode()` hoists a repeated CONSTANT (not just a repeated
-# computed subexpression) into the `values` registry and points every use of
-# it at that one entry via `{"valueReference": K}` -- e.g. the string "year"
-# is used as a Filter.calendarRange field name, a `.set()` property key AND a
-# `.rename()` target in the same graph, so it is stored once and referenced
-# three times, rather than inlined three times. A separate, unrelated
-# indirection applies inside a `.map()`/`.reduce()` callback: the function
-# body is a bare string key into `values` under `functionDefinitionValue`,
-# not a `{"valueReference": ...}` wrapper. Anything that inspects a specific
-# argument's value (not just its presence as a raw substring) has to resolve
-# both, or it silently stops working the moment ee decides to share a value
-# it previously inlined -- which is exactly what broke a `{"constantValue":
-# [...]}`-shaped version of `_renamed_bands` below during fix round 1.
-
-
-def _resolver(graph):
-    """Return `resolve(node)`, `push_children(node, stack)` bound to `graph`."""
-    values = graph.get("values", {})
-
-    def resolve(node):
-        if isinstance(node, dict) and set(node) == {"valueReference"}:
-            return values[node["valueReference"]]
-        return node
-
-    def push_children(node, stack):
-        node = resolve(node)
-        if isinstance(node, dict):
-            fdv = node.get("functionDefinitionValue")
-            if isinstance(fdv, dict) and fdv.get("body") in values:
-                stack.append(values[fdv["body"]])
-            stack.extend(node.values())
-        elif isinstance(node, list):
-            stack.extend(node)
-
-    return resolve, push_children
-
-
-def _walk_calls(obj):
-    """Yield `(resolve, call)` for every resolved `functionInvocationValue`
-    dict in `obj`'s graph -- `resolve` is bound to that same graph, so a
-    caller can resolve any argument found on `call` without re-encoding."""
-    graph = ee.serializer.encode(obj)
-    resolve, push_children = _resolver(graph)
-    stack = [{"valueReference": graph["result"]}]
-    seen: set[int] = set()
-    while stack:
-        current = resolve(stack.pop())
-        marker = id(current)
-        if marker in seen:
-            continue
-        seen.add(marker)
-        if isinstance(current, dict):
-            call = current.get("functionInvocationValue")
-            if isinstance(call, dict):
-                yield resolve, call
-        push_children(current, stack)
-
-
-def _loaded_asset_ids(obj) -> set[str]:
-    """Every asset id ee actually loaded: the `id` argument of every
-    `ImageCollection.load` / `Image.load` node in the serialized graph."""
-    ids: set[str] = set()
-    for deref, call in _walk_calls(obj):
-        if call.get("functionName") in ("ImageCollection.load", "Image.load"):
-            id_arg = deref(call.get("arguments", {}).get("id", {}))
-            constant = id_arg.get("constantValue") if isinstance(id_arg, dict) else None
-            if isinstance(constant, str):
-                ids.add(constant)
-    return ids
-
-
-def _renamed_bands(obj) -> set[str]:
-    """Every band name ever passed to `.rename(...)` anywhere in the graph.
-
-    `names` is `{"constantValue": [...]}` when inlined or `{"arrayValue":
-    {"values": [...]}}` when the array (or an element of it) is itself
-    shared and referenced -- both are handled, and each element is resolved
-    individually since a shared array can mix inlined and referenced items.
-    """
-    names: set[str] = set()
-    for deref, call in _walk_calls(obj):
-        if call.get("functionName") != "Image.rename":
-            continue
-        names_arg = deref(call.get("arguments", {}).get("names", {}))
-        if not isinstance(names_arg, dict):
-            continue
-        if isinstance(names_arg.get("constantValue"), list):
-            items = names_arg["constantValue"]
-        else:
-            array_value = names_arg.get("arrayValue", {})
-            items = [deref(item) for item in array_value.get("values", [])]
-        for item in items:
-            value = deref(item)
-            if isinstance(value, dict):
-                value = value.get("constantValue")
-            if isinstance(value, str):
-                names.add(value)
-    return names
-
-
 def _merged_asset_order(obj) -> list[str]:
     """The order `_process_landsat_sensors` merged sensors in, first to last.
 
@@ -164,60 +42,38 @@ def _merged_asset_order(obj) -> list[str]:
     the receiver, `collection2` the newly merged-in side (verified against a
     hand-built `ee.ImageCollection([]).merge(a).merge(b)`).
     """
-    graph = ee.serializer.encode(obj)
-    resolve, push_children = _resolver(graph)
+    deref, graph = _deref_for(obj)
 
     def call_name(node):
-        node = resolve(node)
-        if isinstance(node, dict):
-            call = node.get("functionInvocationValue")
-            if isinstance(call, dict):
-                return call.get("functionName")
-        return None
+        call = _call(deref(node))
+        return call.get("functionName") if call is not None else None
 
     def first_loaded_id(node):
-        stack = [node]
-        seen: set[int] = set()
-        while stack:
-            current = resolve(stack.pop())
-            marker = id(current)
-            if marker in seen:
-                continue
-            seen.add(marker)
-            if isinstance(current, dict):
-                call = current.get("functionInvocationValue")
-                if isinstance(call, dict) and call.get("functionName") in (
-                    "ImageCollection.load",
-                    "Image.load",
-                ):
-                    id_arg = resolve(call.get("arguments", {}).get("id", {}))
-                    constant = id_arg.get("constantValue") if isinstance(id_arg, dict) else None
-                    if isinstance(constant, str):
-                        return constant
-            push_children(current, stack)
+        for current in _walk(node, deref, graph):
+            call = _call(current)
+            if call is not None and call.get("functionName") in (
+                "ImageCollection.load",
+                "Image.load",
+            ):
+                id_arg = deref(call.get("arguments", {}).get("id", {}))
+                constant = id_arg.get("constantValue") if isinstance(id_arg, dict) else None
+                if isinstance(constant, str):
+                    return constant
         return None
 
     def find_merge_chain(node):
         order = []
-        current = resolve(node)
+        current = deref(node)
         while call_name(current) == "ImageCollection.merge":
             args = current["functionInvocationValue"]["arguments"]
             order.append(first_loaded_id(args["collection2"]))
-            current = resolve(args["collection1"])
+            current = deref(args["collection1"])
         return order  # outermost (last merged) first
 
     def find_first_merge(node):
-        seen: set[int] = set()
-        stack = [node]
-        while stack:
-            current = resolve(stack.pop())
-            marker = id(current)
-            if marker in seen:
-                continue
-            seen.add(marker)
-            if isinstance(current, dict) and call_name(current) == "ImageCollection.merge":
+        for current in _walk(node, deref, graph):
+            if call_name(current) == "ImageCollection.merge":
                 return current
-            push_children(current, stack)
         return None
 
     merge_root = find_first_merge({"valueReference": graph["result"]})

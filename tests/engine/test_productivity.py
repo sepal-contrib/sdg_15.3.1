@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import ee
 import pytest
 
@@ -22,6 +20,20 @@ from sdg1531.errors import SpecError
 from sdg1531.spec import Period
 from sdg1531.truth_table import PRODUCTIVITY_GPGV1, PRODUCTIVITY_GPGV2
 from tests.engine.conftest import make_resolved
+from tests.engine.graph import (
+    _call,
+    _constants_in,
+    _image_constant,
+    _image_constants,
+    _loaded_assets_in,
+    _renamed_bands,
+    _root,
+    _select_bands_of,
+    _selected_bands,
+    _walk,
+    count_calls,
+    encoded,
+)
 
 GAES = "users/amitghosh/sdg_module/fao/GAES_L4"
 
@@ -48,163 +60,9 @@ def resolved_spec(**overrides):
     return make_resolved(**{**periods, **overrides})
 
 
-def encoded(obj) -> str:
-    """The serialized graph as one string, for substring assertions."""
-    return json.dumps(ee.serializer.encode(obj), sort_keys=True)
-
-
-def count_calls(obj, function_name: str) -> int:
-    """Count DISTINCT nodes invoking `function_name`.
-
-    The ee serializer collapses structurally identical subtrees into a single
-    scope entry, so this counts distinct nodes, not textual occurrences.
-    """
-    graph = ee.serializer.encode(obj)
-    total = 0
-    stack = [graph]
-    while stack:
-        node = stack.pop()
-        if isinstance(node, dict):
-            call = node.get("functionInvocationValue")
-            if isinstance(call, dict) and call.get("functionName") == function_name:
-                total += 1
-            stack.extend(node.values())
-        elif isinstance(node, list):
-            stack.extend(node)
-    return total
-
-
-# --- reference-resolving graph walks ----------------------------------------
-#
-# Deliberately duplicated in spirit from test_integration.py rather than hoisted
-# into conftest.py: that file is Task 10's and is shared by Tasks 11-17, and the
-# two files need different slices of the walk. What both need is the same
-# awareness -- `ee.serializer.encode()` hoists a repeated value into the
-# `values` registry and points every use of it at that entry via
-# `{"valueReference": K}`, so anything that reads an ARGUMENT's value (rather
-# than merely noting a substring) has to resolve the indirection first.
-
-
-def _deref_for(obj):
-    """Return `(deref, graph)` for `obj`'s encoded graph."""
-    graph = ee.serializer.encode(obj)
-    values = graph.get("values", {})
-
-    def deref(node):
-        while isinstance(node, dict) and set(node) == {"valueReference"}:
-            node = values[node["valueReference"]]
-        return node
-
-    return deref, graph
-
-
-def _call(node):
-    """The `functionInvocationValue` dict of `node`, or None."""
-    if isinstance(node, dict):
-        call = node.get("functionInvocationValue")
-        if isinstance(call, dict):
-            return call
-    return None
-
-
-def _walk(node, deref, graph):
-    """Yield every resolved node reachable from `node`.
-
-    A `.map()`/`.reduce()` callback body is a bare string key into `values`
-    rather than a `{"valueReference": ...}` wrapper, so it is followed
-    explicitly -- the second indirection test_integration.py documents.
-    """
-    values = graph.get("values", {})
-    stack = [node]
-    seen: set[int] = set()
-    while stack:
-        current = deref(stack.pop())
-        marker = id(current)
-        if marker in seen:
-            continue
-        seen.add(marker)
-        yield current
-        if isinstance(current, dict):
-            body = current.get("functionDefinitionValue")
-            if isinstance(body, dict) and body.get("body") in values:
-                stack.append(values[body["body"]])
-            stack.extend(current.values())
-        elif isinstance(current, list):
-            stack.extend(current)
-
-
-def _root(obj):
-    """`(deref, graph, result node)` for `obj`."""
-    deref, graph = _deref_for(obj)
-    return deref, graph, deref({"valueReference": graph["result"]})
-
-
 # The argument each node carries its receiver in: `Image.uint8` spells it
 # `value`, the other two `input` (verified against the encoder).
 _RECEIVER_ARG = {"Image.where": "input", "Image.rename": "input", "Image.uint8": "value"}
-
-
-def _image_constant(node, deref):
-    """The scalar behind an `ee.Image(k)` argument node, or None."""
-    call = _call(node)
-    if call is not None and call.get("functionName") == "Image.constant":
-        inner = deref(call.get("arguments", {}).get("value", {}))
-        if isinstance(inner, dict):
-            return inner.get("constantValue")
-    return None
-
-
-def _string_list_arg(arg, deref):
-    """The strings behind a `names`/`bandSelectors` argument.
-
-    It is `{"constantValue": [...]}` when inlined and `{"arrayValue":
-    {"values": [...]}}` when the list -- or one of its elements -- is itself
-    hoisted into `values`, so both are resolved; the same handling
-    test_integration.py's `_renamed_bands` needs.
-    """
-    if not isinstance(arg, dict):
-        return []
-    if isinstance(arg.get("constantValue"), list):
-        items = arg["constantValue"]
-    else:
-        items = arg.get("arrayValue", {}).get("values", [])
-    names = []
-    for item in items:
-        value = deref(item)
-        if isinstance(value, dict):
-            value = value.get("constantValue")
-        if isinstance(value, str):
-            names.append(value)
-    return names
-
-
-def _select_bands_of(node, deref):
-    """The band names of an `Image.select` node, or None if it is not one."""
-    call = _call(node)
-    if call is None or call.get("functionName") != "Image.select":
-        return None
-    return _string_list_arg(deref(call.get("arguments", {}).get("bandSelectors", {})), deref)
-
-
-def _selected_bands(obj):
-    """Every band name passed to `.select(...)` anywhere in the graph."""
-    deref, graph, root = _root(obj)
-    names = set()
-    for current in _walk(root, deref, graph):
-        names.update(_select_bands_of(current, deref) or [])
-    return names
-
-
-def _renamed_bands(obj):
-    """Every band name passed to `.rename(...)` anywhere in the graph."""
-    deref, graph, root = _root(obj)
-    names = set()
-    for current in _walk(root, deref, graph):
-        call = _call(current)
-        if call is None or call.get("functionName") != "Image.rename":
-            continue
-        names.update(_string_list_arg(deref(call.get("arguments", {}).get("names", {})), deref))
-    return names
 
 
 def _where_calls(obj, branches=()):
@@ -425,22 +283,6 @@ def _multiply_select_operands(obj):
     return sorted(pairs)
 
 
-def _image_constants(obj):
-    """Every `ee.Image(k)` constant in the graph."""
-    deref, graph, root = _root(obj)
-    return _constants_in(root, deref, graph)
-
-
-def _constants_in(node, deref, graph):
-    """Every `ee.Image(k)` constant under `node`."""
-    values = set()
-    for current in _walk(node, deref, graph):
-        constant = _image_constant(current, deref)
-        if constant is not None:
-            values.add(constant)
-    return values
-
-
 def _constants_under_select(obj, band):
     """The `ee.Image(k)` constants of the collections `.select(band)` is applied to.
 
@@ -466,19 +308,6 @@ def _constants_under_select(obj, band):
             continue
         found |= _constants_in(args["collection"], deref, graph)
     return found
-
-
-def _loaded_assets_in(node, deref, graph):
-    """Every asset id loaded under `node`."""
-    ids = set()
-    for current in _walk(node, deref, graph):
-        call = _call(current)
-        if call is None or call.get("functionName") not in ("Image.load", "ImageCollection.load"):
-            continue
-        value = deref(call.get("arguments", {}).get("id", {}))
-        if isinstance(value, dict) and isinstance(value.get("constantValue"), str):
-            ids.add(value["constantValue"])
-    return ids
 
 
 def _addbands_operand_assets(obj):
