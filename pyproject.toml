@@ -74,6 +74,13 @@ files = ["sdg1531"]
 module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# ee/__init__.py re-exports FeatureCollection, Image, Geometry etc. via plain
+# `from .x import Y`, with no `__all__` — strict mode's implicit-reexport check
+# otherwise treats every one of those as private to the submodule it came from.
+module = ["ee"]
+implicit_reexport = true
+
 [tool.commitizen]
 version = "1.2.0"
 update_changelog_on_bump = true
