@@ -33,6 +33,7 @@ from tests.engine.conftest import (
     make_resolved,
 )
 from tests.engine.graph import (
+    _calendar_windows,
     _call,
     _image_constant,
     _loaded_asset_ids,
@@ -156,17 +157,12 @@ def band_subtree(stack, band):
 
 
 def calendar_windows(deref, graph, node):
-    """`{(start, end)}` for every `Filter.calendarRange` under `node`."""
-    windows = set()
-    for current in _walk(node, deref, graph):
-        call = _call(current)
-        if call is None or call.get("functionName") != "Filter.calendarRange":
-            continue
-        args = call["arguments"]
-        windows.add(
-            (deref(args["start"]).get("constantValue"), deref(args["end"]).get("constantValue"))
-        )
-    return windows
+    """`{(start, end)}` for every `Filter.calendarRange` under `node`.
+
+    Argument-order shim over the shared walker so the `*band_subtree(...)` call
+    sites below read left to right.
+    """
+    return _calendar_windows(node, deref, graph)
 
 
 def remaps_on_spine(deref, node):

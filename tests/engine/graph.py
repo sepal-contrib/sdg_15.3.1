@@ -144,13 +144,18 @@ def _image_constants(obj):
     return _constants_in(root, deref, graph)
 
 
-def _string_list_arg(arg, deref):
-    """The strings behind a `names`/`bandSelectors` argument.
+def _scalar_list_arg(arg, deref):
+    """The scalars behind a list-valued argument.
+
+    Covers `names` and `bandSelectors` (strings, or integer band indices) and
+    `Image.remap`'s `from` / `to` tables (numbers).
 
     It is `{"constantValue": [...]}` when inlined and `{"arrayValue":
     {"values": [...]}}` when the list -- or one of its elements -- is itself
     hoisted into `values`, so both are resolved, and each element is resolved
-    individually since a shared list can mix inlined and referenced items.
+    individually since a shared list can mix inlined and referenced items. A
+    49-entry remap table used by more than one node IS hoisted, so an argument
+    reader that skips the deref silently sees nothing.
     """
     if not isinstance(arg, dict):
         return []
@@ -158,14 +163,32 @@ def _string_list_arg(arg, deref):
         items = arg["constantValue"]
     else:
         items = arg.get("arrayValue", {}).get("values", [])
-    names = []
+    scalars = []
     for item in items:
         value = deref(item)
         if isinstance(value, dict):
             value = value.get("constantValue")
-        if isinstance(value, str):
-            names.append(value)
-    return names
+        scalars.append(value)
+    return scalars
+
+
+def _string_list_arg(arg, deref):
+    """The strings behind a `names`/`bandSelectors` argument."""
+    return [value for value in _scalar_list_arg(arg, deref) if isinstance(value, str)]
+
+
+def _calendar_windows(node, deref, graph):
+    """`{(start, end)}` for every `Filter.calendarRange` under `node`."""
+    windows = set()
+    for current in _walk(node, deref, graph):
+        call = _call(current)
+        if call is None or call.get("functionName") != "Filter.calendarRange":
+            continue
+        args = call["arguments"]
+        windows.add(
+            (deref(args["start"]).get("constantValue"), deref(args["end"]).get("constantValue"))
+        )
+    return windows
 
 
 def _select_bands_of(node, deref):

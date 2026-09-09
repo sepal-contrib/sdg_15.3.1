@@ -19,6 +19,7 @@ from sdg1531.spec import (
     EsaCciSource,
     JrcSeasonalityMask,
     Period,
+    PerPixelClimate,
     SensorSelection,
 )
 from sdg1531.truth_table import PRODUCTIVITY_GPGV2
@@ -42,6 +43,7 @@ def make_resolved(**overrides):
         lceu=Lceu.GAES,
         land_cover=EsaCciSource(),
         water_mask=JrcSeasonalityMask(threshold=6),
+        climate=PerPixelClimate(),
         compatibility=Compatibility(),
     )
     resolved = SimpleNamespace(
@@ -54,6 +56,8 @@ def make_resolved(**overrides):
         soc_period=Period(2001, 2015),
         lc_year_start_esa=2001,
         lc_year_end_esa=2015,
+        soc_year_start=2001,
+        soc_year_end_esa=2015,
         lc_class_combinations=STUB_CLASS_COMBINATIONS,
         trans_matrix_flatten=STUB_TRANS_MATRIX_FLATTEN,
         analysis_scale=250,
