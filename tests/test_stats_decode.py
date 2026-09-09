@@ -88,6 +88,51 @@ def test_decode_transition_areas_names_a_group_entry_that_is_not_a_mapping():
     assert isinstance(excinfo.value.__cause__, TypeError)
 
 
+def test_decode_transition_areas_names_a_non_numeric_transition_code():
+    """A malformed VALUE is the same context-free error a malformed key was.
+
+    ``int("not-a-code")`` would otherwise escape as
+    ``ValueError: invalid literal for int() with base 10: 'not-a-code'``, which names
+    neither the request nor the field.
+    """
+    with pytest.raises(StatisticsError, match=r"'lc_comb' field is not a number") as excinfo:
+        decode_transition_areas([{"lc_comb": "not-a-code", "sum": 1.0}], FakeResolved())
+
+    assert "land cover transitions" in str(excinfo.value)
+    assert isinstance(excinfo.value.__cause__, ValueError)
+
+
+@pytest.mark.parametrize(
+    "payload,field,cause",
+    [
+        ([{"indicator": "x", "groups": [{"lc": 10, "sum": 1.0}]}], "indicator", ValueError),
+        ([{"indicator": 1, "groups": [{"lc": "x", "sum": 1.0}]}], "lc", ValueError),
+        # None is not convertible at all, so it fails with TypeError rather than
+        # ValueError -- both have to be caught for the guard to be total
+        ([{"indicator": None, "groups": [{"lc": 10, "sum": 1.0}]}], "indicator", TypeError),
+        ([{"indicator": 1, "groups": [{"lc": None, "sum": 1.0}]}], "lc", TypeError),
+    ],
+)
+def test_decode_areas_by_land_cover_names_a_non_numeric_code(payload, field, cause):
+    """Both coerced fields, at both nesting levels, for both failure modes."""
+    with pytest.raises(StatisticsError, match=rf"{field!r} field is not a number") as excinfo:
+        decode_areas_by_land_cover(payload, FakeResolved(), layer=IndicatorLayer.SOC)
+
+    assert "areas by land cover for soc" in str(excinfo.value)
+    assert isinstance(excinfo.value.__cause__, cause)
+
+
+def test_decode_areas_by_land_cover_still_accepts_a_numeric_string_class():
+    """Coercion, not validation: a class Earth Engine sent as a string still decodes."""
+    df = decode_areas_by_land_cover(
+        [{"indicator": "1", "groups": [{"lc": "10", "sum": 2.0}]}],
+        FakeResolved(),
+        layer=IndicatorLayer.SOC,
+    )
+
+    assert list(df.itertuples(index=False)) == [("Tree-covered areas", "Degraded", 2.0)]
+
+
 def test_decode_transition_areas_rejects_a_malformed_scheme():
     """``zip(strict=True)`` where run_15_3_1.py:241 truncated -- a code list and a name
     list of different lengths mislabels every row after the mismatch."""

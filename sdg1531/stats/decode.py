@@ -11,8 +11,8 @@ two tables are written out in full, at the two sites that use them, and are
 deliberately NOT derived from :class:`~sdg1531.engine.indicator.ClassifiedLayer`.
 See ``requests.py``'s docstring for why they must be allowed to disagree.
 
-EXPECTED_DIVERGENCES note -- three divergences from the legacy. Task 17's parity
-harness must carry all three:
+EXPECTED_DIVERGENCES note -- four divergences from the legacy. Task 17's parity
+harness must carry all four:
 
 1. **Behaviour-changing.** ``zonal_statistics_to_geodataframe``
    (run_15_3_1.py:475-569) prints four progress and failure lines (:485, :543,
@@ -45,6 +45,9 @@ harness must carry all three:
    malformed, not that odd input arrived from Earth Engine. For every well-formed
    scheme the two are identical. Truncating instead produced a silently
    MISLABELLED table, which is the failure mode worth trading a raise for.
+4. **Behaviour-changing, scoped to one COLUMN NAME** -- the class column is
+   ``layer.value`` (the snake id) where ``run_15_3_1.py:297`` used the translated
+   ``indicator_name``; no value, row or ordering differs.
 """
 
 from __future__ import annotations
@@ -111,6 +114,25 @@ def _field(entry: Any, key: str, *, what: str) -> Any:
         ) from exc
 
 
+def _int_field(entry: Any, key: str, *, what: str) -> int:
+    """A class code off a group entry, with both of its failure modes named.
+
+    :func:`_field` covers an absent key; this covers a value that is not a number.
+    ``int("abc")`` raises ``ValueError: invalid literal for int() with base 10:
+    'abc'`` four frames down, which is the same context-free error the missing-key
+    guard exists to prevent -- closing one half of that class and leaving the other
+    open would be worse than closing neither. ``TypeError`` is caught alongside for
+    a value that is not convertible at all, such as ``None``.
+    """
+    value = _field(entry, key, what=what)
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise StatisticsError(
+            f"Earth Engine returned a {what} entry whose {key!r} field is not a number: {value!r}"
+        ) from exc
+
+
 def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: Any) -> pd.DataFrame:
     """Land cover transition areas -> a three column frame.
 
@@ -141,7 +163,7 @@ def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: Any) -> pd.D
 
     rows: list[list[Any]] = []
     for group in groups:
-        code = int(_field(group, "lc_comb", what="land cover transitions"))
+        code = _int_field(group, "lc_comb", what="land cover transitions")
         try:
             start_name, end_name = labels[code]
         except KeyError as exc:
@@ -162,7 +184,7 @@ def decode_areas_by_land_cover(
     Reads ``r.scheme``. The class column is named for ``layer.value`` -- the snake
     id -- where the legacy named it for the translated widget string it was called
     with (run_15_3_1.py:297, ``indicator_name``); display strings are the app
-    layer's (spec §4).
+    layer's (spec §4). See the module docstring's EXPECTED_DIVERGENCES note 4.
     """
     # transcribed from run_15_3_1.py:291-297
     labels = _STATS_LABELS[layer]
@@ -171,15 +193,15 @@ def decode_areas_by_land_cover(
     what = f"areas by land cover for {layer.value}"
     rows: list[list[Any]] = []
     for outer in groups:
-        raw_class = _field(outer, "indicator", what=what)
+        class_code = _int_field(outer, "indicator", what=what)
         try:
-            class_label = labels[int(raw_class)]
+            class_label = labels[class_code]
         except KeyError as exc:
             raise StatisticsError(
-                f"Earth Engine returned class {raw_class!r} for {layer.value}, which has no label."
+                f"Earth Engine returned class {class_code} for {layer.value}, which has no label."
             ) from exc
         for inner in _field(outer, "groups", what=what):
-            code = int(_field(inner, "lc", what=what))
+            code = _int_field(inner, "lc", what=what)
             try:
                 lc_label = code_to_name[code]
             except KeyError as exc:
