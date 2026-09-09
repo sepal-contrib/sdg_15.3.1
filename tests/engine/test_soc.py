@@ -317,6 +317,53 @@ def test_the_default_subsequent_scale_is_the_legacy_ten():
     assert Compatibility().soc_subsequent_transition_scale == 10
 
 
+def test_the_transition_and_the_change_update_only_where_the_cover_changed():
+    """:115 and :141-142. Both updates are gated on `lc_time0.neq(lc_time1)`, and it
+    is that gate -- not the scale -- that confines D13's damage to changed pixels:
+    unchanged pixels keep the correct four-digit code from the first pair. Flipping
+    either `neq` to `eq` inverts which pixels are updated and is invisible to every
+    shape assertion above, so both gates and both operands are pinned here."""
+    deref, graph, root = _root(soc_image())
+
+    transition_updates, change_updates = [], []
+    for node in _walk(root, deref, graph):
+        call = _call(node)
+        if call is None or call.get("functionName") != "Image.where":
+            continue
+        value = deref(call["arguments"]["value"])
+        value_call = _call(value)
+        if value_call is None:
+            continue
+        if value_call.get("functionName") == "Image.add":
+            multiply = _call(deref(value_call["arguments"]["image1"]))
+            if multiply is None or multiply.get("functionName") != "Image.multiply":
+                continue
+            if _image_constant(deref(multiply["arguments"]["image2"]), deref) is None:
+                continue
+            transition_updates.append((call, multiply, value_call))
+        elif value_call.get("functionName") == "Image.divide":
+            # `ee.Image(1).divide(coef)` at :126 is also a where-value divide; the
+            # stock change is the one whose numerator is the `base - base*c*m*i`
+            # subtraction.
+            numerator = _call(deref(value_call["arguments"]["image1"]))
+            if numerator is not None and numerator.get("functionName") == "Image.subtract":
+                change_updates.append(call)
+
+    assert len(transition_updates) == len(LOOP_YEARS)
+    assert len(change_updates) == len(LOOP_YEARS)
+
+    for where, multiply, add in transition_updates:
+        test = deref(where["arguments"]["test"])
+        assert comparison(test, deref) == ("Image.neq", None)
+        operands = _call(test)["arguments"]
+        # the gate compares the SAME two images the code it guards is built from
+        assert id(deref(operands["image1"])) == id(deref(multiply["arguments"]["image1"]))
+        assert id(deref(operands["image2"])) == id(deref(add["arguments"]["image2"]))
+
+    for where in change_updates:
+        assert comparison(deref(where["arguments"]["test"]), deref) == ("Image.neq", None)
+
+
 # --- the years that reach the graph -------------------------------------------
 
 
@@ -465,6 +512,43 @@ def test_each_stock_change_table_goes_into_its_own_remap():
         (tuple(IPCC_TRANSITION_CODES), tuple(C_CONVERSION_FACTOR)),
         (tuple(IPCC_TRANSITION_CODES), tuple(MANAGEMENT_FACTOR)),
     }
+
+
+def carbon_change_terms(image):
+    """`[(base is also the factored image, factor count)]` per `.divide(20)` node.
+
+    The stock change at :77-81 and :144-150 is ``base - base*c*m*i`` over twenty
+    years. Walking the multiply chain back to its innermost receiver is what shows
+    the SAME image on both sides of the subtraction: `soc - other*c*m*i` would be an
+    equally well-shaped graph.
+    """
+    deref, graph, root = _root(image)
+    terms = []
+    for node in _walk(root, deref, graph):
+        call = _call(node)
+        if call is None or call.get("functionName") != "Image.divide":
+            continue
+        if _image_constant(deref(call["arguments"]["image2"]), deref) != 20:
+            continue
+        subtract = _call(deref(call["arguments"]["image1"]))
+        assert subtract["functionName"] == "Image.subtract"
+
+        base = deref(subtract["arguments"]["image1"])
+        factored = deref(subtract["arguments"]["image2"])
+        factors = 0
+        while (chain := _call(factored)) is not None and chain["functionName"] == "Image.multiply":
+            factors += 1
+            factored = deref(chain["arguments"]["image1"])
+        terms.append((id(base) == id(factored), factors))
+    return terms
+
+
+def test_the_stock_change_is_the_image_less_its_factored_self_over_twenty_years():
+    """:77-81 and :144-150 -- three factors (climate, management, organic input), the
+    same image on both sides of the subtraction, divided by the IPCC twenty-year
+    transition period. The divisor is not the 20 of :151: that one is a year COUNT
+    on `lc_transition_time`, which is why they are pinned separately."""
+    assert carbon_change_terms(soc_image()) == [(True, 3)] * BLOCKS
 
 
 # --- the years-since-transition counter -----------------------------------------
