@@ -8,12 +8,15 @@ import ee.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any
 
 from sdg1531.catalog import LAND_COVER_FIRST_YEAR, LAND_COVER_MAX_YEAR, SENSORS
+from sdg1531.enums import VegetationIndex
 from sdg1531.errors import SpecError
 from sdg1531.spec import Period, PrecomputedViAsset, RunSpec, SensorSelection
 
-__all__ = ["ResolvedSpec", "resolve"]
+__all__ = ["ResolvedSpec", "ViProcessor", "resolve"]
 
 
 def _clamp_cci(year: int) -> int:
@@ -54,6 +57,68 @@ def _integration_period(spec: RunSpec) -> Period:
     )
 
 
+# integration.py:45, :54, :56, :66, :81 — the family sets, verbatim.
+MODIS_SENSORS = frozenset({"MODIS MOD13Q1", "MODIS MYD13Q1"})
+LANDSAT_SENSORS = frozenset({"Landsat 4", "Landsat 5", "Landsat 7", "Landsat 8", "Landsat 9"})
+
+
+class ViProcessor(str, Enum):  # noqa: UP042
+    """Which rung of integration.py's ladder a sensor selection lands on."""
+
+    MODIS = "modis"
+    TERRA_NPP = "terra_npp"
+    SENTINEL2 = "sentinel2"
+    DERIVED_VI_LANDSAT = "derived_vi_landsat"
+    LANDSAT_SENSORS = "landsat_sensors"
+    PRECOMPUTED = "precomputed"
+
+
+def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[str, ...]]:
+    """integration.py:41-94 — an ordered ladder, not a family lookup (spec §6).
+
+    The "GEE Asset" rung (:79-80) is dropped as unreachable; PrecomputedViAsset
+    replaces it as a first-class ViSource arm.
+    """
+    source = spec.vi_source
+    if isinstance(source, PrecomputedViAsset):
+        return ViProcessor.PRECOMPUTED, (source.asset_id,)
+    if not isinstance(source, SensorSelection):
+        raise SpecError("vi_source is not set")  # RunSpec allows this while unfilled
+
+    sensors = source.names
+    # integration.py:41-43 — field 0 of each record, so "Derived VI Landsat"
+    # contributes a (ndvi, evi) pair here while every other sensor contributes a str.
+    ee_asset_list: tuple[Any, ...] = tuple(SENSORS[key].collection_id for key in sensors)
+
+    if MODIS_SENSORS & set(sensors):  # :45
+        return ViProcessor.MODIS, ee_asset_list
+    if "Terra NPP" in sensors:  # :54
+        return ViProcessor.TERRA_NPP, ee_asset_list
+    if "Sentinel 2" in sensors:  # :56
+        return ViProcessor.SENTINEL2, ee_asset_list
+    if "Derived VI Landsat" in sensors:  # :66
+        if (
+            spec.vegetation_index is VegetationIndex.MSVI
+            and not spec.compatibility.derived_vi_msvi_uses_evi_asset
+        ):
+            raise SpecError(
+                "msvi is served the EVI asset by integration.py:66-71; set "
+                "Compatibility.derived_vi_msvi_uses_evi_asset to accept it"
+            )
+        # :67-71 — indexes ee_asset_list[0], the FIRST SELECTED sensor's asset, not
+        # the derived-VI record's. With a Landsat selected first that value is a
+        # plain string and this indexes a single character.
+        asset_id = (
+            ee_asset_list[0][0]
+            if spec.vegetation_index is VegetationIndex.NDVI
+            else ee_asset_list[0][1]
+        )
+        return ViProcessor.DERIVED_VI_LANDSAT, (asset_id,)
+    if LANDSAT_SENSORS & set(sensors):  # :81
+        return ViProcessor.LANDSAT_SENSORS, ee_asset_list
+    raise SpecError("No valid sensor type found in the model.")  # :93-94
+
+
 @dataclass(frozen=True, slots=True)
 class ResolvedSpec:
     spec: RunSpec
@@ -69,6 +134,8 @@ class ResolvedSpec:
     lc_year_end_esa: int
     soc_year_start: int
     soc_year_end_esa: int
+    vi_processor: ViProcessor
+    vi_assets: tuple[str, ...]
 
 
 def resolve(spec: RunSpec) -> ResolvedSpec:
@@ -80,6 +147,10 @@ def resolve(spec: RunSpec) -> ResolvedSpec:
     performance = p.performance.resolve(base)  # :111-124
     land_cover_period = p.land_cover.resolve(base)  # :126-139
     soc_period = p.soc.resolve(base)  # :141-153
+
+    # Dispatched before analysis_scale: an unmatched or empty sensor selection must
+    # surface as the ladder's SpecError, not as an IndexError out of SENSORS[sensors[0]].
+    vi_processor, vi_assets = _vi_dispatch(spec)
 
     sensors = _selected_sensors(spec)
     if isinstance(spec.vi_source, PrecomputedViAsset):
@@ -106,4 +177,6 @@ def resolve(spec: RunSpec) -> ResolvedSpec:
         soc_year_start=soc_year_start,
         # soil_organic_carbon.py:12-14
         soc_year_end_esa=_clamp_cci(_require_year(soc_period.end, "soc.end")),
+        vi_processor=vi_processor,
+        vi_assets=vi_assets,
     )

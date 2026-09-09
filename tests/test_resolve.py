@@ -12,7 +12,9 @@ from hypothesis import given
 from hypothesis import strategies as st
 from spec_factory import default_spec
 
-from sdg1531.resolve import resolve
+from sdg1531.enums import VegetationIndex
+from sdg1531.errors import SpecError
+from sdg1531.resolve import ViProcessor, resolve
 from sdg1531.spec import (
     Compatibility,
     Period,
@@ -214,3 +216,95 @@ def test_land_cover_and_soc_never_move_the_integration_envelope(land_cover, soc)
         == resolve(default_spec(periods=base)).integration_period
         == Period(start=2004, end=2016)
     )
+
+
+MOD = "MODIS/061/MOD13Q1"
+MYD = "MODIS/061/MYD13Q1"
+NPP = "MODIS/006/MOD17A3HGF"
+S2 = "COPERNICUS/S2_SR_HARMONIZED"
+L4 = "LANDSAT/LT04/C02/T1_L2"
+L5 = "LANDSAT/LT05/C02/T1_L2"
+L7 = "LANDSAT/LE07/C02/T1_L2"
+L8 = "LANDSAT/LC08/C02/T1_L2"
+L9 = "LANDSAT/LC09/C02/T1_L2"
+DVI_NDVI = "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NDVI"
+DVI_EVI = "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_EVI"
+
+# Selections reachable through sensor_select.py:62-90, which resets v_model only
+# when the sensor being ADDED shares no family substring with what is already there.
+REACHABLE = [
+    (("MODIS MOD13Q1",), ViProcessor.MODIS, (MOD,)),
+    (("MODIS MYD13Q1",), ViProcessor.MODIS, (MYD,)),
+    (("MODIS MOD13Q1", "MODIS MYD13Q1"), ViProcessor.MODIS, (MOD, MYD)),
+    (("MODIS MYD13Q1", "MODIS MOD13Q1"), ViProcessor.MODIS, (MYD, MOD)),
+    (("Terra NPP",), ViProcessor.TERRA_NPP, (NPP,)),
+    (("Sentinel 2",), ViProcessor.SENTINEL2, (S2,)),
+    (("Derived VI Landsat",), ViProcessor.DERIVED_VI_LANDSAT, (DVI_NDVI,)),
+    (("Landsat 4",), ViProcessor.LANDSAT_SENSORS, (L4,)),
+    (("Landsat 5",), ViProcessor.LANDSAT_SENSORS, (L5,)),
+    (("Landsat 7",), ViProcessor.LANDSAT_SENSORS, (L7,)),
+    (("Landsat 8",), ViProcessor.LANDSAT_SENSORS, (L8,)),
+    (("Landsat 9",), ViProcessor.LANDSAT_SENSORS, (L9,)),
+    (("Landsat 4", "Landsat 5", "Landsat 7"), ViProcessor.LANDSAT_SENSORS, (L4, L5, L7)),
+    (("Landsat 8", "Landsat 9"), ViProcessor.LANDSAT_SENSORS, (L8, L9)),
+    # The ladder's precedence, observable: adding "Derived VI Landsat" to a Landsat
+    # selection is NOT blocked, the derived branch wins over the landsat branch, and
+    # integration.py:66-71 then indexes the FIRST selected sensor's asset — a plain
+    # string here — by character. Legacy behaviour, transcribed (spec §6).
+    (("Landsat 8", "Derived VI Landsat"), ViProcessor.DERIVED_VI_LANDSAT, ("L",)),
+    # Not reachable through the widget; pins that the branch reads sensors[0].
+    (("Derived VI Landsat", "Landsat 8"), ViProcessor.DERIVED_VI_LANDSAT, (DVI_NDVI,)),
+]
+
+
+@pytest.mark.parametrize("names,processor,assets", REACHABLE)
+def test_sensor_ladder(names, processor, assets):
+    r = resolve(default_spec(vi_source=SensorSelection(names)))
+    assert r.vi_processor is processor
+    assert r.vi_assets == assets
+
+
+def test_precomputed_vi_asset_is_its_own_rung():
+    r = resolve(default_spec(vi_source=PrecomputedViAsset(asset_id="users/x/vi", scale=30)))
+    assert r.vi_processor is ViProcessor.PRECOMPUTED
+    assert r.vi_assets == ("users/x/vi",)
+
+
+@pytest.mark.parametrize(
+    "index,asset",
+    [
+        (VegetationIndex.NDVI, DVI_NDVI),
+        (VegetationIndex.EVI, DVI_EVI),
+        (VegetationIndex.MSVI, DVI_EVI),
+    ],
+)
+def test_derived_vi_asset_selection(index, asset):
+    # integration.py:66-71 — everything that is not ndvi takes the EVI asset.
+    r = resolve(
+        default_spec(vi_source=SensorSelection(("Derived VI Landsat",)), vegetation_index=index)
+    )
+    assert r.vi_assets == (asset,)
+
+
+def test_derived_vi_msvi_raises_when_the_compatibility_flag_is_off():
+    spec = default_spec(
+        vi_source=SensorSelection(("Derived VI Landsat",)),
+        vegetation_index=VegetationIndex.MSVI,
+        compatibility=Compatibility(derived_vi_msvi_uses_evi_asset=False),
+    )
+    with pytest.raises(SpecError):
+        resolve(spec)
+
+
+def test_derived_vi_evi_is_unaffected_by_the_msvi_flag():
+    spec = default_spec(
+        vi_source=SensorSelection(("Derived VI Landsat",)),
+        vegetation_index=VegetationIndex.EVI,
+        compatibility=Compatibility(derived_vi_msvi_uses_evi_asset=False),
+    )
+    assert resolve(spec).vi_assets == (DVI_EVI,)
+
+
+def test_an_empty_sensor_selection_raises():
+    with pytest.raises(SpecError):
+        resolve(default_spec(vi_source=SensorSelection(())))
