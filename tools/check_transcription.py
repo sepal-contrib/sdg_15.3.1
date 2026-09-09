@@ -16,8 +16,11 @@ What this does NOT cover: everything sourced from component/parameter/ui.py
 component/model/indicator_model.py (``IndicatorLayer``'s order). ui.py imports
 ipyvuetify and component.message, so ``_load()`` cannot execute it standalone;
 those transcriptions were checked by hand during review, not by this script.
-``TABLES_UNREACHABLE`` below names the tables-side half of that gap so it stays
-visible instead of silently passing as "checked".
+``TABLES_UNREACHABLE``/``CATALOG_UNREACHABLE`` below name that gap, module by
+module, so it stays visible instead of silently passing as "checked" — and the
+closing summary line is built from what actually ran, not asserted outright, so
+a skipped check (numpy absent) is named as skipped rather than folded into
+"all match".
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from sdg1531 import tables  # noqa: E402 — module object, for tables.__all__ below
+from sdg1531 import catalog, tables  # noqa: E402 — module objects, for __all__ below
 from sdg1531.catalog import (  # noqa: E402
     ASSETS,
     INT16_MIN,
@@ -88,6 +91,33 @@ TABLES_VERIFIED = frozenset(
 # cannot execute it standalone; checked by hand during review, not here.
 TABLES_UNREACHABLE = frozenset({"DEFAULT_LC_COLORS"})
 
+# Same mechanism as the tables pair above, for catalog.__all__.
+CATALOG_VERIFIED = frozenset(
+    {
+        "ASSETS",
+        "INT16_MIN",
+        "L4_START",
+        "LAND_COVER_FIRST_YEAR",
+        "LAND_COVER_MAX_YEAR",
+        "SENSORS",
+        "z_coefficient",
+    }
+)
+CATALOG_UNREACHABLE = frozenset(
+    {
+        # ui.py:41-47; ui.py imports ipyvuetify and component.message, so _load()
+        # cannot execute it standalone. Checked by hand during review.
+        "CLIMATE_COEFFICIENTS",
+        # ui.py:39, same reason.
+        "JRC_SEASONALITY_TICKS",
+        # ui.py:35's "disabled": True flag, same reason.
+        "DISABLED_TRAJECTORIES",
+        # a type, not a value — nothing to diff against the legacy plain lists;
+        # its instances are exercised by the SENSORS/sensor_keys checks above.
+        "SensorInfo",
+    }
+)
+
 
 def _load(name: str, relative: str) -> ModuleType:
     """Execute a legacy module straight from its path, bypassing ``component``."""
@@ -135,12 +165,23 @@ def _check(name: str, port: object, legacy: object) -> None:
     print("OK  ", name)
 
 
-def main() -> int:
-    uncategorized = set(tables.__all__) - TABLES_VERIFIED - TABLES_UNREACHABLE
+def _assert_categorized(module_name: str, exported: list[str], *categories: frozenset[str]) -> None:
+    """Every name in ``exported`` must land in exactly one of ``categories``.
+
+    A name in neither is named explicitly in the failure — not just flagged as
+    "something is wrong" — so whoever added it sees what they need to classify.
+    """
+    uncategorized = set(exported) - set().union(*categories)
     assert not uncategorized, (
-        f"tables.__all__ has a name this script neither checks nor excuses: {uncategorized!r}. "
-        "Add a _check() call for it, or add it to TABLES_UNREACHABLE with a reason."
+        f"{module_name}.__all__ has a name this script neither checks nor excuses: "
+        f"{sorted(uncategorized)!r}. Add a _check() call for it, or add it to the "
+        f"module's *_UNREACHABLE set with a reason."
     )
+
+
+def main() -> int:
+    _assert_categorized("tables", tables.__all__, TABLES_VERIFIED, TABLES_UNREACHABLE)
+    _assert_categorized("catalog", catalog.__all__, CATALOG_VERIFIED, CATALOG_UNREACHABLE)
 
     matrix = _load("legacy_matrix", "component/parameter/matrix.py")
     sensor = _load("legacy_sensor", "component/parameter/sensor.py")
@@ -193,22 +234,36 @@ def main() -> int:
         ]
         _check(f"sensor:{name}", port, sensor.sensors[name])
 
+    # matched/skipped drive the closing summary below, so it can only ever
+    # describe checks that actually ran — not a hardcoded claim of full coverage
+    matched = [
+        f"{len(TABLES_VERIFIED)} tables",
+        f"{len(SENSORS)} sensors (keys and values)",
+        "assets",
+        "year bounds",
+    ]
+    skipped: list[str] = []
+
     computation = _load_computation()
     if computation is None:
         print("SKIP  int16_min, z_coefficient — numpy is not installed")
+        skipped.append("int16_min, z_coefficient (numpy not installed)")
     else:
         _check("int16_min", INT16_MIN, computation.int_16_min)
         for n in (4, 5, 10, 23, 40):
             _check(f"z_coefficient({n})", z_coefficient(n), computation.z_coefficient(n))
+        matched.append("int16_min + z_coefficient")
 
-    print(
-        f"checked {len(TABLES_VERIFIED)} tables + {len(SENSORS)} sensors (keys and "
-        "values) + assets + year bounds + int16_min + z_coefficient against the "
-        "legacy source — all match. NOT checked here (ui.py cannot be imported "
-        "standalone): tables.DEFAULT_LC_COLORS, catalog.CLIMATE_COEFFICIENTS, "
+    summary = f"checked {' + '.join(matched)} against the legacy source — all match."
+    if skipped:
+        summary += f" SKIPPED: {'; '.join(skipped)}."
+    summary += (
+        " NOT checked here (ui.py cannot be imported standalone): "
+        "tables.DEFAULT_LC_COLORS, catalog.CLIMATE_COEFFICIENTS, "
         "catalog.JRC_SEASONALITY_TICKS, catalog.DISABLED_TRAJECTORIES, and every "
         "sdg1531.enums value."
     )
+    print(summary)
     return 0
 
 
