@@ -1,0 +1,7 @@
+{
+  "groups": [
+    {"indicator": 1, "groups": [{"lc": 10, "sum": 100.0}, {"lc": 30, "sum": 50.0}]},
+    {"indicator": 2, "groups": [{"lc": 10, "sum": 300.0}]},
+    {"indicator": 3, "groups": [{"lc": 30, "sum": 25.0}, {"lc": 70, "sum": 5.0}]}
+  ]
+}

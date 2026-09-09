@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]},
+      "properties": {"name": "zone-a", "Class_0": 1.234567, "Class_1": 10.5, "Class_2": 20.25, "Class_3": 2.0}
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Polygon", "coordinates": [[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]]},
+      "properties": {"name": "zone-b", "Class_0": 0.0, "Class_1": 5.0, "Class_2": 1.0}
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "LineString", "coordinates": [[0, 0], [1, 1]]},
+      "properties": {"name": "border", "Class_1": 0.5}
+    }
+  ]
+}
