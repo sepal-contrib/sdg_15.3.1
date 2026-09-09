@@ -26,12 +26,16 @@ export sources and the statistics layer picker all iterate it -- and there is
 deliberately no second ``export_layers()``.
 
 The seam is the images, not the vocabulary. :attr:`ClassifiedLayer.band` and
-:attr:`ClassifiedLayer.labels` are the MAP AND EXPORT vocabulary (spec §8);
-``sdg1531/stats/requests.py`` owns the STATISTICS vocabulary in its own
-``_STATS_BAND`` / ``_STATS_LABELS`` tables and reads only ``.image`` from here.
-The two deliberately disagree for the trend and state layers -- statistics keep
-the legacy 5-class bands, export takes the 3-class ones -- so "unifying" them
-would silently change the statistics. See EXPECTED_DIVERGENCES note 4.
+:attr:`ClassifiedLayer.labels` are the MAP AND EXPORT vocabulary (spec §8). The
+STATISTICS vocabulary is Task 15's: ``sdg1531/stats/requests.py`` is SPECIFIED to
+carry its own ``_STATS_BAND`` / ``_STATS_LABELS`` tables and to read only
+``.image`` from here (task-15-brief.md:655-665, :310-320, :699-702). That module
+does not exist yet, so this is a statement about what Task 15 must do, not about
+code in the tree. Under it the two vocabularies deliberately disagree for the
+trend and state layers -- statistics keep the legacy 5-class bands, export takes
+the 3-class ones -- so "unifying" them would silently change the statistics. See
+EXPECTED_DIVERGENCES note 4, whose narrowing depends on Task 15 landing as
+briefed.
 
 ResolvedSpec fields read here: none directly. :func:`build_indicator_maps` threads
 ``r`` into the sub-indicator builders and keeps it on
@@ -67,17 +71,24 @@ harness must carry all four:
    band and a 3-class legend, and the legacy has nothing to compare them against:
    ``display_maps`` (run_15_3_1.py:105-158) draws six rasters plus the AOI --
    land-cover start and end, productivity, land-cover degradation, soc and the
-   indicator -- and trend, state and performance are never drawn at all. Those six
-   are each genuinely 3-class and ``viz_prod`` / ``viz_lc_sub`` / ``viz_soc`` /
-   ``viz_indicator`` are all ``{"min": 1, "max": 3}`` over a 3-entry legend
-   (parameter/ui.py:49-53, :72-75), so the legacy never misapplied a legend; it
-   simply never rendered these two layers. Spec §8 gives them an export band and a
-   legend for the first time. This is a NEW capability, not a changed one -- and in
-   particular it is NOT a statistics change: ``indicator_n_category_label``'s
-   ``trajectory_5_levels`` / ``state_5_levels`` branches (:437-441) are ported
-   faithfully by ``stats/requests.py``'s ``_STATS_BAND`` / ``_STATS_LABELS``, which
-   keep the 5-class band and the 6-entry legend. Filing this as behaviour-changing
-   would hand the harness a licence to wave through a real statistics regression.
+   indicator -- and trend, state and performance are never drawn at all. The four
+   CLASSIFIED ones among those six are each genuinely 3-class, drawn with
+   ``viz_prod`` / ``viz_lc_sub`` / ``viz_soc`` / ``viz_indicator``, all
+   ``{"min": 1, "max": 3}`` over a 3-entry legend (parameter/ui.py:49-53, :72-75).
+   (The other two, land-cover start and end, use ``viz_lc``, whose min/max come
+   from the class code list at run_15_3_1.py:106-110 -- not a 3-class scheme.) So
+   the legacy never misapplied a legend; it simply never rendered these two layers.
+   Spec §8 gives them an export band and a legend for the first time. This is a NEW
+   capability, not a changed one -- and in particular it is not intended to change
+   the statistics: ``indicator_n_category_label``'s ``trajectory_5_levels`` /
+   ``state_5_levels`` branches (:437-442) are to be ported faithfully by Task 15's
+   ``stats/requests.py``, whose ``_STATS_BAND`` / ``_STATS_LABELS`` keep the 5-class
+   band and the 6-entry legend (task-15-brief.md:655-665, :310-320). That module is
+   not in the tree yet, so this half of the entry is a DEPENDENCY on Task 15 rather
+   than a fact about shipped code: if Task 15 lands a 3-class statistics band for
+   trend or state, this note becomes wrong in the licensing direction and must be
+   revisited. Filing it as behaviour-changing instead would hand the harness a
+   licence to wave through a real statistics regression.
 """
 
 from __future__ import annotations
@@ -123,9 +134,10 @@ class ClassifiedLayer:
     Consumers select it: ``layer.image.select(layer.band)``.
 
     ``band`` and ``labels`` are the MAP AND EXPORT vocabulary only. The statistics
-    path keeps its own, in ``sdg1531/stats/requests.py``'s ``_STATS_BAND`` /
-    ``_STATS_LABELS``, and reads only ``.image`` from here; for trend and state the
-    two deliberately disagree (see the module docstring).
+    path is specified to keep its own -- ``_STATS_BAND`` / ``_STATS_LABELS`` in
+    ``sdg1531/stats/requests.py``, which Task 15 has yet to write -- and to read
+    only ``.image`` from here; for trend and state the two are meant to disagree
+    (see the module docstring and EXPECTED_DIVERGENCES note 4).
 
     ``label`` is the layer's snake id -- ``id.value``, e.g. ``"productivity_trend"``
     -- not a human display string. Translated display labels live in the app layer

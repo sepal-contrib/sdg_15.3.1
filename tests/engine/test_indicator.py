@@ -311,6 +311,12 @@ def output_bands(image):
         if name == "Image.rename":
             return _string_list_arg(deref(args["names"]), deref)
         if name == "Image.select":
+            # `.select(bandSelectors, newNames)` renames as it selects, so an
+            # unguarded arm would report the SELECTOR where the image carries the
+            # new name -- silently, and in the direction that lets a mislabelled
+            # band through. `bandSelectors` also takes regexes and indices, neither
+            # of which is a band name.
+            assert set(args) == {"input", "bandSelectors"}, sorted(args)
             return _string_list_arg(deref(args["bandSelectors"]), deref)
         if name == "Image.addBands":
             # the `names`/`overwrite` overloads would rewrite the band list; no
@@ -742,9 +748,10 @@ def test_each_layer_carries_its_own_image(maps):
 
 def test_layer_bands_match_the_export_table(maps):
     """spec §8, the EXPORT vocabulary. Trend and state carry the 3-class band; the
-    5-level band `indicator_n_category_label` selected (run_15_3_1.py:437-441) stays
-    the STATISTICS vocabulary and lives in `stats/requests.py`'s `_STATS_BAND` --
-    see the module docstring's EXPECTED_DIVERGENCES note 4."""
+    5-level band `indicator_n_category_label` selected (run_15_3_1.py:437-442, the
+    range that includes its 6-entry legend) stays the STATISTICS vocabulary, which
+    Task 15's `stats/requests.py` is specified to own -- see the module docstring's
+    EXPECTED_DIVERGENCES note 4."""
     assert {key: layer.band for key, layer in maps.layers().items()} == {
         IndicatorLayer.LAND_COVER: "degradation",
         IndicatorLayer.SOC: "soc",
