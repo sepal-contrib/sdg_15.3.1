@@ -29,6 +29,7 @@ call it is supposed to be able to see.
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import json
 
 import ee
@@ -59,6 +60,7 @@ from tests.engine.graph import (
     _root,
     _selected_bands,
     _spine,
+    _spine_functions,
     _string_list_arg,
     _walk,
     count_calls,
@@ -196,7 +198,7 @@ def spine_functions(image):
     the graph's own nesting and reordering two chained calls reorders it.
     """
     deref, _graph, root = _root(image)
-    return [(_call(node) or {}).get("functionName") for node in _spine(root, deref, _RECEIVER_ARG)]
+    return _spine_functions(root, deref, _RECEIVER_ARG)
 
 
 def _operand_name(node, deref):
@@ -242,7 +244,7 @@ def rule_rows(image):
     """
     deref, _graph, root = _root(image)
     spine = _spine(root, deref, _RECEIVER_ARG)
-    names = [(_call(node) or {}).get("functionName") for node in spine]
+    names = _spine_functions(root, deref, _RECEIVER_ARG)
     assert names.count("Image.rename") == 1, names
     inner = spine[names.index("Image.rename") + 1 :]
 
@@ -274,6 +276,54 @@ def select_inputs(image):
         band = _string_list_arg(deref(call["arguments"]["bandSelectors"]), deref)[0]
         found[band] = deref(call["arguments"]["input"])
     return found
+
+
+# Nodes that hand their receiver's band list straight through, and the argument
+# carrying that receiver. Read off the encoder, like `_RECEIVER_ARG`.
+_BAND_PRESERVING = {
+    "Image.uint8": "value",
+    "Image.uint16": "value",
+    "Image.where": "input",
+}
+
+
+def output_bands(image):
+    """The band names `image` really carries, decoded from its own graph.
+
+    NOT the graph-wide set of `.rename()` targets. That set is a population over the
+    whole upstream subgraph: for the indicator image it is every rename in the
+    corpus -- 17 names, including all seven layer bands -- so `band in renames`
+    there is satisfied by any band whatsoever. This walks only the band-SHAPING
+    nodes, the ones that decide the output band list.
+
+    It RAISES on a node it does not know rather than returning what it has so far.
+    A decoder that silently answered "no bands" would make its caller vacuous, which
+    is the defect this function exists to fix.
+    """
+    deref, _graph, root = _root(image)
+
+    def bands(node):
+        node = deref(node)
+        call = _call(node)
+        if call is None:
+            raise AssertionError(f"output_bands reached a non-call node: {node!r}")
+        name, args = call["functionName"], call.get("arguments", {})
+        if name == "Image.rename":
+            return _string_list_arg(deref(args["names"]), deref)
+        if name == "Image.select":
+            return _string_list_arg(deref(args["bandSelectors"]), deref)
+        if name == "Image.addBands":
+            # the `names`/`overwrite` overloads would rewrite the band list; no
+            # builder uses them, and a future one must extend this decoder.
+            assert set(args) == {"dstImg", "srcImg"}, sorted(args)
+            return bands(args["dstImg"]) + bands(args["srcImg"])
+        if name == "Image.constant":
+            return ["constant"]
+        if name in _BAND_PRESERVING:
+            return bands(args[_BAND_PRESERVING[name]])
+        raise AssertionError(f"output_bands cannot decode {name!r}; extend the table")
+
+    return bands(root)
 
 
 def outer_where(image):
@@ -314,7 +364,10 @@ def test_the_collapse_is_the_legacy_chain_with_the_rename_put_back():
         .where(water, 0)
         .uint8()
     )
-    assert build_indicator(productivity, land_cover, soc).serialize() == expected.serialize()
+    assert (
+        build_indicator(productivity=productivity, land_cover=land_cover, soc=soc).serialize()
+        == expected.serialize()
+    )
 
 
 def test_the_rename_is_the_only_node_the_port_adds():
@@ -326,7 +379,7 @@ def test_the_rename_is_the_only_node_the_port_adds():
     landcover = land_cover.stack.select("degradation")
 
     verbatim = legacy_chain(productivity, landcover, soc).where(water, 0).uint8()
-    ported = build_indicator(productivity, land_cover, soc)
+    ported = build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
 
     assert ported.serialize() != verbatim.serialize()
     assert _renamed_bands(ported) - _renamed_bands(verbatim) == {"indicator_15_3_1"}
@@ -340,7 +393,9 @@ def test_the_thirty_rules_are_emitted_in_legacy_order_with_their_own_operators()
     `degradation`, turning an `lt` into an `eq` or changing a `.where` value each
     change exactly one element of it."""
     productivity, land_cover, soc = fake_inputs()
-    assert rule_rows(build_indicator(productivity, land_cover, soc)) == list(EXPECTED_ROWS)
+    assert rule_rows(
+        build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
+    ) == list(EXPECTED_ROWS)
 
 
 def test_the_last_three_rules_are_the_nodata_rows():
@@ -348,7 +403,9 @@ def test_the_last_three_rules_are_the_nodata_rows():
     rows that use `.lt(1)`, and `Rule` carries no operator field -- class 0 is
     what makes `apply_truth_table` emit `lt` (canonical.md)."""
     productivity, land_cover, soc = fake_inputs()
-    assert rule_rows(build_indicator(productivity, land_cover, soc))[-3:] == [
+    assert rule_rows(build_indicator(productivity=productivity, land_cover=land_cover, soc=soc))[
+        -3:
+    ] == [
         ((("productivity", "eq", 1), ("degradation", "lt", 1), ("soc", "lt", 1)), 1),
         ((("productivity", "lt", 1), ("degradation", "eq", 1), ("soc", "lt", 1)), 1),
         ((("productivity", "lt", 1), ("degradation", "lt", 1), ("soc", "eq", 1)), 1),
@@ -366,7 +423,13 @@ def test_indicator_has_thirty_rule_wheres_plus_the_water_where():
     merge any of them. 30 + 1 = 31.
     """
     productivity, land_cover, soc = fake_inputs()
-    assert count_calls(build_indicator(productivity, land_cover, soc), "Image.where") == 31
+    assert (
+        count_calls(
+            build_indicator(productivity=productivity, land_cover=land_cover, soc=soc),
+            "Image.where",
+        )
+        == 31
+    )
 
 
 def test_the_comparisons_are_nine_eq_nodes_and_three_lt_nodes():
@@ -375,7 +438,7 @@ def test_the_comparisons_are_nine_eq_nodes_and_three_lt_nodes():
     27 grid rules -- and `img.lt(1)` once per operand, 3 distinct nodes, from
     :406-408. A flipped comparison moves a node from one count to the other."""
     productivity, land_cover, soc = fake_inputs()
-    image = build_indicator(productivity, land_cover, soc)
+    image = build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
     assert count_calls(image, "Image.eq") == 9
     assert count_calls(image, "Image.lt") == 3
 
@@ -397,7 +460,12 @@ def test_every_rule_ands_three_terms_and_shares_the_twelve_it_can():
     (41 or 43) and a term dropped from every predicate (12).
     """
     productivity, land_cover, soc = fake_inputs()
-    assert count_calls(build_indicator(productivity, land_cover, soc), "Image.and") == 42
+    assert (
+        count_calls(
+            build_indicator(productivity=productivity, land_cover=land_cover, soc=soc), "Image.and"
+        )
+        == 42
+    )
 
 
 def test_the_water_mask_and_the_cast_sit_outside_the_collapse():
@@ -406,7 +474,9 @@ def test_the_water_mask_and_the_cast_sit_outside_the_collapse():
     graph's own nesting, so this cannot be satisfied by a graph that has the right
     nodes in the wrong order."""
     productivity, land_cover, soc = fake_inputs()
-    names = spine_functions(build_indicator(productivity, land_cover, soc))
+    names = spine_functions(
+        build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
+    )
 
     assert names[:4] == ["Image.uint8", "Image.where", "Image.rename", "Image.where"]
     assert names[-1] == "Image.constant"
@@ -419,16 +489,34 @@ def test_the_water_band_is_its_own_where_condition_and_writes_zero():
     the value written is 0. `.where(water, 1)` or a test taken off another band
     both build."""
     productivity, land_cover, soc = fake_inputs()
-    deref, test, value = outer_where(build_indicator(productivity, land_cover, soc))
+    deref, test, value = outer_where(
+        build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
+    )
 
     assert _operand_name(test, deref) == "water"
     assert value == 0
 
 
+def test_build_indicator_takes_its_three_images_by_keyword_only():
+    """The guard `build_productivity` already carries (productivity.py:512-517).
+
+    `productivity` and `soc` are both single-band 3-class uint8, INDICATOR_15_3_1 is
+    not symmetric in them (:385-387 against :394-396), and `ee` is lazy -- so a
+    positional swap builds a clean graph and misclassifies at evaluation time.
+    Keyword-only turns that into a TypeError at the call site instead.
+    """
+    productivity, land_cover, soc = fake_inputs()
+    kinds = [p.kind for p in inspect.signature(build_indicator).parameters.values()]
+    assert kinds == [inspect.Parameter.KEYWORD_ONLY] * 3
+
+    with pytest.raises(TypeError, match="takes 0 positional arguments"):
+        build_indicator(productivity, land_cover, soc)
+
+
 def test_indicator_band_is_renamed_and_cast_to_uint8():
     """spec §7: the legacy band is called "constant" because :411 never renames."""
     productivity, land_cover, soc = fake_inputs()
-    image = build_indicator(productivity, land_cover, soc)
+    image = build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
 
     assert "indicator_15_3_1" in _renamed_bands(image)
     assert count_calls(image, "Image.uint8") == 1
@@ -439,7 +527,7 @@ def test_indicator_reads_exactly_degradation_and_water_off_the_stack():
     stack feeds both selects -- so their absence cannot be asserted; the select
     count is what pins that nothing else is read."""
     productivity, land_cover, soc = fake_inputs()
-    image = build_indicator(productivity, land_cover, soc)
+    image = build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
 
     assert _selected_bands(image) == {"degradation", "water"}
     assert count_calls(image, "Image.select") == 2
@@ -451,12 +539,23 @@ def test_both_bands_are_read_off_the_same_unselected_stack():
     `landcover.select("degradation")`. Swap those two lines and :374 selects "water"
     off an image that no longer carries it -- and `ee` is lazy enough to build it
     anyway, failing only on evaluation. Taking a `LandCoverMaps` removes the hazard
-    only if BOTH bands are read off the stack, which is what this pins."""
+    only if BOTH bands are read off the stack, which is what this pins.
+
+    `is` rather than `==` because node identity is the claim. It is not the stronger
+    check it looks like: the serializer does CSE by structural equality, so two
+    separately-built but identical stacks collapse to ONE `values` entry and `deref`
+    hands back the same object for both. Measured -- `is` and `==` agree on one
+    shared stack, on two identical stacks and on two different ones. The spelling
+    states the intent; the strength comes from `set(inputs)` and the `addBands`
+    check below.
+    """
     productivity, land_cover, soc = fake_inputs()
-    inputs = select_inputs(build_indicator(productivity, land_cover, soc))
+    inputs = select_inputs(
+        build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
+    )
 
     assert set(inputs) == {"degradation", "water"}
-    assert inputs["degradation"] == inputs["water"]
+    assert inputs["degradation"] is inputs["water"]
     assert _call(inputs["water"])["functionName"] == "Image.addBands"
 
 
@@ -507,7 +606,11 @@ def test_build_indicator_maps_wires_each_builder_to_its_own_inputs(resolved, ctx
     assert maps.productivity.serialize() == leaves["productivity"].serialize()
     assert (
         maps.indicator.serialize()
-        == build_indicator(leaves["productivity"], leaves["land_cover"], leaves["soc"]).serialize()
+        == build_indicator(
+            productivity=leaves["productivity"],
+            land_cover=leaves["land_cover"],
+            soc=leaves["soc"],
+        ).serialize()
     )
 
 
@@ -542,11 +645,19 @@ def test_the_silent_argument_swaps_change_the_graph(resolved, ctx):
         != leaves["productivity"].serialize()
     )
 
-    # build_indicator(productivity, land_cover, soc): both are 3-class uint8 images
+    # build_indicator(productivity=productivity, land_cover=land_cover, soc=soc): both are 3-class uint8 images
     # and INDICATOR_15_3_1 is not symmetric in them (:385-387 against :394-396).
     assert (
-        build_indicator(leaves["soc"], leaves["land_cover"], leaves["productivity"]).serialize()
-        != build_indicator(leaves["productivity"], leaves["land_cover"], leaves["soc"]).serialize()
+        build_indicator(
+            productivity=leaves["soc"],
+            land_cover=leaves["land_cover"],
+            soc=leaves["productivity"],
+        ).serialize()
+        != build_indicator(
+            productivity=leaves["productivity"],
+            land_cover=leaves["land_cover"],
+            soc=leaves["soc"],
+        ).serialize()
     )
 
 
@@ -630,9 +741,10 @@ def test_each_layer_carries_its_own_image(maps):
 
 
 def test_layer_bands_match_the_export_table(maps):
-    """spec §8. Trend and state carry the 3-class band, NOT the 5-level one
-    `indicator_n_category_label` selected (run_15_3_1.py:437-441) -- see the module
-    docstring's EXPECTED_DIVERGENCES note 3."""
+    """spec §8, the EXPORT vocabulary. Trend and state carry the 3-class band; the
+    5-level band `indicator_n_category_label` selected (run_15_3_1.py:437-441) stays
+    the STATISTICS vocabulary and lives in `stats/requests.py`'s `_STATS_BAND` --
+    see the module docstring's EXPECTED_DIVERGENCES note 4."""
     assert {key: layer.band for key, layer in maps.layers().items()} == {
         IndicatorLayer.LAND_COVER: "degradation",
         IndicatorLayer.SOC: "soc",
@@ -646,10 +758,33 @@ def test_layer_bands_match_the_export_table(maps):
 
 def test_every_named_band_really_exists_in_its_own_image(maps):
     """`ClassifiedLayer.band` is a promise consumers act on with
-    `layer.image.select(layer.band)`; offline, the graph's own `.rename()` targets
-    are what can be checked, per layer rather than as one union over the corpus."""
+    `layer.image.select(layer.band)`, so it is checked against the image's OWN band
+    list, decoded from its band-shaping nodes.
+
+    The earlier spelling of this test asked `band in _renamed_bands(image)`, a union
+    over the whole upstream subgraph. That is far weaker than it reads: the
+    indicator image's union is every rename in the corpus, so any of the seven layer
+    bands satisfied it, and both reviewers landed a mislabelled band that this test
+    waved through while only `test_layer_bands_match_the_export_table` -- itself a
+    hardcoded mirror of the implementation -- objected.
+    """
     for key, layer in maps.layers().items():
-        assert layer.band in _renamed_bands(layer.image), key
+        assert layer.band in output_bands(layer.image), key
+
+
+def test_the_seven_images_carry_exactly_the_bands_the_builders_name(maps):
+    """The other half of the band contract: not just that `layer.band` is present,
+    but what else rides with it. Trend and state are the two-band images whose band
+    0 is the 5-class one the statistics path selects; the rest are single-band."""
+    assert {key: output_bands(layer.image) for key, layer in maps.layers().items()} == {
+        IndicatorLayer.LAND_COVER: ["degradation", "transition", "start", "end", "water"],
+        IndicatorLayer.SOC: ["soc"],
+        IndicatorLayer.PRODUCTIVITY: ["productivity"],
+        IndicatorLayer.PRODUCTIVITY_TREND: ["trajectory_5_levels", "trajectory"],
+        IndicatorLayer.PRODUCTIVITY_STATE: ["state_5_levels", "state"],
+        IndicatorLayer.PRODUCTIVITY_PERFORMANCE: ["performance"],
+        IndicatorLayer.INDICATOR_15_3_1: ["indicator_15_3_1"],
+    }
 
 
 def test_only_performance_uses_the_three_class_labels(maps):

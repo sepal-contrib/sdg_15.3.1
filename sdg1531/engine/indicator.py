@@ -21,17 +21,25 @@ stack, so there is no rebinding left to get wrong; threading a pre-selected imag
 in would put the hazard straight back.
 
 :meth:`IndicatorMaps.layers` replaces ``indicator_n_category_label``
-(run_15_3_1.py:425-450). It is the single seam -- map layers, export sources and
-the statistics layer picker all iterate it -- and there is deliberately no second
-``export_layers()``.
+(run_15_3_1.py:425-450). It is the single seam for the seven IMAGES -- map layers,
+export sources and the statistics layer picker all iterate it -- and there is
+deliberately no second ``export_layers()``.
+
+The seam is the images, not the vocabulary. :attr:`ClassifiedLayer.band` and
+:attr:`ClassifiedLayer.labels` are the MAP AND EXPORT vocabulary (spec §8);
+``sdg1531/stats/requests.py`` owns the STATISTICS vocabulary in its own
+``_STATS_BAND`` / ``_STATS_LABELS`` tables and reads only ``.image`` from here.
+The two deliberately disagree for the trend and state layers -- statistics keep
+the legacy 5-class bands, export takes the 3-class ones -- so "unifying" them
+would silently change the statistics. See EXPECTED_DIVERGENCES note 4.
 
 ResolvedSpec fields read here: none directly. :func:`build_indicator_maps` threads
 ``r`` into the sub-indicator builders and keeps it on
 :attr:`IndicatorMaps.resolved`, because the statistics layer decodes class codes
 off the run's own vocabulary.
 
-EXPECTED_DIVERGENCES note -- three divergences from the legacy. Task 17's parity
-harness must carry all three:
+EXPECTED_DIVERGENCES note -- four divergences from the legacy. Task 17's parity
+harness must carry all four:
 
 1. **Behaviour-changing, and CORPUS-WIDE rather than per-scenario.**
    :func:`build_indicator` ends ``.rename("indicator_15_3_1")``, where
@@ -51,13 +59,25 @@ harness must carry all three:
    the seven :class:`~sdg1531.enums.IndicatorLayer` members, where
    ``indicator_n_category_label``'s seven-branch ``if``/``elif`` chain
    (run_15_3_1.py:427-448) had no ``else`` and left both of its locals unbound for
-   an unrecognised name -- an ``UnboundLocalError`` at its own ``return``. The
-   trend and state entries also change WHICH band and WHICH legend they name: the
-   legacy selected ``trajectory_5_levels`` / ``state_5_levels`` with
-   ``pm.prod_trend_5_class`` / ``pm.prod_state_5_class`` (:437-441), while the
-   spec §8 export table names the 3-class ``trajectory`` / ``state`` bands with
-   ``DEGRADATION_LABELS``. The 5-class bands stay in the images and gain their own
-   viz slot when D8 lands.
+   an unrecognised name -- an ``UnboundLocalError`` at its own ``return``. That
+   totality is the whole of this entry: it does NOT license a change of band or of
+   legend on the statistics path, which Task 15 ports unchanged. See note 4.
+4. **No legacy counterpart.** The ``trajectory`` / ``state`` rows of
+   :meth:`IndicatorMaps.layers` give the trend and state layers a 3-class export
+   band and a 3-class legend, and the legacy has nothing to compare them against:
+   ``display_maps`` (run_15_3_1.py:105-158) draws six rasters plus the AOI --
+   land-cover start and end, productivity, land-cover degradation, soc and the
+   indicator -- and trend, state and performance are never drawn at all. Those six
+   are each genuinely 3-class and ``viz_prod`` / ``viz_lc_sub`` / ``viz_soc`` /
+   ``viz_indicator`` are all ``{"min": 1, "max": 3}`` over a 3-entry legend
+   (parameter/ui.py:49-53, :72-75), so the legacy never misapplied a legend; it
+   simply never rendered these two layers. Spec §8 gives them an export band and a
+   legend for the first time. This is a NEW capability, not a changed one -- and in
+   particular it is NOT a statistics change: ``indicator_n_category_label``'s
+   ``trajectory_5_levels`` / ``state_5_levels`` branches (:437-441) are ported
+   faithfully by ``stats/requests.py``'s ``_STATS_BAND`` / ``_STATS_LABELS``, which
+   keep the 5-class band and the 6-entry legend. Filing this as behaviour-changing
+   would hand the harness a licence to wave through a real statistics regression.
 """
 
 from __future__ import annotations
@@ -101,6 +121,20 @@ class ClassifiedLayer:
     productivity trend and state images also hold their 5-level bands -- and
     ``band`` names the classified band inside it, per the spec §8 export table.
     Consumers select it: ``layer.image.select(layer.band)``.
+
+    ``band`` and ``labels`` are the MAP AND EXPORT vocabulary only. The statistics
+    path keeps its own, in ``sdg1531/stats/requests.py``'s ``_STATS_BAND`` /
+    ``_STATS_LABELS``, and reads only ``.image`` from here; for trend and state the
+    two deliberately disagree (see the module docstring).
+
+    ``label`` is the layer's snake id -- ``id.value``, e.g. ``"productivity_trend"``
+    -- not a human display string. Translated display labels live in the app layer
+    (spec §4); the name is a near-twin of ``labels``, which is the class legend, so
+    the distinction is worth stating.
+
+    ``frozen=True`` synthesises ``__hash__``, but hashing an instance raises
+    ``TypeError`` because ``labels`` is a mapping. Nothing hashes these today;
+    ``eq=False`` is not used because equality is worth having.
     """
 
     id: IndicatorLayer
@@ -119,6 +153,11 @@ class IndicatorMaps:
     statistics layer decodes class codes off the run's own vocabulary:
     ``fetch_transition_areas`` and ``fetch_areas_by_land_cover`` read
     ``maps.resolved``. It is the first field and is never an ``ee`` object.
+
+    As with :class:`ClassifiedLayer`, ``frozen=True`` synthesises a ``__hash__``
+    that raises ``TypeError: unhashable type: 'dict'`` -- here because
+    ``resolved`` carries mappings. (``ee.Image`` itself hashes fine; the images
+    are not the obstacle.)
     """
 
     resolved: ResolvedSpec
@@ -133,12 +172,22 @@ class IndicatorMaps:
     def layers(self) -> Mapping[IndicatorLayer, ClassifiedLayer]:
         """Exactly seven layers, in spec §8 table order.
 
-        Bands follow the §8 export table, which corrects a legacy defect: the old
-        map path wrote the 3-entry degradation legend onto band 1 of all seven
-        images, but band 1 of the trend and state images is the 5-class
-        ``trajectory_5_levels`` / ``state_5_levels`` band, so classes 4 and 5 were
-        never coloured. Here the 3-class band is named explicitly; see the module
-        docstring's EXPECTED_DIVERGENCES note 3 for what that changes.
+        Bands follow the §8 export table. That table does not repair a legacy
+        misapplied legend -- there was none. ``display_maps``
+        (run_15_3_1.py:105-158) draws six rasters plus the AOI outline, all four of
+        its classified ones are genuinely 3-class, and trend, state and performance
+        are never drawn at all. §8 gives trend and state a 3-class band and legend
+        for the first time; their 5-class bands stay in the images, and remain what
+        the statistics path selects. See EXPECTED_DIVERGENCES note 4.
+
+        The ORDER here is ``IndicatorLayer``'s (spec §8, from the trait declaration
+        order at indicator_model.py:272-278). Legacy ``download_maps``
+        (run_15_3_1.py:39-49) exports the same seven images in a different order --
+        ``productivity`` sixth rather than third, performance and state swapped --
+        under the comment "they are in correct order don't change it". That is not
+        a divergence of this seam: export order is the app layer's business, the
+        GEE export tasks are independent, and the legacy discards the dict it
+        builds. A consumer that needs the legacy order must impose it itself.
         """
         return {
             layer.id: layer
@@ -196,13 +245,21 @@ class IndicatorMaps:
         }
 
 
-def build_indicator(productivity: ee.Image, land_cover: LandCoverMaps, soc: ee.Image) -> ee.Image:
+def build_indicator(
+    *, productivity: ee.Image, land_cover: LandCoverMaps, soc: ee.Image
+) -> ee.Image:
     """Collapse the three sub-indicators into 15.3.1 (run_15_3_1.py:373-411).
 
     The 30 rules -- the 27 cells of the 3x3x3 grid, then the three rows that test
     ``.lt(1)`` on two of the three operands (:406-408) -- live in
     ``truth_table.INDICATOR_15_3_1``; ``apply_truth_table`` is the emitter, and the
     order it walks the rules in is what keeps the serialized graph identical.
+
+    The three images are KEYWORD-ONLY, for the same reason
+    :func:`~sdg1531.engine.productivity.build_productivity`'s are: ``productivity``
+    and ``soc`` are both single-band 3-class ``uint8``, ``INDICATOR_15_3_1`` is not
+    symmetric in them (compare :385-387 with :394-396), and ``ee`` is lazy -- so a
+    positional swap would build a clean graph and misclassify at evaluation time.
 
     ``.rename("indicator_15_3_1")`` is the one deliberate change; see the module
     docstring's EXPECTED_DIVERGENCES note 1.
@@ -211,7 +268,7 @@ def build_indicator(productivity: ee.Image, land_cover: LandCoverMaps, soc: ee.I
     landcover = land_cover.degradation  # :375
 
     indicator = apply_truth_table(
-        (productivity, landcover, soc), INDICATOR_15_3_1, "indicator_15_3_1"
+        (productivity, landcover, soc), INDICATOR_15_3_1, INDICATOR_15_3_1.band
     )  # :377-409
 
     # :411 -- the mask is applied AFTER the collapse, with the water image as its
@@ -244,7 +301,9 @@ def build_indicator_maps(r: ResolvedSpec, ctx: ExecutionContext) -> IndicatorMap
         r, trajectory=trajectory, state=state, performance=performance
     )
 
-    indicator = build_indicator(productivity, land_cover, soc)  # :200-202
+    indicator = build_indicator(
+        productivity=productivity, land_cover=land_cover, soc=soc
+    )  # :200-202
 
     return IndicatorMaps(
         resolved=r,
@@ -264,8 +323,13 @@ def serialize_maps(maps: IndicatorMaps) -> dict[str, str]:
     The parity harness (§12 Tier 4) compares these strings old-vs-new, so the
     values are WHOLE images -- the same objects the legacy assigned to its seven
     output traits (run_15_3_1.py:173-202) -- and not band selections.
+
+    Keyed on ``layer.id.value``, which IS spec §8's "Layer id" column:
+    ``IndicatorLayer`` is a ``str`` enum, ``naming.py``'s ``LAYER_BASENAMES`` keys
+    on ``.value``, and Task 15 uses ``layer.value`` for DataFrame columns.
+    ``.name.lower()`` agrees today only because every member's identifier happens
+    to spell its own value.
     """
     return {
-        layer.id.name.lower(): str(ee.serializer.toJSON(layer.image))
-        for layer in maps.layers().values()
+        layer.id.value: str(ee.serializer.toJSON(layer.image)) for layer in maps.layers().values()
     }
