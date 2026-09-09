@@ -300,7 +300,8 @@ VI_SOURCES = st.one_of(
             st.sampled_from(
                 ("Landsat 8", "Landsat 9", "Sentinel 2", "MODIS MOD13Q1", "Derived VI Landsat")
             ),
-            min_size=1,
+            # min_size=0: () is the form's initial state (SensorSelection() default), a
+            # real shape the round trip must cover, not just the populated cases.
             max_size=3,
         ).map(tuple),
     ),
@@ -419,6 +420,81 @@ def test_from_dict_rejects_an_unknown_enum_value():
     payload = RunSpec().to_dict()
     payload["trajectory"] = "not_a_trend"
     with pytest.raises(SpecError, match="invalid value"):
+        RunSpec.from_dict(payload)
+
+
+# ---------------------------------------------------------- fix round 1: total encoders
+
+# Every union field is typed `X | None` with no constructor validation, so nothing stops
+# `RunSpec(aoi="not an aoi")` from being built. Before fix round 1 the five `match`
+# encoders had no `case _`, so a value that matched no arm fell off the end and the
+# function returned `None` - indistinguishable from the field being genuinely unset. Each
+# encoder must instead raise, naming the field and the offending type.
+
+
+def test_to_dict_rejects_a_wrong_typed_aoi():
+    with pytest.raises(SpecError, match="aoi: cannot serialize a str value"):
+        RunSpec(aoi="users/me/aoi").to_dict()
+
+
+def test_to_dict_rejects_a_wrong_typed_vi_source():
+    with pytest.raises(SpecError, match="vi_source: cannot serialize a str value"):
+        RunSpec(vi_source="landsat").to_dict()
+
+
+def test_to_dict_rejects_a_wrong_typed_climate():
+    with pytest.raises(SpecError, match="climate: cannot serialize a str value"):
+        RunSpec(climate="crpix").to_dict()
+
+
+def test_to_dict_rejects_a_wrong_typed_water_mask():
+    with pytest.raises(SpecError, match="water_mask: cannot serialize a str value"):
+        RunSpec(water_mask="jrc").to_dict()
+
+
+def test_to_dict_rejects_a_wrong_typed_land_cover():
+    with pytest.raises(SpecError, match="land_cover: cannot serialize a str value"):
+        RunSpec(land_cover="esa_cci").to_dict()
+
+
+def test_fingerprint_no_longer_collides_a_wrong_typed_aoi_with_unset():
+    # Before the fix: RunSpec(aoi="users/me/aoi").to_dict()["aoi"] was None, so this
+    # spec's fingerprint was identical to RunSpec(aoi=None)'s - two materially different
+    # runs sharing one hash. Now both `to_dict` and `fingerprint` raise instead of
+    # silently coercing the wrong-typed field to "unset".
+    with pytest.raises(SpecError, match="aoi: cannot serialize"):
+        RunSpec(aoi="users/me/aoi").fingerprint()
+    assert RunSpec(aoi=None).fingerprint() == RunSpec(aoi=None).fingerprint()
+
+
+# --------------------------------------------------- fix round 1: malformed structure
+
+
+def test_from_dict_rejects_periods_given_as_a_list():
+    payload = RunSpec().to_dict()
+    payload["periods"] = []
+    with pytest.raises(SpecError, match="malformed"):
+        RunSpec.from_dict(payload)
+
+
+def test_from_dict_rejects_a_null_compatibility():
+    payload = RunSpec().to_dict()
+    payload["compatibility"] = None
+    with pytest.raises(SpecError, match="malformed"):
+        RunSpec.from_dict(payload)
+
+
+def test_from_dict_rejects_a_non_iterable_transition_matrix():
+    payload = RunSpec().to_dict()
+    payload["transition_matrix"] = 7
+    with pytest.raises(SpecError, match="malformed"):
+        RunSpec.from_dict(payload)
+
+
+def test_from_dict_rejects_a_transition_matrix_with_a_null_cell():
+    payload = RunSpec().to_dict()
+    payload["transition_matrix"] = [[None]]
+    with pytest.raises(SpecError, match="malformed"):
         RunSpec.from_dict(payload)
 
 

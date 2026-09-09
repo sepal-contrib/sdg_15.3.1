@@ -207,6 +207,15 @@ class FixedClimate:
     @property
     def token(self) -> str:
         # indicator_model.py:310 - int() truncation preserved.
+        #
+        # Known, faithfully-transcribed legacy defect (not fixed here, per D9): over the
+        # slider's real domain (climate_regime.py:29, step=0.01, 101 values) int(c*100)
+        # is not injective - float rounding gives only 99 distinct tokens, e.g. 0.28 and
+        # 0.29 both truncate to "cr28", 0.56 and 0.57 both to "cr56". folder_name() uses
+        # this token as both a directory component and the glob prefix for the
+        # "results already exist" check, so two different custom runs can share a
+        # result directory and the second silently overwrites the first.
+        # fingerprint() still tells them apart - it hashes coefficient, not token.
         return f"cr{int(self.coefficient * 100)}"
 
 
@@ -388,6 +397,12 @@ class RunSpec:
             )
         except KeyError as error:
             raise SpecError(f"RunSpec payload is missing {error}") from error
+        except TypeError as error:
+            # e.g. `periods` given as a list, `compatibility: null`, or a
+            # `transition_matrix` that isn't a list of lists of ints - Task 17's parity
+            # harness re-reads spec.json off disk, so a corrupt golden must surface as a
+            # SpecError with context, not an unannotated TypeError.
+            raise SpecError(f"RunSpec payload is malformed: {error}") from error
         except ValueError as error:
             raise SpecError(f"RunSpec payload holds an invalid value: {error}") from error
 
@@ -449,6 +464,8 @@ def _aoi_to_json(aoi: AoiSpec) -> Json:
             return _arm(AssetAoi.kind, asset_id=asset_id, name=name)
         case GeoJsonAoi(geojson=geojson, name=name):
             return _arm(GeoJsonAoi.kind, geojson=dict(geojson), name=name)
+        case _:
+            raise SpecError(f"aoi: cannot serialize a {type(aoi).__name__} value: {aoi!r}")
 
 
 def _aoi_from_json(payload: Json) -> AoiSpec:
@@ -466,6 +483,10 @@ def _vi_source_to_json(source: ViSource) -> Json:
             return _arm(SensorSelection.kind, names=list(names))
         case PrecomputedViAsset(asset_id=asset_id, scale=scale):
             return _arm(PrecomputedViAsset.kind, asset_id=asset_id, scale=scale)
+        case _:
+            raise SpecError(
+                f"vi_source: cannot serialize a {type(source).__name__} value: {source!r}"
+            )
 
 
 def _vi_source_from_json(payload: Json) -> ViSource:
@@ -483,6 +504,10 @@ def _climate_to_json(climate: Climate) -> Json:
             return _arm(PerPixelClimate.kind)
         case FixedClimate(coefficient=coefficient):
             return _arm(FixedClimate.kind, coefficient=coefficient)
+        case _:
+            raise SpecError(
+                f"climate: cannot serialize a {type(climate).__name__} value: {climate!r}"
+            )
 
 
 def _climate_from_json(payload: Json) -> Climate:
@@ -502,6 +527,8 @@ def _water_mask_to_json(mask: WaterMaskSpec) -> Json:
             return _arm(PixelValueMask.kind, value=value)
         case AssetBandMask(asset_id=asset_id, band=band):
             return _arm(AssetBandMask.kind, asset_id=asset_id, band=band)
+        case _:
+            raise SpecError(f"water_mask: cannot serialize a {type(mask).__name__} value: {mask!r}")
 
 
 def _water_mask_from_json(payload: Json) -> WaterMaskSpec:
@@ -525,6 +552,10 @@ def _land_cover_to_json(source: LandCoverSource) -> Json:
                 start_asset=start_asset,
                 end_asset=end_asset,
                 scheme=None if scheme is None else _scheme_to_json(scheme),
+            )
+        case _:
+            raise SpecError(
+                f"land_cover: cannot serialize a {type(source).__name__} value: {source!r}"
             )
 
 
