@@ -102,6 +102,15 @@ def test_classify_states_one_out_all_out():
     assert classify(0, 1, 1) == 0  # but two degraded plus one nodata is nodata
 
 
+@pytest.mark.parametrize("classes", [(), (1,), (1, 2), (1, 2, 3, 1)])
+def test_classify_rejects_wrong_arity(classes):
+    """INDICATOR_15_3_1 has no arity but three; classify() must not answer for
+    any other count rather than silently returning a plausible-looking class.
+    """
+    with pytest.raises(ValueError, match="exactly 3"):
+        classify(*classes)
+
+
 def test_band_names_record_the_indicator_rename_divergence():
     assert PRODUCTIVITY_GPGV2.band == "productivity"
     assert PRODUCTIVITY_GPGV1.band == "productivity"

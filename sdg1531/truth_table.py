@@ -155,11 +155,18 @@ INDICATOR_15_3_1 = TruthTable(
 def classify(*classes: int) -> int:
     """One-out-all-out over the three 15.3.1 sub-indicators. Test oracle only.
 
+    Takes exactly three classes — productivity, landcover, soc, in that order —
+    and raises otherwise; INDICATOR_15_3_1 has no arity but three, and an oracle
+    that answered confidently for any other count would be a trap for whoever
+    reuses it later.
+
     0 is nodata, 1 degraded, 2 stable, 3 improved. A pixel where any
     sub-indicator is missing is nodata, except the three rows the legacy chain
     spells with `.lt(1)`: a single degraded sub-indicator and nothing else
     observed still reports degraded.
     """
+    if len(classes) != 3:
+        raise ValueError(f"classify() takes exactly 3 sub-indicator classes, got {len(classes)}")
     observed = [value for value in classes if value != 0]
     if len(observed) < len(classes):
         return 1 if observed == [1] else 0

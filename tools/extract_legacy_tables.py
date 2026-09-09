@@ -5,8 +5,15 @@ Spec §12 Tier 2. The three chains are the port's biggest transcription risk:
 reads them out of the legacy source with `ast`, so `sdg1531/truth_table.py`
 can be diffed against the original mechanically.
 
-Encoding: an operand `img.eq(k)` becomes the pair (name, k); `img.lt(1)` — used
-only by run_15_3_1.py:406-408 — becomes (name, 0). Nothing else is accepted.
+Encoding: an operand `img.eq(k)` for k >= 1 becomes the pair (name, k); `img.lt(1)`
+— used only by run_15_3_1.py:406-408 — becomes (name, 0). `img.eq(0)` is refused
+rather than folded onto that same (name, 0): the two predicates read identically
+here, but the emitter this feeds always spells class 0 as `.lt(1)`, never
+`.eq(0)`, so accepting the latter would let a mistranscribed chain through
+looking correct. A shadowed function name, or a function with more than one
+`.where()`-chain assignment, is refused the same way: Python's own name binding
+and control flow pick exactly one of those at runtime, and this tool refuses to
+guess which one that would be. Nothing else is accepted.
 
 The output is committed to `tests/fixtures/legacy_tables.json` so this evidence of
 correctness survives `component/` eventually being deleted. Its faithfulness to
@@ -40,22 +47,38 @@ TARGETS = (
 
 
 def _find_function(tree: ast.Module, name: str) -> ast.FunctionDef:
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return node
-    raise ValueError(f"no function named {name}")
+    matches = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name]
+    if not matches:
+        raise ValueError(f"no function named {name}")
+    if len(matches) > 1:
+        # Python binds a shadowed name to the *last* def, not the first; picking
+        # either without checking would silently extract the wrong function.
+        raise ValueError(
+            f"{len(matches)} functions named {name} in this module — ambiguous "
+            "which one Python would actually bind, refusing to guess"
+        )
+    return matches[0]
 
 
 def _find_chain(func: ast.FunctionDef) -> ast.Assign:
+    matches = []
     for node in func.body:
         if not isinstance(node, ast.Assign):
             continue
         cur = node.value
         while isinstance(cur, ast.Call) and isinstance(cur.func, ast.Attribute):
             if cur.func.attr == "where":
-                return node
+                matches.append(node)
+                break
             cur = cur.func.value
-    raise ValueError(f"no .where() chain in {func.name}")
+    if not matches:
+        raise ValueError(f"no .where() chain in {func.name}")
+    if len(matches) > 1:
+        raise ValueError(
+            f"{len(matches)} .where() chains assigned in {func.name} — ambiguous "
+            "which one is the function's actual result, refusing to guess"
+        )
+    return matches[0]
 
 
 def _operand(node: ast.AST) -> tuple[str, int]:
@@ -68,6 +91,11 @@ def _operand(node: ast.AST) -> tuple[str, int]:
     if len(node.args) != 1 or not isinstance(node.args[0], ast.Constant):
         raise ValueError(f"unsupported comparison argument in .{attr}()")
     argument = node.args[0].value
+    if attr == "eq" and argument == 0:
+        # class 0 is only ever spelled `.lt(1)` in the legacy chains
+        # (run_15_3_1.py:406-408); an `.eq(0)` would be silently
+        # indistinguishable from that once encoded as (name, 0).
+        raise ValueError(f"ambiguous .eq(0) in .{attr}() — class 0 must be .lt(1)")
     if attr == "eq":
         cls = int(argument)
     elif attr == "lt" and argument == 1:

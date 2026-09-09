@@ -123,6 +123,48 @@ def test_fixture_is_regenerated_from_source(extracted):
     assert extracted == committed
 
 
+def test_eq_zero_is_rejected_not_aliased_to_lt_one(tool):
+    """`.eq(0)` would encode to the same (name, 0) as `.lt(1)` — refuse it outright
+    rather than let it through indistinguishable from the real class-0 predicate.
+    """
+    source = (
+        "def f():\n    x = ee.Image(0).where(a.eq(0).And(b.eq(1)), 1).rename('x')\n    return x\n"
+    )
+    with pytest.raises(ValueError, match=r"ambiguous \.eq\(0\)"):
+        tool.extract_chain(source, "f")
+
+
+def test_multiple_where_chains_in_one_function_is_an_error(tool):
+    """Two `.where()`-chain assignments in one function are ambiguous about which
+    one is the actual result — refuse rather than silently pick the first.
+    """
+    source = (
+        "def f():\n"
+        "    y = ee.Image(0).where(a.eq(1), 9).rename('y')\n"
+        "    x = ee.Image(0).where(a.eq(1), 1).rename('x')\n"
+        "    return x\n"
+    )
+    with pytest.raises(ValueError, match="ambiguous which one is the function's actual result"):
+        tool.extract_chain(source, "f")
+
+
+def test_shadowed_function_name_is_an_error(tool):
+    """Python binds a shadowed def to the *last* definition; refuse rather than
+    silently extract the first, which would be the wrong one.
+    """
+    source = (
+        "def f():\n"
+        "    x = ee.Image(0).where(a.eq(1), 9).rename('first')\n"
+        "    return x\n"
+        "\n"
+        "def f():\n"
+        "    x = ee.Image(0).where(a.eq(1), 1).rename('second')\n"
+        "    return x\n"
+    )
+    with pytest.raises(ValueError, match="ambiguous which one Python would actually bind"):
+        tool.extract_chain(source, "f")
+
+
 def test_unknown_predicate_is_an_error_not_a_silent_skip(tool):
     source = (
         "def f():\n    x = ee.Image(0).where(a.gt(1).And(b.eq(2)), 3).rename('x')\n    return x\n"
