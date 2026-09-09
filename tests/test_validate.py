@@ -220,6 +220,106 @@ def test_missing_custom_land_cover_assets_are_reported_per_field():
     assert fields == ["land_cover.start_asset", "land_cover.end_asset"]
 
 
+def test_same_land_cover_asset_is_fatal():
+    # input_tile.py:259-265 — start and end must be different assets.
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/same", end_asset="users/someone/same"
+        )
+    )
+    problem = only(spec, "same_land_cover_asset")
+    assert problem.field == "land_cover"
+    assert problem.fatal is True
+
+
+def test_different_land_cover_assets_are_silent_on_that_rule():
+    assert "same_land_cover_asset" not in codes(
+        BASE.evolve(
+            land_cover=CustomLandCoverSource(
+                start_asset="users/someone/start", end_asset="users/someone/end"
+            )
+        )
+    )
+
+
+def test_custom_code_out_of_range_is_fatal():
+    # input_tile.py:303-308 — legacy checks only the start codelist, not the
+    # end one; preserved faithfully rather than silently widened.
+    out_of_range_scheme = LandCoverScheme(
+        start_names=("Forest", "Big code"),
+        start_codes=(10, 100),
+        end_names=("Forest", "Cropland"),
+        end_codes=(10, 30),
+        matrix=TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=out_of_range_scheme,
+        )
+    )
+    problem = only(spec, "custom_code_out_of_range")
+    assert problem.field == "land_cover.scheme.start_codes"
+    assert problem.fatal is True
+
+
+def test_out_of_range_end_code_is_not_checked():
+    # legacy's own asymmetry (input_tile.py:303-308): only start codes are
+    # range-checked. Not fixed here — this pins the faithfully-ported behaviour.
+    end_out_of_range_scheme = LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Big code"),
+        end_codes=(10, 100),
+        matrix=TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=end_out_of_range_scheme,
+        )
+    )
+    assert "custom_code_out_of_range" not in codes(spec)
+
+
+def test_land_cover_class_mismatch_is_fatal():
+    # input_tile.py:315-320 — start and end class-name sets must match.
+    mismatched_scheme = LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Wetland"),
+        end_codes=(10, 40),
+        matrix=TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=mismatched_scheme,
+        )
+    )
+    problem = only(spec, "land_cover_class_mismatch")
+    assert problem.field == "land_cover.scheme"
+    assert problem.fatal is True
+
+
+def test_matching_class_names_are_silent_on_that_rule():
+    assert "land_cover_class_mismatch" not in codes(
+        BASE.evolve(
+            land_cover=CustomLandCoverSource(
+                start_asset="users/someone/start",
+                end_asset="users/someone/end",
+                scheme=scheme(),
+            )
+        )
+    )
+
+
 # Two of the three legal values, and one foreign value, both built off the real
 # 7x7 default matrix (49 cells) rather than a toy 2x2 — the top-level
 # `transition_matrix` field has no vocabulary of its own, it is only ever meant
@@ -374,8 +474,10 @@ def _matrices(draw: st.DrawFn) -> TransitionMatrix:
 matrices = _matrices()
 schemes = st.builds(
     LandCoverScheme,
-    start_names=st.just(("Forest", "Cropland")),
-    start_codes=st.just((10, 30)),
+    # sometimes mismatched against end_names/end_codes below, so the fuzzer also
+    # exercises custom_code_out_of_range (100, 5) and land_cover_class_mismatch.
+    start_names=st.sampled_from((("Forest", "Cropland"), ("Forest", "Wetland"))),
+    start_codes=st.sampled_from(((10, 30), (10, 100), (5, 30))),
     end_names=st.just(("Forest", "Cropland")),
     end_codes=st.just((10, 30)),
     matrix=matrices,
@@ -397,9 +499,11 @@ land_cover_sources = st.one_of(
     st.just(EsaCciSource()),
     st.builds(
         CustomLandCoverSource,
-        # both asset fields are required strings; "" is the half-filled form
-        start_asset=st.sampled_from(("", "users/someone/start")),
-        end_asset=st.sampled_from(("", "users/someone/end")),
+        # both asset fields are required strings; "" is the half-filled form,
+        # and "same" lets the two coincide so the fuzzer also exercises
+        # same_land_cover_asset.
+        start_asset=st.sampled_from(("", "users/someone/start", "users/someone/same")),
+        end_asset=st.sampled_from(("", "users/someone/end", "users/someone/same")),
         scheme=st.one_of(st.none(), schemes),
     ),
 )

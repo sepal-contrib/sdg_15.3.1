@@ -182,6 +182,38 @@ def _trajectory_problems(spec: RunSpec) -> tuple[Problem, ...]:
     )
 
 
+def _custom_scheme_problems(scheme: LandCoverScheme) -> tuple[Problem, ...]:
+    problems: list[Problem] = []
+
+    # input_tile.py:303-308 — legacy range-checks only the start codelist, not
+    # the end one. Preserved as-is rather than silently widened to both.
+    if scheme.start_codes and (min(scheme.start_codes) < 10 or max(scheme.start_codes) > 99):
+        problems.append(
+            Problem(
+                field="land_cover.scheme.start_codes",
+                code="custom_code_out_of_range",
+                message=(
+                    "Custom land cover codes must be two digits (10-99); got "
+                    f"{sorted(scheme.start_codes)}."
+                ),
+                fatal=True,
+            )
+        )
+
+    # input_tile.py:315-320
+    if set(scheme.start_names) != set(scheme.end_names):
+        problems.append(
+            Problem(
+                field="land_cover.scheme",
+                code="land_cover_class_mismatch",
+                message="The start and end land cover class names must match.",
+                fatal=True,
+            )
+        )
+
+    return tuple(problems)
+
+
 def _land_cover_problems(spec: RunSpec) -> tuple[Problem, ...]:
     source = spec.land_cover
     if not isinstance(source, CustomLandCoverSource):
@@ -205,20 +237,33 @@ def _land_cover_problems(spec: RunSpec) -> tuple[Problem, ...]:
                 fatal=True,
             )
         )
-    if source.start_asset and source.end_asset and source.scheme is None:
-        # land_cover.py:40 vs indicator_model.py:232
-        problems.append(
-            Problem(
-                field="land_cover.scheme",
-                code="half_custom_land_cover",
-                message=(
-                    "Custom land cover assets are set without a transition matrix "
-                    "file, so their pixel codes are remapped through the default "
-                    "IPCC vocabulary."
-                ),
-                fatal=False,
+    if source.start_asset and source.end_asset:
+        if source.start_asset == source.end_asset:
+            # input_tile.py:259-265
+            problems.append(
+                Problem(
+                    field="land_cover",
+                    code="same_land_cover_asset",
+                    message="The start and end land cover assets must be different.",
+                    fatal=True,
+                )
             )
-        )
+        if source.scheme is None:
+            # land_cover.py:40 vs indicator_model.py:232
+            problems.append(
+                Problem(
+                    field="land_cover.scheme",
+                    code="half_custom_land_cover",
+                    message=(
+                        "Custom land cover assets are set without a transition matrix "
+                        "file, so their pixel codes are remapped through the default "
+                        "IPCC vocabulary."
+                    ),
+                    fatal=False,
+                )
+            )
+        else:
+            problems.extend(_custom_scheme_problems(source.scheme))
     return tuple(problems)
 
 
