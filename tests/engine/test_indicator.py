@@ -17,14 +17,41 @@ The 30-rule chain is transcribed here TWICE, deliberately:
   rule moved, which a string comparison cannot.
 
 Both blocks were extracted mechanically from the legacy file, not retyped.
+
+Wiring, not new logic, is ``build_indicator_maps``'s risk: every builder it calls
+takes single-band ``uint8`` images that would build a perfectly clean graph in the
+wrong slot, and ``ee`` is lazy enough never to complain. So each equality
+assertion in ``test_build_indicator_maps_wires_each_builder_to_its_own_inputs`` is
+paired, in ``test_the_silent_argument_swaps_change_the_graph``, with the swapped
+call it is supposed to be able to see.
 """
 
 from __future__ import annotations
 
-import ee
+import dataclasses
+import json
 
-from sdg1531.engine.indicator import build_indicator
-from sdg1531.engine.land_cover import LandCoverMaps
+import ee
+import pytest
+
+from sdg1531.engine.indicator import (
+    ClassifiedLayer,
+    IndicatorMaps,
+    build_indicator,
+    build_indicator_maps,
+    serialize_maps,
+)
+from sdg1531.engine.integration import build_climate_collection, build_vi_collection
+from sdg1531.engine.land_cover import LandCoverMaps, build_land_cover
+from sdg1531.engine.productivity import (
+    build_performance,
+    build_productivity,
+    build_state,
+    build_trajectory,
+)
+from sdg1531.engine.soc import build_soil_organic_carbon
+from sdg1531.enums import IndicatorLayer
+from sdg1531.tables import DEGRADATION_LABELS, PROD_PERFORMANCE_LABELS
 from tests.engine.graph import (
     _call,
     _image_constant,
@@ -431,3 +458,259 @@ def test_both_bands_are_read_off_the_same_unselected_stack():
     assert set(inputs) == {"degradation", "water"}
     assert inputs["degradation"] == inputs["water"]
     assert _call(inputs["water"])["functionName"] == "Image.addBands"
+
+
+# --- build_indicator_maps: the wiring -----------------------------------------
+
+
+@pytest.fixture
+def maps(resolved, ctx):
+    return build_indicator_maps(resolved, ctx)
+
+
+def leaf_builds(resolved, ctx):
+    """Every intermediate `build_indicator_maps` builds, rebuilt independently here
+    in run_15_3_1.py:171-202's own order."""
+    climate = build_climate_collection(resolved, ctx)  # :171
+    vi = build_vi_collection(resolved, ctx)  # :172
+    trajectory = build_trajectory(resolved, vi, climate)  # :173-175
+    performance = build_performance(resolved, ctx, vi)  # :176-178
+    state = build_state(resolved, vi)  # :179
+    land_cover = build_land_cover(resolved, ctx)  # :182
+    soc = build_soil_organic_carbon(resolved, ctx)  # :183
+    productivity = build_productivity(  # :184-197
+        resolved, trajectory=trajectory, state=state, performance=performance
+    )
+    return {
+        "climate": climate,
+        "vi": vi,
+        "trajectory": trajectory,
+        "performance": performance,
+        "state": state,
+        "land_cover": land_cover,
+        "soc": soc,
+        "productivity": productivity,
+    }
+
+
+def test_build_indicator_maps_wires_each_builder_to_its_own_inputs(resolved, ctx, maps):
+    """run_15_3_1.py:164-204. Every output is compared against the same builder
+    called with the same inputs, so a seam that fed one builder another builder's
+    image shows up as a different graph."""
+    leaves = leaf_builds(resolved, ctx)
+
+    assert maps.productivity_trend.serialize() == leaves["trajectory"].serialize()
+    assert maps.productivity_state.serialize() == leaves["state"].serialize()
+    assert maps.productivity_performance.serialize() == leaves["performance"].serialize()
+    assert maps.land_cover.stack.serialize() == leaves["land_cover"].stack.serialize()
+    assert maps.soc.serialize() == leaves["soc"].serialize()
+    assert maps.productivity.serialize() == leaves["productivity"].serialize()
+    assert (
+        maps.indicator.serialize()
+        == build_indicator(leaves["productivity"], leaves["land_cover"], leaves["soc"]).serialize()
+    )
+
+
+def test_the_silent_argument_swaps_change_the_graph(resolved, ctx):
+    """What makes the equalities above evidence rather than tautology.
+
+    Each swap below builds a perfectly clean graph -- `ee` is lazy and the operands
+    are all single-band uint8 images -- and computes the wrong classes. If any of
+    these three comparisons were `==`, the corresponding equality assertion could
+    not see the swap it is there to catch.
+    """
+    leaves = leaf_builds(resolved, ctx)
+
+    # build_trajectory(r, vi, climate): NDVI_TREND never reads `climate`, so a swap
+    # runs the Kendall trend over precipitation instead of the vegetation index.
+    assert (
+        build_trajectory(resolved, leaves["climate"], leaves["vi"]).serialize()
+        != leaves["trajectory"].serialize()
+    )
+
+    # build_productivity's state/performance are keyword-only precisely because the
+    # legacy signature and its only call site are (trajectory, PERFORMANCE, STATE)
+    # -- productivity.py:252 and run_15_3_1.py:185-190 -- while the port's rule
+    # order is (trajectory, STATE, PERFORMANCE).
+    assert (
+        build_productivity(
+            resolved,
+            trajectory=leaves["trajectory"],
+            state=leaves["performance"],
+            performance=leaves["state"],
+        ).serialize()
+        != leaves["productivity"].serialize()
+    )
+
+    # build_indicator(productivity, land_cover, soc): both are 3-class uint8 images
+    # and INDICATOR_15_3_1 is not symmetric in them (:385-387 against :394-396).
+    assert (
+        build_indicator(leaves["soc"], leaves["land_cover"], leaves["productivity"]).serialize()
+        != build_indicator(leaves["productivity"], leaves["land_cover"], leaves["soc"]).serialize()
+    )
+
+
+def test_maps_carry_the_very_resolved_spec_they_were_handed(resolved, ctx):
+    """Task 15's `fetch_transition_areas` / `fetch_areas_by_land_cover` decode class
+    codes off `maps.resolved`."""
+    assert build_indicator_maps(resolved, ctx).resolved is resolved
+
+
+def test_resolved_is_the_first_field_and_the_seven_outputs_follow(maps):
+    """Field ORDER is load-bearing, not cosmetic: `resolved` is first so Task 15
+    reads it positionally-independently of the seven images, and the seven follow in
+    spec §8 order."""
+    assert [field.name for field in dataclasses.fields(IndicatorMaps)] == [
+        "resolved",
+        "land_cover",
+        "soc",
+        "productivity",
+        "productivity_trend",
+        "productivity_state",
+        "productivity_performance",
+        "indicator",
+    ]
+
+
+def test_indicator_maps_is_frozen(maps):
+    with pytest.raises(dataclasses.FrozenInstanceError, match="cannot assign to field 'soc'"):
+        maps.soc = ee.Image(0)
+
+
+def test_classified_layer_is_frozen(maps):
+    layer = maps.layers()[IndicatorLayer.SOC]
+    with pytest.raises(dataclasses.FrozenInstanceError, match="cannot assign to field 'band'"):
+        layer.band = "other"
+
+
+# --- the seven-layer seam -----------------------------------------------------
+
+
+def test_layers_returns_exactly_seven_entries_in_spec_order(maps):
+    """spec §8 table order. Asserted as a LIST: a mapping with the right seven keys
+    in a different order passes an equality on `set(layers)`, and one that keyed two
+    layers under the same id passes a `len(...) == 7` written against a set."""
+    layers = maps.layers()
+    assert list(layers) == [
+        IndicatorLayer.LAND_COVER,
+        IndicatorLayer.SOC,
+        IndicatorLayer.PRODUCTIVITY,
+        IndicatorLayer.PRODUCTIVITY_TREND,
+        IndicatorLayer.PRODUCTIVITY_STATE,
+        IndicatorLayer.PRODUCTIVITY_PERFORMANCE,
+        IndicatorLayer.INDICATOR_15_3_1,
+    ]
+    assert len(layers) == 7
+
+
+def test_every_layer_is_keyed_by_its_own_id_and_labelled_by_its_value(maps):
+    for key, layer in maps.layers().items():
+        assert isinstance(layer, ClassifiedLayer)
+        assert layer.id is key
+        assert layer.label == key.value
+        assert isinstance(layer.image, ee.Image)
+
+
+def test_each_layer_carries_its_own_image(maps):
+    """The seven `.image`s are the seven outputs, each in its own slot -- the
+    mistake a keyed mapping cannot show is two entries pointing at one image."""
+    layers = maps.layers()
+    images = {
+        IndicatorLayer.LAND_COVER: maps.land_cover.stack,
+        IndicatorLayer.SOC: maps.soc,
+        IndicatorLayer.PRODUCTIVITY: maps.productivity,
+        IndicatorLayer.PRODUCTIVITY_TREND: maps.productivity_trend,
+        IndicatorLayer.PRODUCTIVITY_STATE: maps.productivity_state,
+        IndicatorLayer.PRODUCTIVITY_PERFORMANCE: maps.productivity_performance,
+        IndicatorLayer.INDICATOR_15_3_1: maps.indicator,
+    }
+    for key, image in images.items():
+        assert layers[key].image is image
+    assert len({id(layer.image) for layer in layers.values()}) == 7
+
+
+def test_layer_bands_match_the_export_table(maps):
+    """spec §8. Trend and state carry the 3-class band, NOT the 5-level one
+    `indicator_n_category_label` selected (run_15_3_1.py:437-441) -- see the module
+    docstring's EXPECTED_DIVERGENCES note 3."""
+    assert {key: layer.band for key, layer in maps.layers().items()} == {
+        IndicatorLayer.LAND_COVER: "degradation",
+        IndicatorLayer.SOC: "soc",
+        IndicatorLayer.PRODUCTIVITY: "productivity",
+        IndicatorLayer.PRODUCTIVITY_TREND: "trajectory",
+        IndicatorLayer.PRODUCTIVITY_STATE: "state",
+        IndicatorLayer.PRODUCTIVITY_PERFORMANCE: "performance",
+        IndicatorLayer.INDICATOR_15_3_1: "indicator_15_3_1",
+    }
+
+
+def test_every_named_band_really_exists_in_its_own_image(maps):
+    """`ClassifiedLayer.band` is a promise consumers act on with
+    `layer.image.select(layer.band)`; offline, the graph's own `.rename()` targets
+    are what can be checked, per layer rather than as one union over the corpus."""
+    for key, layer in maps.layers().items():
+        assert layer.band in _renamed_bands(layer.image), key
+
+
+def test_only_performance_uses_the_three_class_labels(maps):
+    """`pm.prod_performance_class` has no "Improved" (tables.py:99-101); every
+    other layer is on the 4-entry degradation legend."""
+    layers = maps.layers()
+    assert layers[IndicatorLayer.PRODUCTIVITY_PERFORMANCE].labels == PROD_PERFORMANCE_LABELS
+    for key, layer in layers.items():
+        if key is not IndicatorLayer.PRODUCTIVITY_PERFORMANCE:
+            assert layer.labels == DEGRADATION_LABELS, key
+
+
+def test_there_is_no_export_layers_method():
+    """spec §4: layers() is the single seam -- map layers, export sources and the
+    statistics layer picker all iterate it."""
+    assert not hasattr(IndicatorMaps, "export_layers")
+
+
+# --- serialization ------------------------------------------------------------
+
+
+def test_serialize_maps_is_keyed_by_the_spec_layer_ids(maps):
+    payload = serialize_maps(maps)
+    assert list(payload) == [
+        "land_cover",
+        "soc",
+        "productivity",
+        "productivity_trend",
+        "productivity_state",
+        "productivity_performance",
+        "indicator_15_3_1",
+    ]
+
+
+def test_every_serialize_key_is_its_layer_s_own_id(maps):
+    """The key is `layer.id.name.lower()`, which is the §8 "Layer id" column and so
+    equals `layer.id.value` for all seven. Pinned so the two spellings cannot drift
+    apart silently."""
+    for key, layer in zip(serialize_maps(maps), maps.layers().values(), strict=True):
+        assert key == layer.id.name.lower() == layer.id.value
+
+
+def test_serialize_maps_encodes_the_whole_image_not_the_named_band(maps):
+    """§12 Tier 4 compares these strings old-vs-new, and the legacy assigned WHOLE
+    images to its seven output traits (run_15_3_1.py:173-202). Encoding
+    `layer.image.select(layer.band)` instead would silently change every trend and
+    state comparison, since those images carry two bands."""
+    payload = serialize_maps(maps)
+    for key, layer in zip(payload, maps.layers().values(), strict=True):
+        assert payload[key] == ee.serializer.toJSON(layer.image)
+        assert json.loads(payload[key])["result"]
+
+    assert payload["productivity_trend"] == ee.serializer.toJSON(maps.productivity_trend)
+    assert payload["productivity_trend"] != ee.serializer.toJSON(
+        maps.productivity_trend.select("trajectory")
+    )
+
+
+def test_serialization_is_stable_across_rebuilds(resolved, ctx):
+    """The parity harness compares these as plain strings (§12 Tier 4), so a graph
+    that carried a counter or a timestamp would make every run differ."""
+    assert serialize_maps(build_indicator_maps(resolved, ctx)) == serialize_maps(
+        build_indicator_maps(resolved, ctx)
+    )
