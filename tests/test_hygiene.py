@@ -28,7 +28,11 @@ _DOMAIN_SOURCES = iter_domain_sources()
 assert _DOMAIN_SOURCES, "iter_domain_sources() found nothing; guard 4 would run over zero files"
 
 
-@pytest.mark.parametrize("rel_path,source", _DOMAIN_SOURCES, ids=lambda v: v if isinstance(v, str) and v.endswith(".py") else "")
+@pytest.mark.parametrize(
+    "rel_path,source",
+    _DOMAIN_SOURCES,
+    ids=lambda v: v if isinstance(v, str) and v.endswith(".py") else "",
+)
 def test_domain_source_is_clean(rel_path: str, source: str) -> None:
     violations = check_source(rel_path, source)
     assert violations == [], "\n".join(str(v) for v in violations)
@@ -63,7 +67,7 @@ def test_widget_bag_parameters_are_rejected(param: str) -> None:
 
 def test_private_helper_may_keep_a_banned_parameter() -> None:
     # underscore-private helpers are the escape hatch; the rule is about the API
-    src = '__all__ = []\ndef _f(a, model=None):\n    return a\n'
+    src = "__all__ = []\ndef _f(a, model=None):\n    return a\n"
     assert "banned-param" not in _rules(src)
 
 
@@ -134,7 +138,7 @@ def test_module_level_call_is_rejected() -> None:
         "{1, 2}",
         '{k: 1 for k in "ab"}',
         "[n for n in range(3)]",
-        'dict(a=1)',
+        "dict(a=1)",
         "list(range(3))",
     ],
 )

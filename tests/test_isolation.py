@@ -42,7 +42,7 @@ JSON_HALF = (
     "sdg1531.stats.plots",
 )
 
-_SCRIPT = '''
+_SCRIPT = """
 import importlib, importlib.util, pkgutil, sys
 
 BANNED = {banned!r}
@@ -75,7 +75,7 @@ if not targets:
 for name in targets:
     importlib.import_module(name)
 print("IMPORTED", len(targets))
-'''
+"""
 
 
 def test_domain_imports_without_any_ui_library() -> None:
@@ -98,7 +98,10 @@ def _module_exists(dotted: str) -> bool:
 @pytest.mark.parametrize(
     "name",
     [
-        pytest.param(name, marks=pytest.mark.skipif(not _module_exists(name), reason=f"{name} does not exist yet"))
+        pytest.param(
+            name,
+            marks=pytest.mark.skipif(not _module_exists(name), reason=f"{name} does not exist yet"),
+        )
         for name in JSON_HALF
     ],
 )

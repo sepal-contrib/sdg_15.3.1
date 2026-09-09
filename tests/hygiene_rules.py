@@ -80,7 +80,11 @@ class Violation:
 
 
 def _is_docstring(node: ast.stmt) -> bool:
-    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+    return (
+        isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    )
 
 
 def _param_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
@@ -168,7 +172,9 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
     def add(node: ast.AST, rule: str, detail: str) -> None:
         out.append(Violation(rel_path, getattr(node, "lineno", 0), rule, detail))
 
-    def flag_if_mutable(stmt: ast.stmt, name: str, value: ast.expr, *, owner: str | None = None) -> None:
+    def flag_if_mutable(
+        stmt: ast.stmt, name: str, value: ast.expr, *, owner: str | None = None
+    ) -> None:
         if name in MUTABLE_CHECK_EXEMPT_NAMES or not _is_mutable_container(value):
             return
         label = f"{owner}.{name}" if owner else name
@@ -217,7 +223,9 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
             if isinstance(fn, ast.Name) and fn.id == "globals":
                 add(node, "globals-subscript", "reflective dispatch; use an explicit table")
 
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_"):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith(
+            "_"
+        ):
             for name in _param_names(node):
                 if name in BANNED_PARAMS:
                     add(node, "banned-param", f"public {node.name}() takes '{name}'")
@@ -234,10 +242,18 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
             if not exempt and (name in FS_CALL_NAMES or attr in FS_CALL_ATTRS):
                 add(node, "filesystem", f"{name or attr}() touches the filesystem")
 
-            if (name == "replace" or attr == "replace") and node.args and _looks_like_a_resolved_spec(node.args[0]):
+            if (
+                (name == "replace" or attr == "replace")
+                and node.args
+                and _looks_like_a_resolved_spec(node.args[0])
+            ):
                 add(node, "resolved-replace", "a ResolvedSpec is obtained only from resolve()")
 
-        if isinstance(node, ast.Name) and node.id == "apply_truth_table" and not _is_engine_source(rel_path):
+        if (
+            isinstance(node, ast.Name)
+            and node.id == "apply_truth_table"
+            and not _is_engine_source(rel_path)
+        ):
             add(node, "truth-table-leak", "apply_truth_table is engine-private")
 
     return out

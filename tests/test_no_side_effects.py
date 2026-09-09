@@ -11,7 +11,7 @@ from pathlib import Path
 
 from _subprocess import run_python
 
-_SCRIPT = '''
+_SCRIPT = """
 import builtins, importlib, os, pathlib, pkgutil, socket, sys
 
 import ee  # imported before the patches: its own module-level reads are not the subject
@@ -48,7 +48,7 @@ names = [m.name for m in pkgutil.walk_packages(sdg1531.__path__, "sdg1531.")]
 for name in names:
     importlib.import_module(name)
 print("IMPORTED", len(names))
-'''
+"""
 
 
 def test_importing_the_domain_creates_nothing(tmp_path: Path) -> None:
