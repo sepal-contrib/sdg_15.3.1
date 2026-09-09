@@ -1,5 +1,6 @@
 """sdg1531.naming — run labels and GEE asset ids. Pure; no ee, no filesystem."""
 
+import math
 import re
 import subprocess
 import sys
@@ -136,6 +137,21 @@ def test_run_label_is_total_on_the_default_climate_regime():
 )
 def test_run_label_is_total_over_every_fixed_coefficient(coefficient, token):
     # the five values of parameter/ui.py:41-47
+    label = naming.run_label(_spec(climate=FixedClimate(coefficient)))
+    assert label == f"2000_2015_l8_ndvi_gaes_default_{token}"
+
+
+@pytest.mark.parametrize(
+    "coefficient,token",
+    [
+        (math.nan, "crnan"),
+        (math.inf, "crposinf"),
+        (-math.inf, "crneginf"),
+    ],
+)
+def test_run_label_is_total_over_non_finite_coefficients(coefficient, token):
+    # int(coefficient * 100) raises ValueError on nan, OverflowError on
+    # +-inf - unreachable from the UI, but run_label must still be total.
     label = naming.run_label(_spec(climate=FixedClimate(coefficient)))
     assert label == f"2000_2015_l8_ndvi_gaes_default_{token}"
 
@@ -280,7 +296,15 @@ _climates = st.one_of(
     st.just(PerPixelClimate()),
     st.builds(
         FixedClimate,
-        coefficient=st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False),
+        # nan/+-inf included on purpose: int(coefficient * 100) (spec.py's
+        # FixedClimate.token) raises on all three, and the fuzz missed that
+        # gap entirely while it only drew finite coefficients.
+        coefficient=st.one_of(
+            st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False),
+            st.just(math.nan),
+            st.just(math.inf),
+            st.just(-math.inf),
+        ),
     ),
 )
 _run_specs = st.builds(

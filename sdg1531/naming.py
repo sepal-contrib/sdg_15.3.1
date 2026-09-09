@@ -8,6 +8,7 @@ changed.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Iterable, Mapping
 from types import MappingProxyType
@@ -17,7 +18,9 @@ from anyascii import anyascii
 from .catalog import SENSORS
 from .enums import IndicatorLayer
 from .spec import (
+    Climate,
     CustomLandCoverSource,
+    FixedClimate,
     PrecomputedViAsset,
     RunSpec,
     SensorSelection,
@@ -111,13 +114,36 @@ def _sensor_token(spec: RunSpec) -> str:
     return tokens[0]
 
 
+def _climate_token(climate: Climate) -> str:
+    """The ``{climate}`` slot of the label. indicator_model.py:310.
+
+    ``FixedClimate.token`` truncates ``coefficient`` with ``int()``, faithfully
+    inheriting the legacy's crash on a non-finite value: ``nan`` raises
+    ``ValueError``, ``inf``/``-inf`` raises ``OverflowError``. Neither is
+    reachable from the UI (parameter/ui.py:41-47's five fixed values, or the
+    custom slider's bounded range), but ``run_label`` must be total over the
+    whole ``RunSpec`` space regardless. The three sentinel tokens below all
+    contain a letter, so none collides with ``f"cr{int(coefficient * 100)}"``
+    for any finite coefficient, whose digits are the only thing that varies.
+    """
+    if isinstance(climate, FixedClimate):
+        coefficient = climate.coefficient
+        if math.isnan(coefficient):
+            return "crnan"
+        if math.isinf(coefficient):
+            return "crposinf" if coefficient > 0 else "crneginf"
+
+    return climate.token
+
+
 def run_label(spec: RunSpec) -> str:
     """The legacy result-folder name for ``spec``.
 
     Transcribed from indicator_model.py:280-312. Two departures, both recorded
     in spec §7 and neither touching the ee graph: the climate slot reads the
     climate union's ``.token`` instead of ``int(conversion_coef * 100)`` on a
-    None default (:310), and the transition-matrix test compares by value
+    None default (:310) — with ``nan``/``inf`` also guarded, see
+    :func:`_climate_token` — and the transition-matrix test compares by value
     instead of comparing the module-level list with itself (:305).
     """
     start = spec.periods.overall.start  # :284
@@ -128,7 +154,7 @@ def run_label(spec: RunSpec) -> str:
     custom_matrix = not spec.transition_matrix.is_default()  # :305, fixed
     custom_lc = isinstance(spec.land_cover, CustomLandCoverSource)  # :306
     lc_matrix = "custom" if custom_matrix or custom_lc else "default"  # :307
-    climate = spec.climate.token  # :310
+    climate = _climate_token(spec.climate)  # :310, total
 
     return f"{start}_{end}_{sensor}_{vegetation_index}_{lceu}_{lc_matrix}_{climate}"  # :312
 
