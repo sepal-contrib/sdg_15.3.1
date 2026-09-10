@@ -1,0 +1,129 @@
+{
+  "aoi": {
+    "asset_id": "users/amitghosh/sdg_module/parity_aoi",
+    "kind": "asset",
+    "name": "parity aoi"
+  },
+  "climate": {
+    "coefficient": 0.48,
+    "kind": "fixed"
+  },
+  "compatibility": {
+    "clamp_soc_start_year": true,
+    "derived_vi_msvi_uses_evi_asset": true,
+    "legacy_sensor_folder_token": true,
+    "soc_subsequent_transition_scale": 10
+  },
+  "land_cover": {
+    "end_asset": "users/amitghosh/sdg_module/parity_lc_end",
+    "kind": "custom",
+    "scheme": null,
+    "start_asset": "users/amitghosh/sdg_module/parity_lc_start"
+  },
+  "lceu": "wte",
+  "periods": {
+    "land_cover": {
+      "end": 2014,
+      "start": 2001
+    },
+    "overall": {
+      "end": 2015,
+      "start": 2000
+    },
+    "performance": {
+      "end": null,
+      "start": null
+    },
+    "soc": {
+      "end": 2012,
+      "start": null
+    },
+    "state": {
+      "end": null,
+      "start": null
+    },
+    "trend": {
+      "end": null,
+      "start": null
+    }
+  },
+  "productivity_lookup": "GPGv1",
+  "threshold": -0.25,
+  "trajectory": "p_res_trend",
+  "transition_matrix": [
+    [
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      -1,
+      0,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      -1,
+      -1,
+      -1,
+      0,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      0,
+      1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      -1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "vegetation_index": "msvi",
+  "vi_source": {
+    "kind": "sensors",
+    "names": [
+      "Terra NPP"
+    ]
+  },
+  "water_mask": {
+    "kind": "jrc_seasonality",
+    "threshold": 6
+  }
+}

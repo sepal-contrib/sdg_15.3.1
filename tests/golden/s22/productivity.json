@@ -1,0 +1,2955 @@
+{
+  "result": "0",
+  "values": {
+    "0": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "functionInvocationValue": {
+              "arguments": {
+                "input": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "input": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "input": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "input": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "input": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "input": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "input": {
+                                                            "functionInvocationValue": {
+                                                              "arguments": {
+                                                                "input": {
+                                                                  "functionInvocationValue": {
+                                                                    "arguments": {
+                                                                      "input": {
+                                                                        "functionInvocationValue": {
+                                                                          "arguments": {
+                                                                            "input": {
+                                                                              "functionInvocationValue": {
+                                                                                "arguments": {
+                                                                                  "input": {
+                                                                                    "functionInvocationValue": {
+                                                                                      "arguments": {
+                                                                                        "input": {
+                                                                                          "functionInvocationValue": {
+                                                                                            "arguments": {
+                                                                                              "input": {
+                                                                                                "functionInvocationValue": {
+                                                                                                  "arguments": {
+                                                                                                    "input": {
+                                                                                                      "functionInvocationValue": {
+                                                                                                        "arguments": {
+                                                                                                          "input": {
+                                                                                                            "valueReference": "1"
+                                                                                                          },
+                                                                                                          "test": {
+                                                                                                            "valueReference": "80"
+                                                                                                          },
+                                                                                                          "value": {
+                                                                                                            "valueReference": "43"
+                                                                                                          }
+                                                                                                        },
+                                                                                                        "functionName": "Image.where"
+                                                                                                      }
+                                                                                                    },
+                                                                                                    "test": {
+                                                                                                      "functionInvocationValue": {
+                                                                                                        "arguments": {
+                                                                                                          "image1": {
+                                                                                                            "valueReference": "81"
+                                                                                                          },
+                                                                                                          "image2": {
+                                                                                                            "valueReference": "63"
+                                                                                                          }
+                                                                                                        },
+                                                                                                        "functionName": "Image.and"
+                                                                                                      }
+                                                                                                    },
+                                                                                                    "value": {
+                                                                                                      "valueReference": "43"
+                                                                                                    }
+                                                                                                  },
+                                                                                                  "functionName": "Image.where"
+                                                                                                }
+                                                                                              },
+                                                                                              "test": {
+                                                                                                "functionInvocationValue": {
+                                                                                                  "arguments": {
+                                                                                                    "image1": {
+                                                                                                      "valueReference": "81"
+                                                                                                    },
+                                                                                                    "image2": {
+                                                                                                      "valueReference": "77"
+                                                                                                    }
+                                                                                                  },
+                                                                                                  "functionName": "Image.and"
+                                                                                                }
+                                                                                              },
+                                                                                              "value": {
+                                                                                                "valueReference": "43"
+                                                                                              }
+                                                                                            },
+                                                                                            "functionName": "Image.where"
+                                                                                          }
+                                                                                        },
+                                                                                        "test": {
+                                                                                          "functionInvocationValue": {
+                                                                                            "arguments": {
+                                                                                              "image1": {
+                                                                                                "valueReference": "83"
+                                                                                              },
+                                                                                              "image2": {
+                                                                                                "valueReference": "63"
+                                                                                              }
+                                                                                            },
+                                                                                            "functionName": "Image.and"
+                                                                                          }
+                                                                                        },
+                                                                                        "value": {
+                                                                                          "valueReference": "43"
+                                                                                        }
+                                                                                      },
+                                                                                      "functionName": "Image.where"
+                                                                                    }
+                                                                                  },
+                                                                                  "test": {
+                                                                                    "functionInvocationValue": {
+                                                                                      "arguments": {
+                                                                                        "image1": {
+                                                                                          "valueReference": "83"
+                                                                                        },
+                                                                                        "image2": {
+                                                                                          "valueReference": "77"
+                                                                                        }
+                                                                                      },
+                                                                                      "functionName": "Image.and"
+                                                                                    }
+                                                                                  },
+                                                                                  "value": {
+                                                                                    "valueReference": "46"
+                                                                                  }
+                                                                                },
+                                                                                "functionName": "Image.where"
+                                                                              }
+                                                                            },
+                                                                            "test": {
+                                                                              "functionInvocationValue": {
+                                                                                "arguments": {
+                                                                                  "image1": {
+                                                                                    "valueReference": "85"
+                                                                                  },
+                                                                                  "image2": {
+                                                                                    "valueReference": "63"
+                                                                                  }
+                                                                                },
+                                                                                "functionName": "Image.and"
+                                                                              }
+                                                                            },
+                                                                            "value": {
+                                                                              "valueReference": "46"
+                                                                            }
+                                                                          },
+                                                                          "functionName": "Image.where"
+                                                                        }
+                                                                      },
+                                                                      "test": {
+                                                                        "functionInvocationValue": {
+                                                                          "arguments": {
+                                                                            "image1": {
+                                                                              "valueReference": "85"
+                                                                            },
+                                                                            "image2": {
+                                                                              "valueReference": "77"
+                                                                            }
+                                                                          },
+                                                                          "functionName": "Image.and"
+                                                                        }
+                                                                      },
+                                                                      "value": {
+                                                                        "valueReference": "46"
+                                                                      }
+                                                                    },
+                                                                    "functionName": "Image.where"
+                                                                  }
+                                                                },
+                                                                "test": {
+                                                                  "functionInvocationValue": {
+                                                                    "arguments": {
+                                                                      "image1": {
+                                                                        "valueReference": "86"
+                                                                      },
+                                                                      "image2": {
+                                                                        "valueReference": "63"
+                                                                      }
+                                                                    },
+                                                                    "functionName": "Image.and"
+                                                                  }
+                                                                },
+                                                                "value": {
+                                                                  "valueReference": "46"
+                                                                }
+                                                              },
+                                                              "functionName": "Image.where"
+                                                            }
+                                                          },
+                                                          "test": {
+                                                            "functionInvocationValue": {
+                                                              "arguments": {
+                                                                "image1": {
+                                                                  "valueReference": "86"
+                                                                },
+                                                                "image2": {
+                                                                  "valueReference": "77"
+                                                                }
+                                                              },
+                                                              "functionName": "Image.and"
+                                                            }
+                                                          },
+                                                          "value": {
+                                                            "valueReference": "46"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.where"
+                                                      }
+                                                    },
+                                                    "test": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "image1": {
+                                                            "valueReference": "87"
+                                                          },
+                                                          "image2": {
+                                                            "valueReference": "63"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.and"
+                                                      }
+                                                    },
+                                                    "value": {
+                                                      "valueReference": "43"
+                                                    }
+                                                  },
+                                                  "functionName": "Image.where"
+                                                }
+                                              },
+                                              "test": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "image1": {
+                                                      "valueReference": "87"
+                                                    },
+                                                    "image2": {
+                                                      "valueReference": "77"
+                                                    }
+                                                  },
+                                                  "functionName": "Image.and"
+                                                }
+                                              },
+                                              "value": {
+                                                "valueReference": "48"
+                                              }
+                                            },
+                                            "functionName": "Image.where"
+                                          }
+                                        },
+                                        "test": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "image1": {
+                                                "valueReference": "89"
+                                              },
+                                              "image2": {
+                                                "valueReference": "63"
+                                              }
+                                            },
+                                            "functionName": "Image.and"
+                                          }
+                                        },
+                                        "value": {
+                                          "valueReference": "48"
+                                        }
+                                      },
+                                      "functionName": "Image.where"
+                                    }
+                                  },
+                                  "test": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "image1": {
+                                          "valueReference": "89"
+                                        },
+                                        "image2": {
+                                          "valueReference": "77"
+                                        }
+                                      },
+                                      "functionName": "Image.and"
+                                    }
+                                  },
+                                  "value": {
+                                    "valueReference": "48"
+                                  }
+                                },
+                                "functionName": "Image.where"
+                              }
+                            },
+                            "test": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "image1": {
+                                    "valueReference": "90"
+                                  },
+                                  "image2": {
+                                    "valueReference": "63"
+                                  }
+                                },
+                                "functionName": "Image.and"
+                              }
+                            },
+                            "value": {
+                              "valueReference": "48"
+                            }
+                          },
+                          "functionName": "Image.where"
+                        }
+                      },
+                      "test": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "image1": {
+                              "valueReference": "90"
+                            },
+                            "image2": {
+                              "valueReference": "77"
+                            }
+                          },
+                          "functionName": "Image.and"
+                        }
+                      },
+                      "value": {
+                        "valueReference": "48"
+                      }
+                    },
+                    "functionName": "Image.where"
+                  }
+                },
+                "names": {
+                  "constantValue": [
+                    "productivity"
+                  ]
+                }
+              },
+              "functionName": "Image.rename"
+            }
+          }
+        },
+        "functionName": "Image.uint8"
+      }
+    },
+    "1": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "input": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "valueReference": "2"
+                      },
+                      "test": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "image1": {
+                              "valueReference": "3"
+                            },
+                            "image2": {
+                              "valueReference": "63"
+                            }
+                          },
+                          "functionName": "Image.and"
+                        }
+                      },
+                      "value": {
+                        "valueReference": "43"
+                      }
+                    },
+                    "functionName": "Image.where"
+                  }
+                },
+                "test": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "image1": {
+                        "valueReference": "3"
+                      },
+                      "image2": {
+                        "valueReference": "77"
+                      }
+                    },
+                    "functionName": "Image.and"
+                  }
+                },
+                "value": {
+                  "valueReference": "43"
+                }
+              },
+              "functionName": "Image.where"
+            }
+          },
+          "test": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "valueReference": "78"
+                },
+                "image2": {
+                  "valueReference": "63"
+                }
+              },
+              "functionName": "Image.and"
+            }
+          },
+          "value": {
+            "valueReference": "43"
+          }
+        },
+        "functionName": "Image.where"
+      }
+    },
+    "10": {
+      "functionDefinitionValue": {
+        "argumentNames": [
+          "_MAPPING_VAR_0_0"
+        ],
+        "body": "11"
+      }
+    },
+    "11": {
+      "functionInvocationValue": {
+        "arguments": {
+          "bandSelectors": {
+            "valueReference": "12"
+          },
+          "input": {
+            "argumentReference": "_MAPPING_VAR_0_0"
+          }
+        },
+        "functionName": "Image.select"
+      }
+    },
+    "12": {
+      "constantValue": [
+        "vi"
+      ]
+    },
+    "13": {
+      "functionInvocationValue": {
+        "arguments": {
+          "images": {
+            "functionInvocationValue": {
+              "arguments": {
+                "baseAlgorithm": {
+                  "functionDefinitionValue": {
+                    "argumentNames": [
+                      "_MAPPING_VAR_8_0"
+                    ],
+                    "body": "14"
+                  }
+                },
+                "dropNulls": {
+                  "constantValue": false
+                },
+                "list": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "end": {
+                        "constantValue": 2015
+                      },
+                      "start": {
+                        "constantValue": 1985
+                      }
+                    },
+                    "functionName": "List.sequence"
+                  }
+                }
+              },
+              "functionName": "List.map"
+            }
+          }
+        },
+        "functionName": "ImageCollection.fromImages"
+      }
+    },
+    "14": {
+      "functionInvocationValue": {
+        "arguments": {
+          "key": {
+            "valueReference": "15"
+          },
+          "object": {
+            "functionInvocationValue": {
+              "arguments": {
+                "input": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "collection": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "images": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "baseAlgorithm": {
+                                          "functionDefinitionValue": {
+                                            "argumentNames": [
+                                              "_MAPPING_VAR_6_0"
+                                            ],
+                                            "body": "16"
+                                          }
+                                        },
+                                        "dropNulls": {
+                                          "constantValue": false
+                                        },
+                                        "list": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "list": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "baseAlgorithm": {
+                                                      "functionDefinitionValue": {
+                                                        "argumentNames": [
+                                                          "_MAPPING_VAR_0_0"
+                                                        ],
+                                                        "body": "41"
+                                                      }
+                                                    },
+                                                    "dropNulls": {
+                                                      "constantValue": false
+                                                    },
+                                                    "list": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "collection": {
+                                                            "valueReference": "17"
+                                                          },
+                                                          "property": {
+                                                            "valueReference": "20"
+                                                          }
+                                                        },
+                                                        "functionName": "AggregateFeatureCollection.array"
+                                                      }
+                                                    }
+                                                  },
+                                                  "functionName": "List.map"
+                                                }
+                                              }
+                                            },
+                                            "functionName": "List.distinct"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "List.map"
+                                    }
+                                  }
+                                },
+                                "functionName": "ImageCollection.fromImages"
+                              }
+                            },
+                            "reducer": {
+                              "valueReference": "40"
+                            }
+                          },
+                          "functionName": "ImageCollection.reduce"
+                        }
+                      }
+                    },
+                    "functionName": "Image.float"
+                  }
+                },
+                "names": {
+                  "valueReference": "12"
+                }
+              },
+              "functionName": "Image.rename"
+            }
+          },
+          "value": {
+            "argumentReference": "_MAPPING_VAR_8_0"
+          }
+        },
+        "functionName": "Element.set"
+      }
+    },
+    "15": {
+      "constantValue": "year"
+    },
+    "16": {
+      "functionInvocationValue": {
+        "arguments": {
+          "collection": {
+            "functionInvocationValue": {
+              "arguments": {
+                "collection": {
+                  "valueReference": "17"
+                },
+                "filter": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "field": {
+                        "constantValue": "month"
+                      },
+                      "start": {
+                        "argumentReference": "_MAPPING_VAR_6_0"
+                      }
+                    },
+                    "functionName": "Filter.calendarRange"
+                  }
+                }
+              },
+              "functionName": "Collection.filter"
+            }
+          },
+          "reducer": {
+            "valueReference": "40"
+          }
+        },
+        "functionName": "ImageCollection.reduce"
+      }
+    },
+    "17": {
+      "functionInvocationValue": {
+        "arguments": {
+          "collection": {
+            "functionInvocationValue": {
+              "arguments": {
+                "baseAlgorithm": {
+                  "functionDefinitionValue": {
+                    "argumentNames": [
+                      "_MAPPING_VAR_0_0"
+                    ],
+                    "body": "18"
+                  }
+                },
+                "collection": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "baseAlgorithm": {
+                        "functionDefinitionValue": {
+                          "argumentNames": [
+                            "_MAPPING_VAR_0_0"
+                          ],
+                          "body": "21"
+                        }
+                      },
+                      "collection": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "baseAlgorithm": {
+                              "functionDefinitionValue": {
+                                "argumentNames": [
+                                  "_MAPPING_VAR_0_0"
+                                ],
+                                "body": "23"
+                              }
+                            },
+                            "collection": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "collection1": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "collection1": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "images": {
+                                                "constantValue": []
+                                              }
+                                            },
+                                            "functionName": "ImageCollection.fromImages"
+                                          }
+                                        },
+                                        "collection2": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "baseAlgorithm": {
+                                                "valueReference": "28"
+                                              },
+                                              "collection": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "baseAlgorithm": {
+                                                      "valueReference": "30"
+                                                    },
+                                                    "collection": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "baseAlgorithm": {
+                                                            "valueReference": "34"
+                                                          },
+                                                          "collection": {
+                                                            "functionInvocationValue": {
+                                                              "arguments": {
+                                                                "collection": {
+                                                                  "functionInvocationValue": {
+                                                                    "arguments": {
+                                                                      "collection": {
+                                                                        "functionInvocationValue": {
+                                                                          "arguments": {
+                                                                            "collection": {
+                                                                              "functionInvocationValue": {
+                                                                                "arguments": {
+                                                                                  "id": {
+                                                                                    "constantValue": "LANDSAT/LC08/C02/T1_L2"
+                                                                                  }
+                                                                                },
+                                                                                "functionName": "ImageCollection.load"
+                                                                              }
+                                                                            },
+                                                                            "filter": {
+                                                                              "valueReference": "36"
+                                                                            }
+                                                                          },
+                                                                          "functionName": "Collection.filter"
+                                                                        }
+                                                                      },
+                                                                      "filter": {
+                                                                        "valueReference": "38"
+                                                                      }
+                                                                    },
+                                                                    "functionName": "Collection.filter"
+                                                                  }
+                                                                },
+                                                                "filter": {
+                                                                  "valueReference": "39"
+                                                                }
+                                                              },
+                                                              "functionName": "Collection.filter"
+                                                            }
+                                                          }
+                                                        },
+                                                        "functionName": "Collection.map"
+                                                      }
+                                                    }
+                                                  },
+                                                  "functionName": "Collection.map"
+                                                }
+                                              }
+                                            },
+                                            "functionName": "Collection.map"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "ImageCollection.merge"
+                                    }
+                                  },
+                                  "collection2": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "baseAlgorithm": {
+                                          "valueReference": "28"
+                                        },
+                                        "collection": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "baseAlgorithm": {
+                                                "valueReference": "30"
+                                              },
+                                              "collection": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "baseAlgorithm": {
+                                                      "valueReference": "34"
+                                                    },
+                                                    "collection": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "collection": {
+                                                            "functionInvocationValue": {
+                                                              "arguments": {
+                                                                "collection": {
+                                                                  "functionInvocationValue": {
+                                                                    "arguments": {
+                                                                      "collection": {
+                                                                        "functionInvocationValue": {
+                                                                          "arguments": {
+                                                                            "id": {
+                                                                              "constantValue": "LANDSAT/LC09/C02/T1_L2"
+                                                                            }
+                                                                          },
+                                                                          "functionName": "ImageCollection.load"
+                                                                        }
+                                                                      },
+                                                                      "filter": {
+                                                                        "valueReference": "36"
+                                                                      }
+                                                                    },
+                                                                    "functionName": "Collection.filter"
+                                                                  }
+                                                                },
+                                                                "filter": {
+                                                                  "valueReference": "38"
+                                                                }
+                                                              },
+                                                              "functionName": "Collection.filter"
+                                                            }
+                                                          },
+                                                          "filter": {
+                                                            "valueReference": "39"
+                                                          }
+                                                        },
+                                                        "functionName": "Collection.filter"
+                                                      }
+                                                    }
+                                                  },
+                                                  "functionName": "Collection.map"
+                                                }
+                                              }
+                                            },
+                                            "functionName": "Collection.map"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "Collection.map"
+                                    }
+                                  }
+                                },
+                                "functionName": "ImageCollection.merge"
+                              }
+                            }
+                          },
+                          "functionName": "Collection.map"
+                        }
+                      }
+                    },
+                    "functionName": "Collection.map"
+                  }
+                }
+              },
+              "functionName": "Collection.map"
+            }
+          },
+          "filter": {
+            "functionInvocationValue": {
+              "arguments": {
+                "field": {
+                  "valueReference": "15"
+                },
+                "start": {
+                  "argumentReference": "_MAPPING_VAR_8_0"
+                }
+              },
+              "functionName": "Filter.calendarRange"
+            }
+          }
+        },
+        "functionName": "Collection.filter"
+      }
+    },
+    "18": {
+      "functionInvocationValue": {
+        "arguments": {
+          "destination": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "argumentReference": "_MAPPING_VAR_0_0"
+                },
+                "image2": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "image1": {
+                        "argumentReference": "_MAPPING_VAR_0_0"
+                      },
+                      "image2": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "value": {
+                              "constantValue": 0.0
+                            }
+                          },
+                          "functionName": "Image.constant"
+                        }
+                      }
+                    },
+                    "functionName": "Image.gt"
+                  }
+                }
+              },
+              "functionName": "Image.multiply"
+            }
+          },
+          "properties": {
+            "valueReference": "19"
+          },
+          "source": {
+            "argumentReference": "_MAPPING_VAR_0_0"
+          }
+        },
+        "functionName": "Image.copyProperties"
+      }
+    },
+    "19": {
+      "arrayValue": {
+        "values": [
+          {
+            "valueReference": "20"
+          },
+          {
+            "constantValue": "system:time_end"
+          }
+        ]
+      }
+    },
+    "2": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 0
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "20": {
+      "constantValue": "system:time_start"
+    },
+    "21": {
+      "functionInvocationValue": {
+        "arguments": {
+          "bandSelectors": {
+            "valueReference": "22"
+          },
+          "input": {
+            "argumentReference": "_MAPPING_VAR_0_0"
+          }
+        },
+        "functionName": "Image.select"
+      }
+    },
+    "22": {
+      "constantValue": [
+        "evi"
+      ]
+    },
+    "23": {
+      "functionInvocationValue": {
+        "arguments": {
+          "key": {
+            "valueReference": "20"
+          },
+          "object": {
+            "functionInvocationValue": {
+              "arguments": {
+                "input": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "DEFAULT_EXPRESSION_IMAGE": {
+                        "argumentReference": "_MAPPING_VAR_0_0"
+                      },
+                      "nir": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "bandSelectors": {
+                              "arrayValue": {
+                                "values": [
+                                  {
+                                    "valueReference": "26"
+                                  }
+                                ]
+                              }
+                            },
+                            "input": {
+                              "argumentReference": "_MAPPING_VAR_0_0"
+                            }
+                          },
+                          "functionName": "Image.select"
+                        }
+                      },
+                      "red": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "bandSelectors": {
+                              "arrayValue": {
+                                "values": [
+                                  {
+                                    "valueReference": "27"
+                                  }
+                                ]
+                              }
+                            },
+                            "input": {
+                              "argumentReference": "_MAPPING_VAR_0_0"
+                            }
+                          },
+                          "functionName": "Image.select"
+                        }
+                      }
+                    },
+                    "functionReference": "24"
+                  }
+                },
+                "names": {
+                  "valueReference": "22"
+                }
+              },
+              "functionName": "Image.rename"
+            }
+          },
+          "value": {
+            "functionInvocationValue": {
+              "arguments": {
+                "object": {
+                  "argumentReference": "_MAPPING_VAR_0_0"
+                },
+                "property": {
+                  "valueReference": "20"
+                }
+              },
+              "functionName": "Element.get"
+            }
+          }
+        },
+        "functionName": "Element.set"
+      }
+    },
+    "24": {
+      "functionInvocationValue": {
+        "arguments": {
+          "argName": {
+            "valueReference": "25"
+          },
+          "expression": {
+            "constantValue": "2.4*((nir-red)/(nir+red+1))"
+          },
+          "vars": {
+            "arrayValue": {
+              "values": [
+                {
+                  "valueReference": "25"
+                },
+                {
+                  "constantValue": "nir"
+                },
+                {
+                  "constantValue": "red"
+                }
+              ]
+            }
+          }
+        },
+        "functionName": "Image.parseExpression"
+      }
+    },
+    "25": {
+      "constantValue": "DEFAULT_EXPRESSION_IMAGE"
+    },
+    "26": {
+      "constantValue": "NIR"
+    },
+    "27": {
+      "constantValue": "Red"
+    },
+    "28": {
+      "functionDefinitionValue": {
+        "argumentNames": [
+          "_MAPPING_VAR_0_0"
+        ],
+        "body": "29"
+      }
+    },
+    "29": {
+      "functionInvocationValue": {
+        "arguments": {
+          "destination": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "image1": {
+                        "argumentReference": "_MAPPING_VAR_0_0"
+                      },
+                      "image2": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "value": {
+                              "constantValue": 2.75e-05
+                            }
+                          },
+                          "functionName": "Image.constant"
+                        }
+                      }
+                    },
+                    "functionName": "Image.multiply"
+                  }
+                },
+                "image2": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "constantValue": -0.2
+                      }
+                    },
+                    "functionName": "Image.constant"
+                  }
+                }
+              },
+              "functionName": "Image.add"
+            }
+          },
+          "properties": {
+            "valueReference": "19"
+          },
+          "source": {
+            "argumentReference": "_MAPPING_VAR_0_0"
+          }
+        },
+        "functionName": "Image.copyProperties"
+      }
+    },
+    "3": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "4"
+          },
+          "image2": {
+            "valueReference": "54"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "30": {
+      "functionDefinitionValue": {
+        "argumentNames": [
+          "_MAPPING_VAR_0_0"
+        ],
+        "body": "31"
+      }
+    },
+    "31": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image": {
+                  "argumentReference": "_MAPPING_VAR_0_0"
+                },
+                "mask": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "image1": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "image1": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "image1": {
+                                          "valueReference": "32"
+                                        },
+                                        "image2": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "value": {
+                                                "constantValue": 8
+                                              }
+                                            },
+                                            "functionName": "Image.constant"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "Image.bitwiseAnd"
+                                    }
+                                  },
+                                  "image2": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "image1": {
+                                          "valueReference": "32"
+                                        },
+                                        "image2": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "value": {
+                                                "constantValue": 256
+                                              }
+                                            },
+                                            "functionName": "Image.constant"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "Image.bitwiseAnd"
+                                    }
+                                  }
+                                },
+                                "functionName": "Image.and"
+                              }
+                            },
+                            "image2": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "image1": {
+                                    "valueReference": "32"
+                                  },
+                                  "image2": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "value": {
+                                          "constantValue": 16
+                                        }
+                                      },
+                                      "functionName": "Image.constant"
+                                    }
+                                  }
+                                },
+                                "functionName": "Image.bitwiseAnd"
+                              }
+                            }
+                          },
+                          "functionName": "Image.or"
+                        }
+                      }
+                    },
+                    "functionName": "Image.not"
+                  }
+                }
+              },
+              "functionName": "Image.updateMask"
+            }
+          },
+          "mask": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "image": {
+                        "argumentReference": "_MAPPING_VAR_0_0"
+                      }
+                    },
+                    "functionName": "Image.mask"
+                  }
+                },
+                "reducer": {
+                  "functionInvocationValue": {
+                    "arguments": {},
+                    "functionName": "Reducer.min"
+                  }
+                }
+              },
+              "functionName": "Image.reduce"
+            }
+          }
+        },
+        "functionName": "Image.updateMask"
+      }
+    },
+    "32": {
+      "functionInvocationValue": {
+        "arguments": {
+          "bandSelectors": {
+            "arrayValue": {
+              "values": [
+                {
+                  "valueReference": "33"
+                }
+              ]
+            }
+          },
+          "input": {
+            "argumentReference": "_MAPPING_VAR_0_0"
+          }
+        },
+        "functionName": "Image.select"
+      }
+    },
+    "33": {
+      "constantValue": "pixel_qa"
+    },
+    "34": {
+      "functionDefinitionValue": {
+        "argumentNames": [
+          "_MAPPING_VAR_0_0"
+        ],
+        "body": "35"
+      }
+    },
+    "35": {
+      "functionInvocationValue": {
+        "arguments": {
+          "bandSelectors": {
+            "constantValue": [
+              "SR_B2",
+              "SR_B4",
+              "SR_B5",
+              "QA_PIXEL"
+            ]
+          },
+          "input": {
+            "argumentReference": "_MAPPING_VAR_0_0"
+          },
+          "newNames": {
+            "arrayValue": {
+              "values": [
+                {
+                  "constantValue": "Blue"
+                },
+                {
+                  "valueReference": "27"
+                },
+                {
+                  "valueReference": "26"
+                },
+                {
+                  "valueReference": "33"
+                }
+              ]
+            }
+          }
+        },
+        "functionName": "Image.select"
+      }
+    },
+    "36": {
+      "functionInvocationValue": {
+        "arguments": {
+          "leftField": {
+            "constantValue": ".all"
+          },
+          "rightValue": {
+            "functionInvocationValue": {
+              "arguments": {
+                "geometry": {
+                  "valueReference": "37"
+                }
+              },
+              "functionName": "Feature"
+            }
+          }
+        },
+        "functionName": "Filter.intersects"
+      }
+    },
+    "37": {
+      "functionInvocationValue": {
+        "arguments": {
+          "collection": {
+            "functionInvocationValue": {
+              "arguments": {
+                "tableId": {
+                  "constantValue": "users/amitghosh/sdg_module/parity_aoi"
+                }
+              },
+              "functionName": "Collection.loadTable"
+            }
+          }
+        },
+        "functionName": "Collection.geometry"
+      }
+    },
+    "38": {
+      "functionInvocationValue": {
+        "arguments": {
+          "leftValue": {
+            "functionInvocationValue": {
+              "arguments": {
+                "end": {
+                  "constantValue": "2015-12-31"
+                },
+                "start": {
+                  "constantValue": "1985-01-01"
+                }
+              },
+              "functionName": "DateRange"
+            }
+          },
+          "rightField": {
+            "valueReference": "20"
+          }
+        },
+        "functionName": "Filter.dateRangeContains"
+      }
+    },
+    "39": {
+      "functionInvocationValue": {
+        "arguments": {
+          "leftField": {
+            "constantValue": "CLOUD_COVER_LAND"
+          },
+          "rightValue": {
+            "constantValue": 20
+          }
+        },
+        "functionName": "Filter.lessThan"
+      }
+    },
+    "4": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "5"
+          },
+          "image2": {
+            "valueReference": "43"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "40": {
+      "functionInvocationValue": {
+        "arguments": {},
+        "functionName": "Reducer.mean"
+      }
+    },
+    "41": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "date": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "argumentReference": "_MAPPING_VAR_0_0"
+                      }
+                    },
+                    "functionName": "Date"
+                  }
+                },
+                "format": {
+                  "constantValue": "MM"
+                }
+              },
+              "functionName": "Date.format"
+            }
+          }
+        },
+        "functionName": "Number.parse"
+      }
+    },
+    "42": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": -1.96
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "43": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 1
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "44": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": -1.28
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "45": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "8"
+          },
+          "image2": {
+            "valueReference": "42"
+          }
+        },
+        "functionName": "Image.gte"
+      }
+    },
+    "46": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 2
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "47": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 1.28
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "48": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 3
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "49": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "8"
+          },
+          "image2": {
+            "valueReference": "50"
+          }
+        },
+        "functionName": "Image.lte"
+      }
+    },
+    "5": {
+      "functionInvocationValue": {
+        "arguments": {
+          "bandSelectors": {
+            "valueReference": "6"
+          },
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "dstImg": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "input": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "input": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "input": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "input": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "input": {
+                                                      "valueReference": "7"
+                                                    },
+                                                    "test": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "image1": {
+                                                            "functionInvocationValue": {
+                                                              "arguments": {
+                                                                "image1": {
+                                                                  "valueReference": "8"
+                                                                },
+                                                                "image2": {
+                                                                  "valueReference": "44"
+                                                                }
+                                                              },
+                                                              "functionName": "Image.lt"
+                                                            }
+                                                          },
+                                                          "image2": {
+                                                            "valueReference": "45"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.and"
+                                                      }
+                                                    },
+                                                    "value": {
+                                                      "valueReference": "46"
+                                                    }
+                                                  },
+                                                  "functionName": "Image.where"
+                                                }
+                                              },
+                                              "test": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "image1": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "image1": {
+                                                            "valueReference": "8"
+                                                          },
+                                                          "image2": {
+                                                            "valueReference": "44"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.gte"
+                                                      }
+                                                    },
+                                                    "image2": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "image1": {
+                                                            "valueReference": "8"
+                                                          },
+                                                          "image2": {
+                                                            "valueReference": "47"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.lte"
+                                                      }
+                                                    }
+                                                  },
+                                                  "functionName": "Image.and"
+                                                }
+                                              },
+                                              "value": {
+                                                "valueReference": "48"
+                                              }
+                                            },
+                                            "functionName": "Image.where"
+                                          }
+                                        },
+                                        "test": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "image1": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "image1": {
+                                                      "valueReference": "8"
+                                                    },
+                                                    "image2": {
+                                                      "valueReference": "47"
+                                                    }
+                                                  },
+                                                  "functionName": "Image.gt"
+                                                }
+                                              },
+                                              "image2": {
+                                                "valueReference": "49"
+                                              }
+                                            },
+                                            "functionName": "Image.and"
+                                          }
+                                        },
+                                        "value": {
+                                          "valueReference": "51"
+                                        }
+                                      },
+                                      "functionName": "Image.where"
+                                    }
+                                  },
+                                  "test": {
+                                    "valueReference": "52"
+                                  },
+                                  "value": {
+                                    "valueReference": "53"
+                                  }
+                                },
+                                "functionName": "Image.where"
+                              }
+                            },
+                            "names": {
+                              "constantValue": [
+                                "trajectory_5_levels"
+                              ]
+                            }
+                          },
+                          "functionName": "Image.rename"
+                        }
+                      }
+                    },
+                    "functionName": "Image.uint8"
+                  }
+                },
+                "srcImg": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "input": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "input": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "input": {
+                                          "valueReference": "7"
+                                        },
+                                        "test": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "image1": {
+                                                "valueReference": "45"
+                                              },
+                                              "image2": {
+                                                "valueReference": "49"
+                                              }
+                                            },
+                                            "functionName": "Image.and"
+                                          }
+                                        },
+                                        "value": {
+                                          "valueReference": "46"
+                                        }
+                                      },
+                                      "functionName": "Image.where"
+                                    }
+                                  },
+                                  "test": {
+                                    "valueReference": "52"
+                                  },
+                                  "value": {
+                                    "valueReference": "48"
+                                  }
+                                },
+                                "functionName": "Image.where"
+                              }
+                            },
+                            "names": {
+                              "valueReference": "6"
+                            }
+                          },
+                          "functionName": "Image.rename"
+                        }
+                      }
+                    },
+                    "functionName": "Image.uint8"
+                  }
+                }
+              },
+              "functionName": "Image.addBands"
+            }
+          }
+        },
+        "functionName": "Image.select"
+      }
+    },
+    "50": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 1.96
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "51": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 4
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "52": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "8"
+          },
+          "image2": {
+            "valueReference": "50"
+          }
+        },
+        "functionName": "Image.gt"
+      }
+    },
+    "53": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 5
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "54": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "55"
+          },
+          "image2": {
+            "valueReference": "43"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "55": {
+      "functionInvocationValue": {
+        "arguments": {
+          "bandSelectors": {
+            "valueReference": "56"
+          },
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "dstImg": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "input": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "input": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "input": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "input": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "input": {
+                                                      "valueReference": "57"
+                                                    },
+                                                    "test": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "image1": {
+                                                            "functionInvocationValue": {
+                                                              "arguments": {
+                                                                "image1": {
+                                                                  "valueReference": "58"
+                                                                },
+                                                                "image2": {
+                                                                  "valueReference": "44"
+                                                                }
+                                                              },
+                                                              "functionName": "Image.lt"
+                                                            }
+                                                          },
+                                                          "image2": {
+                                                            "valueReference": "60"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.and"
+                                                      }
+                                                    },
+                                                    "value": {
+                                                      "valueReference": "46"
+                                                    }
+                                                  },
+                                                  "functionName": "Image.where"
+                                                }
+                                              },
+                                              "test": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "image1": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "image1": {
+                                                            "valueReference": "58"
+                                                          },
+                                                          "image2": {
+                                                            "valueReference": "44"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.gte"
+                                                      }
+                                                    },
+                                                    "image2": {
+                                                      "functionInvocationValue": {
+                                                        "arguments": {
+                                                          "image1": {
+                                                            "valueReference": "58"
+                                                          },
+                                                          "image2": {
+                                                            "valueReference": "47"
+                                                          }
+                                                        },
+                                                        "functionName": "Image.lte"
+                                                      }
+                                                    }
+                                                  },
+                                                  "functionName": "Image.and"
+                                                }
+                                              },
+                                              "value": {
+                                                "valueReference": "48"
+                                              }
+                                            },
+                                            "functionName": "Image.where"
+                                          }
+                                        },
+                                        "test": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "image1": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "image1": {
+                                                      "valueReference": "58"
+                                                    },
+                                                    "image2": {
+                                                      "valueReference": "47"
+                                                    }
+                                                  },
+                                                  "functionName": "Image.gt"
+                                                }
+                                              },
+                                              "image2": {
+                                                "valueReference": "61"
+                                              }
+                                            },
+                                            "functionName": "Image.and"
+                                          }
+                                        },
+                                        "value": {
+                                          "valueReference": "51"
+                                        }
+                                      },
+                                      "functionName": "Image.where"
+                                    }
+                                  },
+                                  "test": {
+                                    "valueReference": "62"
+                                  },
+                                  "value": {
+                                    "valueReference": "53"
+                                  }
+                                },
+                                "functionName": "Image.where"
+                              }
+                            },
+                            "names": {
+                              "constantValue": [
+                                "state_5_levels"
+                              ]
+                            }
+                          },
+                          "functionName": "Image.rename"
+                        }
+                      }
+                    },
+                    "functionName": "Image.uint8"
+                  }
+                },
+                "srcImg": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "input": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "input": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "input": {
+                                          "valueReference": "57"
+                                        },
+                                        "test": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "image1": {
+                                                "valueReference": "60"
+                                              },
+                                              "image2": {
+                                                "valueReference": "61"
+                                              }
+                                            },
+                                            "functionName": "Image.and"
+                                          }
+                                        },
+                                        "value": {
+                                          "valueReference": "46"
+                                        }
+                                      },
+                                      "functionName": "Image.where"
+                                    }
+                                  },
+                                  "test": {
+                                    "valueReference": "62"
+                                  },
+                                  "value": {
+                                    "valueReference": "48"
+                                  }
+                                },
+                                "functionName": "Image.where"
+                              }
+                            },
+                            "names": {
+                              "valueReference": "56"
+                            }
+                          },
+                          "functionName": "Image.rename"
+                        }
+                      }
+                    },
+                    "functionName": "Image.uint8"
+                  }
+                }
+              },
+              "functionName": "Image.addBands"
+            }
+          }
+        },
+        "functionName": "Image.select"
+      }
+    },
+    "56": {
+      "constantValue": [
+        "state"
+      ]
+    },
+    "57": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "valueReference": "2"
+          },
+          "test": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "valueReference": "58"
+                },
+                "image2": {
+                  "valueReference": "42"
+                }
+              },
+              "functionName": "Image.lt"
+            }
+          },
+          "value": {
+            "valueReference": "43"
+          }
+        },
+        "functionName": "Image.where"
+      }
+    },
+    "58": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "collection": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "baseAlgorithm": {
+                                    "valueReference": "10"
+                                  },
+                                  "collection": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "collection": {
+                                          "valueReference": "13"
+                                        },
+                                        "filter": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "field": {
+                                                "valueReference": "15"
+                                              },
+                                              "maxValue": {
+                                                "constantValue": 2015
+                                              },
+                                              "minValue": {
+                                                "constantValue": 2013
+                                              }
+                                            },
+                                            "functionName": "Filter.rangeContains"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "Collection.filter"
+                                    }
+                                  }
+                                },
+                                "functionName": "Collection.map"
+                              }
+                            },
+                            "reducer": {
+                              "valueReference": "40"
+                            }
+                          },
+                          "functionName": "ImageCollection.reduce"
+                        }
+                      },
+                      "names": {
+                        "valueReference": "12"
+                      }
+                    },
+                    "functionName": "Image.rename"
+                  }
+                },
+                "image2": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "collection": {
+                              "valueReference": "59"
+                            },
+                            "reducer": {
+                              "valueReference": "40"
+                            }
+                          },
+                          "functionName": "ImageCollection.reduce"
+                        }
+                      },
+                      "names": {
+                        "valueReference": "12"
+                      }
+                    },
+                    "functionName": "Image.rename"
+                  }
+                }
+              },
+              "functionName": "Image.subtract"
+            }
+          },
+          "image2": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "collection": {
+                              "valueReference": "59"
+                            },
+                            "reducer": {
+                              "functionInvocationValue": {
+                                "arguments": {},
+                                "functionName": "Reducer.stdDev"
+                              }
+                            }
+                          },
+                          "functionName": "ImageCollection.reduce"
+                        }
+                      },
+                      "names": {
+                        "valueReference": "12"
+                      }
+                    },
+                    "functionName": "Image.rename"
+                  }
+                },
+                "image2": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "input": {
+                              "constantValue": 3
+                            }
+                          },
+                          "functionName": "Number.sqrt"
+                        }
+                      }
+                    },
+                    "functionName": "Image.constant"
+                  }
+                }
+              },
+              "functionName": "Image.divide"
+            }
+          }
+        },
+        "functionName": "Image.divide"
+      }
+    },
+    "59": {
+      "functionInvocationValue": {
+        "arguments": {
+          "baseAlgorithm": {
+            "valueReference": "10"
+          },
+          "collection": {
+            "functionInvocationValue": {
+              "arguments": {
+                "collection": {
+                  "valueReference": "13"
+                },
+                "filter": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "field": {
+                        "valueReference": "15"
+                      },
+                      "maxValue": {
+                        "constantValue": 2012
+                      },
+                      "minValue": {
+                        "constantValue": 1985
+                      }
+                    },
+                    "functionName": "Filter.rangeContains"
+                  }
+                }
+              },
+              "functionName": "Collection.filter"
+            }
+          }
+        },
+        "functionName": "Collection.map"
+      }
+    },
+    "6": {
+      "constantValue": [
+        "trajectory"
+      ]
+    },
+    "60": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "58"
+          },
+          "image2": {
+            "valueReference": "42"
+          }
+        },
+        "functionName": "Image.gte"
+      }
+    },
+    "61": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "58"
+          },
+          "image2": {
+            "valueReference": "50"
+          }
+        },
+        "functionName": "Image.lte"
+      }
+    },
+    "62": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "58"
+          },
+          "image2": {
+            "valueReference": "50"
+          }
+        },
+        "functionName": "Image.gt"
+      }
+    },
+    "63": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "64"
+          },
+          "image2": {
+            "valueReference": "43"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "64": {
+      "functionInvocationValue": {
+        "arguments": {
+          "bandSelectors": {
+            "valueReference": "65"
+          },
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "value": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "input": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "input": {
+                                    "valueReference": "2"
+                                  },
+                                  "test": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "image1": {
+                                          "valueReference": "66"
+                                        },
+                                        "image2": {
+                                          "valueReference": "76"
+                                        }
+                                      },
+                                      "functionName": "Image.gte"
+                                    }
+                                  },
+                                  "value": {
+                                    "valueReference": "46"
+                                  }
+                                },
+                                "functionName": "Image.where"
+                              }
+                            },
+                            "test": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "image1": {
+                                    "valueReference": "66"
+                                  },
+                                  "image2": {
+                                    "valueReference": "76"
+                                  }
+                                },
+                                "functionName": "Image.lte"
+                              }
+                            },
+                            "value": {
+                              "valueReference": "43"
+                            }
+                          },
+                          "functionName": "Image.where"
+                        }
+                      },
+                      "names": {
+                        "valueReference": "65"
+                      }
+                    },
+                    "functionName": "Image.rename"
+                  }
+                }
+              },
+              "functionName": "Image.uint8"
+            }
+          }
+        },
+        "functionName": "Image.select"
+      }
+    },
+    "65": {
+      "constantValue": [
+        "performance"
+      ]
+    },
+    "66": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "67"
+          },
+          "image2": {
+            "functionInvocationValue": {
+              "arguments": {
+                "input": {
+                  "valueReference": "68"
+                },
+                "test": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "image1": {
+                        "valueReference": "68"
+                      },
+                      "image2": {
+                        "valueReference": "2"
+                      }
+                    },
+                    "functionName": "Image.eq"
+                  }
+                },
+                "value": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "constantValue": 0.001
+                      }
+                    },
+                    "functionName": "Image.constant"
+                  }
+                }
+              },
+              "functionName": "Image.where"
+            }
+          }
+        },
+        "functionName": "Image.divide"
+      }
+    },
+    "67": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "collection": {
+                  "valueReference": "9"
+                },
+                "reducer": {
+                  "valueReference": "40"
+                }
+              },
+              "functionName": "ImageCollection.reduce"
+            }
+          },
+          "names": {
+            "valueReference": "12"
+          }
+        },
+        "functionName": "Image.rename"
+      }
+    },
+    "68": {
+      "functionInvocationValue": {
+        "arguments": {
+          "from": {
+            "functionInvocationValue": {
+              "arguments": {
+                "baseAlgorithm": {
+                  "functionDefinitionValue": {
+                    "argumentNames": [
+                      "_MAPPING_VAR_0_0"
+                    ],
+                    "body": "69"
+                  }
+                },
+                "dropNulls": {
+                  "constantValue": false
+                },
+                "list": {
+                  "valueReference": "72"
+                }
+              },
+              "functionName": "List.map"
+            }
+          },
+          "image": {
+            "valueReference": "73"
+          },
+          "to": {
+            "functionInvocationValue": {
+              "arguments": {
+                "baseAlgorithm": {
+                  "functionDefinitionValue": {
+                    "argumentNames": [
+                      "_MAPPING_VAR_0_0"
+                    ],
+                    "body": "75"
+                  }
+                },
+                "dropNulls": {
+                  "constantValue": false
+                },
+                "list": {
+                  "valueReference": "72"
+                }
+              },
+              "functionName": "List.map"
+            }
+          }
+        },
+        "functionName": "Image.remap"
+      }
+    },
+    "69": {
+      "functionInvocationValue": {
+        "arguments": {
+          "dictionary": {
+            "valueReference": "70"
+          },
+          "key": {
+            "valueReference": "71"
+          }
+        },
+        "functionName": "Dictionary.get"
+      }
+    },
+    "7": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "valueReference": "2"
+          },
+          "test": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "valueReference": "8"
+                },
+                "image2": {
+                  "valueReference": "42"
+                }
+              },
+              "functionName": "Image.lt"
+            }
+          },
+          "value": {
+            "valueReference": "43"
+          }
+        },
+        "functionName": "Image.where"
+      }
+    },
+    "70": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "argumentReference": "_MAPPING_VAR_0_0"
+          }
+        },
+        "functionName": "Dictionary"
+      }
+    },
+    "71": {
+      "constantValue": "code"
+    },
+    "72": {
+      "functionInvocationValue": {
+        "arguments": {
+          "dictionary": {
+            "functionInvocationValue": {
+              "arguments": {
+                "bestEffort": {
+                  "constantValue": true
+                },
+                "geometry": {
+                  "valueReference": "37"
+                },
+                "image": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "dstImg": {
+                        "valueReference": "67"
+                      },
+                      "srcImg": {
+                        "valueReference": "73"
+                      }
+                    },
+                    "functionName": "Image.addBands"
+                  }
+                },
+                "maxPixels": {
+                  "constantValue": 1000000000000000.0
+                },
+                "reducer": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "groupField": {
+                        "constantValue": 1
+                      },
+                      "groupName": {
+                        "valueReference": "71"
+                      },
+                      "reducer": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "percentiles": {
+                              "constantValue": [
+                                90
+                              ]
+                            }
+                          },
+                          "functionName": "Reducer.percentile"
+                        }
+                      }
+                    },
+                    "functionName": "Reducer.group"
+                  }
+                },
+                "scale": {
+                  "constantValue": 30
+                }
+              },
+              "functionName": "Image.reduceRegion"
+            }
+          },
+          "key": {
+            "constantValue": "groups"
+          }
+        },
+        "functionName": "Dictionary.get"
+      }
+    },
+    "73": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "value": {
+                  "constantValue": -1
+                }
+              },
+              "functionName": "Image.constant"
+            }
+          },
+          "test": {
+            "valueReference": "74"
+          },
+          "value": {
+            "valueReference": "74"
+          }
+        },
+        "functionName": "Image.where"
+      }
+    },
+    "74": {
+      "functionInvocationValue": {
+        "arguments": {
+          "id": {
+            "constantValue": "users/amitghosh/sdg_module/fao/aez_v9v2_CRUTS32_Hist_8110_100_avg"
+          }
+        },
+        "functionName": "Image.load"
+      }
+    },
+    "75": {
+      "functionInvocationValue": {
+        "arguments": {
+          "dictionary": {
+            "valueReference": "70"
+          },
+          "key": {
+            "constantValue": "p90"
+          }
+        },
+        "functionName": "Dictionary.get"
+      }
+    },
+    "76": {
+      "functionInvocationValue": {
+        "arguments": {
+          "value": {
+            "constantValue": 0.5
+          }
+        },
+        "functionName": "Image.constant"
+      }
+    },
+    "77": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "64"
+          },
+          "image2": {
+            "valueReference": "46"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "78": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "4"
+          },
+          "image2": {
+            "valueReference": "79"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "79": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "55"
+          },
+          "image2": {
+            "valueReference": "46"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "8": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "functionInvocationValue": {
+              "arguments": {
+                "bandSelectors": {
+                  "constantValue": [
+                    "vi_tau"
+                  ]
+                },
+                "input": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "collection": {
+                        "valueReference": "9"
+                      },
+                      "parallelScale": {
+                        "constantValue": 2
+                      },
+                      "reducer": {
+                        "functionInvocationValue": {
+                          "arguments": {},
+                          "functionName": "Reducer.kendallsCorrelation"
+                        }
+                      }
+                    },
+                    "functionName": "ImageCollection.reduce"
+                  }
+                }
+              },
+              "functionName": "Image.select"
+            }
+          },
+          "image2": {
+            "functionInvocationValue": {
+              "arguments": {
+                "value": {
+                  "constantValue": 7.90333388938897
+                }
+              },
+              "functionName": "Image.constant"
+            }
+          }
+        },
+        "functionName": "Image.multiply"
+      }
+    },
+    "80": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "78"
+          },
+          "image2": {
+            "valueReference": "77"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "81": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "4"
+          },
+          "image2": {
+            "valueReference": "82"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "82": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "55"
+          },
+          "image2": {
+            "valueReference": "48"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "83": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "84"
+          },
+          "image2": {
+            "valueReference": "54"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "84": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "5"
+          },
+          "image2": {
+            "valueReference": "46"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "85": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "84"
+          },
+          "image2": {
+            "valueReference": "79"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "86": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "84"
+          },
+          "image2": {
+            "valueReference": "82"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "87": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "88"
+          },
+          "image2": {
+            "valueReference": "54"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "88": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "5"
+          },
+          "image2": {
+            "valueReference": "48"
+          }
+        },
+        "functionName": "Image.eq"
+      }
+    },
+    "89": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "88"
+          },
+          "image2": {
+            "valueReference": "79"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    },
+    "9": {
+      "functionInvocationValue": {
+        "arguments": {
+          "baseAlgorithm": {
+            "valueReference": "10"
+          },
+          "collection": {
+            "functionInvocationValue": {
+              "arguments": {
+                "collection": {
+                  "valueReference": "13"
+                },
+                "filter": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "filters": {
+                        "arrayValue": {
+                          "values": [
+                            {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "filter": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "leftField": {
+                                          "valueReference": "15"
+                                        },
+                                        "rightValue": {
+                                          "constantValue": 2015
+                                        }
+                                      },
+                                      "functionName": "Filter.greaterThan"
+                                    }
+                                  }
+                                },
+                                "functionName": "Filter.not"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "functionName": "Filter.and"
+                  }
+                }
+              },
+              "functionName": "Collection.filter"
+            }
+          }
+        },
+        "functionName": "Collection.map"
+      }
+    },
+    "90": {
+      "functionInvocationValue": {
+        "arguments": {
+          "image1": {
+            "valueReference": "88"
+          },
+          "image2": {
+            "valueReference": "82"
+          }
+        },
+        "functionName": "Image.and"
+      }
+    }
+  }
+}

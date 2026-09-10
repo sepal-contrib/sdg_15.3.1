@@ -1,0 +1,389 @@
+{
+  "aoi": {
+    "asset_id": "users/amitghosh/sdg_module/parity_aoi",
+    "kind": "asset",
+    "name": "parity aoi"
+  },
+  "climate": {
+    "coefficient": 0.48,
+    "kind": "fixed"
+  },
+  "compatibility": {
+    "clamp_soc_start_year": true,
+    "derived_vi_msvi_uses_evi_asset": true,
+    "legacy_sensor_folder_token": true,
+    "soc_subsequent_transition_scale": 10
+  },
+  "land_cover": {
+    "end_asset": "users/amitghosh/sdg_module/parity_lc_end",
+    "kind": "custom",
+    "scheme": {
+      "end_codes": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "end_names": [
+        "Native forest",
+        "Exotic forest",
+        "Native grassland",
+        "Improve pasture",
+        "Managed parkland",
+        "Plantation",
+        "Cereals",
+        "Horticulture",
+        "Wetland-permanent",
+        "Wetland-ephemeral",
+        "Coastal wetland",
+        "Settlements",
+        "Other Land"
+      ],
+      "is_custom": true,
+      "matrix": [
+        [
+          0,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          0,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          0,
+          0,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          1,
+          1,
+          1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          1,
+          1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0,
+          1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          0,
+          1,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          -1,
+          -1
+        ],
+        [
+          1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          0,
+          -1,
+          0,
+          -1,
+          -1
+        ],
+        [
+          1,
+          -1,
+          1,
+          0,
+          -1,
+          0,
+          -1,
+          0,
+          1,
+          0,
+          0,
+          -1,
+          -1
+        ],
+        [
+          1,
+          -1,
+          1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          0,
+          0,
+          0,
+          -1,
+          -1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          -1,
+          0
+        ]
+      ],
+      "start_codes": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "start_names": [
+        "Native forest",
+        "Exotic forest",
+        "Native grassland",
+        "Improve pasture",
+        "Managed parkland",
+        "Plantation",
+        "Cereals",
+        "Horticulture",
+        "Wetland-permanent",
+        "Wetland-ephemeral",
+        "Coastal wetland",
+        "Settlements",
+        "Other Land"
+      ]
+    },
+    "start_asset": "users/amitghosh/sdg_module/parity_lc_start"
+  },
+  "lceu": "gaes",
+  "periods": {
+    "land_cover": {
+      "end": 2014,
+      "start": 2001
+    },
+    "overall": {
+      "end": 2015,
+      "start": 1985
+    },
+    "performance": {
+      "end": null,
+      "start": null
+    },
+    "soc": {
+      "end": 2012,
+      "start": null
+    },
+    "state": {
+      "end": null,
+      "start": null
+    },
+    "trend": {
+      "end": null,
+      "start": null
+    }
+  },
+  "productivity_lookup": "GPGv1",
+  "threshold": -0.25,
+  "trajectory": "ndvi_trend",
+  "transition_matrix": [
+    [
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      -1,
+      0,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      -1,
+      -1,
+      -1,
+      0,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      0,
+      1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      -1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "vegetation_index": "msvi",
+  "vi_source": {
+    "kind": "sensors",
+    "names": [
+      "MODIS MOD13Q1",
+      "MODIS MYD13Q1"
+    ]
+  },
+  "water_mask": {
+    "kind": "pixel_value",
+    "value": 70
+  }
+}

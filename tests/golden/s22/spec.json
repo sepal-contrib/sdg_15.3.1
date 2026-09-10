@@ -1,0 +1,126 @@
+{
+  "aoi": {
+    "asset_id": "users/amitghosh/sdg_module/parity_aoi",
+    "kind": "asset",
+    "name": "parity aoi"
+  },
+  "climate": {
+    "kind": "per_pixel"
+  },
+  "compatibility": {
+    "clamp_soc_start_year": true,
+    "derived_vi_msvi_uses_evi_asset": true,
+    "legacy_sensor_folder_token": true,
+    "soc_subsequent_transition_scale": 10
+  },
+  "land_cover": {
+    "kind": "esa_cci"
+  },
+  "lceu": "aez",
+  "periods": {
+    "land_cover": {
+      "end": null,
+      "start": null
+    },
+    "overall": {
+      "end": 2015,
+      "start": 1985
+    },
+    "performance": {
+      "end": null,
+      "start": null
+    },
+    "soc": {
+      "end": null,
+      "start": null
+    },
+    "state": {
+      "end": null,
+      "start": null
+    },
+    "trend": {
+      "end": null,
+      "start": null
+    }
+  },
+  "productivity_lookup": "GPGv1",
+  "threshold": 0.0,
+  "trajectory": "ndvi_trend",
+  "transition_matrix": [
+    [
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      -1,
+      0,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      -1,
+      -1,
+      -1,
+      0,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      0,
+      1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      -1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "vegetation_index": "evi",
+  "vi_source": {
+    "kind": "sensors",
+    "names": [
+      "Landsat 8",
+      "Landsat 9"
+    ]
+  },
+  "water_mask": {
+    "kind": "jrc_seasonality",
+    "threshold": 6
+  }
+}

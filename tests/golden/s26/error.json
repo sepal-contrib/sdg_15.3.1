@@ -1,0 +1,4 @@
+{
+  "error": "TypeError: '>' not supported between instances of 'NoneType' and 'int'",
+  "traceback": "Traceback (most recent call last):\n  File \"/home/dguerrero/1_modules/sdg_15.3.1/tools/dump_legacy_graphs.py\", line 115, in dump_scenario\n    compute_indicator_maps(aoi, model, NullOutput())\n  File \"/home/dguerrero/1_modules/sdg_15.3.1/component/scripts/run_15_3_1.py\", line 182, in compute_indicator_maps\n    model.land_cover = land_cover(model, aoi_model, output)\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dguerrero/1_modules/sdg_15.3.1/component/scripts/land_cover.py\", line 58, in land_cover\n    if model.start_lc and model.end_lc and model.water_mask_pixel > 9:\n                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: '>' not supported between instances of 'NoneType' and 'int'\n"
+}
