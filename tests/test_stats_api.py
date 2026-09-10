@@ -77,12 +77,13 @@ def _params(func) -> list[str]:
 def test_the_test_fetchers_satisfy_the_protocol(fetcher_class) -> None:
     """Structural conformance, checked at RUNTIME.
 
-    An annotation in a test file would prove nothing: mypy is configured over
-    ``sdg1531`` only (pyproject.toml ``files = ["sdg1531"]``), so it never reads
-    this module. This walks the Protocol's own members instead -- the names, the
-    coroutine-ness, and the parameter NAMES, which ``sdg1531/ports.py`` calls
-    load-bearing because a Protocol matches positional-or-keyword parameters by
-    name.
+    An annotation in a test file would prove nothing, and adding this module to
+    ``[tool.mypy] files`` -- ``["sdg1531", "tools", "tests/parity"]`` since Task 17,
+    not ``["sdg1531"]`` -- would not change that: an annotation asserting
+    conformance restates the claim where this measures it. What it walks is the
+    Protocol's own members: the names, the coroutine-ness, and the parameter NAMES,
+    which ``sdg1531/ports.py`` calls load-bearing because a Protocol matches
+    positional-or-keyword parameters by name.
 
     The declared names must be a PREFIX of the implemented ones, not equal to them:
     a Protocol is satisfied by an implementor that takes further parameters as long
