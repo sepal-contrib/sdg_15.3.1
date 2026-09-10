@@ -132,6 +132,7 @@ ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/parity/test_canonical.py:_BARE_SPELLINGS": "vocabulary: ee's two bare scope-key spellings",
     "tests/parity/test_canonical.py:_SCOPE_KEY_FIELDS": "vocabulary: every ee field whose string value is a key into `values`",
     "tests/spec_factory.py:__all__": "derived: test_every_export_list_matches_its_module",
+    "tests/test_constants.py:COLOUR_MODULES": "both directions: test_the_domains_colours_live_in_the_two_colour_modules",
     "tests/test_export.py:MANDATORY_MEMBERS": "vocabulary: the ESRI shapefile members a layer cannot be reopened without",
     "tests/test_isolation.py:BANNED_UI": "vocabulary: the UI libraries spec §4 bars from the domain",
     "tests/test_isolation.py:JSON_HALF": "derived: test_the_ee_free_roster_is_every_module_that_imports_without_ee",

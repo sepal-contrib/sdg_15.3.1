@@ -9,9 +9,15 @@ sdg1531.tables and sdg1531.catalog."""
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import FrozenInstanceError
 
 import pytest
+
+# The two modules allowed to name a colour: `tables.py` holds the two legacy legend
+# dicts (parameter/ui.py:48-69) and `palette.py` the vendored CSS4 sequence
+# LandCoverScheme.palette() samples. Everything else reads from one of them.
+COLOUR_MODULES = ("sdg1531/palette.py", "sdg1531/tables.py")
 
 
 # --------------------------------------------------------------------------
@@ -293,6 +299,59 @@ def test_label_dicts() -> None:
     assert five == PROD_TREND_5_LABELS
     assert five == PROD_STATE_5_LABELS
     assert PROD_PERFORMANCE_LABELS == {0: "NoData", 1: "Degraded", 2: "Not degraded"}
+
+
+def test_degradation_colours_key_on_the_degradation_labels() -> None:
+    """The palette and the legend it colours are one vocabulary, in one module.
+
+    The four hexes lived only in ``stats/plots.py``, split across a private
+    three-entry dict and a separate ``_UNKNOWN_CLASS_COLOR`` -- so an app layer
+    building the seven ``visualization_*`` property sets and the map legend had to
+    reach into a private name, retype the hexes (which spec §4 forbids) or invent a
+    fourth colour for NoData that the charts would not agree with. This is the
+    derivation that keeps them one thing: the palette's keys are not a second
+    roster, they are ``DEGRADATION_LABELS``' own values.
+    """
+    from sdg1531.tables import DEGRADATION_COLORS, DEGRADATION_LABELS
+
+    assert list(DEGRADATION_COLORS) == list(DEGRADATION_LABELS.values())
+
+
+def test_degradation_colours_are_the_legacy_legend_bar() -> None:
+    """parameter/ui.py:54-59 (pm.legend_bar), whose first three entries are also
+    ``legend`` (:48-52) -- the palette every ``viz_*`` dict at :72-75 spreads over a
+    ``{"min": 1, "max": 3}`` visualisation."""
+    from sdg1531.tables import DEGRADATION_COLORS
+
+    assert list(DEGRADATION_COLORS.values()) == ["#9ea7ad", "#d7191c", "#ffffbf", "#2c7bb6"]
+    # the three the legacy viz dicts actually draw, in min..max order
+    assert list(DEGRADATION_COLORS.values())[1:] == ["#d7191c", "#ffffbf", "#2c7bb6"]
+
+
+def test_the_domains_colours_live_in_the_two_colour_modules() -> None:
+    """Two undeclared sources of truth is the thing the move was for.
+
+    A module that re-types a hex passes every value assertion in this file --
+    ``"#9ea7ad" == DEGRADATION_COLORS["NoData"]`` is true whether the second copy
+    exists or not -- so the check that can actually fail is on the SOURCE. The
+    degradation hexes lived only in ``stats/plots.py`` until now, which is what made
+    them unreachable for the app layer.
+
+    Both directions: a module that grows a colour fails, and a module named here
+    that no longer holds one fails too, so the pair cannot go stale by rename.
+    Scanned over ``iter_domain_sources()``, so the app package joins the rule the
+    day it lands -- and spec §4 puts the app layer's four viz dicts on exactly these
+    values.
+    """
+    from hygiene_rules import iter_domain_sources
+
+    colour = re.compile(r"\"#[0-9a-fA-F]{6}\"")
+    carriers = {rel for rel, source in iter_domain_sources() if colour.search(source)}
+
+    assert carriers == set(COLOUR_MODULES), {
+        "colours outside the colour modules": sorted(carriers - set(COLOUR_MODULES)),
+        "colour modules that hold none": sorted(set(COLOUR_MODULES) - carriers),
+    }
 
 
 def test_default_land_cover_vocabulary() -> None:

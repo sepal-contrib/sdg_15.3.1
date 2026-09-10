@@ -57,8 +57,8 @@ Task 17's parity harness must carry all eight:
    TRANSLATED ``cm.legend.*`` strings, while the frame's columns are the untranslated
    names bar_plot.py:8 selects on. The two lined up only in English; in any other
    locale matplotlib silently fell back to its default colour cycle.
-   :data:`_DEGRADATION_COLORS` keys on the untranslated names, so the same three hex
-   values now land in every locale.
+   :data:`~sdg1531.tables.DEGRADATION_COLORS` keys on the untranslated names, so the
+   same three hex values now land in every locale.
 8. **No legacy counterpart.** The ``title`` argument ``barh_plot`` took (:20) is
    dropped -- display strings are the app layer's (spec §4). The two axis names are
    NOT dropped: bar_plot.py:17 and :19 hardcode them in English rather than routing
@@ -67,28 +67,26 @@ Task 17's parity harness must carry all eight:
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from types import MappingProxyType
+from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
 
+from sdg1531.tables import DEGRADATION_COLORS
+
 __all__ = ["distribution_option", "sankey_option"]
 
-# transcribed from component/parameter/ui.py:49-53 (pm.legend). The keys are the
-# untranslated class names bar_plot.py:8 selects on; ui.py keyed the same colours
-# on translated strings, which only lined up in English.
-_DEGRADATION_COLORS: Mapping[str, str] = MappingProxyType(
-    {
-        "Degraded": "#d7191c",
-        "Stable": "#ffffbf",
-        "Improved": "#2c7bb6",
-    }
-)
 _DISTRIBUTION_CLASSES = ("Degraded", "Stable", "Improved")
 
-# parameter/ui.py:59 (pm.legend_bar), the "no data" swatch
-_UNKNOWN_CLASS_COLOR = "#9ea7ad"
+# parameter/ui.py:59 (pm.legend_bar), the "no data" swatch, reused for a land cover
+# class the run's scheme has no colour for -- the same hex out of the same legacy
+# dict (see EXPECTED_DIVERGENCES note 4). Named off `DEGRADATION_COLORS` rather
+# than retyped: this module used to be the only home of these four hexes, so the
+# app layer building the seven `visualization_*` property sets and the map's
+# `LegendData` had a private name, a re-typed literal or a fifth colour to choose
+# between. The palette now sits beside `DEGRADATION_LABELS`, whose vocabulary it
+# is keyed on, and this module reads it like any other consumer.
+_UNKNOWN_CLASS_COLOR = DEGRADATION_COLORS["NoData"]
 
 
 def sankey_option(df: pd.DataFrame, r: Any) -> dict[str, Any]:
@@ -196,7 +194,7 @@ def distribution_option(pivot: pd.DataFrame, r: Any) -> dict[str, Any]:
                 "name": klass,
                 "type": "bar",
                 "stack": "Total",
-                "itemStyle": {"color": _DEGRADATION_COLORS[klass]},
+                "itemStyle": {"color": DEGRADATION_COLORS[klass]},
                 "data": [float(value) for value in pct[klass]],
             }
             for klass in _DISTRIBUTION_CLASSES

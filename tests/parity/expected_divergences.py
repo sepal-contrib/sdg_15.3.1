@@ -658,9 +658,9 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
             "(parameter/ui.py:49-53), whose keys are the TRANSLATED cm.legend.* "
             "strings, while the frame's columns are the untranslated names "
             "bar_plot.py:8 selects on. They lined up only in English; elsewhere "
-            "matplotlib silently fell back to its default cycle. _DEGRADATION_COLORS "
-            "keys on the untranslated names, so the same three hex values land in "
-            "every locale."
+            "matplotlib silently fell back to its default cycle. tables."
+            "DEGRADATION_COLORS keys on the untranslated names, so the same three "
+            "hex values land in every locale."
         ),
         "tests": ("test_distribution_keeps_the_legacy_legend_colours",),
     },

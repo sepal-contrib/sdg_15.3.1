@@ -18,6 +18,7 @@ __all__ = [
     "DEFAULT_LC_CODES",
     "DEFAULT_LC_COLORS",
     "DEFAULT_TRANSITION_MATRIX",
+    "DEGRADATION_COLORS",
     "DEGRADATION_LABELS",
     "ESA_LC_CLASSES",
     "INPUT_FACTOR",
@@ -75,6 +76,33 @@ DEFAULT_LC_COLORS: Mapping[str, str] = MappingProxyType(
 # ("chnage") are transcribed verbatim, not fixed
 DEGRADATION_LABELS: Mapping[int, str] = MappingProxyType(
     {0: "NoData", 1: "Degraded", 2: "Stable", 3: "Improved"}
+)
+
+# transcribed from parameter/ui.py:54-59 (pm.legend_bar). Keyed on the values of
+# DEGRADATION_LABELS above, not on the translated cm.legend.* strings ui.py used:
+# the frame columns and band legends the port keys colours against are the
+# untranslated names, and the two lined up only in English (stats/plots.py's
+# EXPECTED_DIVERGENCES note 7).
+#
+# This is the DEGRADATION palette, and it is the domain's only one. Its three
+# non-NoData entries are also `legend` (ui.py:48-52), which every viz dict at
+# :72-75 spreads for the productivity, land cover, soc and indicator layers -- so
+# `tuple(DEGRADATION_COLORS.values())[1:]` is the palette of a {"min": 1, "max": 3}
+# visualisation, and the app layer builds those from here rather than retyping the
+# hexes (spec §4 bars re-deriving colours in the app layer).
+#
+# There is deliberately NO palette beside PROD_PERFORMANCE_LABELS. The legacy has
+# none: parameter/ui.py defines exactly two colour dicts, and performance -- like
+# the 5-level trend and state legends -- was never drawn. Inventing one here would
+# be new design in a transcription, and would need its own divergence entry; the
+# phase that first renders those layers is the one that gets to choose.
+DEGRADATION_COLORS: Mapping[str, str] = MappingProxyType(
+    {
+        "NoData": "#9ea7ad",
+        "Degraded": "#d7191c",
+        "Stable": "#ffffbf",
+        "Improved": "#2c7bb6",
+    }
 )
 PROD_TREND_5_LABELS: Mapping[int, str] = MappingProxyType(
     {
