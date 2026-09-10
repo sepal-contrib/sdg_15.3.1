@@ -1,14 +1,32 @@
 """The deliberate divergences from D9's byte-parity rule.
 
-Three registers, because a divergence can show up in three ways:
+**An entry here is a LICENCE TO DIFFER, and a licence is only ever as narrow as
+its patterns.** ``EXPECTED_DIVERGENCES`` is keyed on (scenario glob, layer glob),
+and a glob that covers a whole layer licenses everything in that layer: every node,
+every argument, every ordering. This register carried exactly such an entry --
+``("*", "indicator_15_3_1")``, written for the band rename below -- and under it
+the 30-rule collapse, its rule order, the water mask and the cast position of the
+module's headline output were compared against nothing at all. Swapping
+``.uint8()`` and ``.where(water, 0)`` in ``build_indicator`` left all 101 parity
+tests green. Before adding an entry, ask what a mutation INSIDE the region it
+covers would do; if the answer is "nothing", the entry is too broad.
+
+The registers, because a difference can show up in five ways:
 
 ``EXPECTED_DIVERGENCES``
-    a GRAPH PAIR that differs. Keys are (scenario pattern, layer pattern), both
-    fnmatch globs, so a corpus-wide divergence is one entry rather than 28x7. The
-    table fails in BOTH directions: an unlisted divergence fails, a listed
-    divergence that no longer appears fails, and an entry that matches no
-    scenario/layer pair at all fails. That is what keeps it from rotting into a
-    list of excuses.
+    a GRAPH PAIR that differs and is licensed. Keys are (scenario pattern, layer
+    pattern), both fnmatch globs. The table fails in BOTH directions: an unlisted
+    divergence fails, a listed divergence that no longer appears fails, and an
+    entry that matches no scenario/layer pair at all fails. That is what keeps it
+    from rotting into a list of excuses -- but it is not what keeps an entry
+    narrow, and nothing can be except reading it.
+``EXPECTED_NORMALISATIONS``
+    a graph pair that differs by a known node, which the harness SPLICES OUT and
+    then requires byte equality on the remainder. This is strictly stronger than a
+    licence and is where a difference belongs whenever it can be described
+    structurally: the normalisation is written down as code, tested for what it
+    refuses as well as what it removes, and it leaves the rest of the layer
+    compared.
 ``EXPECTED_LEGACY_AND_PORT_BOTH_FAIL``
     scenarios BOTH trees refuse. There is no graph pair, so these are not
     divergences and must not be listed above.
@@ -38,6 +56,7 @@ __all__ = [
     "EXPECTED_COMPATIBILITY_DIVERGENCES",
     "EXPECTED_DIVERGENCES",
     "EXPECTED_LEGACY_AND_PORT_BOTH_FAIL",
+    "EXPECTED_NORMALISATIONS",
     "EXPECTED_OFF_GRAPH",
     "GRAPH_DIVERGENCE_NOTES",
     "MODULE_NOTE_CLAIMS",
@@ -47,13 +66,6 @@ __all__ = [
 ]
 
 EXPECTED_DIVERGENCES: dict[tuple[str, str], str] = {
-    # engine/indicator.py note 1: the indicator band is unnamed in the legacy.
-    # run_15_3_1.py:411 returns ee.Image(0).where(...).uint8() with no rename, so
-    # the band is "constant". Corpus-wide, one entry.
-    ("*", "indicator_15_3_1"): (
-        "indicator band renamed to 'indicator_15_3_1' (run_15_3_1.py:411 left it "
-        "as 'constant', which would make visualization_0_bands say 'constant')"
-    ),
     # engine/land_cover.py note 4: "water_mask_pixel > 9 with a None default".
     # land_cover.py:58 reads
     #     if model.start_lc and model.end_lc and model.water_mask_pixel > 9:
@@ -82,7 +94,6 @@ EXPECTED_DIVERGENCES: dict[tuple[str, str], str] = {
 # Which module note licenses each graph entry above. Separate from the reason
 # strings because `matching_entry` returns those verbatim to a failing assertion.
 GRAPH_DIVERGENCE_NOTES: dict[tuple[str, str], str] = {
-    ("*", "indicator_15_3_1"): "sdg1531/engine/indicator.py:1",
     ("s05", "*"): "sdg1531/engine/land_cover.py:4",
     ("s08", "*"): "sdg1531/engine/land_cover.py:4",
     ("s09", "*"): "sdg1531/engine/land_cover.py:4",
@@ -92,6 +103,39 @@ GRAPH_DIVERGENCE_NOTES: dict[tuple[str, str], str] = {
     ("s20", "*"): "sdg1531/engine/land_cover.py:4",
     ("s26", "*"): "sdg1531/engine/land_cover.py:4",
     ("s28", "*"): "sdg1531/engine/land_cover.py:4",
+}
+
+# Differences the harness SPLICES OUT before comparing, rather than licensing.
+#
+# The distinction is the whole lesson of this register. A licence says "this layer
+# may differ" and stops looking; a normalisation says "these exact nodes differ,
+# here is the code that removes them, and everything else must still be equal
+# byte for byte". Anything describable as a structural edit belongs here.
+#
+# Each entry names the function in `tests/parity/canonical.py` that performs it and
+# a test that pins it. The tests that matter are the ones about what the splice
+# REFUSES: `test_the_splice_declines_on_the_legacy_graph` (it is asymmetric, so it
+# cannot cancel the same node on both sides and compare nothing) and
+# `test_the_splice_declines_when_the_cast_moves_inside_the_water_mask` (it is tied
+# to one position, so a port that moved the cast is not normalised, it fails).
+EXPECTED_NORMALISATIONS: dict[str, dict[str, str]] = {
+    # --- engine/indicator.py ---------------------------------------------------
+    "indicator_band_rename": {
+        "note": "sdg1531/engine/indicator.py:1",
+        "splice": "strip_indicator_band_rename",
+        "reason": (
+            "build_indicator ends `.rename('indicator_15_3_1')`, where "
+            "run_15_3_1.py:411 returns ee.Image(0).where(...).uint8() with no "
+            "rename at all, so the legacy band is literally called 'constant' "
+            "(spec 7). One extra Image.rename node, in one position, in every "
+            "scenario's indicator layer. It was originally licensed as "
+            "('*', 'indicator_15_3_1'), which licensed the entire indicator graph "
+            "-- the 30-rule collapse, its rule order, the water mask and the cast "
+            "position all went uncompared. Splicing the node out instead leaves "
+            "the rest of the layer under the ordinary byte-equality rule."
+        ),
+        "test": "test_the_splice_turns_the_port_graph_into_the_legacy_one",
+    },
 }
 
 # Scenarios BOTH trees refuse. There is no graph pair, so these are not
@@ -366,12 +410,13 @@ NOTE_MODULES: tuple[str, ...] = (
 )
 
 # note id -> the register entry that accounts for it. "graph:<scenario>/<layer>"
-# names an EXPECTED_DIVERGENCES key; "off_graph:<key>" names an EXPECTED_OFF_GRAPH
-# key. Built from the two tables above so a note cannot claim an entry that is not
-# there, and checked against the notes found in NOTE_MODULES so an entry cannot
-# claim a note that is not there.
+# names an EXPECTED_DIVERGENCES key, "normalised:<key>" an EXPECTED_NORMALISATIONS
+# key and "off_graph:<key>" an EXPECTED_OFF_GRAPH key. Built from the three tables
+# above so a note cannot claim an entry that is not there, and checked against the
+# notes found in NOTE_MODULES so an entry cannot claim a note that is not there.
 MODULE_NOTE_CLAIMS: dict[str, str] = {
     **{note: f"graph:{key[0]}/{key[1]}" for key, note in GRAPH_DIVERGENCE_NOTES.items()},
+    **{entry["note"]: f"normalised:{name}" for name, entry in EXPECTED_NORMALISATIONS.items()},
     **{
         entry["note"]: f"off_graph:{name}"
         for name, entry in EXPECTED_OFF_GRAPH.items()

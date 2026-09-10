@@ -44,14 +44,25 @@ off the run's own vocabulary.
 EXPECTED_DIVERGENCES note -- four divergences from the legacy. Task 17's parity
 harness must carry all four:
 
-1. **Behaviour-changing, and CORPUS-WIDE rather than per-scenario.**
+1. **Behaviour-changing, and NORMALISED rather than licensed.**
    :func:`build_indicator` ends ``.rename("indicator_15_3_1")``, where
    ``run_15_3_1.py:411`` renames nothing at all, so the legacy band is literally
    called ``constant`` (spec §7). Every scenario's indicator layer carries the
-   same one extra ``Image.rename`` node, so the harness entry belongs on the
-   corpus and not on any single scenario. With the rename put back the two graphs
-   are byte-identical; ``tests/engine/test_indicator.py`` re-derives that against
-   a verbatim copy of the legacy chain rather than asserting it.
+   same one extra ``Image.rename`` node, in the same position.
+
+   The harness does NOT license it. It was licensed once, as
+   ``EXPECTED_DIVERGENCES[("*", "indicator_15_3_1")]``, and that entry -- written
+   for this one node -- covered the whole layer: the 30-rule collapse, its rule
+   order, the water mask and the cast position of the module's headline output
+   were compared against nothing, and swapping ``.uint8()`` and
+   ``.where(water, 0)`` below left every parity test green. The entry is gone.
+   ``tests/parity/canonical.py`` splices the rename node out and requires byte
+   equality on everything that remains, so the layer is compared like any other;
+   see ``EXPECTED_NORMALISATIONS["indicator_band_rename"]``. The splice is tied to
+   this exact chain -- ``Image.uint8`` over ``Image.where`` over
+   ``Image.rename(["indicator_15_3_1"])`` -- so moving the cast, the mask or the
+   rename stops it firing and fails. ``tests/engine/test_indicator.py``
+   re-derives the same equality against a verbatim copy of the legacy chain.
 2. **Behaviour-changing.** :func:`build_indicator_maps` drops
    ``run_15_3_1.py:165-167``'s ``if not (model.start < model.end): raise``. That
    check now belongs to :func:`sdg1531.validate.validate` (validate.py:61-70,

@@ -4,10 +4,19 @@ Runs offline under the ee fixture in tests/conftest.py. This file must NEVER
 import the legacy tree: `component/parameter/directory.py:6-10` mkdirs
 `~/module_results` at import, and the whole point of the two stages is that only
 stage A (`tools/dump_legacy_graphs.py`, a tool) touches it.
+
+Graphs are compared through `tests/parity/canonical.py`, not as raw serialized
+strings. `ee` numbers its scope keys in traversal order, so the port's one extra
+`Image.rename` on the indicator layer shifted every later key and made the raw
+strings differ in almost every line -- which is how that layer came to carry a
+corpus-wide LICENCE covering its entire graph. The canonical form is independent
+of that numbering, so the rename can be spliced out as a named normalisation and
+everything else compared byte for byte.
 """
 
 from __future__ import annotations
 
+import difflib
 import json
 import sys
 from pathlib import Path
@@ -21,10 +30,13 @@ from sdg1531.enums import IndicatorLayer
 from sdg1531.errors import SpecError
 from sdg1531.resolve import resolve
 from sdg1531.spec import Compatibility, RunSpec
+from tests.parity import canonical
+from tests.parity.canonical import render, strip_indicator_band_rename
 from tests.parity.expected_divergences import (
     EXPECTED_COMPATIBILITY_DIVERGENCES,
     EXPECTED_DIVERGENCES,
     EXPECTED_LEGACY_AND_PORT_BOTH_FAIL,
+    EXPECTED_NORMALISATIONS,
     EXPECTED_OFF_GRAPH,
     MODULE_NOTE_CLAIMS,
     matching_entry,
@@ -37,9 +49,24 @@ GOLDEN = REPO_ROOT / "tests" / "golden"
 METADATA = json.loads((GOLDEN / "metadata.json").read_text())
 SCENARIO_DIRS = sorted(p for p in GOLDEN.iterdir() if p.is_dir())
 
+# how much of the legacy-vs-port diff to put in a failing assertion. The whole
+# encoding runs to thousands of lines; the first differing nodes are the answer.
+_DIFF_LINES = 40
+
 
 def encode(image: ee.Image) -> str:
     return json.dumps(ee.serializer.encode(image), sort_keys=True)
+
+
+def graph_diff(golden: str, actual: str) -> str:
+    """The first `_DIFF_LINES` lines of the canonical legacy-vs-port diff."""
+    lines = list(
+        difflib.unified_diff(
+            golden.splitlines(), actual.splitlines(), "legacy", "port", lineterm="", n=1
+        )
+    )
+    head = "\n".join(lines[:_DIFF_LINES])
+    return head if len(lines) <= _DIFF_LINES else f"{head}\n... {len(lines) - _DIFF_LINES} more"
 
 
 def test_the_recorded_ee_version_matches_this_environment():
@@ -148,8 +175,33 @@ def test_scenario_graphs_match_the_goldens(directory):
         golden_path = directory / f"{stem}.json"
         assert golden_path.exists(), f"no golden for {scenario}/{stem}"
 
-        golden = json.dumps(json.loads(golden_path.read_text()), sort_keys=True)
-        actual = encode(layers[layer].image)
+        golden_graph = json.loads(golden_path.read_text())
+        actual_graph = ee.serializer.encode(layers[layer].image)
+
+        if layer is IndicatorLayer.INDICATOR_15_3_1:
+            # EXPECTED_NORMALISATIONS["indicator_band_rename"]. Both asserts are
+            # load-bearing: the splice has to fire on the port (or the port has
+            # stopped renaming, or moved the node the goldens pin) and has to
+            # DECLINE on the legacy (or it is cancelling the same node on both
+            # sides, which would compare nothing at all).
+            actual_graph, spliced = strip_indicator_band_rename(actual_graph)
+            assert spliced, (
+                f"{scenario}/{stem}: the port no longer ends "
+                "Image.uint8 <- Image.where <- Image.rename(['indicator_15_3_1']), "
+                "so the normalisation could not fire. Either the rename is gone or "
+                "the cast or water mask moved -- both are graph changes the goldens "
+                "pin. See EXPECTED_NORMALISATIONS."
+            )
+            golden_graph, golden_spliced = strip_indicator_band_rename(golden_graph)
+            assert not golden_spliced, (
+                f"{scenario}/{stem}: the LEGACY golden carries the rename too, so "
+                "the normalisation is subtracting the same node from both sides and "
+                "proving nothing. run_15_3_1.py:411 renames nothing; a golden that "
+                "does was not recorded from the legacy."
+            )
+
+        golden = render(golden_graph)
+        actual = render(actual_graph)
         entry = matching_entry(scenario, stem)
 
         if actual == golden:
@@ -158,19 +210,19 @@ def test_scenario_graphs_match_the_goldens(directory):
                 f"still lists {entry[0]} ({entry[1]}). Remove the stale entry."
             )
         elif entry is None:
-            # Write the port's own encoding next to the golden so the diff needs no
-            # copy-paste. Untracked: .gitignore holds the pattern. Written ONLY on
-            # an unlicensed divergence -- writing it for a licensed one too would
-            # leave a diagnostic behind on every green run, and "no .actual.json
-            # files" is exactly the signal that the harness has converged.
+            # Write the port's canonical graph next to the golden. Untracked:
+            # .gitignore holds the pattern. Written ONLY on an unlicensed
+            # divergence -- writing it for a licensed one too would leave a
+            # diagnostic behind on every green run, and "no .actual.json files" is
+            # exactly the signal that the harness has converged.
             actual_path = directory / f"{stem}.actual.json"
-            actual_path.write_text(json.dumps(json.loads(actual), indent=2, sort_keys=True))
+            actual_path.write_text(actual)
             raise AssertionError(
                 f"{scenario}/{stem} diverges from the legacy graph and no "
-                f"EXPECTED_DIVERGENCES entry covers it. The port's encoding was "
-                f"written to {actual_path} for the diff. Phase 1 is a "
-                "transcription: either restore the legacy shape or record the "
-                "divergence with a reason."
+                f"EXPECTED_DIVERGENCES entry covers it. Phase 1 is a transcription: "
+                "either restore the legacy shape or record the divergence with a "
+                f"reason.\nThe port's canonical graph is at {actual_path}.\n"
+                f"{graph_diff(golden, actual)}"
             )
 
 
@@ -240,12 +292,30 @@ def test_every_divergence_entry_matches_at_least_one_pair():
     assert not unused, f"EXPECTED_DIVERGENCES entries match nothing: {unused}"
 
 
-def test_every_off_graph_divergence_names_a_test_that_exists():
+def _test_sources() -> str:
     tests_root = Path(__file__).parent.parent
-    sources = "\n".join(path.read_text() for path in tests_root.rglob("test_*.py"))
+    return "\n".join(path.read_text() for path in tests_root.rglob("test_*.py"))
+
+
+def test_every_off_graph_divergence_names_a_test_that_exists():
+    sources = _test_sources()
     for key, entry in EXPECTED_OFF_GRAPH.items():
         assert f"def {entry['test']}" in sources, (
             f"off-graph divergence {key!r} names {entry['test']}, which no test defines"
+        )
+
+
+def test_every_normalisation_names_a_splice_and_a_test_that_exist():
+    """A normalisation is a claim about CODE, so both halves have to be real: the
+    function that performs the splice and the test that pins what it refuses."""
+    sources = _test_sources()
+    for key, entry in EXPECTED_NORMALISATIONS.items():
+        assert hasattr(canonical, entry["splice"]), (
+            f"normalisation {key!r} names {entry['splice']}, which "
+            "tests/parity/canonical.py does not define"
+        )
+        assert f"def {entry['test']}" in sources, (
+            f"normalisation {key!r} names {entry['test']}, which no test defines"
         )
 
 
@@ -269,8 +339,10 @@ def test_every_register_note_reference_names_a_real_module_note():
 
 
 def test_every_note_claim_names_a_register_entry_that_is_there():
-    graph_keys = {f"graph:{s}/{layer}" for s, layer in EXPECTED_DIVERGENCES}
-    off_graph_keys = {f"off_graph:{key}" for key in EXPECTED_OFF_GRAPH}
-    known = graph_keys | off_graph_keys
+    known = (
+        {f"graph:{s}/{layer}" for s, layer in EXPECTED_DIVERGENCES}
+        | {f"normalised:{key}" for key in EXPECTED_NORMALISATIONS}
+        | {f"off_graph:{key}" for key in EXPECTED_OFF_GRAPH}
+    )
     missing = sorted(claim for claim in MODULE_NOTE_CLAIMS.values() if claim not in known)
     assert missing == [], f"note claims pointing at no register entry: {missing}"
