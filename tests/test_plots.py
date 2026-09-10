@@ -304,7 +304,7 @@ def test_sankey_falls_back_to_grey_for_a_class_with_no_colour():
     assert {node["itemStyle"]["color"] for node in option["series"][0]["data"]} == {"#9ea7ad"}
 
 
-def test_sankey_declares_one_node_for_a_class_outside_the_vocabulary():
+def test_sankey_declares_one_start_node_for_a_class_outside_the_vocabulary():
     """``ordered()``'s tail, and the ``dict.fromkeys`` that feeds it, in one shape.
 
     Drop the tail and the option carries a link naming a node that was never declared --
@@ -333,6 +333,31 @@ def test_sankey_declares_one_node_for_a_class_outside_the_vocabulary():
     assert names.count("Mangrove 2001") == 1
     declared = set(names)
     assert all(link["source"] in declared for link in series["links"]), series["links"]
+
+
+def test_sankey_declares_one_end_node_for_a_class_outside_the_vocabulary():
+    """The end-side mirror of the test above, and the fourth instance of one bug class.
+
+    ``left_present`` and ``right_present`` are separate expressions with separate
+    ``dict.fromkeys`` calls, so a test built on the start side cannot see the end one:
+    ``grouped`` repeats an end class once per start class that reaches it, exactly as it
+    repeats a start class once per end class it leaves for. Two rows ARRIVING at the same
+    out-of-vocabulary class is the only shape that shows it, because ``ordered()``'s
+    known half iterates ``r.scheme.end_names`` and is immune either way.
+    """
+    r = FakeResolved(start_year=2001, end_year=2015)
+    first, second = r.scheme.start_names[0], r.scheme.start_names[1]
+    df = pd.DataFrame(
+        [[first, "Mangrove", 3.0], [second, "Mangrove", 1.0]],
+        columns=[r.lc_year_start_esa, r.lc_year_end_esa, "Area"],
+    )
+
+    series = sankey_option(df, r)["series"][0]
+
+    names = [node["name"] for node in series["data"]]
+    assert names.count("Mangrove 2015") == 1
+    declared = set(names)
+    assert all(link["target"] in declared for link in series["links"]), series["links"]
 
 
 def test_sankey_option_uses_only_keys_ipecharts_declares():
