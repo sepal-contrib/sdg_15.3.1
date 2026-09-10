@@ -46,6 +46,8 @@ from tests.parity.expected_divergences import (
     MODULE_NOTE_CLAIMS,
     matching_entry,
     module_notes,
+    note_mentions,
+    note_modules,
 )
 from tools.scenarios import SCENARIOS
 
@@ -461,6 +463,24 @@ def test_every_module_divergence_note_is_claimed_by_the_register() -> None:
         "to EXPECTED_DIVERGENCES with its GRAPH_DIVERGENCE_NOTES key. The roster is "
         "SCANNED off sdg1531/, so a note in a newly written module reaches this test "
         "on its own."
+    )
+
+
+def test_no_module_raises_the_subject_without_opening_a_parseable_note() -> None:
+    """The roster is scanned, so its staleness moved from a LIST to a REGEX.
+
+    A module headed some other way -- "EXPECTED_DIVERGENCES notes: two divergences
+    from the legacy." was the wording that slipped -- is invisible to the anchor,
+    and if no register entry cites that module, nothing dangles and nothing fails.
+    Comparing "modules that mention the subject" against "modules the anchor finds"
+    is the check that does not depend on the anchor being right.
+    """
+    missed = sorted(set(note_mentions(REPO_ROOT)) - set(note_modules(REPO_ROOT)))
+    assert missed == [], (
+        f"modules whose docstring mentions EXPECTED_DIVERGENCES but open no "
+        f"parseable note section: {missed}. Head the section "
+        "`EXPECTED_DIVERGENCES note(s) ...` on its own line so the scan finds it, "
+        "or reword the mention if the module declares no divergence."
     )
 
 

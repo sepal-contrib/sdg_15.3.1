@@ -25,28 +25,45 @@ values, literals, and the sharing structure. :func:`render` prints that as one
 line per node, which compares byte-for-byte and diffs readably.
 
 THE HAZARD, and the reason :data:`_BARE_SCOPE_KEY` is a table rather than an
-``if``: a scope key does not always arrive wrapped. ``ee`` spells a reference three
-different ways, and the two BARE ones look like ordinary string literals to a
-walker that is not expecting them -- so the subtree behind them silently drops out
-of the canonical form and any difference inside it becomes invisible. This file
-shipped once knowing only two of the three, and the one it missed
-(``functionReference``) is where ``ee.Image.expression`` puts the EVI and MSVI
-formulas: two graphs differing only in a coefficient canonicalised identically.
-The three, and nothing else, are what ``ee/serializer.py`` passes through
-``_optimize_referred_value`` -- at ``:497`` (``body``), ``:509``
-(``functionReference``) and ``:517`` (``valueReference``); there is no fourth.
+``if``: a scope key does not always arrive wrapped. ``ee`` spells a reference FOUR
+different ways, and three of them are BARE -- they look like ordinary string
+literals to a walker that is not expecting them, so the subtree behind them
+silently drops out of the canonical form and any difference inside it becomes
+invisible. This file shipped once knowing only two of the four, and the one it
+missed (``functionReference``) is where ``ee.Image.expression`` puts the EVI and
+MSVI formulas: two graphs differing only in a coefficient canonicalised
+identically.
 
-* ``{"valueReference": key}`` -- the wrapper form, handled by ``resolve()``.
-* ``body`` -- a ``.map()``/``.reduce()`` callback body, a bare key directly under
-  ``functionDefinitionValue`` (also documented in ``tests/engine/graph.py``).
-* ``functionReference`` -- a bare key directly inside a ``functionInvocationValue``,
-  sitting where ``functionName`` normally sits, when the function being called is
-  itself computed rather than named.
+The four are exactly the call sites of ``_optimize_referred_value`` in
+``ee/serializer.py``, which is the only thing there that creates a ``values`` key:
 
-Each is resolved only under its own enclosing node kind. That anchoring is not
-fussiness: ``body`` is a perfectly ordinary key for an ``ee.Dictionary`` constant
-to carry, and resolving one of those would either crash or splice in an unrelated
-node.
+* ``:411`` -- the top-level ``result``, a bare key. Resolved in
+  :func:`canonical_graph` itself, not through the table, because it has no
+  enclosing node.
+* ``:497`` -- ``body``, a bare key directly under ``functionDefinitionValue``: a
+  ``.map()``/``.reduce()`` callback (also documented in ``tests/engine/graph.py``).
+* ``:509`` -- ``functionReference``, a bare key directly inside a
+  ``functionInvocationValue``, sitting where ``functionName`` normally sits, when
+  the function being called is itself computed rather than named.
+* ``:527`` -- ``{"valueReference": key}``, the wrapper form, handled by
+  ``resolve()``.
+
+Everything else in the ValueNode union is terminal: ``_optimize_value`` returns
+``constantValue``, ``integerValue``, ``bytesValue`` and ``argumentReference``
+untouched and recurses into ``arrayValue`` / ``dictionaryValue`` as ValueNodes. So
+there is no FIFTH -- for earthengine-api 1.6.14, which
+``test_the_recorded_ee_version_matches_this_environment`` is what pins.
+
+The two table entries are resolved only under their own enclosing node kind, and
+that anchoring NARROWS the converse hazard rather than removing it. ``body`` is a
+perfectly ordinary key for an ``ee.Dictionary`` constant to carry, and resolving
+one of those would splice in an unrelated node; the kind check means a bare
+``{"body": "..."}`` constant is left alone. What it does not cover is a constant
+shaped like the node it sits under --
+``{"constantValue": {"functionInvocationValue": {"functionReference": "12"}}}`` --
+because the kind consulted is only the child's immediate parent key. Nothing in this port builds such a dictionary, and if one
+appeared the lookup raises ``KeyError`` unless the string also happens to name a
+live scope key. Named here so the next reader knows the bound of the guarantee.
 
 Also worth stating, because it has broken a walker on this plan: a repeated
 CONSTANT is hoisted too, not just a repeated computed subexpression, so an
@@ -89,11 +106,13 @@ __all__ = [
 INDICATOR_BAND = "indicator_15_3_1"
 
 # enclosing node kind -> the field inside it whose STRING value is a bare key into
-# `values` rather than a literal. See the module docstring: these are the two
-# unwrapped spellings of a reference, and `ee/serializer.py` creates references at
-# exactly these two sites plus the `valueReference` wrapper. Keyed on the enclosing
-# kind so that `body` is only resolved under `functionDefinitionValue` -- an
-# ee.Dictionary constant may legitimately carry a key called `body`.
+# `values` rather than a literal. See the module docstring: these are two of the
+# four spellings `ee` gives a reference -- the other two are the `valueReference`
+# wrapper, handled by `resolve()`, and the top-level `result`, handled in
+# `canonical_graph` itself. Keyed on the enclosing kind so that `body` is only
+# resolved under `functionDefinitionValue`: an ee.Dictionary constant may
+# legitimately carry a key called `body`, and the docstring states what that
+# one-level anchoring does and does not cover.
 _BARE_SCOPE_KEY: dict[str, str] = {
     "functionDefinitionValue": "body",
     "functionInvocationValue": "functionReference",

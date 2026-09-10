@@ -71,7 +71,22 @@ def test_mypy_reads_the_parity_harness_and_its_tools() -> None:
     `tests/parity/canonical.py`, which decides whether two ee graphs match, and
     `tools/to_legacy_model.py`, the sole adapter every golden was recorded through
     -- read as type-checked while mypy never opened them. Widening it found a real
-    defect in the adapter on the first run."""
-    files = _pyproject()["tool"]["mypy"]["files"]
+    defect in the adapter on the first run.
 
-    assert {"sdg1531", "tools", "tests/parity"} <= set(files)
+    Checking `files` alone would leave this test's name broader than its body: an
+    `exclude` regex, or an override switching `ignore_errors` on, takes those trees
+    back out of the check while `files` still names them. Reading means all three.
+    """
+    mypy = _pyproject()["tool"]["mypy"]
+    trees = ("sdg1531", "tools", "tests/parity")
+
+    assert set(trees) <= set(mypy["files"])
+    assert "exclude" not in mypy, f"an exclude pattern can take {trees} back out: {mypy}"
+
+    silenced = [
+        override["module"]
+        for override in mypy.get("overrides", [])
+        if override.get("ignore_errors") or override.get("follow_imports") in ("skip", "silent")
+        if any(str(m).split(".")[0] in ("sdg1531", "tools", "tests") for m in override["module"])
+    ]
+    assert silenced == [], f"overrides silencing a checked tree: {silenced}"

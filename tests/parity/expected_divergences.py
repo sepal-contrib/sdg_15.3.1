@@ -106,6 +106,7 @@ __all__ = [
     "OffGraph",
     "matching_entry",
     "module_notes",
+    "note_mentions",
     "note_modules",
 ]
 
@@ -715,8 +716,25 @@ MODULE_NOTE_CLAIMS: dict[str, str] = {
     },
 }
 
-_NOTE_ANCHOR = re.compile(r"^EXPECTED_DIVERGENCES note\b.*(--|harness)", re.MULTILINE)
+# The heading that opens a note section. Deliberately loose about everything after
+# the word: it once required "--" or "harness" on the same line, so a section
+# headed "EXPECTED_DIVERGENCES notes: two divergences from the legacy." parsed as
+# nothing at all -- and in a module nothing else cited, that was silent. A scan is
+# only as good as the pattern it scans for, which is why `note_mentions` below
+# checks the pattern itself rather than trusting it.
+_NOTE_ANCHOR = re.compile(r"^EXPECTED_DIVERGENCES notes?\b", re.MULTILINE)
 _NOTE_ITEM = re.compile(r"^(\d+)\. (.+)$", re.MULTILINE)
+
+
+def _docstrings(repo_root: Path) -> list[tuple[str, str]]:
+    """``(path relative to repo_root, module docstring)`` for every port module."""
+    return [
+        (
+            path.relative_to(repo_root).as_posix(),
+            ast.get_docstring(ast.parse(path.read_text(encoding="utf-8"))) or "",
+        )
+        for path in sorted((repo_root / "sdg1531").rglob("*.py"))
+    ]
 
 
 def note_modules(repo_root: Path) -> tuple[str, ...]:
@@ -731,12 +749,21 @@ def note_modules(repo_root: Path) -> tuple[str, ...]:
     That is the third hand-maintained roster on this plan to go stale. A scan
     cannot.
     """
-    found = []
-    for path in sorted((repo_root / "sdg1531").rglob("*.py")):
-        docstring = ast.get_docstring(ast.parse(path.read_text(encoding="utf-8"))) or ""
-        if _NOTE_ANCHOR.search(docstring):
-            found.append(path.relative_to(repo_root).as_posix())
-    return tuple(found)
+    return tuple(rel for rel, doc in _docstrings(repo_root) if _NOTE_ANCHOR.search(doc))
+
+
+def note_mentions(repo_root: Path) -> tuple[str, ...]:
+    """Every module under ``sdg1531/`` whose docstring says EXPECTED_DIVERGENCES.
+
+    The backstop for :func:`note_modules`, and it is deliberately format-blind.
+    Replacing the hand-written roster with a scan moved the staleness from a list to
+    a REGEX: a module whose section is headed in some other wording is invisible to
+    the anchor, and if nothing cites that module, no register entry dangles and
+    nothing fails. Comparing the two answers turns that back into a loud failure --
+    a docstring that raises the subject but does not open a parseable section is
+    exactly the case a person should resolve rather than a pattern guess at.
+    """
+    return tuple(rel for rel, doc in _docstrings(repo_root) if "EXPECTED_DIVERGENCES" in doc)
 
 
 def module_notes(repo_root: Path) -> dict[str, str]:

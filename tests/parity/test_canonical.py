@@ -9,16 +9,21 @@ test that a change in it is invisible, and for each thing it is meant to KEEP
 there is a test that a change in it is visible.
 
 The graphs are small ones built here rather than corpus goldens, except where a
-real graph's size, `.map()` callbacks and `functionReference` are the point.
-`test_parity.py` runs the same code over all 16 graph-producing scenarios.
+real graph's size and its bare scope keys are the point. `test_parity.py` runs the
+same code over all 16 graph-producing scenarios.
 
-The real-graph tests run over TWO goldens, and that is not redundancy. They ran
-over one -- `s01/soc.json` -- through a whole review round, and because no scenario
-in that file reaches `ee.Image.expression`, none of them had ever seen a
-`functionReference`. The canonicaliser silently dropped every such subtree, the
-helpers below carried the same blind spot, and the EVI and MSVI formulas were
-compared against nothing. A test that only ever sees one shape of input proves
-something about that shape.
+The real-graph tests run over TWO goldens, and `REAL_GRAPHS` records what each one
+actually contributes rather than describing it. They ran over `s01/soc.json` alone
+through a whole review round, and that file reaches neither `.map()` nor
+`ee.Image.expression` -- so it carries NEITHER bare spelling, and none of these
+tests had ever seen one. The canonicaliser silently dropped every
+`functionReference` subtree, the helpers below carried the same blind spot, and the
+EVI and MSVI formulas were compared against nothing.
+
+The first version of the guard was a union over the pair, which s06 satisfies by
+itself: it could not have noticed that s01 contributes nothing, and the comment
+beside it claimed s01 brought the callbacks. Recording the contribution per golden
+is what makes the division of labour checkable instead of asserted.
 """
 
 from __future__ import annotations
@@ -47,13 +52,24 @@ GOLDEN = Path(__file__).resolve().parents[1] / "golden"
 pytestmark = pytest.mark.parity
 
 
-# Corpus goldens read off disk rather than rebuilt, so these tests say nothing
-# about the port -- they are about the canonicaliser only. The pair covers both
-# bare scope-key spellings between them; `test_the_real_graphs_cover_both_bare_
-# scope_key_spellings` is what stops that from silently ceasing to be true.
-REAL_GRAPHS = ("s01/soc.json", "s06/productivity_trend.json")
+# The bare spellings each real graph carries. Corpus goldens read off disk rather
+# than rebuilt, so these tests say nothing about the port -- they are about the
+# canonicaliser only.
+#
+# The value is the claim, and `test_each_real_graph_carries_the_spellings_it_is_
+# recorded_as_carrying` checks it per golden and in both directions. s01/soc.json
+# is here for its SHAPE, not for a spelling: 620 leaves of chained arithmetic with
+# heavily shared constants, no callback and no computed function anywhere, so the
+# invariance tests run over two structurally different graphs rather than two of a
+# kind. Recording that it carries nothing is the honest version of that, and it is
+# what makes "s06 carries both" a fact about s06 rather than about the union.
+_BARE_SPELLINGS = ("body", "functionReference")
+REAL_GRAPHS: dict[str, frozenset[str]] = {
+    "s01/soc.json": frozenset(),
+    "s06/productivity_trend.json": frozenset(_BARE_SPELLINGS),
+}
 
-real_graph = pytest.mark.parametrize("graph_name", REAL_GRAPHS)
+real_graph = pytest.mark.parametrize("graph_name", sorted(REAL_GRAPHS))
 
 
 def encode(image: ee.Image) -> dict[str, Any]:
@@ -66,21 +82,66 @@ def a_real_graph(graph_name: str) -> dict[str, Any]:
     return graph
 
 
-def test_the_real_graphs_cover_both_bare_scope_key_spellings() -> None:
-    """The parametrization above is only worth having while this holds.
+def _bare_spellings_in(graph: dict[str, Any]) -> frozenset[str]:
+    """Which bare scope-key fields appear anywhere in `graph`, as KEYS.
 
-    `body` and `functionReference` are the two places `ee` puts a scope key
-    unwrapped, and each is invisible to a walker that does not expect it. If a
-    later edit points these tests at two goldens that both lack one of them, the
-    blind spot reopens in silence -- so assert the coverage rather than trusting
-    the filenames.
+    Structural rather than a substring search over the file: `"body"` can appear
+    inside a constant string, and the question here is which fields the document
+    actually carries.
     """
     found: set[str] = set()
-    for name in REAL_GRAPHS:
-        text = (GOLDEN / name).read_text()
-        found.update(key for key in ("body", "functionReference") if f'"{key}"' in text)
+    stack: list[Any] = [graph]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            found.update(name for name in node if name in _BARE_SPELLINGS)
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return frozenset(found)
 
-    assert found == {"body", "functionReference"}
+
+@real_graph
+def test_each_real_graph_carries_the_spellings_it_is_recorded_as_carrying(
+    graph_name: str,
+) -> None:
+    """Per golden, and in both directions.
+
+    The first version of this was a union over the pair, which s06 satisfies on its
+    own -- so it stayed green with s01 contributing nothing, while the comment
+    beside it said s01 brought the `.map()` callbacks. A union cannot notice which
+    member earned it.
+    """
+    assert _bare_spellings_in(a_real_graph(graph_name)) == REAL_GRAPHS[graph_name]
+
+
+def test_the_real_graphs_cover_both_bare_scope_key_spellings() -> None:
+    """And the union, which is the property the parametrization exists for.
+
+    `body` and `functionReference` are the two places `ee` puts a scope key
+    unwrapped inside a node, and each is invisible to a walker that does not expect
+    it. Drop the golden that carries them and this fails -- which is the whole
+    reason the pair is not just `s01`.
+    """
+    covered = frozenset().union(*REAL_GRAPHS.values()) if REAL_GRAPHS else frozenset()
+
+    assert covered == frozenset(_BARE_SPELLINGS)
+
+
+def test_the_real_graphs_span_a_graph_with_no_bare_key_and_one_with_both() -> None:
+    """The other half of why there are two, and the half a union cannot state.
+
+    The union test is satisfied by `s06` alone, so on its own it would let the pair
+    shrink to one graph and stay green -- which is the same shape of gap as the
+    single-golden state that hid `functionReference` in the first place. The
+    invariance tests (renumbering, hoisting, load order, idempotence) are worth
+    running over a graph that has no callback and no computed function AND over one
+    that has both, because those are the two shapes whose traversals differ.
+    """
+    profiles = set(REAL_GRAPHS.values())
+
+    assert frozenset() in profiles, "no graph free of both bare spellings"
+    assert frozenset(_BARE_SPELLINGS) in profiles, "no graph carrying both"
 
 
 # --- fixtures shaped like the indicator layer ---------------------------------
