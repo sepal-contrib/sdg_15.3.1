@@ -132,3 +132,4 @@ dmypy.json
 .idea/
 .vscode/sftp.json
 CLAUDE.md
+tests/golden/**/*.actual.json
