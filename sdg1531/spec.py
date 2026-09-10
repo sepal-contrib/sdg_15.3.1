@@ -8,6 +8,12 @@ and nothing here raises on construction.  Validation lives in ``sdg1531.validate
 ``start_lc_band`` (:61) and ``end_lc_band`` (:63) are dropped - bound at input_tile.py:209
 and :211, read nowhere.  ``lc_pixel_check`` (:70) is not a science parameter; it is the
 ``exact`` argument to ``check_custom_lc_codes``.
+
+No EXPECTED_DIVERGENCES: the legacy input traits as plain data, with no computation and
+no validation. Two traits are dropped -- ``start_lc_band`` and ``end_lc_band``,
+bound at input_tile.py:209/:211 and read nowhere (spec §6) -- so dropping them
+changes nothing that ran. ``Compatibility``'s flags select between legacy and
+corrected behaviour; each flag's effect is recorded by the module it reaches.
 """
 
 from __future__ import annotations

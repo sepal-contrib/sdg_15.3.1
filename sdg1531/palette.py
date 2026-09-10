@@ -7,6 +7,10 @@ seeds random with 100 and samples this exact sequence.
 Regenerate with:
     python -c "import matplotlib.colors as c; print(tuple(c.cnames.values()))"
 tests/test_palette.py asserts it still matches the installed matplotlib.
+
+No EXPECTED_DIVERGENCES: the CSS4 sequence ``matplotlib.colors.cnames`` yields, vendored
+in its own order because ``LandCoverScheme.palette()`` seeds ``random`` with 100 and
+samples it. ``tests/test_palette.py`` re-checks it against the installed matplotlib.
 """
 
 from __future__ import annotations

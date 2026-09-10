@@ -53,6 +53,20 @@ roster used to be a hand-written tuple of seven files, and the three modules
 missing from it had sixteen declared divergences between them that never reached
 the register -- with the both-directions test green the whole time, because it
 checked the roster against itself.
+
+**Every module is in scope, including the ones with nothing to declare.** The scan
+above answers "which modules opened a note", and for a long time that was the whole
+guarantee -- so a module that never mentioned the subject at all was simply outside
+it. Eighteen of the twenty-eight were, and four of them had real, unrecorded
+behaviour changes: ``validate.py``'s new fatal land-cover-period rules,
+``naming.py``'s now-total ``run_label``, ``scheme.py``'s by-value ``is_default``,
+``resolve.py``'s ``_require_year``. Two ``EXPECTED_OFF_GRAPH`` entries carried no
+``note`` key for exactly that reason. So the question is inverted:
+:func:`divergence_free_modules` finds the modules that say **"No
+EXPECTED_DIVERGENCES: <why>"** in one line, and
+``test_every_port_module_declares_whether_it_diverges`` requires every module under
+``sdg1531/`` to be in one set or the other. Silence is no longer an answer, and a
+new module joins the rule by existing.
 """
 
 from __future__ import annotations
@@ -81,9 +95,12 @@ class Normalisation(TypedDict):
 class OffGraph(TypedDict):
     """One EXPECTED_OFF_GRAPH entry.
 
-    ``note`` is NotRequired because two divergences come from modules that carry no
-    numbered note at all -- ``resolve.py`` and the unported ``component/tile/`` --
-    and ``MODULE_NOTE_CLAIMS`` cannot reference what does not exist.
+    ``note`` is NotRequired because ``HELD_CONSTANT`` shares this shape and holds no
+    divergence to declare in a module. Every ``EXPECTED_OFF_GRAPH`` entry now carries
+    one: the two that did not -- ``resolve_requires_a_year`` and
+    ``matrix_validation_relaxed`` -- were missing it because their modules were
+    outside the scan entirely, which is the hole
+    ``test_every_port_module_declares_whether_it_diverges`` closed.
     """
 
     reason: str
@@ -104,10 +121,11 @@ __all__ = [
     "MODULE_NOTE_CLAIMS",
     "Normalisation",
     "OffGraph",
+    "divergence_free_modules",
     "matching_entry",
     "module_notes",
-    "note_mentions",
     "note_modules",
+    "port_modules",
 ]
 
 # Layers that are allowed to DIFFER. Empty, and that is the strongest thing this
@@ -674,11 +692,9 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
         ),
         "tests": ("test_distribution_keeps_the_legacy_axis_labels",),
     },
-    # --- outside the module notes ---------------------------------------------
-    # resolve.py carries NO EXPECTED_DIVERGENCES note of its own, so this entry
-    # has no `note` key and MODULE_NOTE_CLAIMS cannot reference it. Reported to
-    # the controller as a missing module note rather than fixed here.
+    # --- resolve.py -------------------------------------------------------------
     "resolve_requires_a_year": {
+        "note": "sdg1531/resolve.py:1",
         "reason": (
             "resolve._require_year raises SpecError for a missing period endpoint "
             "where the legacy raised TypeError deep inside max() "
@@ -687,15 +703,129 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
         ),
         "tests": ("test_a_missing_period_endpoint_is_named_rather_than_escaping_as_a_type_error",),
     },
-    # matrix validation moved from the tile layer, which has no module note at all
-    # (component/tile/ is not ported). Same shape: no `note` key.
+    # --- validate.py ------------------------------------------------------------
+    # validate() itself is new -- the legacy had no total validator -- so what is
+    # recorded here is the narrower set that changes WHICH RUNS ARE POSSIBLE: a
+    # fatal rule refusing a configuration the legacy computed, or a rule accepting
+    # one it refused. Its non-fatal warnings leave the Process button enabled and
+    # change nothing about what runs.
+    "land_cover_period_rules": {
+        "note": "sdg1531/validate.py:1",
+        "reason": (
+            "three rules over the land cover period that the legacy has no "
+            "counterpart for: land_cover_start_not_before_end (fatal), "
+            "land_cover_period_collapses (fatal) and land_cover_start_before_cci "
+            "(warning). run_15_3_1.py:165-166 order-checks periods.overall ONLY, so "
+            "an inverted or wholly-out-of-range land cover override reached the "
+            "decoders and produced a Sankey with two identically-labelled year "
+            "columns. Against the corpus the fatal pair rejects s04 and s08, which "
+            "stage A recorded a legacy result for -- so this refuses runs the legacy "
+            "performed, and spec §7 has no row for it."
+        ),
+        "tests": (
+            "test_an_inverted_land_cover_override_is_fatal",
+            "test_land_cover_period_collapsing_before_the_cci_floor_is_fatal",
+            "test_land_cover_period_collapsing_after_the_cci_ceiling_is_fatal",
+            "test_land_cover_start_before_cci_is_a_warning",
+            "test_a_zero_length_land_cover_period_is_not_tolerated_the_way_soc_is",
+        ),
+    },
+    "soc_period_collapse_is_fatal": {
+        "note": "sdg1531/validate.py:2",
+        "reason": (
+            "soc_period_collapses (fatal) rejects a SOC period lying entirely after "
+            "the CCI record, where soil_organic_carbon.py:161 selected a NEGATIVE "
+            "band index and computed something. Spec §7 mandates the rule by name, "
+            "so unlike the land-cover rules this was a recorded decision -- but it "
+            "still refuses runs the legacy performed: s04, s08, s24 and s27."
+        ),
+        "tests": (
+            "test_soc_period_collapses_is_fatal",
+            "test_soc_period_ending_at_the_cci_ceiling_does_not_collapse",
+        ),
+    },
+    "non_finite_climate_coefficient": {
+        "note": "sdg1531/validate.py:3",
+        "reason": (
+            "FixedClimate(nan|inf) is refused (fatal). Nothing in the legacy ever "
+            "range-checks conversion_coef -- only climate_regime.py:29's widget "
+            "bounds constrain it, and RunSpec.from_dict does not go through the "
+            "widget. The entry is exactly the two non-finite shapes: a coefficient "
+            "outside [0, 1] is still accepted, as it was."
+        ),
+        "tests": (
+            "test_non_finite_climate_coefficient_is_rejected",
+            "test_finite_and_per_pixel_climates_are_accepted",
+        ),
+    },
     "matrix_validation_relaxed": {
+        "note": "sdg1531/validate.py:4",
         "reason": (
             "input_tile.py:310 compared {1,0,-1} to set(flatten) by equality, "
             "rejecting a legitimate two-valued matrix; validate() now uses a subset "
-            "test, which only widens what is accepted."
+            "test, which only widens what is accepted. The same rule adds a "
+            "row-and-column SHAPE check the legacy had nothing equivalent to: a "
+            "rectangular matrix of the wrong rectangle -- the 7x7 default in one "
+            "49-value row, a transposed custom scheme -- flattened in order and "
+            "misaligned the transition table silently."
         ),
-        "tests": ("test_two_valued_matrix_is_accepted",),
+        "tests": (
+            "test_two_valued_matrix_is_accepted",
+            "test_wrong_shape_transition_matrix_is_fatal",
+            "test_undersized_custom_scheme_matrix_is_fatal",
+            "test_transposed_custom_scheme_matrix_is_fatal",
+        ),
+    },
+    # --- naming.py --------------------------------------------------------------
+    "run_label_is_total": {
+        "note": "sdg1531/naming.py:1",
+        "reason": (
+            "run_label() returns a label where folder_name() raised. "
+            'indicator_model.py:310 is f"cr{int(self.conversion_coef*100)}" over a '
+            "conversion_coef defaulting to None, so the legacy's own default regime "
+            "raised TypeError at input_tile.py:336. The label names the result "
+            "DIRECTORY (run_15_3_1.py:313-317 globs it), so this is a string and "
+            'never a node. The sibling defect on the same path -- `"l" in '
+            "self.sensors[0]` -- is PRESERVED behind "
+            "Compatibility.legacy_sensor_folder_token and is not covered here."
+        ),
+        "tests": (
+            "test_run_label_is_total_on_the_default_climate_regime",
+            "test_run_label_is_total_over_every_fixed_coefficient",
+            "test_run_label_is_total_over_non_finite_coefficients",
+        ),
+    },
+    # --- scheme.py --------------------------------------------------------------
+    "matrix_is_default_by_value": {
+        "note": "sdg1531/scheme.py:1",
+        "reason": (
+            "TransitionMatrix.is_default() compares by VALUE. indicator_model.py:305 "
+            "compared the shared module-level list with itself (:53 stores it without "
+            "a copy), so custom_matrix was permanently False and a run whose only "
+            "change was an edited matrix was labelled 'default' -- silently "
+            "overwriting the previous run's result directory. It reaches nothing but "
+            "naming.run_label, so no graph moves."
+        ),
+        "tests": (
+            "test_edited_matrix_is_not_default",
+            "test_matrix_edit_flips_the_label",
+        ),
+    },
+    "ragged_matrix_refused_at_construction": {
+        "note": "sdg1531/scheme.py:2",
+        "reason": (
+            "TransitionMatrix.__post_init__ raises on a ragged matrix. The legacy had "
+            "no such type -- a matrix was a list of lists read off a CSV, flatten() "
+            "read it row by row regardless of length, and a short or long row shifted "
+            "every value after it, so the sequence zipped against class_combinations "
+            "in resolve.py came out misaligned rather than refused. The check is on "
+            "the constructor because RunSpec.from_dict can hand it a shape read "
+            "straight off disk without passing through sdg1531.validate."
+        ),
+        "tests": (
+            "test_ragged_rows_are_rejected",
+            "test_a_single_row_is_never_ragged",
+        ),
     },
 }
 
@@ -719,11 +849,22 @@ MODULE_NOTE_CLAIMS: dict[str, str] = {
 # The heading that opens a note section. Deliberately loose about everything after
 # the word: it once required "--" or "harness" on the same line, so a section
 # headed "EXPECTED_DIVERGENCES notes: two divergences from the legacy." parsed as
-# nothing at all -- and in a module nothing else cited, that was silent. A scan is
-# only as good as the pattern it scans for, which is why `note_mentions` below
-# checks the pattern itself rather than trusting it.
+# nothing at all -- and in a module nothing else cited, that was silent.
+#
+# A scan is only as good as the pattern it scans for. That used to be guarded by
+# `note_mentions`, which found every docstring MENTIONING the subject and compared
+# the two answers; it is gone, because the inversion below is strictly stronger and
+# leaves it nothing to catch. Under the inversion a module headed some other way
+# opens neither anchor, so it is in neither set, so it fails -- whether or not
+# anything cites it, and whether or not its docstring mentions the subject at all.
 _NOTE_ANCHOR = re.compile(r"^EXPECTED_DIVERGENCES notes?\b", re.MULTILINE)
 _NOTE_ITEM = re.compile(r"^(\d+)\. (.+)$", re.MULTILINE)
+
+# The one-line counterpart: a module declaring it has nothing to record. The colon
+# and the reason after it are required by the test, not by this pattern, so a bare
+# "No EXPECTED_DIVERGENCES." is found here and rejected there with a message that
+# says what is missing.
+_NO_NOTE_ANCHOR = re.compile(r"^No EXPECTED_DIVERGENCES\b(.*)$", re.MULTILINE)
 
 
 def _docstrings(repo_root: Path) -> list[tuple[str, str]]:
@@ -752,18 +893,31 @@ def note_modules(repo_root: Path) -> tuple[str, ...]:
     return tuple(rel for rel, doc in _docstrings(repo_root) if _NOTE_ANCHOR.search(doc))
 
 
-def note_mentions(repo_root: Path) -> tuple[str, ...]:
-    """Every module under ``sdg1531/`` whose docstring says EXPECTED_DIVERGENCES.
+def port_modules(repo_root: Path) -> tuple[str, ...]:
+    """Every module under ``sdg1531/``, whatever it declares.
 
-    The backstop for :func:`note_modules`, and it is deliberately format-blind.
-    Replacing the hand-written roster with a scan moved the staleness from a list to
-    a REGEX: a module whose section is headed in some other wording is invisible to
-    the anchor, and if nothing cites that module, no register entry dangles and
-    nothing fails. Comparing the two answers turns that back into a loud failure --
-    a docstring that raises the subject but does not open a parseable section is
-    exactly the case a person should resolve rather than a pattern guess at.
+    The denominator of the inversion: the set every module has to be accounted for
+    within. Read off the filesystem, so a module joins it by existing.
     """
-    return tuple(rel for rel, doc in _docstrings(repo_root) if "EXPECTED_DIVERGENCES" in doc)
+    return tuple(rel for rel, _ in _docstrings(repo_root))
+
+
+def divergence_free_modules(repo_root: Path) -> dict[str, str]:
+    """``{module: the reason it gives}`` for every module declaring no divergence.
+
+    The other half of :func:`note_modules`. A module with nothing to record says so
+    in one line -- ``No EXPECTED_DIVERGENCES: <why>`` -- and the reason is returned
+    rather than discarded, so the test can refuse a bare declaration with no reason
+    after it. "Nothing to declare" is a claim like any other and is worth one line
+    of why; before the inversion it was spelled as silence, and silence is what
+    eighteen modules and four real divergences hid behind.
+    """
+    found: dict[str, str] = {}
+    for rel, doc in _docstrings(repo_root):
+        match = _NO_NOTE_ANCHOR.search(doc)
+        if match is not None:
+            found[rel] = match.group(1).lstrip(": ").strip()
+    return found
 
 
 def module_notes(repo_root: Path) -> dict[str, str]:

@@ -44,10 +44,11 @@ from tests.parity.expected_divergences import (
     EXPECTED_OFF_GRAPH,
     HELD_CONSTANT,
     MODULE_NOTE_CLAIMS,
+    divergence_free_modules,
     matching_entry,
     module_notes,
-    note_mentions,
     note_modules,
+    port_modules,
 )
 from tools.scenarios import SCENARIOS
 
@@ -485,21 +486,62 @@ def test_every_module_divergence_note_is_claimed_by_the_register() -> None:
     )
 
 
-def test_no_module_raises_the_subject_without_opening_a_parseable_note() -> None:
-    """The roster is scanned, so its staleness moved from a LIST to a REGEX.
+def test_every_port_module_declares_whether_it_diverges() -> None:
+    """The register is complete over the whole package, not over the modules that
+    opted in.
 
-    A module headed some other way -- "EXPECTED_DIVERGENCES notes: two divergences
-    from the legacy." was the wording that slipped -- is invisible to the anchor,
-    and if no register entry cites that module, nothing dangles and nothing fails.
-    Comparing "modules that mention the subject" against "modules the anchor finds"
-    is the check that does not depend on the anchor being right.
+    ``note_modules`` answers "who opened a note", which made silence indistinguishable
+    from "nothing to say". Eighteen of the twenty-eight modules were silent, and four
+    of them had real behaviour changes nothing recorded: ``validate.py``'s new fatal
+    land-cover-period rules, ``naming.py``'s now-total ``run_label``, ``scheme.py``'s
+    by-value ``is_default`` and ``resolve.py``'s ``_require_year`` -- the last of which
+    the register itself flagged, by carrying an entry with no ``note`` key.
+
+    So every module has to answer, and the answer may be one line. This subsumes
+    ``test_no_module_raises_the_subject_without_opening_a_parseable_note``, which
+    compared "mentions the subject" with "opens a note" to catch a section headed the
+    wrong way: under this test a module headed the wrong way opens neither anchor, is
+    in neither set and fails here, whether or not anything cites it.
     """
-    missed = sorted(set(note_mentions(REPO_ROOT)) - set(note_modules(REPO_ROOT)))
-    assert missed == [], (
-        f"modules whose docstring mentions EXPECTED_DIVERGENCES but open no "
-        f"parseable note section: {missed}. Head the section "
-        "`EXPECTED_DIVERGENCES note(s) ...` on its own line so the scan finds it, "
-        "or reword the mention if the module declares no divergence."
+    modules = set(port_modules(REPO_ROOT))
+    declared = set(note_modules(REPO_ROOT)) | set(divergence_free_modules(REPO_ROOT))
+
+    assert len(modules) > 20, sorted(modules)  # the scan found the package at all
+    silent = sorted(modules - declared)
+    assert silent == [], (
+        f"modules that declare nothing either way: {silent}. Open a section headed "
+        "`EXPECTED_DIVERGENCES note(s) ...` and give each divergence a numbered item "
+        "with a register entry, or say `No EXPECTED_DIVERGENCES: <why>` on one line. "
+        "Silence used to mean 'outside the guarantee', which is how four real "
+        "divergences went unrecorded."
+    )
+
+
+def test_no_module_declares_both_a_note_and_no_divergences() -> None:
+    """A module cannot both list divergences and say it has none.
+
+    Cheap, and it is the way the inversion decays: a module that grows a divergence
+    gets a note section and keeps the one-line denial it was written with, and the
+    test above is satisfied by either.
+    """
+    both = sorted(set(note_modules(REPO_ROOT)) & set(divergence_free_modules(REPO_ROOT)))
+
+    assert both == [], f"modules claiming both a note section and no divergences: {both}"
+
+
+def test_every_divergence_free_declaration_gives_a_reason() -> None:
+    """`No EXPECTED_DIVERGENCES.` with nothing after it is a box ticked.
+
+    The reason is the part a reviewer reads to decide whether the claim is true, and
+    it is the part that goes stale visibly when the module grows a behaviour change.
+    """
+    bare = sorted(
+        module for module, reason in divergence_free_modules(REPO_ROOT).items() if len(reason) < 20
+    )
+
+    assert bare == [], (
+        f"modules declaring no divergences without saying why: {bare}. Write "
+        "`No EXPECTED_DIVERGENCES: <one line on why there is nothing to record>`."
     )
 
 

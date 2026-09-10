@@ -3,7 +3,11 @@ round-trip both carry; the translated display labels stay in the app layer.
 
 Every enum mixes in ``str`` rather than using ``enum.StrEnum``: consumers read
 ``.value`` everywhere (JSON payloads, GEE parameters, RunSpec fields), and the
-``(str, Enum)`` spelling is pinned across tasks — don't "modernize" it."""
+``(str, Enum)`` spelling is pinned across tasks — don't "modernize" it.
+No EXPECTED_DIVERGENCES: closed vocabularies whose members carry the legacy strings
+verbatim. Nothing here decides anything; the translated display labels the legacy
+mixed in with them stay in the app layer (spec §4), which is a MOVE, not a change.
+"""
 
 from __future__ import annotations
 

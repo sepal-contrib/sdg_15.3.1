@@ -11,6 +11,11 @@ uses for its last three rows (run_15_3_1.py:406-408). No other predicate occurs.
 `classify()` is the one-line statement of the one-out-all-out rule and exists
 only as a test oracle for INDICATOR_15_3_1. It never emits a graph, and the UI
 layer must not call it (spec §4).
+
+No EXPECTED_DIVERGENCES: the three ``.where()`` collapse chains as ordered data, in
+source order. ``engine/apply.py`` emits one node per rule in the order given here,
+and the parity harness compares the result node for node -- so a divergence in this
+table is a graph divergence, and there is none.
 """
 
 from __future__ import annotations

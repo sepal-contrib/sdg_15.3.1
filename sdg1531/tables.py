@@ -4,6 +4,12 @@ Every list in the legacy module is a shared mutable module-level default;
 widget/transition_matrix.py:46 index-assigns into one of them, which under Solara
 leaks one user's matrix into every other session in the worker (spec §7).
 Tuples make that impossible.
+
+No EXPECTED_DIVERGENCES: ``parameter/matrix.py`` and the two ``ui.py`` legend dicts,
+retyped as tuples and ``MappingProxyType`` with every value unchanged. Freezing
+them fixes the process-wide shared mutable default of ``widget/transition_matrix.py:46``,
+which spec §7 records as no divergence: it is unobservable within a single run,
+and the widget that wrote into them is not ported.
 """
 
 from __future__ import annotations

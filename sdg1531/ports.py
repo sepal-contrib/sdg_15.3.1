@@ -4,6 +4,10 @@ The app passes pysepal's ``GEEInterface``, which satisfies this structurally
 (``pysepal/scripts/gee_interface.py:193`` and ``:207``, checked against pysepal
 3.8.3); the tests pass ``FakeFetcher``. Nothing here imports pysepal or ``ee``, so
 ``sdg1531`` stays installable and testable without either.
+
+No EXPECTED_DIVERGENCES: a ``Protocol`` declaration and nothing else. The legacy had no
+port; the transport change injecting one enables is
+``sdg1531/stats/requests.py``'s note 1, recorded there.
 """
 
 from __future__ import annotations

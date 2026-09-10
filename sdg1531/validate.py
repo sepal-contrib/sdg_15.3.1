@@ -5,6 +5,52 @@ are still ``None``. It therefore never raises and never rejects a half-filled
 spec: it returns field-anchored :class:`Problem` records instead. This replaces
 the scattered ``alert.check_input`` chain at ``input_tile.py:245-330`` and the
 ``raise Exception`` at ``run_15_3_1.py:165-166``.
+
+EXPECTED_DIVERGENCES note -- four divergences from the legacy. Task 17's parity
+harness must carry all four.
+
+The legacy had no total validator, so in one sense every :class:`Problem` here is
+new. What is recorded below is the narrower set that changes WHICH RUNS ARE
+POSSIBLE: a ``fatal=True`` rule refusing a configuration the legacy computed, or a
+rule accepting one it refused. The rest are transcriptions of ``input_tile.py``'s
+own checks, or non-fatal warnings, which leave the Process button enabled and
+therefore change nothing about what runs -- ``state_period_too_short``,
+``soc_start_before_cci``, ``land_cover_start_before_cci`` and
+``half_custom_land_cover`` are all of that kind, and spec §7 reasoned about the
+first explicitly.
+
+1. **Behaviour-changing, and it refuses runs the legacy performed.** The three
+   land-cover period rules of :func:`_land_cover_period_problems` have no legacy
+   counterpart at all: ``periods.overall`` was the only period whose order was ever
+   checked (run_15_3_1.py:165-166). ``land_cover_start_not_before_end`` (fatal) and
+   ``land_cover_period_collapses`` (fatal) refuse specs that reached the legacy
+   decoders and produced a Sankey with two identically-labelled year columns;
+   ``land_cover_start_before_cci`` (warning) reports the clamp. Measured against the
+   parity corpus, the fatal pair rejects s04 and s08 -- configurations stage A
+   recorded a legacy result for. Spec §7 has no row for any of the three, and the
+   trade-off it reasoned about for ``state_period_too_short`` ("Making it fatal
+   would refuse configurations the legacy accepts") was not re-applied here; the
+   justification is that the failure it prevents is downstream and unattributable,
+   at ``sankey_option``, rather than a masked layer.
+2. **Behaviour-changing, and it refuses runs the legacy performed.**
+   ``soc_period_collapses`` (fatal, :func:`_soc_period_problems`) rejects a SOC
+   period lying entirely after the CCI record, where soil_organic_carbon.py:161
+   selected a negative band index. Spec §7 mandates it by name, so unlike note 1
+   this was a recorded decision; it is here because it still refuses configurations
+   the legacy ran -- s04, s08, s24 and s27 in the corpus.
+3. **Behaviour-changing.** ``non_finite_climate_coefficient`` (fatal,
+   :func:`_climate_problems`) rejects ``nan``/``inf``. Nothing in the legacy ever
+   range-checks ``conversion_coef``; only the widget's own ``[0, 1]`` bounds
+   constrained it, and a spec read from disk through ``RunSpec.from_dict`` does not
+   go through the widget. Values outside ``[0, 1]`` are still accepted, so the entry
+   is exactly the two non-finite shapes.
+4. **Behaviour-changing, and it WIDENS what is accepted.** ``_matrix_problems``
+   tests ``set(flatten()) <= {-1, 0, 1}`` where input_tile.py:310 compared by
+   equality, so a legitimate two-valued matrix is no longer rejected. It also adds a
+   row-and-column shape check the legacy had nothing equivalent to: a rectangular
+   matrix of the wrong rectangle -- the 7x7 default crammed into one 49-value row, a
+   transposed custom scheme -- kept the legacy's flatten reading in order and
+   misaligned the transition table silently.
 """
 
 from __future__ import annotations

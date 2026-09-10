@@ -2,6 +2,10 @@
 
 The value halves of component/parameter/sensor.py, computation.py and ui.py.
 ui.py's translated labels and its four viz dicts stay in the app layer (spec §4).
+
+No EXPECTED_DIVERGENCES: frozen data, retyped with every value unchanged.
+``tools/check_transcription.py`` imports the legacy modules and diffs them against
+this one directly.
 """
 
 from __future__ import annotations

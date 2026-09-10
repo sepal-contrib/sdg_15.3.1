@@ -3,6 +3,27 @@
 Replaces indicator_model.py:172-266 (nine properties, five of which re-read the
 CSV from disk through custom_lc_matrix_list :172-174) and its csv_reader
 :315-321. Pure: no file I/O, no ee, no global RNG.
+
+EXPECTED_DIVERGENCES note -- two divergences from the legacy. Task 17's parity
+harness must carry both:
+
+1. **Behaviour-changing, scoped to the LABEL.** :meth:`TransitionMatrix.is_default`
+   compares by VALUE. indicator_model.py:305 compared the shared module-level list
+   with itself -- ``:53`` stores it without a copy -- so ``custom_matrix`` was
+   permanently False and a run whose only change was an edited matrix was labelled
+   "default", silently overwriting the previous run's result directory. It reaches
+   nothing but ``naming.run_label``, whose own divergence is
+   ``sdg1531/naming.py``'s note 1.
+2. **Behaviour-changing, at CONSTRUCTION.** ``TransitionMatrix.__post_init__``
+   rejects a ragged matrix. The legacy had no such type: a matrix was a list of
+   lists read off a CSV, ``flatten()`` read it row by row regardless of length, and
+   a short or long row shifted every value after it -- so the flattened sequence
+   zipped against ``class_combinations`` in ``resolve.py`` came out misaligned
+   rather than refused. ``RunSpec.from_dict`` is the one path that can hand this
+   constructor a shape straight off disk without passing through
+   ``sdg1531.validate``, which is why the check is on the constructor and not only
+   in the validator (``validate._matrix_shape_defect`` catches the rectangular-but-
+   wrong shapes that this one cannot see).
 """
 
 from __future__ import annotations

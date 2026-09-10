@@ -19,6 +19,12 @@ This module is the one place that says so, for engine-wide narrowing of both kin
   engine module that narrows a resolved field routes through here, so Task 17's parity
   harness has ONE place to enumerate these raises and one docstring pattern to match,
   rather than a copy per module.
+
+No EXPECTED_DIVERGENCES: narrowing helpers with no legacy counterpart.
+``require_int``/``require_float`` raise where the legacy passed ``None`` on into
+``ee``, and those raises ARE divergences -- of the modules that call them
+(``engine/integration.py`` note 1, ``engine/productivity.py`` note 1), recorded
+there rather than duplicated here.
 """
 
 from __future__ import annotations

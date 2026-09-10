@@ -4,6 +4,21 @@ Pure: no ``ee``, no filesystem, no network. This is the transcription of
 ``component/model/indicator_model.py:280-312`` (``IndicatorModel.folder_name``),
 with the two label defects of spec §7 handled explicitly and nothing else
 changed.
+
+EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
+harness must carry it:
+
+1. **Behaviour-changing, scoped to the LABEL.** :func:`run_label` is total where
+   ``folder_name()`` raised. indicator_model.py:310 is
+   ``climate = f"cr{int(self.conversion_coef*100)}"``, ``conversion_coef`` defaults
+   to ``None``, and the default regime is per-pixel -- so the legacy's own default
+   path raised ``TypeError`` at input_tile.py:336, before anything was computed.
+   ``PerPixelClimate`` carries the token ``crpix`` instead, and a non-finite
+   coefficient gets a token rather than an exception. The label names the result
+   DIRECTORY (run_15_3_1.py:313-317 globs it to find an existing run), so this
+   changes a string and never a graph; the third label defect on this path,
+   ``"l" in self.sensors[0]``, is PRESERVED behind
+   ``Compatibility.legacy_sensor_folder_token`` and is not part of this entry.
 """
 
 from __future__ import annotations

@@ -14,6 +14,10 @@ legacy one (spec D9). A rule's class 0 emits `.lt(1)`, matching
 run_15_3_1.py:406-408; every other class k emits `.eq(k)`.
 
 The UI layer must never call this (spec §4); a Tier-0 guard enforces it.
+
+No EXPECTED_DIVERGENCES: the emitter for ``truth_table``'s rules, one ``.where()`` per
+rule in the order given. Every graph it builds is byte-compared against the legacy
+by the parity harness, so it has no room to diverge silently.
 """
 
 from __future__ import annotations

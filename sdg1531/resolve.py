@@ -3,6 +3,17 @@
 Transcribed from the legacy `IndicatorModel` properties and the derivations the
 science scripts kept inline (spec §6). This module is the JSON half: it must not
 import ee.
+
+EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
+harness must carry it:
+
+1. **No legacy counterpart.** :func:`_require_year` raises ``SpecError`` naming the
+   missing endpoint, where the legacy raised ``TypeError`` deep inside ``max()``
+   (indicator_model.py:156-168) with nothing in the message about which field was
+   unset. Every corpus row sets both endpoints of the overall period, so no
+   scenario reaches it and there is no graph pair. The register carried this entry
+   with no ``note`` key for a whole round, because this module was outside the scan
+   that finds notes at all; see ``EXPECTED_OFF_GRAPH["resolve_requires_a_year"]``.
 """
 
 from __future__ import annotations

@@ -7,6 +7,11 @@ the only AOI shapes the legacy science uses, and they must stay node-identical:
     feature_collection.geometry()           productivity.py:143
     feature_collection.geometry().bounds()  land_cover.py:10,
                                             soil_organic_carbon.py:9, :21
+
+No EXPECTED_DIVERGENCES: the AOI is an INPUT to both trees rather than a thing under
+test, and ``tools/to_legacy_model.py`` builds it the same way on the legacy side.
+That makes it ``HELD_CONSTANT["aoi_leaf"]`` -- something the harness does not
+compare -- which is recorded, but is not a divergence: nothing differs.
 """
 
 from __future__ import annotations
