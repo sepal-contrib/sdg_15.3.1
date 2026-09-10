@@ -7,7 +7,12 @@ on the PR gate, rather than discovered from a build that was passing all along:
 * a ``-m`` selection that matches no test (it exits 5 today, but the count is what
   the claim rests on, and the nightly's selection would otherwise only be measured
   at 03:17 UTC);
+* a job that COUNTS its tests and never runs them -- ``--collect-only`` proves a
+  selection is not empty and executes nothing;
+* a job or step switched off by an ``if:``, which reports as skipped, which branch
+  protection treats as satisfied in its common configuration;
 * a glob or path that matches nothing after a rename;
+* a test run narrowed to one path, which overrides ``testpaths``;
 * a lint or type command narrower than the one a developer runs locally;
 * a step whose failure does not fail the job.
 
@@ -43,8 +48,9 @@ APP_LAYER_STEPS = ("Verify ee-api fork", "Verify notebook kernelspec", "Test UI 
 _MARKER_FLAG = re.compile(r"""-m\s+(?:"([^"]+)"|'([^']+)'|([^\s|)]+))""")
 
 # Ways a step's failure can stop failing its job. `set +e` cancels the guard the
-# rule below requires; the rest swallow one command's exit code.
-_SUPPRESSORS = ("|| true", "|| :", "|| exit 0", "; true", "set +e", "continue-on-error")
+# rule below requires; the rest swallow one command's exit code. `continue-on-error`
+# is not here because it is not a shell spelling: it is a YAML key, read as one.
+_SUPPRESSORS = ("|| true", "|| :", "|| exit 0", "; true", "set +e")
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -90,23 +96,29 @@ def _script_lines(step: dict[str, Any]) -> list[str]:
     ]
 
 
-def _marker_expressions() -> set[str]:
-    """Every ``-m`` a ``pytest`` invocation in any workflow passes.
+def _pytest_commands() -> list[tuple[str, str, str]]:
+    """``(workflow file name, job name, command)`` for every ``pytest`` invocation.
 
     Anchored on the word ``pytest`` and cut at the next pipe, because ``-m`` is a
     flag on plenty of other commands: the `ci` job's ``python -m ipykernel`` was
-    read as a marker expression by a regex that scanned whole lines.
+    read as a marker expression by a regex that scanned whole lines. The same slice
+    is what the rules below read, so "what the job passes pytest" is decided once.
     """
-    found = set()
-    for _, _, step in _run_steps():
-        for line in _script_lines(step):
-            for match in re.finditer(r"\bpytest\b", line):
-                command = line[match.start() :].split("|")[0]
-                found.update(
-                    next(group for group in m.groups() if group is not None)
-                    for m in _MARKER_FLAG.finditer(command)
-                )
-    return found
+    return [
+        (workflow, job, line[match.start() :].split("|")[0])
+        for workflow, job, step in _run_steps()
+        for line in _script_lines(step)
+        for match in re.finditer(r"\bpytest\b", line)
+    ]
+
+
+def _marker_expressions() -> set[str]:
+    """Every ``-m`` a ``pytest`` invocation in any workflow passes."""
+    return {
+        next(group for group in m.groups() if group is not None)
+        for _, _, command in _pytest_commands()
+        for m in _MARKER_FLAG.finditer(command)
+    }
 
 
 def _collected(marker: str) -> int:
@@ -166,13 +178,88 @@ def test_the_app_layer_checks_are_intact() -> None:
     assert (REPO_ROOT / "ui.ipynb").is_file()
 
 
-def test_no_step_can_fail_without_failing_its_job() -> None:
+def test_every_job_that_counts_its_tests_also_runs_them() -> None:
+    """``--collect-only`` proves a selection is not empty and executes nothing.
+
+    Delete the ``pytest -m "not network" -q --durations=10`` line from the domain
+    job and every other assertion in this file still holds: the marker expression
+    survives in the collection guard above it, so the job counts the whole offline
+    suite, prints ``selected <n> offline tests`` and exits 0 having run none of it.
+    Counting is the claim to run, so it is what the rule is anchored on -- and a job
+    that drops BOTH lines loses its marker expression, which
+    :func:`test_every_marker_expression_selects_tests` compares as an exact set.
+    """
+    commands = _pytest_commands()
+    counting = {(workflow, job) for workflow, job, c in commands if "--collect-only" in c}
+    running = {(workflow, job) for workflow, job, c in commands if "--collect-only" not in c}
+
+    idle = sorted(counting - running)
+    assert idle == [], f"jobs that count their tests and never run them: {idle}"
+
+
+def test_no_test_run_narrows_itself_to_a_path() -> None:
+    """A path argument overrides ``testpaths``, so ``pytest -m "not network" -q
+    tests/test_workflows.py`` is a green domain job that ran one file -- the same
+    silent narrowing the lint job's bare invocations exist to prevent, one command
+    over. The `ci` job is exempt because ``pytest --nbmake ui.ipynb`` names
+    the notebook on purpose."""
+    named = []
+    for workflow, job, command in _pytest_commands():
+        if job == LEGACY_JOB:
+            continue
+        named += [
+            f"{workflow}:{job}: {token}"
+            for token in shlex.split(command)[1:]
+            if not token.startswith("-") and (REPO_ROOT / token).exists()
+        ]
+
+    assert named == [], f"a test run names a path, so its selection can narrow: {named}"
+
+
+def test_no_job_or_step_is_switched_off_by_a_condition() -> None:
+    """A job that never runs reports as SKIPPED, and branch protection treats a
+    skipped required check as satisfied in its common configuration -- so ``if:
+    false`` on the domain job is a merge gate that gates nothing, with every other
+    assertion here green. A step-level ``if:`` empties a job just as thoroughly.
+
+    Absence, rather than a judgement about which expressions are constantly false:
+    no job in either workflow has a condition today, the `ci` job included, so
+    there is nothing to weigh and the day one is wanted it is a decision someone
+    writes down here.
+    """
     offenders = []
     for path in WORKFLOWS:
-        text = path.read_text(encoding="utf-8")
-        for suppressor in _SUPPRESSORS:
-            if suppressor in text:
-                offenders.append(f"{path.name}: {suppressor}")
+        for job_name, job in _jobs(path).items():
+            if "if" in job:
+                offenders.append(f"{path.name}:{job_name}: if: {job['if']}")
+            offenders += [
+                f"{path.name}:{job_name}:{step.get('name')}: if: {step['if']}"
+                for step in job["steps"]
+                if "if" in step
+            ]
+
+    assert offenders == [], f"jobs or steps a condition can switch off: {offenders}"
+
+
+def test_no_step_can_fail_without_failing_its_job() -> None:
+    """``continue-on-error`` is read as the parsed key it is, at both the job and
+    the step level, and the shell spellings are looked for in the script rather
+    than in the file: a comment explaining why a step does NOT use ``|| true`` is
+    not a step that uses it, and the whole-file text scan this replaced would have
+    failed the job for saying so."""
+    offenders = []
+    for path in WORKFLOWS:
+        for job_name, job in _jobs(path).items():
+            if job.get("continue-on-error"):
+                offenders.append(f"{path.name}:{job_name}: continue-on-error")
+            for step in job["steps"]:
+                where = f"{path.name}:{job_name}:{step.get('name')}"
+                if step.get("continue-on-error"):
+                    offenders.append(f"{where}: continue-on-error")
+                if "run" not in step:
+                    continue
+                for line in _script_lines(step):
+                    offenders += [f"{where}: {s}" for s in _SUPPRESSORS if s in line]
 
     assert offenders == [], offenders
 
@@ -206,7 +293,7 @@ def test_every_new_step_runs_inside_the_micromamba_environment() -> None:
 
 
 def test_the_lint_job_names_no_paths() -> None:
-    """Naming paths is how a lint job silently narrows. ``mypy sdg1531`` reads 29
+    """Naming paths is how a lint job silently narrows. ``mypy sdg1531`` reads 28
     files where ``[tool.mypy] files`` reads 42, and ``ruff check sdg1531 tests
     tools`` stops covering the app package the day it lands. A bare invocation
     reads the same configuration the local run reads, so the two cannot drift."""
