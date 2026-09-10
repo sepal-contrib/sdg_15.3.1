@@ -61,6 +61,10 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
 "sdg1531/palette.py" = ["E501"]
+# the parity corpus is a pairwise-reduction table: one row per scenario, one
+# column per axis. Wrapping a row makes the columns unscannable, which is the
+# only way to read a reduction table for holes.
+"tools/scenarios.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["sdg1531"]
