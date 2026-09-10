@@ -391,14 +391,33 @@ def test_the_two_failure_sets_do_not_overlap() -> None:
     assert overlap == frozenset(), f"listed in both failure registers: {sorted(overlap)}"
 
 
-def _defines(name: str, sources: str) -> bool:
-    """Whether `sources` defines a test called exactly `name`.
+def _definitions(name: str, sources: str) -> int:
+    """How many tests in `sources` are called exactly `name`.
 
     A plain `f"def {name}"` substring is a PREFIX match: a test renamed from
     `test_foo` to `test_foo_and_something_else` would keep satisfying an entry that
     names `test_foo`. The trailing `(` is the word boundary.
+
+    The COUNT, not a boolean, because an entry citing a name two files define does
+    not say which of them does the pinning -- and this suite already has two names
+    defined twice. Nothing cheap can check that the named test pins the claim the
+    entry makes; what is cheap is refusing a citation that is ambiguous about which
+    test it even means.
     """
-    return re.search(rf"^\s*(?:async )?def {re.escape(name)}\(", sources, re.MULTILINE) is not None
+    return len(re.findall(rf"^\s*(?:async )?def {re.escape(name)}\(", sources, re.MULTILINE))
+
+
+def _cited_test_problems(
+    register: str, key: str, names: tuple[str, ...], sources: str
+) -> list[str]:
+    problems = []
+    for name in names:
+        found = _definitions(name, sources)
+        if found == 0:
+            problems.append(f"{register} {key!r} names {name}, which no test defines")
+        elif found > 1:
+            problems.append(f"{register} {key!r} names {name}, which {found} tests define")
+    return problems
 
 
 def _test_sources() -> str:
@@ -416,39 +435,39 @@ def test_every_off_graph_divergence_names_tests_that_exist() -> None:
     accountable.
     """
     sources = _test_sources()
+    problems = []
     for key, entry in EXPECTED_OFF_GRAPH.items():
         assert entry["tests"], f"off-graph divergence {key!r} names no test at all"
-        for name in entry["tests"]:
-            assert _defines(name, sources), (
-                f"off-graph divergence {key!r} names {name}, which no test defines"
-            )
+        problems += _cited_test_problems("off-graph divergence", key, entry["tests"], sources)
+
+    assert problems == [], "\n".join(problems)
 
 
 def test_every_held_constant_entry_names_tests_that_exist() -> None:
     """A held-constant entry is a claim that something IS pinned somewhere, just not
     by the graph comparison. If the tests it names are gone, so is the pin."""
     sources = _test_sources()
+    problems = []
     for key, entry in HELD_CONSTANT.items():
         assert entry["tests"], f"held-constant entry {key!r} names no test at all"
-        for name in entry["tests"]:
-            assert _defines(name, sources), (
-                f"held-constant entry {key!r} names {name}, which no test defines"
-            )
+        problems += _cited_test_problems("held-constant entry", key, entry["tests"], sources)
+
+    assert problems == [], "\n".join(problems)
 
 
 def test_every_normalisation_names_a_splice_and_tests_that_exist() -> None:
     """A normalisation is a claim about CODE, so both halves have to be real: the
     function that performs the splice and the tests that pin what it refuses."""
     sources = _test_sources()
+    problems = []
     for key, entry in EXPECTED_NORMALISATIONS.items():
         assert hasattr(canonical, entry["splice"]), (
             f"normalisation {key!r} names {entry['splice']}, which "
             "tests/parity/canonical.py does not define"
         )
-        for name in entry["tests"]:
-            assert _defines(name, sources), (
-                f"normalisation {key!r} names {name}, which no test defines"
-            )
+        problems += _cited_test_problems("normalisation", key, entry["tests"], sources)
+
+    assert problems == [], "\n".join(problems)
 
 
 def test_every_module_divergence_note_is_claimed_by_the_register() -> None:
