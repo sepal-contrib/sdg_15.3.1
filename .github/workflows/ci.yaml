@@ -47,3 +47,79 @@ jobs:
       - name: Test UI notebook
         shell: micromamba-shell {0}
         run: pytest --nbmake ui.ipynb --nbmake-timeout=600 --nbmake-kernel=test-kernel
+
+  # The `ci` job above still guards the Voila entrypoint (kernelspec + nbmake on
+  # ui.ipynb). Its replacement is the companion spec's call (§15.7), not this
+  # task's: the domain jobs below are additive, and nothing above was touched.
+
+  domain:
+    name: Domain suite (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: sepal_environment.yml
+          cache-environment: true
+
+      - name: Install the package and test extras
+        shell: micromamba-shell {0}
+        run: pip install -e ".[dev]"
+
+      - name: Run the offline suite
+        shell: micromamba-shell {0}
+        # The count is asserted, not inferred. An empty marker selection does exit
+        # 5 today, but "the command did not fail" is not the same claim as "the
+        # tests ran", and a job that runs zero tests passes every assertion it
+        # never made.
+        run: |
+          set -euo pipefail
+          selected=$(pytest -m "not network" --collect-only -q | awk '/::/ {n++} END {print n+0}')
+          if [ "$selected" -eq 0 ]; then
+            echo "::error::the 'not network' selection is empty; this job would pass vacuously"
+            exit 1
+          fi
+          echo "selected ${selected} offline tests"
+          start=$SECONDS
+          pytest -m "not network" -q --durations=10
+          elapsed=$(( SECONDS - start ))
+          echo "offline suite took ${elapsed}s"
+          if [ "$elapsed" -gt 60 ]; then
+            echo "::warning::offline suite took ${elapsed}s; spec §12 targets 60s"
+            echo "It includes the parity harness and gates every PR - keep it fast."
+          fi
+
+  lint:
+    name: ruff + mypy --strict
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: sepal_environment.yml
+          cache-environment: true
+
+      - name: Install the package and test extras
+        shell: micromamba-shell {0}
+        run: pip install -e ".[dev]"
+
+      # No path arguments in this job, deliberately. Naming paths is how a lint job
+      # silently narrows: `mypy sdg1531` reads 29 files where `[tool.mypy] files`
+      # reads 42, and `ruff check sdg1531 tests tools` stops covering the app
+      # package the day it lands. Bare invocations read the same configuration a
+      # developer's local run reads, so the two cannot drift apart.
+      - name: ruff check
+        shell: micromamba-shell {0}
+        run: ruff check
+
+      - name: ruff format
+        shell: micromamba-shell {0}
+        run: ruff format --check
+
+      - name: mypy
+        shell: micromamba-shell {0}
+        run: mypy
