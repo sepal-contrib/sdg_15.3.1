@@ -38,7 +38,12 @@ jobs:
         # the run rather than left to pytest's exit code.
         run: |
           set -euo pipefail
-          selected=$(pytest -m "network" --collect-only -q | awk '/::/ {n++} END {print n+0}')
+          if ! pytest -m "network" --collect-only -q > collected.txt; then
+            cat collected.txt
+            echo "::error::collecting the 'network' selection failed; nothing ran"
+            exit 1
+          fi
+          selected=$(awk '/::/ {n++} END {print n+0}' collected.txt)
           if [ "$selected" -eq 0 ]; then
             echo "::error::the 'network' selection is empty; the nightly would run nothing"
             exit 1

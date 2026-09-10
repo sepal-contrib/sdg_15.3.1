@@ -73,10 +73,17 @@ jobs:
         # The count is asserted, not inferred. An empty marker selection does exit
         # 5 today, but "the command did not fail" is not the same claim as "the
         # tests ran", and a job that runs zero tests passes every assertion it
-        # never made.
+        # never made. The collection runs under `if !` rather than into a pipe so
+        # that an empty selection reports THAT, instead of dying on pipefail with
+        # the annotation below unprinted.
         run: |
           set -euo pipefail
-          selected=$(pytest -m "not network" --collect-only -q | awk '/::/ {n++} END {print n+0}')
+          if ! pytest -m "not network" --collect-only -q > collected.txt; then
+            cat collected.txt
+            echo "::error::collecting the 'not network' selection failed; nothing ran"
+            exit 1
+          fi
+          selected=$(awk '/::/ {n++} END {print n+0}' collected.txt)
           if [ "$selected" -eq 0 ]; then
             echo "::error::the 'not network' selection is empty; this job would pass vacuously"
             exit 1
