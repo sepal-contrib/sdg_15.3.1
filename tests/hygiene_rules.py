@@ -14,31 +14,50 @@ ROOTS = ("sdg1531", "app")
 BANNED_PARAMS = frozenset({"output", "model", "aoi_model", "alert"})
 BANNED_CALL_ATTRS = frozenset({"getInfo", "getDownloadURL", "urlopen"})
 BANNED_CALL_NAMES = frozenset({"print", "urlopen"})
-FS_CALL_NAMES = frozenset({"open"})
-FS_CALL_ATTRS = frozenset(
+# The tempfile entry points are here because they are the one family that touches
+# the filesystem without naming a path: `mkdir` and `open` were both covered while
+# `tempfile.mkdtemp()` -- a directory that outlives the call unless something
+# deletes it -- passed every rule. sdg1531/export.py became the first module in the
+# domain to spool to disk, and nothing static covered it.
+_TEMP_SPOOLS = frozenset(
     {
-        "mkdir",
-        "makedirs",
-        "write_text",
-        "write_bytes",
-        "read_text",
-        "read_bytes",
-        "to_csv",
-        "to_file",
-        "rmtree",
-        "unlink",
-        "expanduser",
-        "home",
-        "cwd",
-        "open",
+        "mkdtemp",
+        "mkstemp",
+        "TemporaryDirectory",
+        "TemporaryFile",
+        "NamedTemporaryFile",
+        "SpooledTemporaryFile",
     }
 )
-# zonal_shapefile_zip must round-trip a GeoDataFrame through a shapefile driver and
-# read the zipped result back as bytes (spec D12) — that write-then-read pair is the
-# only filesystem access sdg1531/export.py is allowed; everything else there (mkdir,
-# rmtree, home, ...) is still flagged like anywhere else in the domain.
+FS_CALL_NAMES = frozenset({"open"}) | _TEMP_SPOOLS
+FS_CALL_ATTRS = (
+    frozenset(
+        {
+            "mkdir",
+            "makedirs",
+            "write_text",
+            "write_bytes",
+            "read_text",
+            "read_bytes",
+            "to_csv",
+            "to_file",
+            "rmtree",
+            "unlink",
+            "expanduser",
+            "home",
+            "cwd",
+            "open",
+        }
+    )
+    | _TEMP_SPOOLS
+)
+# zonal_shapefile_zip must give the shapefile driver a directory to write into, then
+# round-trip a GeoDataFrame through it and read the zipped result back as bytes (spec
+# D12) — that spool-write-read trio is the only filesystem access sdg1531/export.py is
+# allowed; everything else there (mkdir, rmtree, home, and every OTHER temp spool) is
+# still flagged like anywhere else in the domain.
 FS_EXEMPT_FILES = frozenset({"sdg1531/export.py"})
-FS_EXEMPT_CALLS = frozenset({"to_file", "read_bytes"})
+FS_EXEMPT_CALLS = frozenset({"to_file", "read_bytes", "TemporaryDirectory"})
 ENGINE_PREFIX = "sdg1531/engine/"
 ENGINE_MODULE = "sdg1531/engine.py"
 # "resolved"/"r" missed the common instance-attribute spelling (self.resolved) and the

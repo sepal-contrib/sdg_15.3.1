@@ -299,3 +299,49 @@ def test_replacing_an_unrelated_object_is_not_flagged() -> None:
         "    return replace(config, scale=30)\n"
     )
     assert "resolved-replace" not in _rules(src)
+
+
+@pytest.mark.parametrize(
+    "expr",
+    [
+        "tempfile.mkdtemp()",
+        "tempfile.mkstemp()",
+        "tempfile.TemporaryDirectory()",
+        "tempfile.NamedTemporaryFile()",
+        "tempfile.TemporaryFile()",
+        "tempfile.SpooledTemporaryFile()",
+    ],
+)
+def test_temp_spool_is_rejected(expr: str) -> None:
+    # the filesystem rule listed mkdir/open/write_text and every other way of
+    # naming a path, but not the tempfile entry points, which create a directory
+    # or a file without one. sdg1531/export.py became the first module in the
+    # domain to use one, and no static guard covered it.
+    src = f'__all__ = ["f"]\nimport tempfile\ndef f():\n    return {expr}\n'
+    assert "filesystem" in _rules(src)
+
+
+@pytest.mark.parametrize("expr", ["mkdtemp()", "TemporaryDirectory()", "mkstemp()"])
+def test_temp_spool_is_rejected_in_the_imported_form_too(expr: str) -> None:
+    src = (
+        '__all__ = ["f"]\n'
+        "from tempfile import TemporaryDirectory, mkdtemp, mkstemp\n"
+        "def f():\n"
+        f"    return {expr}\n"
+    )
+    assert "filesystem" in _rules(src)
+
+
+def test_export_module_may_spool_the_directory_it_zips() -> None:
+    # spec D12: zonal_shapefile_zip has to give the shapefile driver a directory to
+    # write into, and deletes it before returning
+    src = '__all__ = ["f"]\nimport tempfile\ndef f():\n    return tempfile.TemporaryDirectory()\n'
+    assert "filesystem" not in _rules(src, rel_path="sdg1531/export.py")
+    assert "filesystem" in _rules(src, rel_path="sdg1531/stats/decode.py")
+
+
+def test_the_export_exemption_does_not_cover_every_temp_spool() -> None:
+    # the one exemption is the directory; a stray temp FILE left in the spool is
+    # exactly the leak the rule is for
+    src = '__all__ = ["f"]\nimport tempfile\ndef f():\n    return tempfile.mkstemp()\n'
+    assert "filesystem" in _rules(src, rel_path="sdg1531/export.py")

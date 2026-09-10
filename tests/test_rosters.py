@@ -90,6 +90,7 @@ ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/hygiene_rules.py:FS_CALL_NAMES": "vocabulary: the stdlib's filesystem entry points",
     "tests/hygiene_rules.py:FS_EXEMPT_CALLS": "vocabulary: the two calls spec D12 allows sdg1531/export.py",
     "tests/hygiene_rules.py:FS_EXEMPT_FILES": "derived: test_every_hygiene_exemption_names_a_file_that_exists",
+    "tests/hygiene_rules.py:_TEMP_SPOOLS": "vocabulary: the tempfile entry points that put something on disk",
     "tests/hygiene_rules.py:MUTABLE_BUILTINS": "vocabulary: the stdlib factories that return a fresh mutable container",
     "tests/hygiene_rules.py:MUTABLE_CHECK_EXEMPT_NAMES": "vocabulary: the two attribute lists the interpreter itself reads",
     "tests/hygiene_rules.py:RESOLVED_NAMES": "vocabulary: the spellings a ResolvedSpec is threaded through under",
@@ -145,9 +146,17 @@ def _string_elements(value: ast.expr) -> list[ast.expr] | None:
     wrappings, and a dict, whose KEYS are the roster (``RESOLVED_FIELD`` is keyed
     on sub-period names). ``None`` when ``value`` is anything else, or when one
     element is not a plain string -- a mixed container is not a roster of names.
+
+    A ``|`` union contributes the literal elements on either side. ``FS_CALL_ATTRS``
+    is ``frozenset({...}) | _TEMP_SPOOLS``, and a scanner that only matched a bare
+    literal would have stopped seeing it the moment that rule set was factored --
+    leaving an account on the books for a roster nothing scanned any more.
     """
     elements: list[ast.expr] | None = None
     minimum = 1
+    if isinstance(value, ast.BinOp) and isinstance(value.op, ast.BitOr):
+        elements = (_string_elements(value.left) or []) + (_string_elements(value.right) or [])
+        return elements or None
     if isinstance(value, (ast.Tuple, ast.List, ast.Set)):
         elements = list(value.elts)
     elif (
@@ -199,6 +208,19 @@ def test_the_scan_still_finds_rosters() -> None:
     assert len(found) > 30, found
     assert found["tests/test_isolation.py:JSON_HALF"] == len(JSON_HALF)
     assert "tests/hygiene_rules.py:FS_EXEMPT_FILES" in found
+    assert "tests/hygiene_rules.py:FS_CALL_ATTRS" in found
+
+
+def test_the_scan_sees_a_roster_built_as_a_union() -> None:
+    """The union branch, pinned on its own: the scan lost sight of ``FS_CALL_ATTRS``
+    the moment its temp-spool half was factored into a shared name, and an account
+    for a roster nothing scans is the exact failure this file exists to prevent."""
+    assigned = ast.parse('X = frozenset({"a"}) | Y').body[0]
+    assert isinstance(assigned, ast.Assign)
+    elements = _string_elements(assigned.value)
+
+    assert elements is not None
+    assert [e.value for e in elements if isinstance(e, ast.Constant)] == ["a"]
 
 
 def test_every_string_roster_in_the_suite_is_accounted_for() -> None:
