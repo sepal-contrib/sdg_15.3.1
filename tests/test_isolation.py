@@ -47,10 +47,11 @@ JSON_HALF = (
     "sdg1531.ports",
     "sdg1531.stats.decode",
     "sdg1531.stats.plots",
-    # export.py is the one module allowed to touch the filesystem (hygiene_rules.py's
-    # FS_EXEMPT_FILES), which makes it the one most worth pinning here: it reaches
-    # geopandas and the shapefile driver, and neither may drag ee or a widget library
-    # in behind them.
+    # export.py must stay ee-free like the rest of this roster. What it does NOT do is
+    # import geopandas: `gdf` is typed `Any` and the shapefile driver is reached through
+    # a duck-typed `.to_file`, which is what keeps the module's own import list to
+    # stdlib plus sdg1531.errors. This entry pins that; it says nothing about geopandas'
+    # import chain, because the check below imports only the one module it names.
     "sdg1531.export",
 )
 

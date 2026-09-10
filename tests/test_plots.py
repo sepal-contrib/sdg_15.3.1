@@ -223,7 +223,7 @@ def test_every_sankey_link_names_a_declared_node():
 def test_sankey_node_names_are_never_repeated():
     """ECharts: "The name of the node cannot be repeated."
 
-    (ipecharts/option/seriesitems/sankey.py:278, transcribing the ECharts docs for
+    (ipecharts/option/seriesitems/sankey.py:281, transcribing the ECharts docs for
     ``series-sankey.data``.) A repeat is how the legacy's two columns would collapse
     into one self-looping node.
     """
@@ -304,6 +304,37 @@ def test_sankey_falls_back_to_grey_for_a_class_with_no_colour():
     assert {node["itemStyle"]["color"] for node in option["series"][0]["data"]} == {"#9ea7ad"}
 
 
+def test_sankey_declares_one_node_for_a_class_outside_the_vocabulary():
+    """``ordered()``'s tail, and the ``dict.fromkeys`` that feeds it, in one shape.
+
+    Drop the tail and the option carries a link naming a node that was never declared --
+    a ribbon ECharts draws as nothing, the exact silent failure this file exists to
+    catch. Keep the tail but stop deduplicating ``left_present`` and the opposite
+    happens: ``grouped`` carries one row per (start, end) pair, so a class leaving for
+    two different end classes appears twice and the tail declares its node twice, which
+    ECharts also forbids. The known-class half of ``ordered()`` iterates the vocabulary
+    and so cannot show either defect -- only an out-of-vocabulary class can, and it
+    needs the two rows below to do it.
+
+    Not reachable through ``decode_transition_areas``, which raises ``StatisticsError``
+    on any code outside ``lc_class_combinations`` (sdg1531/stats/decode.py:168-173), so
+    it is pinned here rather than left to the integration path.
+    """
+    r = FakeResolved(start_year=2001, end_year=2015)
+    first, second = r.scheme.start_names[0], r.scheme.start_names[1]
+    df = pd.DataFrame(
+        [["Mangrove", first, 3.0], ["Mangrove", second, 1.0]],
+        columns=[r.lc_year_start_esa, r.lc_year_end_esa, "Area"],
+    )
+
+    series = sankey_option(df, r)["series"][0]
+
+    names = [node["name"] for node in series["data"]]
+    assert names.count("Mangrove 2001") == 1
+    declared = set(names)
+    assert all(link["source"] in declared for link in series["links"]), series["links"]
+
+
 def test_sankey_option_uses_only_keys_ipecharts_declares():
     r = FakeResolved()
     option = sankey_option(decoded_transitions(r), r)
@@ -311,6 +342,27 @@ def test_sankey_option_uses_only_keys_ipecharts_declares():
     assert set(option) <= OPTION_KEYS, sorted(set(option) - OPTION_KEYS)
     series = option["series"][0]
     assert set(series) <= SANKEY_SERIES_KEYS, sorted(set(series) - SANKEY_SERIES_KEYS)
+
+
+def test_sankey_pins_the_interaction_values_a_key_check_cannot_see():
+    """A key-set assertion passes on any legal-but-wrong value, so the values are pinned.
+
+    ``emphasis.focus`` is a real ECharts option path -- ipecharts references
+    ``series-sankey.emphasis.focus`` from ``blur``'s help
+    (option/seriesitems/sankey.py:246) -- but ``emphasis`` there is a bare ``Dict`` with
+    no schema for its contents, so ``"adjacency"`` is transcribed from the ECharts docs
+    and cannot be checked against the package. ``tooltip.trigger``/``triggerOn`` can be:
+    both are enumerated in option/tooltip.py:50-72 and :199-215.
+    """
+    r = FakeResolved()
+    option = sankey_option(decoded_transitions(r), r)
+
+    assert option["tooltip"] == {"trigger": "item", "triggerOn": "mousemove"}
+    series = option["series"][0]
+    assert series["emphasis"] == {"focus": "adjacency"}
+    # {b} is the node name; sankey.py:139-145 and :154-160 drew the class name beside
+    # each bar, and {c} (the value) would print the ribbon totals instead.
+    assert series["label"] == {"formatter": "{b}"}
 
 
 # --- distribution -----------------------------------------------------------
@@ -432,6 +484,82 @@ def test_distribution_option_uses_only_keys_ipecharts_declares():
     assert set(option) <= OPTION_KEYS, sorted(set(option) - OPTION_KEYS)
     for series in option["series"]:
         assert set(series) <= BAR_SERIES_KEYS, sorted(set(series) - BAR_SERIES_KEYS)
+
+
+def test_distribution_pins_the_layout_values_a_key_check_cannot_see():
+    """``grid.containLabel`` is what keeps the land cover names inside the canvas, and
+    ``axisPointer.type`` is enumerated at option/axispointer.py:155. Both are legal
+    ECharts either way, so the key-set test above cannot tell a wrong value from a
+    right one.
+    """
+    r = FakeResolved()
+    option = distribution_option(decoded_pivot(r), r)
+
+    assert option["grid"] == {"containLabel": True}
+    assert option["tooltip"] == {"trigger": "axis", "axisPointer": {"type": "shadow"}}
+
+
+def test_distribution_keeps_the_legacy_axis_labels():
+    """The two display strings kept in the domain on purpose (EXPECTED_DIVERGENCES note
+    8): bar_plot.py:17 and :19 hardcode them in English rather than routing them through
+    the message catalogue, so they are transcriptions. A decision with no test rots.
+    """
+    r = FakeResolved()
+    option = distribution_option(decoded_pivot(r), r)
+
+    assert option["xAxis"]["name"] == "Percentage of area"  # bar_plot.py:17
+    assert option["yAxis"]["name"] == "Land cover type"  # bar_plot.py:19
+
+
+def test_distribution_keeps_a_land_cover_row_outside_the_vocabulary():
+    """The order's tail. Drop it and the row is not reordered but DELETED -- an AOI's
+    land cover silently missing from the chart rather than drawn out of order.
+    """
+    r = FakeResolved()
+    known = r.scheme.start_names[0]
+    pivot = pd.DataFrame(
+        {"Degraded": [4.0, 1.0], "Stable": [0.0, 0.0], "Improved": [0.0, 0.0]},
+        index=["Mangrove", known],
+    )
+    pivot.index.name = "landcover"
+
+    option = distribution_option(pivot, r)
+
+    assert option["yAxis"]["data"] == [known, "Mangrove"]
+    assert len(option["series"][0]["data"]) == 2
+
+
+def test_distribution_does_not_repeat_a_row_when_the_vocabulary_does():
+    """The twin of ``test_sankey_does_not_repeat_a_node_when_the_vocabulary_does``.
+
+    Reindexing on a repeated label does not raise -- it duplicates that land cover into
+    a phantom second bar carrying the same numbers, which is worse than a crash because
+    the chart is silently wrong.
+    """
+    r = FakeResolved()
+    names = ("Forest ", "Forest ", "Water bodies")
+    r.scheme = LandCoverScheme(
+        start_names=names,
+        start_codes=(10, 20, 30),
+        end_names=names,
+        end_codes=(10, 20, 30),
+        matrix=TransitionMatrix(rows=((0, 0, 0),) * 3),
+        is_custom=True,
+    )
+    pivot = pd.DataFrame(
+        {"Degraded": [10.0, 5.0], "Stable": [10.0, 15.0], "Improved": [0.0, 0.0]},
+        index=["Forest ", "Water bodies"],
+    )
+    pivot.index.name = "landcover"
+
+    option = distribution_option(pivot, r)
+
+    assert option["yAxis"]["data"] == ["Forest ", "Water bodies"]
+    assert {s["name"]: s["data"] for s in option["series"]} == {
+        "Degraded": [50.0, 25.0],
+        "Stable": [50.0, 75.0],
+        "Improved": [0.0, 0.0],
+    }
 
 
 def test_distribution_reads_the_pivot_task_15_actually_produces():

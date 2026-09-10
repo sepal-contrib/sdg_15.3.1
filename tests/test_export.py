@@ -49,6 +49,18 @@ def test_zip_contains_every_mandatory_shapefile_member():
     assert names == sorted(names)
 
 
+def test_the_zip_is_deflated_not_stored():
+    """``EXPECTED_DIVERGENCES`` note 2 calls this a deliberate change from the legacy's
+    ``ZipFile(path, "w")`` default of ``ZIP_STORED`` (run_15_3_1.py:361). A shapefile's
+    .dbf and .shp are highly compressible and the bytes cross the wire to a browser, so
+    the divergence is the point -- and it was pinned by nothing.
+    """
+    data = zonal_shapefile_zip(sample_gdf())
+
+    members = zipfile.ZipFile(io.BytesIO(data)).infolist()
+    assert {m.compress_type for m in members} == {zipfile.ZIP_DEFLATED}
+
+
 def test_the_zip_round_trips_back_into_geopandas():
     data = zonal_shapefile_zip(sample_gdf())
 

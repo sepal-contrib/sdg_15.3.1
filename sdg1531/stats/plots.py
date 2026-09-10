@@ -8,7 +8,16 @@ accepts ``numpy.float64``, which subclasses ``float``. The coercion is not alway
 observable from here -- ``Series.__iter__`` already boxes through ``ndarray.item`` --
 but ``.iloc``, ``.sum()`` and ``.values`` all hand back numpy scalars, so the casts are
 what make the option's types a property of this module rather than of pandas' internal
-boxing rules.
+boxing rules. ``distribution_option``'s ``totals.where(totals != 0)`` is defence of the
+same kind, and equally unobservable from here: pandas already yields NaN for 0/0, so
+``.fillna(0.0)`` alone handles the all-zero row and deleting the ``where`` changes no
+output any test can see. It guards the other zero-total shape -- a non-zero class over a
+total of zero, which needs a negative area and so cannot come from a ``Reducer.sum`` --
+because that one divides to ``inf``, which ``json.dumps`` writes as the bare literal
+``Infinity`` and ``JSON.parse`` then rejects. ``str(name)`` over ``pct.index`` is the
+third of these: the index holds ``code_to_name_start()`` values, which are already
+``str``, so the cast is unobservable from here and exists so a non-string label could
+never reach the option.
 
 EXPECTED_DIVERGENCES note -- eight divergences from the legacy charts
 (``component/scripts/sankey.py:15-235`` and ``component/scripts/bar_plot.py:1-26``).
@@ -32,7 +41,7 @@ Task 17's parity harness must carry all eight:
    bar_plot.py plotted the pivot's own (alphabetically sorted) index. Same members,
    same values, different drawing order.
 4. **Behaviour-changing.** A class outside ``r.lc_color_by_class`` is drawn in
-   ``#9ea7ad`` -- the "no data" grey of parameter/ui.py:56-61 -- where sankey.py:136
+   ``#9ea7ad`` -- the "no data" grey of parameter/ui.py:55-60 -- where sankey.py:136
    and :150 raised ``KeyError`` on ``colorDict[label]``. The companion
    ``ValueError("specify a colour palette")`` (:73-74) is gone with the argument it
    guarded: the palette comes from the resolved spec, not from a caller.
@@ -78,7 +87,7 @@ _DEGRADATION_COLORS: Mapping[str, str] = MappingProxyType(
 )
 _DISTRIBUTION_CLASSES = ("Degraded", "Stable", "Improved")
 
-# parameter/ui.py:60 (pm.legend_bar), the "no data" swatch
+# parameter/ui.py:59 (pm.legend_bar), the "no data" swatch
 _UNKNOWN_CLASS_COLOR = "#9ea7ad"
 
 
@@ -161,7 +170,10 @@ def distribution_option(pivot: pd.DataFrame, r: Any) -> dict[str, Any]:
     """
     frame = pivot.reindex(columns=list(_DISTRIBUTION_CLASSES), fill_value=0)
 
-    vocabulary = list(r.scheme.start_names)
+    # dict.fromkeys for the same reason sankey_option's ordered() uses it: a scrubbed
+    # custom scheme can name two start classes alike, and reindexing on a repeated label
+    # duplicates that land cover's row into a second bar carrying the same numbers.
+    vocabulary = list(dict.fromkeys(r.scheme.start_names))
     order = [name for name in vocabulary if name in frame.index]
     order += [name for name in frame.index if name not in set(vocabulary)]
     frame = frame.reindex(order)
