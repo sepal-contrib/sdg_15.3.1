@@ -7,12 +7,14 @@ on the PR gate, rather than discovered from a build that was passing all along:
 * a ``-m`` selection that matches no test (it exits 5 today, but the count is what
   the claim rests on, and the nightly's selection would otherwise only be measured
   at 03:17 UTC);
-* a job that COUNTS its tests and never runs them -- ``--collect-only`` proves a
-  selection is not empty and executes nothing;
+* a job that COUNTS its tests and never runs them -- ``--collect-only``, or the
+  ``--co`` alias, proves a selection is not empty and executes nothing;
 * a job or step switched off by an ``if:``, which reports as skipped, which branch
   protection treats as satisfied in its common configuration;
 * a glob or path that matches nothing after a rename;
-* a test run narrowed to one path, which overrides ``testpaths``;
+* a run narrowed under its own marker -- by ``-k``, ``--deselect``, ``--ignore`` or a
+  path -- which is measured here rather than enumerated, because the flags that can
+  do it are an open list and the count they produce is not;
 * a lint or type command narrower than the one a developer runs locally;
 * a step whose failure does not fail the job.
 
@@ -27,6 +29,7 @@ exclusions someone wrote down, rather than rules quietly weakened for everybody.
 
 from __future__ import annotations
 
+import functools
 import re
 import shlex
 import subprocess
@@ -51,6 +54,11 @@ _MARKER_FLAG = re.compile(r"""-m\s+(?:"([^"]+)"|'([^']+)'|([^\s|)]+))""")
 # rule below requires; the rest swallow one command's exit code. `continue-on-error`
 # is not here because it is not a shell spelling: it is a YAML key, read as one.
 _SUPPRESSORS = ("|| true", "|| :", "|| exit 0", "; true", "set +e")
+
+# What a test run may carry besides its marker: flags that change how the run is
+# REPORTED, never which tests it selects. See `_runs_the_selection` for why this is
+# an allowlist and not a list of the flags that narrow.
+_REPORTING_FLAGS = ("-q", "--quiet", "--durations")
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -99,17 +107,46 @@ def _script_lines(step: dict[str, Any]) -> list[str]:
 def _pytest_commands() -> list[tuple[str, str, str]]:
     """``(workflow file name, job name, command)`` for every ``pytest`` invocation.
 
-    Anchored on the word ``pytest`` and cut at the next pipe, because ``-m`` is a
-    flag on plenty of other commands: the `ci` job's ``python -m ipykernel`` was
-    read as a marker expression by a regex that scanned whole lines. The same slice
-    is what the rules below read, so "what the job passes pytest" is decided once.
+    Anchored on the word ``pytest``, because ``-m`` is a flag on plenty of other
+    commands: the `ci` job's ``python -m ipykernel`` was read as a marker expression
+    by a regex that scanned whole lines. Cut at the first shell metacharacter that
+    ends a command, so what comes back is the invocation and nothing around it --
+    cutting at ``|`` alone left the collection guard's ``> collected.txt`` in the
+    token stream, where a repo file of that name would have been read as an argument.
+    The same slice is what the rules below read, so "what the job passes pytest" is
+    decided once.
     """
     return [
-        (workflow, job, line[match.start() :].split("|")[0])
+        (workflow, job, re.split(r"[|><;&]", line[match.start() :])[0])
         for workflow, job, step in _run_steps()
         for line in _script_lines(step)
         for match in re.finditer(r"\bpytest\b", line)
     ]
+
+
+def _arguments(command: str) -> tuple[str, ...]:
+    """The invocation's arguments, ``pytest`` itself dropped."""
+    return tuple(shlex.split(command)[1:])
+
+
+def _selection_arguments(arguments: tuple[str, ...]) -> tuple[str, ...]:
+    """``arguments`` with the reporting flags dropped: what is left decides the
+    selection, and only that is worth measuring.
+
+    Dropping them rather than keeping them is not cosmetic. ``-q`` counts
+    cumulatively, so an invocation that already carries one, measured by a collection
+    that adds another, is a ``-qq`` run: pytest stops listing test ids and the count
+    read off that output is zero for every invocation, equally and uninformatively.
+    """
+    return tuple(a for a in arguments if a.split("=")[0] not in _REPORTING_FLAGS)
+
+
+def _marker_pair(arguments: tuple[str, ...]) -> tuple[str, ...]:
+    """The ``-m <expr>`` pair out of an argument list, or ``()`` if there is none."""
+    for index, argument in enumerate(arguments[:-1]):
+        if argument == "-m":
+            return (argument, arguments[index + 1])
+    return ()
 
 
 def _marker_expressions() -> set[str]:
@@ -121,15 +158,40 @@ def _marker_expressions() -> set[str]:
     }
 
 
-def _collected(marker: str) -> int:
-    """How many tests ``pytest -m <marker>`` selects, from a clean subprocess."""
+def _runs_the_selection(command: str) -> bool:
+    """Whether this invocation RUNS what its marker selects, or does something less.
+
+    Decided from the WHOLE argument set, by allowlist: a run carries its marker
+    expression and flags that change how it is REPORTED, and nothing else. The
+    denylist is the open-ended one -- ``-k``, ``--deselect``, ``--ignore``,
+    ``--last-failed``, a bare path, and ``--collect-only`` under every spelling
+    argparse accepts for it (``--co`` is the alias that got past a check for the
+    literal) are one flag each, and a rule that enumerates them is a rule that is one
+    pytest release from being wrong again. Anything not on the allowlist means this
+    invocation does not count as the job's run, so adding a flag to a CI test command
+    is a decision recorded here.
+    """
+    arguments = list(_arguments(command))
+    while arguments:
+        argument = arguments.pop(0)
+        if argument == "-m":  # the marker expression, measured by the rules below
+            if arguments:
+                arguments.pop(0)
+            continue
+        if argument.split("=")[0] not in _REPORTING_FLAGS:
+            return False
+    return True
+
+
+@functools.cache
+def _collected(arguments: tuple[str, ...]) -> int:
+    """How many tests ``pytest <arguments>`` selects, from a clean subprocess."""
     proc = subprocess.run(
         [
             sys.executable,
             "-m",
             "pytest",
-            "-m",
-            marker,
+            *arguments,
             "--collect-only",
             "-q",
             "-p",
@@ -141,7 +203,7 @@ def _collected(marker: str) -> int:
         check=False,
     )
     # 0 = tests collected, 5 = none collected; anything else is a collection error
-    assert proc.returncode in (0, 5), f"-m {marker!r} did not collect:\n{proc.stdout}{proc.stderr}"
+    assert proc.returncode in (0, 5), f"{arguments} did not collect:\n{proc.stdout}{proc.stderr}"
     return sum(1 for line in proc.stdout.splitlines() if "::" in line)
 
 
@@ -178,42 +240,66 @@ def test_the_app_layer_checks_are_intact() -> None:
     assert (REPO_ROOT / "ui.ipynb").is_file()
 
 
-def test_every_job_that_counts_its_tests_also_runs_them() -> None:
-    """``--collect-only`` proves a selection is not empty and executes nothing.
+def test_every_pytest_job_actually_executes_its_selection() -> None:
+    """A job may collect, filter and report as much as it likes, as long as ONE of
+    its invocations is a plain run: the marker expression, reporting flags, nothing
+    else.
 
-    Delete the ``pytest -m "not network" -q --durations=10`` line from the domain
-    job and every other assertion in this file still holds: the marker expression
-    survives in the collection guard above it, so the job counts the whole offline
-    suite, prints ``selected <n> offline tests`` and exits 0 having run none of it.
-    Counting is the claim to run, so it is what the rule is anchored on -- and a job
-    that drops BOTH lines loses its marker expression, which
-    :func:`test_every_marker_expression_selects_tests` compares as an exact set.
+    Every way a job can appear to run tests without running them lands here, and it
+    does not matter which one anybody thought of. Deleting the domain job's
+    ``pytest -m "not network" -q --durations=10`` leaves only the collection guard,
+    which is not a run. Spelling that line ``--co`` -- pytest's own alias, which a
+    check for the literal ``--collect-only`` reads as a run -- leaves the job
+    collecting twice and executing nothing. Adding ``-k`` or ``--deselect`` to it
+    leaves it running a fraction while the guard above still prints the whole count.
+    None of those is enumerated: they are all simply not a plain run.
+
+    A job that drops its pytest lines ENTIRELY is out of this rule's scope and in
+    :func:`test_every_marker_expression_selects_tests`'s, which compares the marker
+    expressions across both workflows as an exact set.
     """
-    commands = _pytest_commands()
-    counting = {(workflow, job) for workflow, job, c in commands if "--collect-only" in c}
-    running = {(workflow, job) for workflow, job, c in commands if "--collect-only" not in c}
+    invoking = {(workflow, job) for workflow, job, _ in _pytest_commands() if job != LEGACY_JOB}
+    running = {
+        (workflow, job)
+        for workflow, job, command in _pytest_commands()
+        if job != LEGACY_JOB and _runs_the_selection(command)
+    }
 
-    idle = sorted(counting - running)
-    assert idle == [], f"jobs that count their tests and never run them: {idle}"
+    idle = sorted(invoking - running)
+    assert idle == [], (
+        f"jobs that invoke pytest and never plainly run it: {idle}. A run carries its "
+        f"marker and {list(_REPORTING_FLAGS)} and nothing else."
+    )
 
 
-def test_no_test_run_narrows_itself_to_a_path() -> None:
-    """A path argument overrides ``testpaths``, so ``pytest -m "not network" -q
-    tests/test_workflows.py`` is a green domain job that ran one file -- the same
-    silent narrowing the lint job's bare invocations exist to prevent, one command
-    over. The `ci` job is exempt because ``pytest --nbmake ui.ipynb`` names
-    the notebook on purpose."""
-    named = []
+@pytest.mark.slow
+def test_no_pytest_invocation_narrows_what_its_marker_selects() -> None:
+    """The selection each invocation would really make, MEASURED against the one its
+    marker alone makes.
+
+    ``-k "test_domain_package_imports"`` on the domain job's run line is ONE test
+    with the marker untouched, no path named, and the collection guard above it
+    still printing the whole count. ``--deselect`` drops a test; ``--ignore`` drops
+    a tree, and ``--ignore=tests/parity`` takes the entire Tier-4 harness with it;
+    a bare path overrides ``testpaths``. Rather than enumerate those, each
+    invocation is COLLECTED as written and compared against its own marker pair, so
+    a flag nobody here thought of narrows the count just the same and fails just the
+    same.
+
+    The `ci` job is exempt: ``pytest --nbmake ui.ipynb`` names the notebook on
+    purpose, and it is §15.7's to retire.
+    """
+    problems = []
     for workflow, job, command in _pytest_commands():
         if job == LEGACY_JOB:
             continue
-        named += [
-            f"{workflow}:{job}: {token}"
-            for token in shlex.split(command)[1:]
-            if not token.startswith("-") and (REPO_ROOT / token).exists()
-        ]
+        arguments = _selection_arguments(_arguments(command))
+        selected = _collected(arguments)
+        whole = _collected(_marker_pair(arguments))
+        if selected != whole:
+            problems.append(f"{workflow}:{job}: `{command.strip()}` selects {selected} of {whole}")
 
-    assert named == [], f"a test run names a path, so its selection can narrow: {named}"
+    assert problems == [], problems
 
 
 def test_no_job_or_step_is_switched_off_by_a_condition() -> None:
@@ -345,5 +431,5 @@ def test_every_marker_expression_selects_tests() -> None:
     expressions = _marker_expressions()
 
     assert expressions == {"not network", "network"}, expressions
-    empty = sorted(expr for expr in expressions if _collected(expr) == 0)
+    empty = sorted(expr for expr in expressions if _collected(("-m", expr)) == 0)
     assert empty == [], f"marker expressions that select no test: {empty}"
