@@ -68,11 +68,14 @@ Task 17's parity harness must carry all eight:
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 from sdg1531.tables import DEGRADATION_COLORS
+
+if TYPE_CHECKING:  # typing only; `sdg1531.resolve` is on the ee-free JSON half
+    from sdg1531.resolve import ResolvedSpec
 
 __all__ = ["distribution_option", "sankey_option"]
 
@@ -89,7 +92,7 @@ _DISTRIBUTION_CLASSES = ("Degraded", "Stable", "Improved")
 _UNKNOWN_CLASS_COLOR = DEGRADATION_COLORS["NoData"]
 
 
-def sankey_option(df: pd.DataFrame, r: Any) -> dict[str, Any]:
+def sankey_option(df: pd.DataFrame, r: ResolvedSpec) -> dict[str, Any]:
     """Land cover transitions -> an ECharts sankey option.
 
     Replaces the hand-rolled pySankey of scripts/sankey.py:15-235. Reads
@@ -158,7 +161,7 @@ def sankey_option(df: pd.DataFrame, r: Any) -> dict[str, Any]:
     }
 
 
-def distribution_option(pivot: pd.DataFrame, r: Any) -> dict[str, Any]:
+def distribution_option(pivot: pd.DataFrame, r: ResolvedSpec) -> dict[str, Any]:
     """Land cover x class areas -> a 100% stacked horizontal bar option.
 
     Transcribed from scripts/bar_plot.py:8-24, with two fixes: the hard

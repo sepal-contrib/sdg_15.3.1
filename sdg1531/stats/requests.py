@@ -58,11 +58,17 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import ee
 
 from sdg1531.enums import IndicatorLayer
+
+if TYPE_CHECKING:
+    # Typing only. Neither is needed at runtime, and `engine/indicator.py` does not
+    # import `stats`, so naming them here creates no cycle in either direction.
+    from sdg1531.engine.context import ExecutionContext
+    from sdg1531.engine.indicator import IndicatorMaps
 
 __all__ = [
     "build_areas_by_land_cover",
@@ -108,7 +114,7 @@ _STATS_BAND: Mapping[IndicatorLayer, str | None] = MappingProxyType(
 )
 
 
-def build_transition_areas(maps: Any, ctx: Any) -> ee.Dictionary:
+def build_transition_areas(maps: IndicatorMaps, ctx: ExecutionContext) -> ee.Dictionary:
     """Area per land cover transition class. Reads ``maps.land_cover.stack``."""
     # transcribed from run_15_3_1.py:212-234
     landcover: ee.Image = maps.land_cover.stack.select("transition")
@@ -123,7 +129,9 @@ def build_transition_areas(maps: Any, ctx: Any) -> ee.Dictionary:
     )
 
 
-def build_areas_by_land_cover(maps: Any, ctx: Any, *, layer: IndicatorLayer) -> ee.Dictionary:
+def build_areas_by_land_cover(
+    maps: IndicatorMaps, ctx: ExecutionContext, *, layer: IndicatorLayer
+) -> ee.Dictionary:
     """Area per (indicator class, land cover class).
 
     Reads ``maps.land_cover.stack`` and ``maps.layers()[layer].image``. The land
@@ -158,7 +166,9 @@ def build_areas_by_land_cover(maps: Any, ctx: Any, *, layer: IndicatorLayer) -> 
     )
 
 
-def build_zonal_areas(maps: Any, zones: Any, *, scale: int) -> ee.FeatureCollection:
+def build_zonal_areas(
+    maps: IndicatorMaps, zones: ee.FeatureCollection, *, scale: int
+) -> ee.FeatureCollection:
     """Per-zone area of each indicator class, as ``Class_N`` properties.
 
     ``zones`` is the caller's own collection, not ``ctx``: the legacy passed

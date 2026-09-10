@@ -65,6 +65,14 @@ def zonal_shapefile_zip(gdf: Any) -> bytes:
     Replaces run_15_3_1.py:356-366 (``to_file`` into ``~/module_results`` plus a
     ZipFile over five hard-coded suffixes). The temporary directory is gone by the
     time this returns; the caller gets bytes and decides where they land.
+
+    ``gdf: Any`` is the one deliberate ``Any`` on the app-facing surface, and it is
+    forced rather than lazy: this module's whole import list is stdlib plus
+    :mod:`sdg1531.errors`, so it cannot name ``geopandas.GeoDataFrame`` without
+    importing geopandas -- which ``tests/test_isolation.py`` pins that it must not
+    do. The frame is reached through a duck-typed ``.to_file``. The other four
+    app-facing seams are typed; this one stays ``Any`` for as long as that import
+    ban does.
     """
     if gdf is None or len(gdf) == 0:
         raise StatisticsError("There is nothing to export: the zonal table is empty.")

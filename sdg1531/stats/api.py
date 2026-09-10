@@ -38,14 +38,19 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import ee
 import geopandas as gpd
 import pandas as pd
 
 from sdg1531.enums import IndicatorLayer
 from sdg1531.errors import StatisticsError
 from sdg1531.ports import InfoFetcher
+
+if TYPE_CHECKING:  # typing only; see stats/requests.py's note
+    from sdg1531.engine.context import ExecutionContext
+    from sdg1531.engine.indicator import IndicatorMaps
 
 from .decode import (
     decode_areas_by_land_cover,
@@ -112,14 +117,20 @@ def _require_groups(payload: Any, *, what: str) -> Any:
     return payload["groups"]
 
 
-async def fetch_transition_areas(fetcher: InfoFetcher, maps: Any, ctx: Any) -> pd.DataFrame:
+async def fetch_transition_areas(
+    fetcher: InfoFetcher, maps: IndicatorMaps, ctx: ExecutionContext
+) -> pd.DataFrame:
     payload = await fetcher.get_info_async(build_transition_areas(maps, ctx))
     groups = _require_groups(payload, what="land cover transitions")
     return decode_transition_areas(groups, maps.resolved)
 
 
 async def fetch_areas_by_land_cover(
-    fetcher: InfoFetcher, maps: Any, ctx: Any, *, layer: IndicatorLayer
+    fetcher: InfoFetcher,
+    maps: IndicatorMaps,
+    ctx: ExecutionContext,
+    *,
+    layer: IndicatorLayer,
 ) -> pd.DataFrame:
     request = build_areas_by_land_cover(maps, ctx, layer=layer)
     payload = await fetcher.get_info_async(request)
@@ -128,7 +139,7 @@ async def fetch_areas_by_land_cover(
 
 
 async def fetch_zonal_areas(
-    fetcher: InfoFetcher, maps: Any, zones: Any, *, scale: int
+    fetcher: InfoFetcher, maps: IndicatorMaps, zones: ee.FeatureCollection, *, scale: int
 ) -> gpd.GeoDataFrame:
     count = _unwrap(await fetcher.get_info_async(zones.size()), what="the zone count")
     if count is not None and int(count) > _MAX_ZONAL_FEATURES:

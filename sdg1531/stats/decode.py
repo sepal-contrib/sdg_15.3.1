@@ -54,7 +54,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import geopandas as gpd
 import pandas as pd
@@ -67,6 +67,11 @@ from sdg1531.tables import (
     PROD_STATE_5_LABELS,
     PROD_TREND_5_LABELS,
 )
+
+if TYPE_CHECKING:
+    # Typing only, and `sdg1531.resolve` is on the ee-free JSON half anyway
+    # (tests/test_isolation.py), so this stays true even at runtime.
+    from sdg1531.resolve import ResolvedSpec
 
 __all__ = [
     "decode_areas_by_land_cover",
@@ -133,7 +138,7 @@ def _int_field(entry: Any, key: str, *, what: str) -> int:
         ) from exc
 
 
-def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: Any) -> pd.DataFrame:
+def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: ResolvedSpec) -> pd.DataFrame:
     """Land cover transition areas -> a three column frame.
 
     Reads ``r.lc_class_combinations``, ``r.scheme``, ``r.lc_year_start_esa`` and
@@ -177,7 +182,7 @@ def decode_transition_areas(groups: Sequence[Mapping[str, Any]], r: Any) -> pd.D
 
 
 def decode_areas_by_land_cover(
-    groups: Sequence[Mapping[str, Any]], r: Any, *, layer: IndicatorLayer
+    groups: Sequence[Mapping[str, Any]], r: ResolvedSpec, *, layer: IndicatorLayer
 ) -> pd.DataFrame:
     """Nested (indicator, land cover) groups -> a long frame.
 
