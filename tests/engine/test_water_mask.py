@@ -231,3 +231,21 @@ def test_an_unset_water_mask_is_rejected():
     threshold to reach for."""
     with pytest.raises(SpecError, match="unsupported water mask"):
         water_for(ESA, None)
+
+
+def test_an_unrecognised_land_cover_source_is_rejected():
+    """The OTHER half of land_cover.py's note 3, which claims an unrecognised
+    `spec.land_cover` *or* `spec.water_mask` arm raises.
+
+    Only the water-mask half was pinned, and the parity register cited the
+    water-mask test for both -- so `land_cover.py:151`, the source arm of the
+    pixel-value branch, was reached by nothing in the suite. `LandCoverSource` is a
+    closed union, so no `RunSpec` gets here; a stand-in arm is the only way in, and
+    an unreachable branch that raises the wrong thing is still worth knowing about.
+    """
+
+    class UnknownSource:
+        pass
+
+    with pytest.raises(SpecError, match="unsupported land cover source"):
+        water_for(UnknownSource(), PixelValueMask(70))

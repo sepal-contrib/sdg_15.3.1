@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -36,6 +37,7 @@ from tests.parity.expected_divergences import (
     EXPECTED_COMPATIBILITY_DIVERGENCES,
     EXPECTED_DIVERGENCES,
     EXPECTED_LEGACY_AND_PORT_BOTH_FAIL,
+    EXPECTED_LEGACY_ONLY_FAILS,
     EXPECTED_NORMALISATIONS,
     EXPECTED_OFF_GRAPH,
     MODULE_NOTE_CLAIMS,
@@ -100,9 +102,12 @@ def test_stage_b_never_imports_the_legacy_tree():
     """Importing `component` mkdirs ~/module_results (directory.py:6-10).
 
     `tests/test_no_side_effects.py` walks `sdg1531` only, so it would NOT catch an
-    accidental legacy import here -- this is the check that does. It runs last in
-    file order but does not depend on order: every module this file needs is
-    already imported by the time any test runs."""
+    accidental legacy import here -- this is the check that does, and it catches the
+    case that matters whatever order it runs in, because every module-level import
+    in this file has happened before any test body does. What it cannot see is a
+    LAZY `import component` inside a test function defined after it; nothing in this
+    suite does that, and the fix if one ever appears is to hoist the import, not to
+    move this test."""
     leaked = sorted(name for name in sys.modules if name.split(".")[0] == "component")
     assert leaked == [], f"the parity suite imported the legacy tree: {leaked}"
 
@@ -153,14 +158,18 @@ def test_scenario_graphs_match_the_goldens(directory):
         return
 
     if (directory / "error.json").exists():
+        # A custom land cover source with a JRC or asset-band mask: the legacy
+        # raised before building anything, so stage A recorded no layer files and
+        # there is no pair to compare. Membership of a SET, not a ("sNN", "*") glob
+        # in EXPECTED_DIVERGENCES -- a glob says "every layer of this scenario may
+        # differ", which is not what is meant and would become a real licence the
+        # moment a re-run of stage A recorded graphs for one of these.
         recorded = json.loads((directory / "error.json").read_text())["error"]
+        assert scenario in EXPECTED_LEGACY_ONLY_FAILS, (
+            f"{scenario} raised {recorded} in the legacy, but no register entry covers it."
+        )
         maps = build(directory, legacy_compatibility=True)  # must no longer raise
         assert len(maps.layers()) == 7
-        entry = matching_entry(scenario, "*")
-        assert entry is not None, (
-            f"{scenario} raised {recorded} in the legacy and now succeeds, but no "
-            "EXPECTED_DIVERGENCES entry covers it."
-        )
         return
 
     # a diagnostic from an earlier, failing run must not outlive the failure
@@ -292,31 +301,85 @@ def test_every_divergence_entry_matches_at_least_one_pair():
     assert not unused, f"EXPECTED_DIVERGENCES entries match nothing: {unused}"
 
 
+def test_no_layer_is_licensed():
+    """The strongest statement the register can make, and it is currently true.
+
+    Every one of the 112 graph pairs is compared byte for byte after
+    canonicalisation, with nothing exempted. This is a tripwire, not a law: if a
+    graph difference ever genuinely needs licensing, delete this test in the same
+    change, deliberately, so the decision is visible in the diff. Reach for
+    EXPECTED_NORMALISATIONS first -- a splice compares the rest of the layer, a
+    licence compares none of it.
+    """
+    assert EXPECTED_DIVERGENCES == {}
+
+
+def test_every_legacy_only_failure_recorded_a_legacy_crash():
+    """The other direction on EXPECTED_LEGACY_ONLY_FAILS: a scenario listed there
+    whose golden holds real layer graphs would be a stale entry hiding a comparison
+    that could now be made."""
+    wrong = sorted(
+        name for name in EXPECTED_LEGACY_ONLY_FAILS if not (GOLDEN / name / "error.json").exists()
+    )
+    assert wrong == [], (
+        f"listed as legacy-only failures but stage A recorded a successful run: {wrong}"
+    )
+
+
+def test_the_two_failure_sets_do_not_overlap():
+    """A scenario is either refused by both trees or only by the legacy. Listing one
+    in both would make whichever branch runs first silently decide the other's."""
+    overlap = EXPECTED_LEGACY_ONLY_FAILS & EXPECTED_LEGACY_AND_PORT_BOTH_FAIL
+
+    assert overlap == frozenset(), f"listed in both failure registers: {sorted(overlap)}"
+
+
+def _defines(name: str, sources: str) -> bool:
+    """Whether `sources` defines a test called exactly `name`.
+
+    A plain `f"def {name}"` substring is a PREFIX match: a test renamed from
+    `test_foo` to `test_foo_and_something_else` would keep satisfying an entry that
+    names `test_foo`. The trailing `(` is the word boundary.
+    """
+    return re.search(rf"^\s*(?:async )?def {re.escape(name)}\(", sources, re.MULTILINE) is not None
+
+
 def _test_sources() -> str:
     tests_root = Path(__file__).parent.parent
     return "\n".join(path.read_text() for path in tests_root.rglob("test_*.py"))
 
 
-def test_every_off_graph_divergence_names_a_test_that_exists():
+def test_every_off_graph_divergence_names_tests_that_exist():
+    """Each entry names EVERY test that pins it, not one of them.
+
+    Two entries used to name a single test for a two-part claim -- `unrecognised_arm`
+    cited the water-mask test for a land-cover-or-water-mask claim, and
+    `unresolved_period_bound` cited the trend test for a trend/state/performance one
+    -- so the register read as coverage it did not have. Tuples make the whole claim
+    accountable.
+    """
     sources = _test_sources()
     for key, entry in EXPECTED_OFF_GRAPH.items():
-        assert f"def {entry['test']}" in sources, (
-            f"off-graph divergence {key!r} names {entry['test']}, which no test defines"
-        )
+        assert entry["tests"], f"off-graph divergence {key!r} names no test at all"
+        for name in entry["tests"]:
+            assert _defines(name, sources), (
+                f"off-graph divergence {key!r} names {name}, which no test defines"
+            )
 
 
-def test_every_normalisation_names_a_splice_and_a_test_that_exist():
+def test_every_normalisation_names_a_splice_and_tests_that_exist():
     """A normalisation is a claim about CODE, so both halves have to be real: the
-    function that performs the splice and the test that pins what it refuses."""
+    function that performs the splice and the tests that pin what it refuses."""
     sources = _test_sources()
     for key, entry in EXPECTED_NORMALISATIONS.items():
         assert hasattr(canonical, entry["splice"]), (
             f"normalisation {key!r} names {entry['splice']}, which "
             "tests/parity/canonical.py does not define"
         )
-        assert f"def {entry['test']}" in sources, (
-            f"normalisation {key!r} names {entry['test']}, which no test defines"
-        )
+        for name in entry["tests"]:
+            assert _defines(name, sources), (
+                f"normalisation {key!r} names {name}, which no test defines"
+            )
 
 
 def test_every_module_divergence_note_is_claimed_by_the_register():
@@ -327,8 +390,10 @@ def test_every_module_divergence_note_is_claimed_by_the_register():
     unclaimed = sorted(set(module_notes(REPO_ROOT)) - set(MODULE_NOTE_CLAIMS))
     assert unclaimed == [], (
         f"module EXPECTED_DIVERGENCES notes with no register entry: {unclaimed}. Add "
-        "one to EXPECTED_DIVERGENCES (with its GRAPH_DIVERGENCE_NOTES key) or to "
-        "EXPECTED_OFF_GRAPH."
+        "one to EXPECTED_OFF_GRAPH, to EXPECTED_NORMALISATIONS, or -- last resort -- "
+        "to EXPECTED_DIVERGENCES with its GRAPH_DIVERGENCE_NOTES key. The roster is "
+        "SCANNED off sdg1531/, so a note in a newly written module reaches this test "
+        "on its own."
     )
 
 
@@ -341,6 +406,7 @@ def test_every_register_note_reference_names_a_real_module_note():
 def test_every_note_claim_names_a_register_entry_that_is_there():
     known = (
         {f"graph:{s}/{layer}" for s, layer in EXPECTED_DIVERGENCES}
+        | {"legacy_only_fails"}
         | {f"normalised:{key}" for key in EXPECTED_NORMALISATIONS}
         | {f"off_graph:{key}" for key in EXPECTED_OFF_GRAPH}
     )
