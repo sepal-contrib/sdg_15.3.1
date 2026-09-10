@@ -47,6 +47,11 @@ JSON_HALF = (
     "sdg1531.ports",
     "sdg1531.stats.decode",
     "sdg1531.stats.plots",
+    # export.py is the one module allowed to touch the filesystem (hygiene_rules.py's
+    # FS_EXEMPT_FILES), which makes it the one most worth pinning here: it reaches
+    # geopandas and the shapefile driver, and neither may drag ee or a widget library
+    # in behind them.
+    "sdg1531.export",
 )
 
 _SCRIPT = """
