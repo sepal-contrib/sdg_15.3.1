@@ -20,7 +20,14 @@ from sdg1531.scheme import LandCoverScheme
 from sdg1531.spec import CustomLandCoverSource, Period, PrecomputedViAsset, RunSpec, SensorSelection
 from sdg1531.truth_table import PRODUCTIVITY_GPGV1, PRODUCTIVITY_GPGV2, TruthTable
 
-__all__ = ["ResolvedSpec", "ViProcessor", "resolve"]
+__all__ = [
+    "LANDSAT_SENSORS",
+    "MODIS_SENSORS",
+    "ResolvedSpec",
+    "ViAsset",
+    "ViProcessor",
+    "resolve",
+]
 
 
 def _clamp_cci(year: int) -> int:
