@@ -57,6 +57,16 @@ def _year(value: object) -> int | None:
     return value
 
 
+def _clamp_cci(year: int) -> int:
+    """indicator_model.py:156-168, the same clamp ``resolve._clamp_cci`` applies.
+
+    Written out here rather than imported from :mod:`sdg1531.resolve`: ``validate`` runs
+    on every keystroke against a half-filled spec, and ``resolve`` raises on one
+    (``_require_year``). This module deliberately depends on nothing that can fail.
+    """
+    return min(max(year, LAND_COVER_FIRST_YEAR), LAND_COVER_MAX_YEAR)
+
+
 def _base_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
     # run_15_3_1.py:165-166 — `if not (model.start < model.end): raise`
     start = _year(spec.periods.overall.start)
@@ -99,7 +109,7 @@ def _soc_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
 
     if start is not None and end is not None:
         # soil_organic_carbon.py:12-14 — the clamped end year
-        end_esa = min(max(end, LAND_COVER_FIRST_YEAR), LAND_COVER_MAX_YEAR)
+        end_esa = _clamp_cci(end)
         effective_start = max(start, LAND_COVER_FIRST_YEAR) if clamp_start else start
         if end_esa - effective_start < 0:
             # soil_organic_carbon.py:161 — a negative band index
@@ -115,6 +125,72 @@ def _soc_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
                     fatal=True,
                 )
             )
+
+    return tuple(problems)
+
+
+def _land_cover_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    """The land cover period, after resolve.py:241-242 clamps BOTH of its endpoints.
+
+    Two holes this closes. First, ``periods.overall`` is the only period whose order is
+    checked (:func:`_base_period_problems`), so an inverted land cover override reached
+    the decoders unchallenged. Second, because both endpoints go through the CCI clamp, a
+    period lying wholly outside the record collapses onto a single year:
+    ``_clamp_cci(1980) == _clamp_cci(1985) == 1992``. ``decode_transition_areas`` then
+    labels its two year columns identically (stats/decode.py:176) and
+    ``stats.plots.sankey_option`` fails on the duplicate label with a bare
+    ``ValueError: Grouper for '1992' not 1-dimensional``.
+    """
+    period = spec.periods.land_cover.resolve(spec.periods.overall)
+    start = _year(period.start)
+    end = _year(period.end)
+    if start is None or end is None:
+        return ()
+
+    problems: list[Problem] = []
+    if start >= end:
+        problems.append(
+            Problem(
+                field="periods.land_cover.start",
+                code="land_cover_start_not_before_end",
+                message="The land cover start year must be earlier than the end year.",
+                fatal=True,
+            )
+        )
+    elif _clamp_cci(start) >= _clamp_cci(end):
+        # NOT soc's `end_esa - start < 0`: a zero-length SOC span is a legal band index
+        # of 0 (soil_organic_carbon.py:161), while for land cover equality IS the
+        # defect. `>=` also catches the wholly-after-LAND_COVER_MAX_YEAR direction.
+        problems.append(
+            Problem(
+                field="periods.land_cover",
+                code="land_cover_period_collapses",
+                message=(
+                    "The land cover period lies outside the CCI land cover record "
+                    f"({LAND_COVER_FIRST_YEAR}-{LAND_COVER_MAX_YEAR}), so both of its "
+                    "years clamp to the same one and there is no transition to measure."
+                ),
+                fatal=True,
+            )
+        )
+
+    if start < LAND_COVER_FIRST_YEAR:
+        # The SOC equivalent (code "soc_start_before_cci") already warns about a shift
+        # the user never sees; here the clamped year is written into every transition
+        # chart label, so it is the more visible of the two.
+        problems.append(
+            Problem(
+                field="periods.land_cover.start",
+                code="land_cover_start_before_cci",
+                message=(
+                    "The land cover period starts before the CCI land cover record "
+                    f"({LAND_COVER_FIRST_YEAR}), so the transition is measured from "
+                    f"{LAND_COVER_FIRST_YEAR} instead, and that is the year the chart "
+                    "will be labelled with."
+                ),
+                fatal=False,
+            )
+        )
 
     return tuple(problems)
 
@@ -405,6 +481,7 @@ def _aoi_problems(spec: RunSpec) -> tuple[Problem, ...]:
 _CHECKS = (
     _base_period_problems,
     _soc_period_problems,
+    _land_cover_period_problems,
     _state_period_problems,
     _vi_source_problems,
     _trajectory_problems,

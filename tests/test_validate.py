@@ -153,6 +153,86 @@ def test_four_year_state_period_is_accepted():
     assert "state_period_too_short" not in codes(BASE.evolve(periods=state(start=2012, end=2015)))
 
 
+def land_cover(**override) -> SubPeriods:
+    return replace(BASE.periods, land_cover=PeriodOverride(**override))
+
+
+def test_land_cover_period_collapsing_before_the_cci_floor_is_fatal():
+    """resolve.py:241-242 clamps BOTH endpoints, so 1980-1985 resolves to 1992-1992;
+    decode_transition_areas then names its two year columns identically and
+    stats.plots.sankey_option dies on the duplicate label."""
+    problem = only(
+        BASE.evolve(periods=land_cover(start=1980, end=1985)), "land_cover_period_collapses"
+    )
+    assert problem.field == "periods.land_cover"
+    assert problem.fatal is True
+    assert "land_cover_period_collapses" not in codes(BASE)
+
+
+def test_land_cover_period_collapsing_after_the_cci_ceiling_is_fatal():
+    """The other direction the `>=` condition covers in one rule."""
+    assert "land_cover_period_collapses" in codes(
+        BASE.evolve(periods=land_cover(start=2030, end=2035))
+    )
+
+
+def test_a_land_cover_period_touching_the_cci_record_does_not_collapse():
+    # 1991-1993 clamps to 1992-1993: one real year of transition, so it stands
+    assert "land_cover_period_collapses" not in codes(
+        BASE.evolve(periods=land_cover(start=1991, end=1993))
+    )
+
+
+def test_a_zero_length_land_cover_period_is_not_tolerated_the_way_soc_is():
+    """soc_period_collapses fires on `< 0` because a zero-length SOC span is a legal
+    band index of 0 (soil_organic_carbon.py:161). For land cover, equality is exactly
+    the defect, so the same two years must be rejected here and accepted there."""
+    spec = BASE.evolve(periods=land_cover(start=2000, end=2000))
+    assert "land_cover_start_not_before_end" in codes(spec)
+    assert "soc_period_collapses" not in codes(BASE.evolve(periods=soc(start=2000, end=2000)))
+
+
+def test_an_inverted_land_cover_override_is_fatal():
+    """Only periods.overall was order-checked, so this reached the decoders unchallenged."""
+    problem = only(
+        BASE.evolve(periods=land_cover(start=2015, end=2000)), "land_cover_start_not_before_end"
+    )
+    assert problem.field == "periods.land_cover.start"
+    assert problem.fatal is True
+    assert "land_cover_start_not_before_end" not in codes(BASE)
+
+
+def test_an_inverted_land_cover_period_is_not_also_reported_as_a_collapse():
+    """One user error, one message: the collapse rule is about the clamp, not the order."""
+    assert "land_cover_period_collapses" not in codes(
+        BASE.evolve(periods=land_cover(start=2015, end=2000))
+    )
+
+
+def test_land_cover_start_before_cci_is_a_warning():
+    """Unlike the SOC shift, this one is visible: the clamped year is written into every
+    node label of the transition chart."""
+    problem = only(
+        BASE.evolve(periods=land_cover(start=1980, end=2000)), "land_cover_start_before_cci"
+    )
+    assert problem.field == "periods.land_cover.start"
+    assert problem.fatal is False
+
+
+def test_land_cover_start_inside_cci_is_silent():
+    assert "land_cover_start_before_cci" not in codes(BASE)
+
+
+def test_a_half_filled_land_cover_period_is_not_a_land_cover_problem():
+    """validate() runs on every keystroke, so a half-typed year is the common case, not
+    an edge one. `internal_error` is asserted here as well as in the Hypothesis run: an
+    unguarded `None >= int` would be swallowed into that code by validate()'s own
+    try/except and would otherwise show up only as an absence."""
+    spec = BASE.evolve(periods=replace(BASE.periods, overall=Period(2000, None)))
+    assert not {c for c in codes(spec) if c.startswith("land_cover_")}
+    assert "internal_error" not in codes(spec)
+
+
 def scheme(matrix: TransitionMatrix | None = None) -> LandCoverScheme:
     # Stands in for a parsed CSV, so is_custom is True. It is a stored field, not
     # something resolve() re-derives from the source arm, so it is set here.
