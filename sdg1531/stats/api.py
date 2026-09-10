@@ -52,13 +52,13 @@ if TYPE_CHECKING:  # typing only; see stats/requests.py's note
     from sdg1531.engine.context import ExecutionContext
     from sdg1531.engine.indicator import IndicatorMaps
 
-from .decode import (
+from sdg1531.stats.decode import (
     decode_areas_by_land_cover,
     decode_distinct_pixel_values,
     decode_transition_areas,
     decode_zonal_areas,
 )
-from .requests import (
+from sdg1531.stats.requests import (
     build_areas_by_land_cover,
     build_band_names,
     build_distinct_pixel_values,

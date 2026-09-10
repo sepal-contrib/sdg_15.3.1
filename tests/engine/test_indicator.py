@@ -377,9 +377,15 @@ def test_the_collapse_is_the_legacy_chain_with_the_rename_put_back():
 
 
 def test_the_rename_is_the_only_node_the_port_adds():
-    """spec §7, and a corpus-wide EXPECTED_DIVERGENCES entry rather than a
-    per-scenario one: run_15_3_1.py:411 never renames, so the legacy band is
-    literally called "constant". Nothing else about the chain moves."""
+    """spec §7: run_15_3_1.py:411 never renames, so the legacy band is literally
+    called "constant". Nothing else about the chain moves.
+
+    The harness does not LICENSE that difference. It did once -- a corpus-wide
+    `EXPECTED_DIVERGENCES[("*", "indicator_15_3_1")]` entry, which covered the whole
+    layer and compared none of it -- and Task 17 replaced it with
+    `EXPECTED_NORMALISATIONS["indicator_band_rename"]`, a splice that removes this
+    one node and requires byte equality on everything else.
+    """
     productivity, land_cover, soc = fake_inputs()
     water = land_cover.stack.select("water")
     landcover = land_cover.stack.select("degradation")

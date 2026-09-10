@@ -1,7 +1,8 @@
-"""Shared paths for the domain test suite.
+"""Shared paths for the domain test suite, and the offline ``ee`` fixture.
 
-Deliberately tiny: the offline ``ee`` fixture that Tier 3 needs is added later,
-in the engine scaffolding task, not here.
+Two things only: ``REPO_ROOT``, so the suite imports ``sdg1531`` from the checkout
+rather than from an install, and the session-scoped ``ee_offline`` fixture below
+that Tier 3 and Tier 4 build every graph under.
 """
 
 from __future__ import annotations

@@ -30,9 +30,9 @@ from types import MappingProxyType
 
 from anyascii import anyascii
 
-from .catalog import SENSORS
-from .enums import IndicatorLayer
-from .spec import (
+from sdg1531.catalog import SENSORS
+from sdg1531.enums import IndicatorLayer
+from sdg1531.spec import (
     Climate,
     CustomLandCoverSource,
     FixedClimate,

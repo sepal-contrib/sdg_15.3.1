@@ -7,6 +7,16 @@ against the raw CSV rows. Run it from the repo root:
     python tools/check_scheme.py
 
 Exits 0 and prints one ``OK`` line per property, or raises on the first mismatch.
+
+**A one-shot artefact, retained until ``component/`` is deleted.** Nothing runs it:
+it is not collected by pytest, no CI job invokes it, and unlike its sibling
+``tools/check_transcription.py`` -- which ``tests/test_constants.py``'s docstring
+names -- nothing in the suite even mentioned it, so a reader had no way to discover
+it existed. It records no run date either, so "it passed" is a claim about whenever
+someone last typed the command. What it checks is pinned in the suite by
+``tests/test_scheme.py`` and ``tests/test_palette.py``, against literals rather
+than against the legacy; this is the against-the-legacy half, and it goes when the
+tree it reads goes.
 """
 
 from __future__ import annotations

@@ -2,6 +2,12 @@
 
 Transcribed behaviour lives in indicator_model.py:172-266 and 315-321, plus the
 label/combination construction at run_15_3_1.py:217-219 and :266.
+
+Every assertion here is against a literal. The against-the-legacy comparison is
+``tools/check_scheme.py``, which re-executes those property bodies verbatim against
+the raw CSV rows; it needs matplotlib and imports the legacy tree, so it cannot be
+collected here. It is named from this docstring because nothing else named it at
+all -- see its own header for what it is and when it goes.
 """
 
 from __future__ import annotations

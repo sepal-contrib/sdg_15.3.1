@@ -32,8 +32,6 @@ from sdg1531.spec import CustomLandCoverSource, Period, PrecomputedViAsset, RunS
 from sdg1531.truth_table import PRODUCTIVITY_GPGV1, PRODUCTIVITY_GPGV2, TruthTable
 
 __all__ = [
-    "LANDSAT_SENSORS",
-    "MODIS_SENSORS",
     "ResolvedSpec",
     "ViAsset",
     "ViProcessor",
@@ -79,9 +77,12 @@ def _integration_period(spec: RunSpec) -> Period:
     )
 
 
-# integration.py:45, :54, :56, :66, :81 — the family sets, verbatim.
-MODIS_SENSORS = frozenset({"MODIS MOD13Q1", "MODIS MYD13Q1"})
-LANDSAT_SENSORS = frozenset({"Landsat 4", "Landsat 5", "Landsat 7", "Landsat 8", "Landsat 9"})
+# integration.py:45, :54, :56, :66, :81 — the family sets, verbatim. Private, and
+# named apart from `ViProcessor.LANDSAT_SENSORS` below: a module-level frozenset and
+# an enum member sharing one name read alike at a glance and mean different things,
+# and both were exported while nothing outside this module read either.
+_MODIS_SENSORS = frozenset({"MODIS MOD13Q1", "MODIS MYD13Q1"})
+_LANDSAT_SENSORS = frozenset({"Landsat 4", "Landsat 5", "Landsat 7", "Landsat 8", "Landsat 9"})
 
 
 class ViProcessor(str, Enum):  # noqa: UP042
@@ -123,7 +124,7 @@ def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[ViAsset, ...]]:
         # of this module that _require_year's SpecError-naming discipline did not cover.
         raise SpecError(f"{error} is not a known sensor (see sdg1531.catalog.SENSORS)") from error
 
-    if MODIS_SENSORS & set(sensors):  # :45
+    if _MODIS_SENSORS & set(sensors):  # :45
         return ViProcessor.MODIS, ee_asset_list
     if "Terra NPP" in sensors:  # :54
         return ViProcessor.TERRA_NPP, ee_asset_list
@@ -147,7 +148,7 @@ def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[ViAsset, ...]]:
             else ee_asset_list[0][1]
         )
         return ViProcessor.DERIVED_VI_LANDSAT, (asset_id,)
-    if LANDSAT_SENSORS & set(sensors):  # :81
+    if _LANDSAT_SENSORS & set(sensors):  # :81
         return ViProcessor.LANDSAT_SENSORS, ee_asset_list
     raise SpecError("No valid sensor type found in the model.")  # :93-94
 

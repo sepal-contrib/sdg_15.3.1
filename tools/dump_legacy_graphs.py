@@ -79,19 +79,30 @@ class NullOutput:
         return None
 
 
-def initialize_ee(live: bool) -> str:
-    """Initialise ``ee`` and return the algorithm-table provenance, for metadata.json."""
+def initialize_ee(live: bool) -> tuple[str, str | None]:
+    """Initialise ``ee``; return the algorithm table's provenance and its digest.
+
+    The digest is ``None`` under ``--live``, where no fixture is installed and there
+    is nothing to fingerprint. Stage B refuses a ``metadata.json`` recorded that
+    way, which is the point: the provenance string alone cannot tell a fixture
+    re-captured with different contents from the one committed here.
+    """
     if live:
         ee.Initialize()
-        return "live"
+        return "live", None
 
     repo_root = Path(__file__).resolve().parent.parent
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from tests.ee_offline import fixture_provenance, initialize_offline_ee, load_ee_algorithms
+    from tests.ee_offline import (
+        fixture_digest,
+        fixture_provenance,
+        initialize_offline_ee,
+        load_ee_algorithms,
+    )
 
     initialize_offline_ee(load_ee_algorithms()["algorithms"])
-    return fixture_provenance()
+    return fixture_provenance(), fixture_digest()
 
 
 def dump_scenario(name: str, out_root: Path) -> str:
@@ -142,7 +153,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    algorithms = initialize_ee(args.live)
+    algorithms, algorithms_sha256 = initialize_ee(args.live)
 
     names = args.only or sorted(SCENARIOS)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -157,6 +168,7 @@ def main() -> None:
             {
                 "ee_version": ee.__version__,
                 "algorithms": algorithms,
+                "algorithms_sha256": algorithms_sha256,
                 "generated": datetime.now(UTC).isoformat(),
                 "legacy_commit": commit,
                 "scenarios": sorted(names),

@@ -32,7 +32,7 @@ from sdg1531.enums import IndicatorLayer
 from sdg1531.errors import SpecError
 from sdg1531.resolve import resolve
 from sdg1531.spec import Compatibility, RunSpec
-from tests.ee_offline import fixture_provenance
+from tests.ee_offline import fixture_digest, fixture_provenance
 from tests.parity import canonical
 from tests.parity.canonical import render, strip_indicator_band_rename
 from tests.parity.expected_divergences import (
@@ -102,14 +102,26 @@ def test_the_recorded_algorithm_table_is_the_one_this_environment_installs() -> 
     one against the committed fixture, at the same `ee` version. Asserted here for
     the same reason and in the same place -- before any comparison.
 
-    What this does NOT catch is the fixture being regenerated with different
-    contents at the same `ee` version: `metadata.json` records a provenance string,
-    not a digest, and recording a digest would mean re-running stage A.
+    The provenance string alone did not earn this test its name. Both halves of it
+    -- the path and the version INSIDE the fixture -- are derived from the same
+    committed file, so a fixture re-captured with different contents at the same
+    `ee` version passed. The digest is over the bytes, and it was added to
+    `metadata.json` by hand: `metadata.json` is a committed file, so recording it
+    did not mean re-running stage A.
     """
     assert METADATA["algorithms"] == fixture_provenance(), (
         f"goldens were recorded against algorithm table {METADATA['algorithms']!r}, "
         f"this environment installs {fixture_provenance()!r}. Do NOT regenerate the "
         "goldens: align the environment."
+    )
+    assert METADATA["algorithms_sha256"] == fixture_digest(), (
+        f"the algorithm fixture has changed since the goldens were recorded: "
+        f"{METADATA['algorithms_sha256']} was recorded, this checkout holds "
+        f"{fixture_digest()}. The provenance string above still matches, which is "
+        "exactly the case it cannot see. Do NOT regenerate the goldens: restore the "
+        "fixture. (A stage-A run with `--live` records no digest at all and fails "
+        "here, which is the same guard: goldens taken against a live discovery "
+        "document are not goldens taken against this table.)"
     )
 
 

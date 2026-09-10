@@ -19,6 +19,17 @@ jobs:
           environment-file: sepal_environment.yml
           cache-environment: true
 
+      # This checks the VERSION, not the fork. The stock PyPI `earthengine-api`
+      # reports 1.6.14 too, and the `domain` and `lint` jobs both `pip install -e
+      # ".[dev]"` on top of this environment against a `earthengine-api==1.6.14`
+      # pin (pyproject.toml:13) that PyPI can satisfy -- so a resolver decision to
+      # take the wheel would swap the openforis fork out and leave this step, and
+      # `test_the_recorded_ee_version_matches_this_environment`, both green. What
+      # WOULD catch it is the algorithm-table digest the parity harness asserts
+      # (`test_the_recorded_algorithm_table_is_the_one_this_environment_installs`),
+      # since the two builds do not serialize identically. Spec §15.7(b) owns the
+      # question of pinning the fork properly; until then, read this step as a
+      # version check and not as a provenance guard.
       - name: Verify ee-api fork
         shell: micromamba-shell {0}
         run: |

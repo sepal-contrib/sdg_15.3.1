@@ -89,7 +89,14 @@ __all__ = [
 
 
 def _lceu_static(asset_key: str) -> Callable[[ResolvedSpec], ee.Image]:
-    def build(r: ResolvedSpec) -> ee.Image:
+    """The four fixed LCEU rungs: one asset each, chosen by `spec.lceu` alone.
+
+    `build` takes the run and reads nothing off it, which is correct rather than an
+    oversight -- these assets do not depend on the run -- and its signature has to
+    match `_lceu_calculate`, the fifth rung, which does.
+    """
+
+    def build(_: ResolvedSpec) -> ee.Image:
         return as_image(ee.Image(ASSETS[asset_key]))
 
     return build

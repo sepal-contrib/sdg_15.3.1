@@ -202,5 +202,5 @@ C_CONVERSION_FACTOR: tuple[float, ...] = (
 # fmt: on
 
 # transcribed from parameter/matrix.py:368-418 and :420-470
-MANAGEMENT_FACTOR: tuple[int, ...] = tuple([1] * 49)
-INPUT_FACTOR: tuple[int, ...] = tuple([1] * 49)
+MANAGEMENT_FACTOR: tuple[int, ...] = (1,) * 49
+INPUT_FACTOR: tuple[int, ...] = (1,) * 49
