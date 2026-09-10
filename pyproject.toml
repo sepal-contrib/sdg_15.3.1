@@ -42,7 +42,10 @@ include = ["sdg1531*"]
 minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["tests"]
-addopts = "-ra --strict-markers"
+# `-m "not network"` by default, so a bare `pytest` is the PR gate's own selection
+# and the two cannot drift apart. A CLI `-m` overrides it (later wins), which is
+# how the nightly's `pytest -m "network"` still reaches the Tier-6 test.
+addopts = "-ra --strict-markers -m 'not network'"
 asyncio_mode = "strict"
 markers = [
     "network: hits Google Earth Engine; excluded from the PR gate (pytest -m 'not network')",
