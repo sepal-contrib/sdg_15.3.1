@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import ee
 import pytest
@@ -39,6 +40,12 @@ from tests.parity.canonical import (
 )
 
 GOLDEN = Path(__file__).resolve().parents[1] / "golden"
+# Tier 4. Declared in pyproject.toml and, until fix round 2, applied to nothing: a
+# CI job running `pytest -m parity` selected zero tests. Module-level so a new test
+# in this file cannot miss it, and `test_every_parity_module_carries_the_marker`
+# checks the whole directory.
+pytestmark = pytest.mark.parity
+
 
 # Corpus goldens read off disk rather than rebuilt, so these tests say nothing
 # about the port -- they are about the canonicaliser only. The pair covers both
@@ -49,15 +56,17 @@ REAL_GRAPHS = ("s01/soc.json", "s06/productivity_trend.json")
 real_graph = pytest.mark.parametrize("graph_name", REAL_GRAPHS)
 
 
-def encode(image: ee.Image) -> dict:
-    return ee.serializer.encode(image)
+def encode(image: ee.Image) -> dict[str, Any]:
+    encoded: dict[str, Any] = ee.serializer.encode(image)
+    return encoded
 
 
-def a_real_graph(graph_name: str) -> dict:
-    return json.loads((GOLDEN / graph_name).read_text())
+def a_real_graph(graph_name: str) -> dict[str, Any]:
+    graph: dict[str, Any] = json.loads((GOLDEN / graph_name).read_text())
+    return graph
 
 
-def test_the_real_graphs_cover_both_bare_scope_key_spellings():
+def test_the_real_graphs_cover_both_bare_scope_key_spellings() -> None:
     """The parametrization above is only worth having while this holds.
 
     `body` and `functionReference` are the two places `ee` puts a scope key
@@ -66,7 +75,7 @@ def test_the_real_graphs_cover_both_bare_scope_key_spellings():
     blind spot reopens in silence -- so assert the coverage rather than trusting
     the filenames.
     """
-    found = set()
+    found: set[str] = set()
     for name in REAL_GRAPHS:
         text = (GOLDEN / name).read_text()
         found.update(key for key in ("body", "functionReference") if f'"{key}"' in text)
@@ -82,7 +91,8 @@ def test_the_real_graphs_cover_both_bare_scope_key_spellings():
 
 
 def _collapse() -> ee.Image:
-    return ee.Image(0).where(ee.Image(1).eq(1), 2)
+    collapse: ee.Image = ee.Image(0).where(ee.Image(1).eq(1), 2)
+    return collapse
 
 
 def port_indicator() -> ee.Image:
@@ -101,7 +111,7 @@ def legacy_indicator() -> ee.Image:
 _SCOPE_KEY_FIELDS = ("valueReference", "body", "functionReference")
 
 
-def _renumbered(encoded: dict) -> dict:
+def _renumbered(encoded: dict[str, Any]) -> dict[str, Any]:
     """`encoded` with every scope key rewritten, in reverse insertion order.
 
     Rewrites all FOUR places a key can appear: `result`, a `{"valueReference":
@@ -118,7 +128,7 @@ def _renumbered(encoded: dict) -> dict:
     order = sorted(values, key=lambda key: -int(key))
     mapping = {key: f"x{index}" for index, key in enumerate(order)}
 
-    def walk(node):
+    def walk(node: Any) -> Any:
         if isinstance(node, dict):
             return {
                 name: mapping[child]
@@ -137,23 +147,23 @@ def _renumbered(encoded: dict) -> dict:
 
 
 @real_graph
-def test_renumbering_every_scope_key_leaves_the_canonical_form_alone(graph_name):
+def test_renumbering_every_scope_key_leaves_the_canonical_form_alone(graph_name: str) -> None:
     graph = a_real_graph(graph_name)
 
     assert render(_renumbered(graph)) == render(graph)
 
 
 @real_graph
-def test_renumbering_actually_changed_the_serialization(graph_name):
+def test_renumbering_actually_changed_the_serialization(graph_name: str) -> None:
     """Otherwise the test above passes by comparing a graph with itself."""
     graph = a_real_graph(graph_name)
 
     assert json.dumps(_renumbered(graph), sort_keys=True) != json.dumps(graph, sort_keys=True)
 
 
-def _hoisted(encoded: dict) -> dict:
+def _hoisted(encoded: dict[str, Any]) -> dict[str, Any]:
     """`encoded` with the root's first inlined composite argument moved into `values`."""
-    graph = json.loads(json.dumps(encoded))
+    graph: dict[str, Any] = json.loads(json.dumps(encoded))
     values = graph["values"]
     call = values[graph["result"]]["functionInvocationValue"]
     for name, argument in call["arguments"].items():
@@ -165,7 +175,7 @@ def _hoisted(encoded: dict) -> dict:
 
 
 @real_graph
-def test_hoisting_an_inlined_node_leaves_the_canonical_form_alone(graph_name):
+def test_hoisting_an_inlined_node_leaves_the_canonical_form_alone(graph_name: str) -> None:
     """`ee` inlines a node used once and hoists it on the second use. Which of the
     two a graph happens to carry is presentation, not meaning."""
     graph = a_real_graph(graph_name)
@@ -174,13 +184,13 @@ def test_hoisting_an_inlined_node_leaves_the_canonical_form_alone(graph_name):
 
 
 @real_graph
-def test_hoisting_actually_changed_the_serialization(graph_name):
+def test_hoisting_actually_changed_the_serialization(graph_name: str) -> None:
     graph = a_real_graph(graph_name)
 
     assert json.dumps(_hoisted(graph), sort_keys=True) != json.dumps(graph, sort_keys=True)
 
 
-def _reordered(node):
+def _reordered(node: Any) -> Any:
     """Every dict rebuilt in reverse key order -- the JSON load order, changed."""
     if isinstance(node, dict):
         return {name: _reordered(node[name]) for name in reversed(list(node))}
@@ -190,14 +200,14 @@ def _reordered(node):
 
 
 @real_graph
-def test_the_order_the_json_loaded_in_leaves_the_canonical_form_alone(graph_name):
+def test_the_order_the_json_loaded_in_leaves_the_canonical_form_alone(graph_name: str) -> None:
     graph = a_real_graph(graph_name)
 
     assert render(_reordered(graph)) == render(graph)
 
 
 @real_graph
-def test_the_canonical_form_is_its_own_fixed_point(graph_name):
+def test_the_canonical_form_is_its_own_fixed_point(graph_name: str) -> None:
     graph = a_real_graph(graph_name)
 
     assert render(canonical_graph(graph)) == render(graph)
@@ -207,21 +217,21 @@ def test_the_canonical_form_is_its_own_fixed_point(graph_name):
 
 
 @real_graph
-def test_a_changed_function_name_is_visible(graph_name):
+def test_a_changed_function_name_is_visible(graph_name: str) -> None:
     graph = a_real_graph(graph_name)
     mutated = json.loads(json.dumps(graph).replace("Image.select", "Image.selfMask", 1))
 
     assert render(mutated) != render(graph)
 
 
-def test_a_changed_argument_value_is_visible():
+def test_a_changed_argument_value_is_visible() -> None:
     before = encode(ee.Image(0).where(ee.Image(1).eq(1), 2))
     after = encode(ee.Image(0).where(ee.Image(1).eq(1), 3))
 
     assert render(after) != render(before)
 
 
-def test_an_inserted_rename_is_visible():
+def test_an_inserted_rename_is_visible() -> None:
     """The exact miss that made a first probe at this question report the port and
     the legacy identical: a rename's band name is INLINE in the arguments dict, not
     a node of its own, so a comparison over node function names cannot see it."""
@@ -231,7 +241,7 @@ def test_an_inserted_rename_is_visible():
     assert render(after) != render(before)
 
 
-def test_swapping_two_chained_calls_is_visible():
+def test_swapping_two_chained_calls_is_visible() -> None:
     """`.where(water, 0).uint8()` against `.uint8().where(water, 0)` -- the same
     nodes, the same count, a different graph. A comparison by population cannot see
     this one, and it is the shape `build_indicator`'s terminal line has."""
@@ -244,13 +254,14 @@ def test_swapping_two_chained_calls_is_visible():
 
 def _evi(image: ee.Image, coefficient: str) -> ee.Image:
     """`_calculate_evi`'s shape (sdg1531/engine/integration.py:199-209)."""
-    return image.expression(
+    evi: ee.Image = image.expression(
         f"{coefficient}*((nir-red)/(nir+red+1))",
         {"nir": image.select("NIR"), "red": image.select("Red")},
     )
+    return evi
 
 
-def test_a_difference_inside_an_expression_is_visible():
+def test_a_difference_inside_an_expression_is_visible() -> None:
     """`ee.Image.expression` puts the formula in an `Image.parseExpression` node
     reachable ONLY through a `functionReference` -- a bare scope key sitting where
     `functionName` normally sits. Treating that as a string literal drops the whole
@@ -264,7 +275,7 @@ def test_a_difference_inside_an_expression_is_visible():
     assert render(after) != render(before)
 
 
-def test_a_difference_inside_a_map_callback_is_visible():
+def test_a_difference_inside_a_map_callback_is_visible() -> None:
     """A callback body is a BARE key into `values` under `functionDefinitionValue`,
     not a `{"valueReference": ...}` wrapper. A walk that does not follow it
     explicitly cannot see the whole callback subtree (tests/engine/graph.py)."""
@@ -276,7 +287,7 @@ def test_a_difference_inside_a_map_callback_is_visible():
 
 
 @real_graph
-def test_a_dropped_argument_is_visible(graph_name):
+def test_a_dropped_argument_is_visible(graph_name: str) -> None:
     graph = a_real_graph(graph_name)
     mutated = json.loads(json.dumps(graph))
     call = mutated["values"][mutated["result"]]["functionInvocationValue"]
@@ -285,7 +296,7 @@ def test_a_dropped_argument_is_visible(graph_name):
     assert render(mutated) != render(graph)
 
 
-def _raw_function_counts(encoded: dict) -> dict[str, int]:
+def _raw_function_counts(encoded: dict[str, Any]) -> dict[str, int]:
     """Distinct invocations per function name, counted off the RAW encoding.
 
     An independent implementation of what `function_name_counts` reports, written
@@ -314,7 +325,7 @@ def _raw_function_counts(encoded: dict) -> dict[str, int]:
 
 
 @real_graph
-def test_the_canonical_form_keeps_every_invocation_the_raw_graph_has(graph_name):
+def test_the_canonical_form_keeps_every_invocation_the_raw_graph_has(graph_name: str) -> None:
     """A canonicaliser that dropped a subtree would still compare equal to itself.
 
     Counted against a walk of the raw document, which reaches the `values`
@@ -327,7 +338,7 @@ def test_the_canonical_form_keeps_every_invocation_the_raw_graph_has(graph_name)
     assert function_name_counts(graph) == _raw_function_counts(graph)
 
 
-def test_the_expression_subtree_is_reachable_through_the_function_reference():
+def test_the_expression_subtree_is_reachable_through_the_function_reference() -> None:
     """The `Image.parseExpression` node behind a `functionReference` is the one the
     canonicaliser used to drop, and this names it directly rather than inferring it
     from a count."""
@@ -347,14 +358,14 @@ def test_the_expression_subtree_is_reachable_through_the_function_reference():
 # --- the one normalisation ------------------------------------------------------
 
 
-def test_the_splice_turns_the_port_graph_into_the_legacy_one():
+def test_the_splice_turns_the_port_graph_into_the_legacy_one() -> None:
     spliced, fired = strip_indicator_band_rename(encode(port_indicator()))
 
     assert fired is True
     assert render(spliced) == render(encode(legacy_indicator()))
 
 
-def test_the_splice_declines_on_the_legacy_graph():
+def test_the_splice_declines_on_the_legacy_graph() -> None:
     """The normalisation is asymmetric, and has to be: a splice that fired on both
     sides would cancel a rename the legacy never had and compare nothing."""
     legacy = encode(legacy_indicator())
@@ -365,7 +376,7 @@ def test_the_splice_declines_on_the_legacy_graph():
     assert render(spliced) == render(legacy)
 
 
-def test_the_splice_removes_the_rename_and_nothing_else():
+def test_the_splice_removes_the_rename_and_nothing_else() -> None:
     before = function_name_counts(encode(port_indicator()))
     spliced, fired = strip_indicator_band_rename(encode(port_indicator()))
 
@@ -376,7 +387,7 @@ def test_the_splice_removes_the_rename_and_nothing_else():
     assert before["Image.rename"] == 1
 
 
-def test_the_splice_leaves_a_second_rename_in_place():
+def test_the_splice_leaves_a_second_rename_in_place() -> None:
     """It is a splice of one named node in one position, not a rename filter."""
     image = _collapse().rename("degradation").rename(INDICATOR_BAND).where(ee.Image(3), 0).uint8()
 
@@ -386,7 +397,7 @@ def test_the_splice_leaves_a_second_rename_in_place():
     assert function_name_counts(spliced)["Image.rename"] == 1
 
 
-def test_the_splice_declines_when_the_cast_moves_inside_the_water_mask():
+def test_the_splice_declines_when_the_cast_moves_inside_the_water_mask() -> None:
     """`indicator.uint8().where(water, 0)` instead of `.where(water, 0).uint8()`.
 
     The port's cast position is part of what the goldens are meant to pin, so the
@@ -401,7 +412,7 @@ def test_the_splice_declines_when_the_cast_moves_inside_the_water_mask():
     assert function_name_counts(spliced)["Image.rename"] == 1
 
 
-def test_the_splice_declines_when_the_water_mask_is_gone():
+def test_the_splice_declines_when_the_water_mask_is_gone() -> None:
     image = _collapse().rename(INDICATOR_BAND).uint8()
 
     _, fired = strip_indicator_band_rename(encode(image))
@@ -409,7 +420,7 @@ def test_the_splice_declines_when_the_water_mask_is_gone():
     assert fired is False
 
 
-def test_the_splice_declines_on_a_differently_named_rename():
+def test_the_splice_declines_on_a_differently_named_rename() -> None:
     """`run_15_3_1.py:411` left the band called `constant`. A port that renamed to
     something else has made a second, unlicensed change."""
     image = _collapse().rename("constant").where(ee.Image(3), 0).uint8()
@@ -419,7 +430,7 @@ def test_the_splice_declines_on_a_differently_named_rename():
     assert fired is False
 
 
-def test_the_splice_declines_when_the_rename_takes_more_than_one_band():
+def test_the_splice_declines_when_the_rename_takes_more_than_one_band() -> None:
     image = _collapse().rename([INDICATOR_BAND, "extra"]).where(ee.Image(3), 0).uint8()
 
     _, fired = strip_indicator_band_rename(encode(image))
@@ -428,7 +439,7 @@ def test_the_splice_declines_when_the_rename_takes_more_than_one_band():
 
 
 @pytest.mark.parametrize("stem", ["land_cover", "soc", "productivity"])
-def test_the_splice_declines_on_the_other_layers(stem):
+def test_the_splice_declines_on_the_other_layers(stem: str) -> None:
     """Those layers' renames are in the legacy too, and must stay compared."""
     _, fired = strip_indicator_band_rename(
         json.loads((GOLDEN / "s01" / f"{stem}.json").read_text())

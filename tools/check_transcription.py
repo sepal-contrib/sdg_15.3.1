@@ -148,13 +148,13 @@ def _same(port: object, legacy: object) -> bool:
     """
     if type(port) is not type(legacy):
         return False
-    if isinstance(port, float):
+    if isinstance(port, float) and isinstance(legacy, float):
         return float.hex(port) == float.hex(legacy)
-    if isinstance(port, (list, tuple)):
+    if isinstance(port, list | tuple) and isinstance(legacy, list | tuple):
         return len(port) == len(legacy) and all(
             _same(p, u) for p, u in zip(port, legacy, strict=True)
         )
-    if isinstance(port, dict):
+    if isinstance(port, dict) and isinstance(legacy, dict):
         return set(port) == set(legacy) and all(_same(port[k], legacy[k]) for k in port)
     return bool(port == legacy)
 

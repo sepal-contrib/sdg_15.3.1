@@ -72,10 +72,25 @@ known-first-party = ["sdg1531"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["sdg1531"]
+# `tools/` and `tests/parity/` are here because the two files this module's parity
+# guarantee rests on live in them: `tests/parity/canonical.py` decides whether two
+# ee graphs match, and `tools/to_legacy_model.py` is the sole adapter every golden
+# was recorded through. Both are fully annotated and both used to read as checked
+# while mypy never opened them.
+files = ["sdg1531", "tools", "tests/parity"]
 
 [[tool.mypy.overrides]]
 module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# `tools/` imports the legacy tree on purpose (stage A runs it). `component/` is
+# unported, untyped and slated for deletion: following it yields ~300 errors about
+# code nobody is going to annotate. `follow_imports = skip` makes everything it
+# exports `Any`, which is the honest description of it, and keeps the `tools/`
+# code that CALLS it checked.
+module = ["component.*"]
+follow_imports = "skip"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

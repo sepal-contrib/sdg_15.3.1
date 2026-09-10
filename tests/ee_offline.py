@@ -23,6 +23,7 @@ from __future__ import annotations
 import gzip
 import json
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -31,12 +32,25 @@ import ee
 FIXTURE = Path(__file__).parent / "fixtures" / "ee_algorithms.json.gz"
 
 
-def load_ee_algorithms() -> dict:
+def load_ee_algorithms() -> dict[str, Any]:
     """Return {"ee_version": str, "algorithms": dict} from the committed fixture."""
-    return json.loads(gzip.decompress(FIXTURE.read_bytes()))
+    payload: dict[str, Any] = json.loads(gzip.decompress(FIXTURE.read_bytes()))
+    return payload
 
 
-def initialize_offline_ee(algorithms: dict) -> None:
+def fixture_provenance() -> str:
+    """What algorithm table `initialize_offline_ee` would install, as one string.
+
+    Recorded into `tests/golden/metadata.json` by stage A and asserted by stage B
+    before it compares anything, the way `ee_version` already is. The algorithm
+    signatures shape argument names and value promotion during client-side
+    serialization, so a stage-A run against a live discovery document rather than
+    this fixture is the same hazard the `ee_version` assert exists to catch.
+    """
+    return f"{FIXTURE.relative_to(FIXTURE.parents[2]).as_posix()} (ee {load_ee_algorithms()['ee_version']})"
+
+
+def initialize_offline_ee(algorithms: dict[str, Any]) -> None:
     """Initialise `ee` with a fake credential and a captured algorithm table."""
     ee.Reset()
 

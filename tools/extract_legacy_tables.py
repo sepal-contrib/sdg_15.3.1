@@ -33,6 +33,7 @@ import ast
 import json
 import warnings
 from pathlib import Path
+from typing import Any
 
 TARGETS = (
     # (table name, legacy file, enclosing function)
@@ -91,13 +92,20 @@ def _operand(node: ast.AST) -> tuple[str, int]:
     if len(node.args) != 1 or not isinstance(node.args[0], ast.Constant):
         raise ValueError(f"unsupported comparison argument in .{attr}()")
     argument = node.args[0].value
+    # `ast.Constant.value` is any literal, so a `.eq("2")` or `.eq(2.0)` in the
+    # legacy would have reached int() and been silently coerced to the same class
+    # code as `.eq(2)`. This tool raises on everything else it cannot read exactly;
+    # this is the same rule applied to the class code itself. bool is excluded
+    # because it is an int subclass and `.eq(True)` is not a class code.
+    if not isinstance(argument, int) or isinstance(argument, bool):
+        raise ValueError(f"non-integer comparison argument in .{attr}({argument!r})")
     if attr == "eq" and argument == 0:
         # class 0 is only ever spelled `.lt(1)` in the legacy chains
         # (run_15_3_1.py:406-408); an `.eq(0)` would be silently
         # indistinguishable from that once encoded as (name, 0).
         raise ValueError(f"ambiguous .eq(0) in .{attr}() — class 0 must be .lt(1)")
     if attr == "eq":
-        cls = int(argument)
+        cls = argument
     elif attr == "lt" and argument == 1:
         # run_15_3_1.py:406-408 — `.lt(1)` on a uint8 band means "is 0".
         cls = 0
@@ -121,7 +129,7 @@ def _unwind_and(node: ast.AST) -> list[ast.AST]:
     return [node]
 
 
-def extract_chain(source: str, function_name: str) -> dict:
+def extract_chain(source: str, function_name: str) -> dict[str, Any]:
     """Extract one `.where()` chain from `source` by function name."""
     with warnings.catch_warnings():
         # productivity.py:186 has an unescaped LaTeX docstring (`$$\mu = ...$$`),
@@ -168,17 +176,20 @@ def extract_chain(source: str, function_name: str) -> dict:
     wheres.reverse()
 
     inputs: list[str] | None = None
-    rules: list[list] = []
+    rules: list[list[Any]] = []
     for predicate, value in wheres:
         if not isinstance(value, ast.Constant):
             raise ValueError("non-literal .where() value")
+        outcome = value.value
+        if not isinstance(outcome, int) or isinstance(outcome, bool):
+            raise ValueError(f"non-integer .where() value: {outcome!r}")
         operands = [_operand(term) for term in _unwind_and(predicate)]
         names = [name for name, _ in operands]
         if inputs is None:
             inputs = names
         elif names != inputs:
             raise ValueError(f"operand order changes mid-chain: {names} != {inputs}")
-        rules.append([[cls for _, cls in operands], int(value.value)])
+        rules.append([[cls for _, cls in operands], outcome])
 
     return {
         "inputs": inputs,
@@ -193,7 +204,7 @@ def extract_chain(source: str, function_name: str) -> dict:
     }
 
 
-def extract_all(repo_root: Path) -> dict:
+def extract_all(repo_root: Path) -> dict[str, Any]:
     tables = []
     for name, relative, function_name in TARGETS:
         source = (repo_root / relative).read_text(encoding="utf-8")

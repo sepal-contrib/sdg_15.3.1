@@ -17,6 +17,7 @@ everything else compared byte for byte.
 from __future__ import annotations
 
 import difflib
+import importlib
 import json
 import re
 import sys
@@ -26,11 +27,12 @@ import ee
 import pytest
 
 from sdg1531.engine.context import ExecutionContext
-from sdg1531.engine.indicator import build_indicator_maps
+from sdg1531.engine.indicator import IndicatorMaps, build_indicator_maps
 from sdg1531.enums import IndicatorLayer
 from sdg1531.errors import SpecError
 from sdg1531.resolve import resolve
 from sdg1531.spec import Compatibility, RunSpec
+from tests.ee_offline import fixture_provenance
 from tests.parity import canonical
 from tests.parity.canonical import render, strip_indicator_band_rename
 from tests.parity.expected_divergences import (
@@ -40,6 +42,7 @@ from tests.parity.expected_divergences import (
     EXPECTED_LEGACY_ONLY_FAILS,
     EXPECTED_NORMALISATIONS,
     EXPECTED_OFF_GRAPH,
+    HELD_CONSTANT,
     MODULE_NOTE_CLAIMS,
     matching_entry,
     module_notes,
@@ -47,6 +50,12 @@ from tests.parity.expected_divergences import (
 from tools.scenarios import SCENARIOS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# Tier 4. Declared in pyproject.toml and, until fix round 2, applied to nothing: a
+# CI job running `pytest -m parity` selected zero tests. Module-level so a new test
+# in this file cannot miss it, and `test_every_parity_module_carries_the_marker`
+# checks the whole directory.
+pytestmark = pytest.mark.parity
+
 GOLDEN = REPO_ROOT / "tests" / "golden"
 METADATA = json.loads((GOLDEN / "metadata.json").read_text())
 SCENARIO_DIRS = sorted(p for p in GOLDEN.iterdir() if p.is_dir())
@@ -71,7 +80,7 @@ def graph_diff(golden: str, actual: str) -> str:
     return head if len(lines) <= _DIFF_LINES else f"{head}\n... {len(lines) - _DIFF_LINES} more"
 
 
-def test_the_recorded_ee_version_matches_this_environment():
+def test_the_recorded_ee_version_matches_this_environment() -> None:
     """Two earthengine-api versions produce different graphs for reasons that have
     nothing to do with the port. Assert this BEFORE comparing any string."""
     assert ee.__version__ == METADATA["ee_version"], (
@@ -81,7 +90,27 @@ def test_the_recorded_ee_version_matches_this_environment():
     )
 
 
-def test_the_goldens_cover_exactly_the_committed_corpus():
+def test_the_recorded_algorithm_table_is_the_one_this_environment_installs() -> None:
+    """The second half of the R6 guard, and it was recorded but never checked.
+
+    `ee_version` alone does not pin the graphs: the ALGORITHM SIGNATURES decide
+    argument names and value promotion during client-side serialization, so a
+    stage-A run against a live discovery document produces different encodings from
+    one against the committed fixture, at the same `ee` version. Asserted here for
+    the same reason and in the same place -- before any comparison.
+
+    What this does NOT catch is the fixture being regenerated with different
+    contents at the same `ee` version: `metadata.json` records a provenance string,
+    not a digest, and recording a digest would mean re-running stage A.
+    """
+    assert METADATA["algorithms"] == fixture_provenance(), (
+        f"goldens were recorded against algorithm table {METADATA['algorithms']!r}, "
+        f"this environment installs {fixture_provenance()!r}. Do NOT regenerate the "
+        "goldens: align the environment."
+    )
+
+
+def test_the_goldens_cover_exactly_the_committed_corpus() -> None:
     """Stage B reads spec.json off disk, so a scenario edited in `tools/scenarios.py`
     without re-running stage A would leave `test_scenarios.py` checking one corpus
     and this file checking another, with both green."""
@@ -98,7 +127,7 @@ def test_the_goldens_cover_exactly_the_committed_corpus():
     )
 
 
-def test_stage_b_never_imports_the_legacy_tree():
+def test_stage_b_never_imports_the_legacy_tree() -> None:
     """Importing `component` mkdirs ~/module_results (directory.py:6-10).
 
     `tests/test_no_side_effects.py` walks `sdg1531` only, so it would NOT catch an
@@ -116,7 +145,7 @@ def read_spec(directory: Path) -> RunSpec:
     return RunSpec.from_dict(json.loads((directory / "spec.json").read_text()))
 
 
-def build(directory: Path, *, legacy_compatibility: bool = False):
+def build(directory: Path, *, legacy_compatibility: bool = False) -> IndicatorMaps:
     spec = read_spec(directory)
     if legacy_compatibility:
         spec = spec.evolve(compatibility=Compatibility())
@@ -126,7 +155,7 @@ def build(directory: Path, *, legacy_compatibility: bool = False):
 
 
 @pytest.mark.parametrize("directory", SCENARIO_DIRS, ids=lambda p: p.name)
-def test_scenario_graphs_match_the_goldens(directory):
+def test_scenario_graphs_match_the_goldens(directory: Path) -> None:
     """The port, built the way the legacy behaves, must reproduce the legacy graph.
 
     `legacy_compatibility=True` resets ONLY `spec.compatibility`, whose defaults are
@@ -236,7 +265,7 @@ def test_scenario_graphs_match_the_goldens(directory):
 
 
 @pytest.mark.parametrize("directory", SCENARIO_DIRS, ids=lambda p: p.name)
-def test_compatibility_flags_change_exactly_the_recorded_layers(directory):
+def test_compatibility_flags_change_exactly_the_recorded_layers(directory: Path) -> None:
     """What the corpus's non-default Compatibility flags actually move.
 
     This is deliberately a PORT-vs-PORT comparison -- the same spec with the flags
@@ -276,7 +305,7 @@ def test_compatibility_flags_change_exactly_the_recorded_layers(directory):
     )
 
 
-def test_every_compatibility_footprint_names_a_scenario_that_sets_a_flag():
+def test_every_compatibility_footprint_names_a_scenario_that_sets_a_flag() -> None:
     """The other direction: an entry for a scenario with default flags is a typo."""
     default = Compatibility()
     stray = sorted(
@@ -287,7 +316,7 @@ def test_every_compatibility_footprint_names_a_scenario_that_sets_a_flag():
     assert stray == [], f"compatibility footprints for scenarios that set no flag: {stray}"
 
 
-def test_every_divergence_entry_matches_at_least_one_pair():
+def test_every_divergence_entry_matches_at_least_one_pair() -> None:
     stems = [layer.name.lower() for layer in IndicatorLayer]
     unused = []
     for key in EXPECTED_DIVERGENCES:
@@ -301,7 +330,33 @@ def test_every_divergence_entry_matches_at_least_one_pair():
     assert not unused, f"EXPECTED_DIVERGENCES entries match nothing: {unused}"
 
 
-def test_no_layer_is_licensed():
+def test_every_parity_module_carries_the_marker() -> None:
+    """`pyproject.toml` declares a `parity` marker for Task 18's CI to select on.
+
+    It was declared and applied to nothing, so `pytest -m parity` selected zero
+    tests. That is not silent -- pytest exits 5, "no tests collected" -- but a job
+    that tolerates 5, or that later selects a wider expression, gets a green run
+    proving nothing, and the marker is exactly the thing Task 18 will select on.
+
+    Checked against each module's `pytestmark` ATTRIBUTE, which is what pytest
+    itself reads, rather than by grepping the source for the assignment. This test
+    lives in a marked module, so `-m parity` selects it, and it is what catches a
+    new parity file that forgets the mark.
+    """
+    unmarked = []
+    for path in sorted(Path(__file__).parent.glob("test_*.py")):
+        module = importlib.import_module(f"tests.parity.{path.stem}")
+        marks = getattr(module, "pytestmark", [])
+        marks = marks if isinstance(marks, list) else [marks]
+        if not any(mark.name == "parity" for mark in marks):
+            unmarked.append(path.name)
+    assert unmarked == [], (
+        f"parity modules with no `pytestmark = pytest.mark.parity`: {unmarked}. "
+        "Without it `pytest -m parity` silently skips them."
+    )
+
+
+def test_no_layer_is_licensed() -> None:
     """The strongest statement the register can make, and it is currently true.
 
     Every one of the 112 graph pairs is compared byte for byte after
@@ -314,7 +369,7 @@ def test_no_layer_is_licensed():
     assert EXPECTED_DIVERGENCES == {}
 
 
-def test_every_legacy_only_failure_recorded_a_legacy_crash():
+def test_every_legacy_only_failure_recorded_a_legacy_crash() -> None:
     """The other direction on EXPECTED_LEGACY_ONLY_FAILS: a scenario listed there
     whose golden holds real layer graphs would be a stale entry hiding a comparison
     that could now be made."""
@@ -326,7 +381,7 @@ def test_every_legacy_only_failure_recorded_a_legacy_crash():
     )
 
 
-def test_the_two_failure_sets_do_not_overlap():
+def test_the_two_failure_sets_do_not_overlap() -> None:
     """A scenario is either refused by both trees or only by the legacy. Listing one
     in both would make whichever branch runs first silently decide the other's."""
     overlap = EXPECTED_LEGACY_ONLY_FAILS & EXPECTED_LEGACY_AND_PORT_BOTH_FAIL
@@ -349,7 +404,7 @@ def _test_sources() -> str:
     return "\n".join(path.read_text() for path in tests_root.rglob("test_*.py"))
 
 
-def test_every_off_graph_divergence_names_tests_that_exist():
+def test_every_off_graph_divergence_names_tests_that_exist() -> None:
     """Each entry names EVERY test that pins it, not one of them.
 
     Two entries used to name a single test for a two-part claim -- `unrecognised_arm`
@@ -367,7 +422,19 @@ def test_every_off_graph_divergence_names_tests_that_exist():
             )
 
 
-def test_every_normalisation_names_a_splice_and_tests_that_exist():
+def test_every_held_constant_entry_names_tests_that_exist() -> None:
+    """A held-constant entry is a claim that something IS pinned somewhere, just not
+    by the graph comparison. If the tests it names are gone, so is the pin."""
+    sources = _test_sources()
+    for key, entry in HELD_CONSTANT.items():
+        assert entry["tests"], f"held-constant entry {key!r} names no test at all"
+        for name in entry["tests"]:
+            assert _defines(name, sources), (
+                f"held-constant entry {key!r} names {name}, which no test defines"
+            )
+
+
+def test_every_normalisation_names_a_splice_and_tests_that_exist() -> None:
     """A normalisation is a claim about CODE, so both halves have to be real: the
     function that performs the splice and the tests that pin what it refuses."""
     sources = _test_sources()
@@ -382,7 +449,7 @@ def test_every_normalisation_names_a_splice_and_tests_that_exist():
             )
 
 
-def test_every_module_divergence_note_is_claimed_by_the_register():
+def test_every_module_divergence_note_is_claimed_by_the_register() -> None:
     """Every numbered EXPECTED_DIVERGENCES note in the port has a register entry.
 
     This is the direction that stops a new licence being granted in a docstring and
@@ -397,13 +464,13 @@ def test_every_module_divergence_note_is_claimed_by_the_register():
     )
 
 
-def test_every_register_note_reference_names_a_real_module_note():
+def test_every_register_note_reference_names_a_real_module_note() -> None:
     """And the other direction: a register entry cannot cite a note that is gone."""
     dangling = sorted(set(MODULE_NOTE_CLAIMS) - set(module_notes(REPO_ROOT)))
     assert dangling == [], f"register entries citing notes that no longer exist: {dangling}"
 
 
-def test_every_note_claim_names_a_register_entry_that_is_there():
+def test_every_note_claim_names_a_register_entry_that_is_there() -> None:
     known = (
         {f"graph:{s}/{layer}" for s, layer in EXPECTED_DIVERGENCES}
         | {"legacy_only_fails"}

@@ -49,7 +49,7 @@ from pathlib import Path
 
 import ee
 
-from component.scripts.run_15_3_1 import compute_indicator_maps  # type: ignore[import-not-found]
+from component.scripts.run_15_3_1 import compute_indicator_maps
 from sdg1531.spec import RunSpec
 from tools.scenarios import SCENARIOS
 from tools.to_legacy_model import to_legacy_model
@@ -69,13 +69,13 @@ LAYERS = (
 class NullOutput:
     """sw.Alert stand-in: the science calls these and reads nothing back."""
 
-    def add_live_msg(self, *args, **kwargs) -> None:
+    def add_live_msg(self, *args: object, **kwargs: object) -> None:
         return None
 
-    def add_msg(self, *args, **kwargs) -> None:
+    def add_msg(self, *args: object, **kwargs: object) -> None:
         return None
 
-    def reset(self, *args, **kwargs) -> None:
+    def reset(self, *args: object, **kwargs: object) -> None:
         return None
 
 
@@ -88,11 +88,10 @@ def initialize_ee(live: bool) -> str:
     repo_root = Path(__file__).resolve().parent.parent
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-    from tests.ee_offline import initialize_offline_ee, load_ee_algorithms
+    from tests.ee_offline import fixture_provenance, initialize_offline_ee, load_ee_algorithms
 
-    payload = load_ee_algorithms()
-    initialize_offline_ee(payload["algorithms"])
-    return f"tests/fixtures/ee_algorithms.json.gz (ee {payload['ee_version']})"
+    initialize_offline_ee(load_ee_algorithms()["algorithms"])
+    return fixture_provenance()
 
 
 def dump_scenario(name: str, out_root: Path) -> str:

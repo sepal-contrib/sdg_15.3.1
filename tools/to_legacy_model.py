@@ -47,7 +47,7 @@ from typing import Any
 
 import ee
 
-from component.model.indicator_model import IndicatorModel  # type: ignore[import-not-found]
+from component.model.indicator_model import IndicatorModel
 from sdg1531.spec import (
     AssetAoi,
     AssetBandMask,
@@ -202,7 +202,9 @@ def to_legacy_model(spec: RunSpec, workdir: Path) -> tuple[IndicatorModel, Legac
     model.productivity_lookup_table = spec.productivity_lookup.value
     # :49, read at productivity.py:29-49 against pm.trajectories[i]["value"].
     model.trajectory = spec.trajectory.value
-    # :50, read at productivity.py:85-99 against "gaes"/"aez"/"hru"/"calculate".
+    # :50, read at productivity.py:92-116 against "gaes"/"aez"/"hru"/"calculate"
+    # /"wte". The dispatch runs to :116; "wte" is its last branch (:115-116) and
+    # five corpus rows use it (s03, s08, s13, s18, s23), two of them with goldens.
     model.lceu = spec.lceu.value
     # :53, read through trans_matrix_flatten (:239-241) as a list of lists of int,
     # which is the shape of pm.default_trans_matrix (parameter/matrix.py:1-17).
@@ -258,6 +260,14 @@ def to_legacy_model(spec: RunSpec, workdir: Path) -> tuple[IndicatorModel, Legac
         model.seasonality = spec.water_mask.threshold
     else:
         raise TypeError(f"unsupported water mask arm: {type(spec.water_mask).__name__}")
+
+    # RunSpec.aoi is `AoiSpec | None`, and an unset one reached `.name` unguarded:
+    # it happened to raise from `_feature_collection` first, with "unsupported aoi
+    # arm: NoneType", only because Python evaluates arguments left to right. mypy
+    # found this the day `tools/` entered its file list. A scenario with no AOI has
+    # no legacy run, so refuse it here the way PrecomputedViAsset is refused above.
+    if spec.aoi is None:
+        raise ValueError("a parity scenario must set an AOI; spec.aoi is None")
 
     aoi = LegacyAoi(
         feature_collection=_feature_collection(spec.aoi),

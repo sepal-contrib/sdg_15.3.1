@@ -14,14 +14,17 @@ from typing import Any
 from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
 from sdg1531.scheme import TransitionMatrix, parse_custom_matrix_csv, read_matrix_csv
 from sdg1531.spec import (
+    AoiSpec,
     AssetAoi,
     AssetBandMask,
+    Climate,
     Compatibility,
     CustomLandCoverSource,
     EsaCciSource,
     FixedClimate,
     GeoJsonAoi,
     JrcSeasonalityMask,
+    LandCoverSource,
     Period,
     PeriodOverride,
     PerPixelClimate,
@@ -29,6 +32,7 @@ from sdg1531.spec import (
     RunSpec,
     SensorSelection,
     SubPeriods,
+    WaterMaskSpec,
 )
 
 __all__ = ["AXES", "SCENARIOS", "axis_levels"]
@@ -122,12 +126,12 @@ _LCEU = {
     "calculate": Lceu.CALCULATE,
 }
 _LOOKUP = {"GPGv2": ProductivityLookup.GPGV2, "GPGv1": ProductivityLookup.GPGV1}
-_CLIMATE = {
+_CLIMATE: dict[str, Climate] = {
     "per_pixel": PerPixelClimate(),
     "fixed_080": FixedClimate(coefficient=0.80),
     "fixed_048": FixedClimate(coefficient=0.48),
 }
-_LAND_COVER = {
+_LAND_COVER: dict[str, LandCoverSource] = {
     "esa": EsaCciSource(),
     "custom_full": CustomLandCoverSource(
         start_asset=_CUSTOM_START, end_asset=_CUSTOM_END, scheme=_CUSTOM_SCHEME
@@ -136,7 +140,7 @@ _LAND_COVER = {
         start_asset=_CUSTOM_START, end_asset=_CUSTOM_END, scheme=None
     ),
 }
-_WATER = {
+_WATER: dict[str, WaterMaskSpec] = {
     "jrc": JrcSeasonalityMask(threshold=6),
     "pixel_70": PixelValueMask(value=70),
     "pixel_10": PixelValueMask(value=10),
@@ -169,7 +173,7 @@ _WINDOW = {
     "after_cci": Period(2010, 2030),
     "soc_after_cci": Period(2023, 2030),
 }
-_AOI = {"geojson": _GEOJSON_AOI, "asset": _ASSET_AOI}
+_AOI: dict[str, AoiSpec] = {"geojson": _GEOJSON_AOI, "asset": _ASSET_AOI}
 _COMPAT = {
     "default": Compatibility(),
     "soc_scale_100": Compatibility(soc_subsequent_transition_scale=100),

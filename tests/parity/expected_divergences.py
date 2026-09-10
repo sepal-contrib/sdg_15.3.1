@@ -32,6 +32,10 @@ says "these may differ" and stops looking. The order here is the order to try:
 ``EXPECTED_OFF_GRAPH``
     real divergences that produce no graph pair in this corpus, so the
     both-directions rule cannot police them. Each names the tests that do.
+``HELD_CONSTANT``
+    inputs both trees are built from identically, so no mutation of them can make
+    a comparison fail. Nothing diverges; they are here because this file is where
+    a reader looks to learn what the harness does not compare.
 ``EXPECTED_DIVERGENCES``
     a GRAPH PAIR that differs and is licensed outright. Currently EMPTY, which is
     the strongest statement this file can make. Keys are (scenario glob, layer
@@ -57,6 +61,35 @@ import ast
 import re
 from fnmatch import fnmatch
 from pathlib import Path
+from typing import NotRequired, TypedDict
+
+
+class Normalisation(TypedDict):
+    """One EXPECTED_NORMALISATIONS entry.
+
+    ``splice`` names the function in ``tests/parity/canonical.py`` that performs
+    the edit; ``tests`` names EVERY test that pins it, because an entry citing one
+    test for a two-part claim reads as coverage it does not have.
+    """
+
+    note: str
+    splice: str
+    reason: str
+    tests: tuple[str, ...]
+
+
+class OffGraph(TypedDict):
+    """One EXPECTED_OFF_GRAPH entry.
+
+    ``note`` is NotRequired because two divergences come from modules that carry no
+    numbered note at all -- ``resolve.py`` and the unported ``component/tile/`` --
+    and ``MODULE_NOTE_CLAIMS`` cannot reference what does not exist.
+    """
+
+    reason: str
+    tests: tuple[str, ...]
+    note: NotRequired[str]
+
 
 __all__ = [
     "EXPECTED_COMPATIBILITY_DIVERGENCES",
@@ -66,8 +99,11 @@ __all__ = [
     "EXPECTED_NORMALISATIONS",
     "EXPECTED_OFF_GRAPH",
     "GRAPH_DIVERGENCE_NOTES",
+    "HELD_CONSTANT",
     "LEGACY_ONLY_FAILS_NOTE",
     "MODULE_NOTE_CLAIMS",
+    "Normalisation",
+    "OffGraph",
     "matching_entry",
     "module_notes",
     "note_modules",
@@ -132,7 +168,7 @@ LEGACY_ONLY_FAILS_NOTE = "sdg1531/engine/land_cover.py:4"
 # cannot cancel the same node on both sides and compare nothing) and
 # `test_the_splice_declines_when_the_cast_moves_inside_the_water_mask` (it is tied
 # to one position, so a port that moved the cast is not normalised, it fails).
-EXPECTED_NORMALISATIONS: dict[str, dict[str, str]] = {
+EXPECTED_NORMALISATIONS: dict[str, Normalisation] = {
     # --- engine/indicator.py ---------------------------------------------------
     "indicator_band_rename": {
         "note": "sdg1531/engine/indicator.py:1",
@@ -201,9 +237,36 @@ EXPECTED_COMPATIBILITY_DIVERGENCES: dict[str, frozenset[str]] = {
     "s25": frozenset({"soc", "indicator_15_3_1"}),
 }
 
+# Inputs the harness HOLDS CONSTANT, so no mutation of them can make a comparison
+# fail. Not divergences -- nothing differs -- but this file is the document a
+# reader consults to learn what the harness does not compare, and something
+# excluded from every comparison belongs in it just as much as something licensed.
+HELD_CONSTANT: dict[str, OffGraph] = {
+    "aoi_leaf": {
+        "reason": (
+            "tools/to_legacy_model.py's _feature_collection is a deliberate, "
+            "documented copy of ExecutionContext.from_aoi_spec "
+            "(sdg1531/engine/context.py:48-57): both spell an AssetAoi as "
+            "ee.FeatureCollection(asset_id) and a GeoJsonAoi as "
+            "ee.FeatureCollection(geojson). The reasoning is sound -- the AOI is an "
+            "INPUT to both trees rather than a thing under test, and in the real "
+            "legacy it came from sepal_ui's AoiModel, not from a RunSpec -- but the "
+            "consequence is that the AOI is the one node in every golden that came "
+            "from the port. A mutation of it changes both sides identically and no "
+            "parity test can fail. The tests below pin the port's spelling; the "
+            "adapter's is a reviewed copy and stage B cannot import it to check "
+            "(tools/to_legacy_model.py imports the legacy tree)."
+        ),
+        "tests": (
+            "test_from_aoi_spec_asset_arm",
+            "test_from_aoi_spec_geojson_arm",
+        ),
+    },
+}
+
 # Divergences that are real but produce no graph pair to compare, so the
 # both-directions rule cannot police them. Each names the test that does.
-EXPECTED_OFF_GRAPH: dict[str, dict[str, str]] = {
+EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
     # --- engine/integration.py ------------------------------------------------
     "vi_threshold_narrowing": {
         "note": "sdg1531/engine/integration.py:1",

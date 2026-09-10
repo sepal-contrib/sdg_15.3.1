@@ -64,3 +64,14 @@ def test_ruff_and_mypy_target_the_domain_by_name() -> None:
     assert "component" in cfg["ruff"]["extend-exclude"]
     assert cfg["mypy"]["strict"] is True
     assert "sdg1531" in cfg["mypy"]["files"]
+
+
+def test_mypy_reads_the_parity_harness_and_its_tools() -> None:
+    """`files` was `["sdg1531"]`, so the two files the parity guarantee rests on --
+    `tests/parity/canonical.py`, which decides whether two ee graphs match, and
+    `tools/to_legacy_model.py`, the sole adapter every golden was recorded through
+    -- read as type-checked while mypy never opened them. Widening it found a real
+    defect in the adapter on the first run."""
+    files = _pyproject()["tool"]["mypy"]["files"]
+
+    assert {"sdg1531", "tools", "tests/parity"} <= set(files)
