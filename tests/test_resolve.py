@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from pathlib import Path
 
 import pytest
@@ -361,6 +362,43 @@ def test_unknown_sensor_name_raises_spec_error_not_keyerror():
     # An out-of-catalog name would otherwise escape SENSORS[key] as a bare KeyError.
     with pytest.raises(SpecError):
         resolve(default_spec(vi_source=SensorSelection(("Not A Sensor",))))
+
+
+_NO_OVERRIDE = PeriodOverride(None, None)
+
+
+@pytest.mark.parametrize(
+    ("periods", "field"),
+    [
+        (_periods("trend", _NO_OVERRIDE, base=Period(None, 2020)), "soc.start"),
+        # the end side needs a sub-period end so `_integration_period`'s max() has
+        # something to reduce -- see the companion test below
+        (
+            _periods("trend", PeriodOverride(None, 2015), base=Period(2000, None)),
+            "land_cover.end",
+        ),
+    ],
+)
+def test_a_missing_period_endpoint_is_named_rather_than_escaping_as_a_type_error(periods, field):
+    """`_require_year` -- a divergence with no EXPECTED_DIVERGENCES note in
+    `resolve.py`. The legacy reached the same missing endpoint inside
+    `min(max(None, 1992), 2022)` (indicator_model.py:156-168) and raised an
+    unannotated TypeError; resolve() names the field instead. Task 17's parity
+    register carries it as `resolve_requires_a_year`."""
+    with pytest.raises(SpecError, match=re.escape(field)):
+        resolve(default_spec(periods=periods))
+
+
+def test_an_all_none_end_side_still_escapes_as_a_bare_value_error():
+    """`_require_year` is NOT reached when every end is unset: `_integration_period`
+    reduces an empty sequence first and `max()` raises ValueError.
+
+    That is legacy-faithful -- integration.py:19 is the same `max(filter(...))` over
+    the same four values and raises the same ValueError -- so it is not a divergence
+    and must not be "fixed" into a SpecError while parity is the rule. Pinned here so
+    the `resolve_requires_a_year` entry above is not read as covering it."""
+    with pytest.raises(ValueError, match="empty"):
+        resolve(default_spec(periods=_periods("trend", _NO_OVERRIDE, base=Period(2000, None))))
 
 
 CUSTOM_SCHEME = LandCoverScheme(

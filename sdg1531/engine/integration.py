@@ -10,14 +10,20 @@ ResolvedSpec fields read here:
     integration_period, spec.vi_source, spec.vegetation_index, spec.threshold,
     spec.compatibility.derived_vi_msvi_uses_evi_asset
 
-EXPECTED_DIVERGENCES note: the rungs that consume ``spec.threshold`` (MODIS,
-Sentinel 2, the Landsat sensors, Derived VI Landsat) narrow it with
-``require_float`` and raise ``SpecError`` if it is unset. That check has NO
-legacy counterpart -- ``vi_threshold`` (integration.py:410-415) calls
-``img.gt(threshold)`` unconditionally and would pass a Python ``None``
-straight into the ``ee`` graph. Task 17's parity harness should expect this
-module to raise where a legacy run with an unset threshold would instead
-build a graph that fails differently (or not at all, client-side).
+EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
+harness must carry it:
+
+1. **No legacy counterpart.** The rungs that consume ``spec.threshold`` (MODIS,
+   Sentinel 2, the Landsat sensors, Derived VI Landsat) narrow it with
+   ``require_float`` and raise ``SpecError`` if it is unset. ``vi_threshold``
+   (integration.py:410-415) calls ``img.gt(threshold)`` unconditionally, and
+   ``ee.Image.gt(None)`` builds an ``Image.gt`` node with its ``image2``
+   argument simply ABSENT -- so the legacy shipped a graph that looks well
+   formed and fails only on evaluation. Terra NPP is deliberately outside the
+   entry: ``process_terra_npp`` (:134-142) takes no threshold argument, so that
+   rung still builds with the field unset. Pinned by
+   ``test_an_unset_threshold_raises_on_every_rung_that_consumes_it`` and its
+   companion ``test_terra_npp_still_builds_without_a_threshold``.
 """
 
 from __future__ import annotations

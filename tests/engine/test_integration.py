@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from sdg1531.engine.integration import (
@@ -286,6 +288,33 @@ def test_empty_sensor_selection_raises(ctx):
 
     with pytest.raises(SpecError):
         build_vi_collection(r, ctx)
+
+
+@pytest.mark.parametrize(
+    "sensors",
+    [("MODIS MOD13Q1",), ("Sentinel 2",), ("Landsat 8",), ("Derived VI Landsat",)],
+)
+def test_an_unset_threshold_raises_on_every_rung_that_consumes_it(ctx, sensors):
+    """The module's EXPECTED_DIVERGENCES note, pinned.
+
+    `vi_threshold` (integration.py:410-415) calls `img.gt(threshold)`
+    unconditionally, and `ee.Image.gt(None)` builds a node with its `image2`
+    argument simply absent -- so the legacy shipped a silently broken graph.
+    `require_float` raises instead, and this is the only test that says so.
+    """
+    r = make_resolved(vi_source=SensorSelection(names=sensors), threshold=None)
+
+    with pytest.raises(SpecError, match=re.escape("spec.threshold")):
+        build_vi_collection(r, ctx)
+
+
+def test_terra_npp_still_builds_without_a_threshold(ctx):
+    """The narrowing is at the point of consumption, not at the top of the ladder:
+    `process_terra_npp` (integration.py:134-142) takes no threshold argument, so a
+    Terra NPP spec the legacy ran must not start raising."""
+    r = make_resolved(vi_source=SensorSelection(names=("Terra NPP",)), threshold=None)
+
+    assert NPP in _loaded_asset_ids(build_vi_collection(r, ctx))
 
 
 def test_year_band_is_present_only_on_the_non_monthly_annual_paths(ctx):

@@ -632,6 +632,25 @@ def test_fixed_climate_keeps_the_zone_asset_out_of_the_graph():
     }
 
 
+def test_a_zero_coefficient_takes_the_fixed_branch_where_the_legacy_took_per_pixel():
+    """EXPECTED_DIVERGENCES 2 -- soil_organic_carbon.py:19 tests `if not
+    model.conversion_coef`, i.e. TRUTHINESS, so 0.0 fell to the per-pixel IPCC
+    remap. The tagged union sends it to the fixed branch, which is a different
+    graph and not an error. None of the five UI coefficients is 0.0, but
+    FixedClimate is unconstrained and validate() does not bound it, so this pins
+    which way the port goes rather than leaving it to be discovered."""
+    coefficient = climate_coefficient(
+        make_resolved(climate=FixedClimate(coefficient=0.0)), aoi_context()
+    )
+
+    assert coefficient == 0.0
+    assert not isinstance(coefficient, ee.Image)
+    assert _loaded_asset_ids(soc_image(climate=FixedClimate(coefficient=0.0))) == {
+        ASSETS["soc"],
+        ASSETS["land_cover_ic"],
+    }
+
+
 def test_an_unsupported_climate_regime_raises_spec_error():
     """EXPECTED_DIVERGENCES 1 -- no legacy counterpart; the legacy if/else is total."""
     with pytest.raises(SpecError, match="unsupported climate regime"):
