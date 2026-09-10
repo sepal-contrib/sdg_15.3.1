@@ -21,6 +21,9 @@ from tests.engine.graph import (
     _deref_for,
     _loaded_asset_ids,
     _renamed_bands,
+    _root,
+    _select_bands_of,
+    _string_list_arg,
     _walk,
     count_calls,
     encoded,
@@ -35,6 +38,48 @@ L8 = "LANDSAT/LC08/C02/T1_L2"
 L9 = "LANDSAT/LC09/C02/T1_L2"
 DERIVED_NDVI = "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NDVI"
 DERIVED_EVI = "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_EVI"
+
+# integration.py:387 and :401, character for character. Both legacy MSVI builders
+# spell the same expression; only the two bands they bind it over differ, which is
+# why the two tests below share this constant.
+MSVI_EXPRESSION = "(2 * nir + 1 - sqrt(pow((2 * nir + 1), 2) - 8 * (nir - red)) ) / 2"
+
+
+def _vi_expressions(obj) -> list[tuple[str, dict[str, str]]]:
+    """Every `Image.expression` in the graph, as (expression text, {var: band}).
+
+    `ee` compiles `img.expression(text, vars)` into TWO nodes: an
+    `Image.parseExpression` holding the text and the variable names, and an
+    invocation of that node whose arguments bind each name to the image it was
+    handed. Neither half alone is the claim -- the text without the bindings does
+    not say which band is `nir`, and the bindings without the text do not say what
+    was computed -- so this reads them together.
+
+    The first entry of `vars` is the expression's own image argument
+    (`DEFAULT_EXPRESSION_IMAGE`), which is bound to the whole input rather than to a
+    band; it is named by `argName` and dropped here rather than guessed at.
+    """
+    deref, graph, root = _root(obj)
+    values = graph.get("values", {})
+    found: list[tuple[str, dict[str, str]]] = []
+    for current in _walk(root, deref, graph):
+        call = _call(current)
+        if call is None or "functionReference" not in call:
+            continue
+        target = _call(deref(values.get(call["functionReference"], {})))
+        if target is None or target.get("functionName") != "Image.parseExpression":
+            continue
+        arguments = target["arguments"]
+        text = deref(arguments["expression"]).get("constantValue")
+        image_arg = deref(arguments["argName"]).get("constantValue")
+        bands = {}
+        for name in _string_list_arg(deref(arguments["vars"]), deref):
+            if name == image_arg:
+                continue
+            selected = _select_bands_of(deref(call["arguments"][name]), deref)
+            bands[name] = selected[0] if selected and len(selected) == 1 else selected
+        found.append((text, bands))
+    return found
 
 
 def _merged_asset_order(obj) -> list[str]:
@@ -172,11 +217,68 @@ def test_modis_msvi_uses_the_surface_reflectance_bands(ctx):
         vegetation_index=VegetationIndex.MSVI,
     )
 
-    graph = encoded(build_vi_collection(r, ctx))
+    coll = build_vi_collection(r, ctx)
 
     # integration.py:398-407 -- MODIS msvi reads sur_refl_b01/b02, not Red/NIR.
-    assert "sur_refl_b01" in graph
-    assert "sur_refl_b02" in graph
+    # Equality on the whole extraction, not two substring hits: `"sur_refl_b01" in
+    # graph` also passes for an expression that reads the band and does nothing
+    # with it, or that binds it to the wrong variable.
+    assert _vi_expressions(coll) == [
+        (MSVI_EXPRESSION, {"nir": "sur_refl_b02", "red": "sur_refl_b01"})
+    ]
+
+
+@pytest.mark.parametrize("sensors", [("Sentinel 2",), ("Landsat 8", "Landsat 9")])
+def test_non_modis_msvi_is_the_transcribed_expression_over_red_and_nir(ctx, sensors):
+    """`_calculate_msvi` (integration.py:386-395), which nothing else reaches.
+
+    Its MODIS twin is covered twice over -- by the test above and by parity row s06
+    -- but the non-MODIS builder is verified by neither. The corpus asks for all
+    eighteen sensor x index pairs, yet every `msvi` row that is not MODIS carries a
+    land-cover/water combination the legacy refuses, so stage A recorded a crash for
+    it and there is no graph pair: `(sentinel2, msvi)`, `(landsat_pair, msvi)` and
+    `(derived_vi, msvi)` reach no comparison at all. That left a hand-typed
+    60-character expression string -- the exact class of transcription D9 exists to
+    protect -- with no verification of any kind.
+
+    Both rungs that call it are covered, because `_process_sentinel2` and
+    `_process_landsat_sensors` reach it through separate call sites
+    (integration.py:550 and :524). This proves it against the transcription, not
+    against the legacy; only moving a row onto a compared scenario would do that,
+    and that means re-recording goldens.
+    """
+    r = make_resolved(
+        vi_source=SensorSelection(names=sensors),
+        vegetation_index=VegetationIndex.MSVI,
+    )
+
+    coll = build_vi_collection(r, ctx)
+
+    assert _vi_expressions(coll) == [(MSVI_EXPRESSION, {"nir": "NIR", "red": "Red"})]
+
+
+def test_the_two_msvi_builders_differ_only_in_the_bands_they_read(ctx):
+    """The invariant that makes one of them easy to edit and forget.
+
+    `_calculate_msvi` and `_calculate_msvi_modis` are two copies of one formula over
+    two band vocabularies. Pinning each separately lets them drift apart silently;
+    this says the text is the SAME text and the bands are the ones that differ.
+    """
+    landsat = make_resolved(
+        vi_source=SensorSelection(names=("Landsat 8",)),
+        vegetation_index=VegetationIndex.MSVI,
+    )
+    modis = make_resolved(
+        vi_source=SensorSelection(names=("MODIS MOD13Q1",)),
+        vegetation_index=VegetationIndex.MSVI,
+    )
+
+    [(landsat_text, landsat_bands)] = _vi_expressions(build_vi_collection(landsat, ctx))
+    [(modis_text, modis_bands)] = _vi_expressions(build_vi_collection(modis, ctx))
+
+    assert landsat_text == modis_text == MSVI_EXPRESSION
+    assert landsat_bands != modis_bands
+    assert set(landsat_bands) == set(modis_bands) == {"nir", "red"}
 
 
 def test_terra_npp_takes_the_first_image_per_year(ctx):

@@ -1,6 +1,16 @@
-"""The corpus is a reduction, so assert what it actually covers."""
+"""The corpus is a reduction, so assert what it actually covers.
+
+Two different claims live here and they are not interchangeable. A test over
+``SCENARIOS`` measures the TABLE: what ``tools/scenarios.py`` says the corpus asks
+for. A test over :func:`compared_scenarios` measures the PROOF: the rows that
+actually yield a legacy-vs-port graph pair. Twelve of the 28 rows record a legacy
+crash instead of a graph, so the two answers differ, and a coverage claim phrased
+over the table reads as a statement about parity coverage while measuring only
+the thing it was derived from.
+"""
 
 from itertools import product
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +22,20 @@ from tools.scenarios import AXES, SCENARIOS, axis_levels
 # in this file cannot miss it, and `test_every_parity_module_carries_the_marker`
 # checks the whole directory.
 pytestmark = pytest.mark.parity
+
+GOLDEN = Path(__file__).resolve().parents[2] / "tests" / "golden"
+
+
+def compared_scenarios() -> tuple[str, ...]:
+    """The rows stage B actually compares a graph pair for.
+
+    Read off the goldens, the way ``test_scenario_graphs_match_the_goldens``
+    reads them: a scenario directory holding ``error.json`` recorded a legacy
+    crash, so stage A wrote no layer graphs and there is nothing to compare.
+    Derived rather than listed, so a re-run of stage A that stops one of them
+    crashing moves this set on its own.
+    """
+    return tuple(name for name in SCENARIOS if not (GOLDEN / name / "error.json").exists())
 
 
 def test_the_corpus_has_28_uniquely_named_scenarios() -> None:
@@ -65,14 +89,70 @@ def test_every_scenario_names_a_level_on_every_axis() -> None:
         assert set(axis_levels(name)) == set(AXES), name
 
 
-def test_sensor_by_index_is_covered_exhaustively() -> None:
+def test_the_table_asks_for_every_sensor_by_index_pair() -> None:
+    """A claim about the TABLE, and its name now says so.
+
+    It was called `test_sensor_by_index_is_covered_exhaustively`, which reads as a
+    statement about parity coverage while measuring the table it is derived from --
+    and under that name seven of the eighteen pairs turned out to reach no compared
+    scenario at all, `(sentinel2, msvi)` and `(landsat_pair, msvi)` among them, so
+    `engine.integration._calculate_msvi` was verified by nothing. What the pairs
+    actually prove is
+    `test_every_axis_level_reaches_a_scenario_that_is_compared`'s business.
+    """
     pairs = {(axis_levels(name)["sensor"], axis_levels(name)["index"]) for name in SCENARIOS}
     assert pairs == set(product(AXES["sensor"], AXES["index"]))
 
 
-def test_land_cover_by_water_mask_is_covered_exhaustively() -> None:
+def test_the_table_asks_for_every_land_cover_by_water_mask_pair() -> None:
+    """The same kind of claim, about the same kind of table. Unlike sensor x index,
+    the pairs this one asks for that no comparison reaches are fully accounted for:
+    they are exactly EXPECTED_LEGACY_ONLY_FAILS and
+    EXPECTED_LEGACY_AND_PORT_BOTH_FAIL, both of which the register explains."""
     pairs = {(axis_levels(name)["land_cover"], axis_levels(name)["water"]) for name in SCENARIOS}
     assert pairs == set(product(AXES["land_cover"], AXES["water"]))
+
+
+def test_the_compared_subset_is_a_real_and_proper_subset() -> None:
+    """The premise the coverage test below rests on.
+
+    If `compared_scenarios()` ever returned everything, the test below would say
+    exactly what the table-level ones already say and quietly stop being a second
+    measurement; if it returned nothing, it would pass by having no levels to check.
+    """
+    compared = set(compared_scenarios())
+
+    assert compared, "no scenario compares a graph pair; the corpus proves nothing"
+    assert compared < set(SCENARIOS), (
+        "every scenario compares a graph pair, so this is no longer a second "
+        "measurement -- if stage A really did stop crashing, the register's "
+        "EXPECTED_LEGACY_ONLY_FAILS entries are stale too."
+    )
+
+
+def test_every_axis_level_reaches_a_scenario_that_is_compared() -> None:
+    """Coverage over the rows that yield a graph pair, not over the table.
+
+    `test_every_level_of_every_axis_appears_at_least_once` is satisfied by a level
+    that appears only on rows the legacy refused to build -- those rows compare
+    nothing, so the level is asked for and never proved. This is the same claim
+    made where it counts.
+    """
+    seen: dict[str, set[str]] = {axis: set() for axis in AXES}
+    for name in compared_scenarios():
+        for axis, level in axis_levels(name).items():
+            seen[axis].add(level)
+
+    unproven = {
+        axis: sorted(set(levels) - seen[axis])
+        for axis, levels in AXES.items()
+        if set(levels) - seen[axis]
+    }
+    assert unproven == {}, (
+        f"axis levels no compared scenario reaches: {unproven}. Every row carrying "
+        "them records a legacy crash, so nothing about them is compared against the "
+        "legacy at all."
+    )
 
 
 @pytest.mark.parametrize("name", sorted(SCENARIOS))
