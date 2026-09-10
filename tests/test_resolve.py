@@ -7,6 +7,7 @@ soil_organic_carbon.py:12-16.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import random
 import re
@@ -20,7 +21,7 @@ from spec_factory import default_spec
 from sdg1531.enums import ProductivityLookup, VegetationIndex
 from sdg1531.errors import SpecError
 from sdg1531.palette import CSS4_HEX
-from sdg1531.resolve import ViProcessor, resolve
+from sdg1531.resolve import ResolvedSpec, ViProcessor, resolve
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     Compatibility,
@@ -29,6 +30,7 @@ from sdg1531.spec import (
     Period,
     PeriodOverride,
     PrecomputedViAsset,
+    RunSpec,
     SensorSelection,
     SubPeriods,
 )
@@ -521,6 +523,33 @@ def test_derived_snapshot_matches_the_committed_golden():
     assert golden["lc_palette"] == list(DEFAULT_LC_COLORS.values())
 
     assert resolve(default_spec()).derived_snapshot() == golden
+
+
+def test_the_two_data_models_share_no_field_name():
+    """Spec §13 risk 1's named mitigation, which was specified and never written.
+
+    > "**Two data models is a standing tax.** ... Enforce with a test asserting the
+    > two field-name sets are disjoint. Without it the split rots within two
+    > features."
+
+    A name on both sides is how the split rots: `RunSpec.threshold` and a
+    `ResolvedSpec.threshold` would read alike at every call site, and the engine
+    reads BOTH objects -- `r.spec.threshold` and `r.integration_period` in the same
+    function -- so nothing at the point of use would say which one was meant. The
+    property holds today (13 fields against 20); the app-layer phase is when both
+    models start growing, which is what makes the guard worth having now.
+
+    `spec` is excluded because it is not a derived value: it is the RunSpec itself,
+    hanging off the ResolvedSpec so the engine can reach both through one object.
+    """
+    run_fields = {field.name for field in dataclasses.fields(RunSpec)}
+    derived_fields = {field.name for field in dataclasses.fields(ResolvedSpec)} - {"spec"}
+
+    # both directions of the premise: an empty set is disjoint from everything, so
+    # a dataclass that lost its fields would make the assertion below vacuous
+    assert len(run_fields) > 10, sorted(run_fields)
+    assert len(derived_fields) > 10, sorted(derived_fields)
+    assert run_fields & derived_fields == set(), sorted(run_fields & derived_fields)
 
 
 def test_resolve_is_on_the_json_half_roster():

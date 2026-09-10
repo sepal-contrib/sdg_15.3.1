@@ -178,6 +178,38 @@ def _json_safe(value: Any) -> Any:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedSpec:
+    """Every derivation of one run, computed once (spec §6).
+
+    Twenty fields, plus ``spec`` -- not a derivation but the ``RunSpec`` itself,
+    carried along so a component that needs both has one object to take.
+
+    **Twenty fields against §6's twenty-seven derived values.** §6 counts
+    DERIVATIONS, not fields, and the two do not correspond one to one; the count is
+    reconciled here because a reader checking §6 against this declaration otherwise
+    stalls on it. Its 27 is 21 surviving legacy properties (22 less
+    ``custom_lc_matrix_list``, which §6 deletes) plus six that were duplicated or
+    inline. Where they land:
+
+    * ten period-endpoint properties (``p_trend_start`` ... ``p_soc_t_end``) collapse
+      onto five :class:`~sdg1531.spec.Period` fields, because an endpoint pair is one
+      resolved period;
+    * five live on :class:`~sdg1531.scheme.LandCoverScheme` -- ``matrix`` and the
+      four ``{start,end}_{names,codes}`` -- and are reached through ``scheme``,
+      which is itself a field no §6 row names;
+    * ``vi_assets``/sensor dispatch is one §6 row and two fields here, since the rung
+      and its assets are separately useful;
+    * the rest are one row, one field.
+
+    ``lc_class_combinations``, ``trans_matrix_flatten``, ``lc_palette`` and
+    ``lc_color_by_class`` are computed off ``scheme`` and flattened onto this class
+    anyway, because the engine and the charts want the values without the vocabulary.
+
+    Field names are disjoint from ``RunSpec``'s. Spec §13 risk 1 names that as the
+    mitigation that keeps two data models from rotting into one, and
+    ``tests/test_resolve.py::test_the_two_data_models_share_no_field_name`` enforces
+    it.
+    """
+
     spec: RunSpec
     analysis_scale: int
     zonal_scale: int
