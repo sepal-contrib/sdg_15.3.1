@@ -24,15 +24,34 @@ What survives is exactly the expression: function names, argument names, argumen
 values, literals, and the sharing structure. :func:`render` prints that as one
 line per node, which compares byte-for-byte and diffs readably.
 
-Two indirections this has to get right, both documented in
-``tests/engine/graph.py`` because each has already broken a walker on this plan:
+THE HAZARD, and the reason :data:`_BARE_SCOPE_KEY` is a table rather than an
+``if``: a scope key does not always arrive wrapped. ``ee`` spells a reference three
+different ways, and the two BARE ones look like ordinary string literals to a
+walker that is not expecting them -- so the subtree behind them silently drops out
+of the canonical form and any difference inside it becomes invisible. This file
+shipped once knowing only two of the three, and the one it missed
+(``functionReference``) is where ``ee.Image.expression`` puts the EVI and MSVI
+formulas: two graphs differing only in a coefficient canonicalised identically.
+The three, and nothing else, are what ``ee/serializer.py`` passes through
+``_optimize_referred_value`` -- at ``:497`` (``body``), ``:509``
+(``functionReference``) and ``:517`` (``valueReference``); there is no fourth.
 
-* a ``.map()``/``.reduce()`` callback body is a BARE string key into ``values``
-  under ``functionDefinitionValue``, not a ``{"valueReference": ...}`` wrapper, so
-  it has to be followed explicitly or the whole callback subtree is invisible;
-* a repeated CONSTANT is hoisted too, not just a repeated computed subexpression,
-  so an argument reader that does not resolve references sees a reference where it
-  expected a value.
+* ``{"valueReference": key}`` -- the wrapper form, handled by ``resolve()``.
+* ``body`` -- a ``.map()``/``.reduce()`` callback body, a bare key directly under
+  ``functionDefinitionValue`` (also documented in ``tests/engine/graph.py``).
+* ``functionReference`` -- a bare key directly inside a ``functionInvocationValue``,
+  sitting where ``functionName`` normally sits, when the function being called is
+  itself computed rather than named.
+
+Each is resolved only under its own enclosing node kind. That anchoring is not
+fussiness: ``body`` is a perfectly ordinary key for an ``ee.Dictionary`` constant
+to carry, and resolving one of those would either crash or splice in an unrelated
+node.
+
+Also worth stating, because it has broken a walker on this plan: a repeated
+CONSTANT is hoisted too, not just a repeated computed subexpression, so an
+argument reader that does not resolve references sees a reference where it
+expected a value.
 
 A ``values`` entry that nothing reachable from ``result`` points at is dropped: it
 is not part of the expression. ``ee`` does not emit those, but saying so is
@@ -59,6 +78,7 @@ import json
 from typing import Any
 
 __all__ = [
+    "COMPUTED_FUNCTION",
     "INDICATOR_BAND",
     "canonical_graph",
     "function_name_counts",
@@ -67,6 +87,21 @@ __all__ = [
 ]
 
 INDICATOR_BAND = "indicator_15_3_1"
+
+# enclosing node kind -> the field inside it whose STRING value is a bare key into
+# `values` rather than a literal. See the module docstring: these are the two
+# unwrapped spellings of a reference, and `ee/serializer.py` creates references at
+# exactly these two sites plus the `valueReference` wrapper. Keyed on the enclosing
+# kind so that `body` is only resolved under `functionDefinitionValue` -- an
+# ee.Dictionary constant may legitimately carry a key called `body`.
+_BARE_SCOPE_KEY: dict[str, str] = {
+    "functionDefinitionValue": "body",
+    "functionInvocationValue": "functionReference",
+}
+
+# the bucket `function_name_counts` reports a computed (rather than named) call
+# under, since such a node carries no `functionName` at all
+COMPUTED_FUNCTION = "<functionReference>"
 
 # wide enough for any graph this corpus produces, and zero-padded so a lexical
 # sort of the rendered lines is also the numeric one
@@ -87,13 +122,21 @@ def canonical_graph(encoded: dict[str, Any]) -> dict[str, Any]:
     values: dict[str, Any] = encoded.get("values", {})
     ids: dict[Any, int] = {}
     definitions: list[Any] = []
-    # id(node) -> canonical id. The structural key alone is not enough to memoise
-    # on, because computing it walks the subtree: a node the graph shares 30 times
-    # -- and the truth-table collapse shares its three operand images exactly that
-    # often -- would be re-walked 30 times, and its own shared children 30 times
-    # again, which is exponential rather than merely slow. Every node here is
-    # reachable from `encoded` for the whole call, so no id can be recycled.
-    seen: dict[int, int] = {}
+    # (id(node), memo kind) -> canonical id. The structural key alone is not enough
+    # to memoise on, because computing it walks the subtree: a node the graph
+    # shares 30 times -- and the truth-table collapse shares its three operand
+    # images exactly that often -- would be re-walked 30 times, and its own shared
+    # children 30 times again, which is exponential rather than merely slow. Every
+    # node here is reachable from `encoded` for the whole call, so no id can be
+    # recycled.
+    #
+    # The kind rides along ONLY for the two enclosing kinds that change how a
+    # string child is read; for every other node it is flattened to None, so an
+    # image shared under `input` here and `image1` there still hits the memo once.
+    seen: dict[tuple[int, Any], int] = {}
+
+    def memo_kind(kind: Any) -> Any:
+        return kind if kind in _BARE_SCOPE_KEY else None
 
     def resolve(node: Any) -> Any:
         """Follow a chain of ``valueReference`` wrappers to the node itself."""
@@ -106,13 +149,16 @@ def canonical_graph(encoded: dict[str, Any]) -> dict[str, Any]:
             node = values[key]
         raise ValueError("valueReference chain does not terminate")
 
-    def named_children(node: Any) -> list[tuple[Any, Any]]:
+    def named_children(node: Any, kind: Any) -> list[tuple[Any, Any]]:
         """``(name, resolved child)`` pairs of a composite, in canonical order.
 
-        ``name`` is the dict key, or the index for a list. Sorting the dict keys
-        here is what stops the order the JSON happened to load in from reaching
-        the traversal -- and with it the ids.
+        ``name`` is the dict key, or the index for a list. ``kind`` is the key this
+        node hangs off in its parent, which is what says whether a string child is
+        a bare scope key (see :data:`_BARE_SCOPE_KEY`). Sorting the dict keys here
+        is what stops the order the JSON happened to load in from reaching the
+        traversal -- and with it the ids.
         """
+        bare = _BARE_SCOPE_KEY.get(kind)
         if isinstance(node, dict):
             names: list[Any] = sorted(node)
         else:
@@ -120,31 +166,35 @@ def canonical_graph(encoded: dict[str, Any]) -> dict[str, Any]:
         pairs = []
         for name in names:
             child = node[name]
-            if name == "body" and isinstance(child, str):
-                # a function body is a bare key into `values`, not a wrapper
+            if name == bare and isinstance(child, str):
+                if child not in values:
+                    raise KeyError(f"{name} {child!r} has no entry in values")
                 child = values[child]
             pairs.append((name, resolve(child)))
         return pairs
 
-    def slot(name: Any, child: Any) -> tuple[Any, Any]:
+    def slot(name: Any, child: Any, kind: Any) -> tuple[Any, Any]:
         """``(what the parent stores, the parent's key part)`` for one child.
 
         The child is already interned by the time this runs, so this is a lookup.
+        A bare scope key keeps its bare spelling and is tagged with its own field
+        name, so a resolved reference can never share a key part with a literal or
+        with the other reference spelling.
         """
         if isinstance(child, dict | list):
-            child_id = seen[id(child)]
-            if name == "body":
-                return _tag(child_id), ("body", child_id)
+            child_id = seen[id(child), memo_kind(name)]
+            if name == _BARE_SCOPE_KEY.get(kind):
+                return _tag(child_id), (name, child_id)
             return {"valueReference": _tag(child_id)}, ("ref", child_id)
         return child, ("literal", json.dumps(child, sort_keys=True))
 
-    def rewrite(node: Any) -> tuple[Any, Any]:
+    def rewrite(node: Any, kind: Any) -> tuple[Any, Any]:
         """``(node with its children replaced by ids, hashable structural key)``.
 
         The key holds child IDS rather than child structures, so it stays small
         however deep the graph runs -- this is hash-consing, not stringification.
         """
-        slots = [(name, *slot(name, child)) for name, child in named_children(node)]
+        slots = [(name, *slot(name, child, kind)) for name, child in named_children(node, kind)]
         if isinstance(node, dict):
             return (
                 {name: stored for name, stored, _ in slots},
@@ -160,26 +210,26 @@ def canonical_graph(encoded: dict[str, Any]) -> dict[str, Any]:
         one chain per year of the integration period -- and a recursive walk hits
         Python's stack limit on the wider corpus windows.
         """
-        pending: list[tuple[Any, bool]] = [(root, False)]
+        pending: list[tuple[Any, Any, bool]] = [(root, None, False)]
         while pending:
-            node, expanded = pending.pop()
-            if id(node) in seen:
+            node, kind, expanded = pending.pop()
+            if (id(node), memo_kind(kind)) in seen:
                 continue
             if not expanded:
-                pending.append((node, True))
+                pending.append((node, kind, True))
                 # reversed so the first child in canonical order is visited first
-                for _, child in reversed(named_children(node)):
-                    if isinstance(child, dict | list) and id(child) not in seen:
-                        pending.append((child, False))
+                for name, child in reversed(named_children(node, kind)):
+                    if isinstance(child, dict | list) and (id(child), memo_kind(name)) not in seen:
+                        pending.append((child, name, False))
                 continue
-            rewritten, key = rewrite(node)
+            rewritten, key = rewrite(node, kind)
             node_id = ids.get(key)
             if node_id is None:
                 node_id = len(definitions)
                 ids[key] = node_id
                 definitions.append(rewritten)
-            seen[id(node)] = node_id
-        return seen[id(root)]
+            seen[id(node), memo_kind(kind)] = node_id
+        return seen[id(root), memo_kind(None)]
 
     result = encoded["result"]
     root = values[result] if isinstance(result, str) and result in values else result
@@ -208,12 +258,24 @@ def function_name_counts(encoded: dict[str, Any]) -> dict[str, int]:
     ``ee``'s own serializer does, so two structurally identical subtrees are one
     node in both. In the canonical form an invocation's ``{"functionName": ...,
     "arguments": ...}`` pair is a node of its own, so counting those counts calls.
+
+    A call to a COMPUTED function carries a ``functionReference`` where a named one
+    carries a ``functionName``, and is counted under :data:`COMPUTED_FUNCTION`.
+    Counting it is the point: comparing this against an independent walk of the raw
+    document is what would have caught the canonicaliser dropping the
+    ``Image.parseExpression`` subtree those references lead to.
     """
     counts: dict[str, int] = {}
     for node in canonical_graph(encoded)["values"].values():
-        if isinstance(node, dict) and "functionName" in node:
+        if not isinstance(node, dict):
+            continue
+        if "functionName" in node:
             name = node["functionName"]
-            counts[name] = counts.get(name, 0) + 1
+        elif "functionReference" in node:
+            name = COMPUTED_FUNCTION
+        else:
+            continue
+        counts[name] = counts.get(name, 0) + 1
     return counts
 
 
