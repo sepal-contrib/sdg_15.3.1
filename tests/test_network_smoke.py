@@ -225,6 +225,11 @@ def histogram_problems(
     # which is exactly the answer the two-year window produced and the answer this
     # AOI cannot honestly give. Both checks below reject it; they are separate
     # because they fail for different reasons and the message should say which.
+    # If this is the check that reds on the nightly's first real run, weigh it
+    # before weakening it: a uniformly-classified AOI is a legitimate answer, so
+    # this is the one assertion here that can fail on an honest result. Widen the
+    # AOI or the window in preference to dropping it -- the NoData check below
+    # cannot substitute, since {"1": N} passes that and is still degenerate.
     if len(counts) < 2:
         problems.append(f"{band} has a single class over the whole AOI: {counts}")
     if not set(counts) - {"0"}:

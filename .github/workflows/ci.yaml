@@ -25,9 +25,10 @@ jobs:
       # pin (pyproject.toml:13) that PyPI can satisfy -- so a resolver decision to
       # take the wheel would swap the openforis fork out and leave this step, and
       # `test_the_recorded_ee_version_matches_this_environment`, both green. What
-      # WOULD catch it is the algorithm-table digest the parity harness asserts
-      # (`test_the_recorded_algorithm_table_is_the_one_this_environment_installs`),
-      # since the two builds do not serialize identically. Spec §15.7(b) owns the
+      # WOULD catch it is `test_scenario_graphs_match_the_goldens`: its 112
+      # comparisons run through the INSTALLED `ee.serializer` against committed
+      # goldens, so a build that serialized differently would redden them. (The
+      # algorithm-table digest would not -- both its sides are committed files.) Spec §15.7(b) owns the
       # question of pinning the fork properly; until then, read this step as a
       # version check and not as a provenance guard.
       - name: Verify ee-api fork

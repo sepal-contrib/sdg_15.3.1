@@ -89,7 +89,7 @@ TABLES_VERIFIED = frozenset(
 # DEFAULT_LC_COLORS is keyed on component/parameter/ui.py's cm.classes.* strings
 # (ui.py:61-69). ui.py imports ipyvuetify and component.message, so _load()
 # cannot execute it standalone; checked by hand during review, not here.
-TABLES_UNREACHABLE = frozenset({"DEFAULT_LC_COLORS"})
+TABLES_UNREACHABLE = frozenset({"DEFAULT_LC_COLORS", "DEGRADATION_COLORS"})
 
 # Same mechanism as the tables pair above, for catalog.__all__.
 CATALOG_VERIFIED = frozenset(
