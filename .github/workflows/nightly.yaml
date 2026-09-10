@@ -35,17 +35,21 @@ jobs:
         #
         # This is the only job that ever runs the test, so an empty selection here
         # would mean nobody ever learns it is broken. The count is asserted before
-        # the run rather than left to pytest's exit code.
+        # the run rather than left to pytest's exit code, and exit 5 -- which IS
+        # the empty selection -- is reported as that rather than as a collection
+        # failure.
         run: |
           set -euo pipefail
-          if ! pytest -m "network" --collect-only -q > collected.txt; then
-            cat collected.txt
-            echo "::error::collecting the 'network' selection failed; nothing ran"
+          status=0
+          pytest -m "network" --collect-only -q > collected.txt || status=$?
+          selected=$(awk '/::/ {n++} END {print n+0}' collected.txt)
+          if [ "$status" -eq 5 ] || [ "$selected" -eq 0 ]; then
+            echo "::error::the 'network' selection is empty; the nightly would run nothing"
             exit 1
           fi
-          selected=$(awk '/::/ {n++} END {print n+0}' collected.txt)
-          if [ "$selected" -eq 0 ]; then
-            echo "::error::the 'network' selection is empty; the nightly would run nothing"
+          if [ "$status" -ne 0 ]; then
+            cat collected.txt
+            echo "::error::collecting the 'network' selection failed; nothing ran"
             exit 1
           fi
           echo "selected ${selected} network tests"

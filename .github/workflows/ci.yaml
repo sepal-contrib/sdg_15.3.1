@@ -70,22 +70,25 @@ jobs:
 
       - name: Run the offline suite
         shell: micromamba-shell {0}
-        # The count is asserted, not inferred. An empty marker selection does exit
-        # 5 today, but "the command did not fail" is not the same claim as "the
-        # tests ran", and a job that runs zero tests passes every assertion it
-        # never made. The collection runs under `if !` rather than into a pipe so
-        # that an empty selection reports THAT, instead of dying on pipefail with
-        # the annotation below unprinted.
+        # The count is asserted, not inferred: "the command did not fail" is not
+        # the same claim as "the tests ran", and a job that runs zero tests passes
+        # every assertion it never made. Exit 5 IS the empty selection, so the
+        # status is taken first and read as that. Piping into awk under pipefail
+        # killed the step before any annotation printed; running the collection
+        # under `if !` printed the generic "collecting failed" instead, which is
+        # the less accurate of the two messages for the one case that matters.
         run: |
           set -euo pipefail
-          if ! pytest -m "not network" --collect-only -q > collected.txt; then
-            cat collected.txt
-            echo "::error::collecting the 'not network' selection failed; nothing ran"
+          status=0
+          pytest -m "not network" --collect-only -q > collected.txt || status=$?
+          selected=$(awk '/::/ {n++} END {print n+0}' collected.txt)
+          if [ "$status" -eq 5 ] || [ "$selected" -eq 0 ]; then
+            echo "::error::the 'not network' selection is empty; this job would pass vacuously"
             exit 1
           fi
-          selected=$(awk '/::/ {n++} END {print n+0}' collected.txt)
-          if [ "$selected" -eq 0 ]; then
-            echo "::error::the 'not network' selection is empty; this job would pass vacuously"
+          if [ "$status" -ne 0 ]; then
+            cat collected.txt
+            echo "::error::collecting the 'not network' selection failed; nothing ran"
             exit 1
           fi
           echo "selected ${selected} offline tests"
@@ -115,7 +118,7 @@ jobs:
         run: pip install -e ".[dev]"
 
       # No path arguments in this job, deliberately. Naming paths is how a lint job
-      # silently narrows: `mypy sdg1531` reads 29 files where `[tool.mypy] files`
+      # silently narrows: `mypy sdg1531` reads 28 files where `[tool.mypy] files`
       # reads 42, and `ruff check sdg1531 tests tools` stops covering the app
       # package the day it lands. Bare invocations read the same configuration a
       # developer's local run reads, so the two cannot drift apart.
