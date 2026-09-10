@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tomllib
+from fnmatch import fnmatch
 
 from conftest import REPO_ROOT
 
@@ -64,6 +65,27 @@ def test_ruff_and_mypy_target_the_domain_by_name() -> None:
     assert "component" in cfg["ruff"]["extend-exclude"]
     assert cfg["mypy"]["strict"] is True
     assert "sdg1531" in cfg["mypy"]["files"]
+
+
+def test_ruff_excludes_no_first_party_tree() -> None:
+    """The lint job passes ruff no paths, deliberately (`.github/workflows/ci.yaml`),
+    so its file set is decided entirely by the config a local run also reads. That
+    moves the narrowing risk here: appending `"sdg1531", "tests", "tools"` to
+    `extend-exclude` takes `ruff format --check` from 86 files to 2 with every test
+    that polices this configuration still green. It is the same hole an `exclude`
+    pattern would open in mypy, which the test below closes on that side. `app` is
+    on the list before it exists, the way `hygiene_rules.ROOTS` carries it.
+    """
+    excluded = _pyproject()["tool"]["ruff"]["extend-exclude"]
+    trees = ("sdg1531", "tests", "tools", "app")
+
+    narrowed = [
+        pattern
+        for pattern in excluded
+        for tree in trees
+        if pattern == tree or pattern.startswith(f"{tree}/") or fnmatch(tree, pattern)
+    ]
+    assert narrowed == [], f"ruff patterns that exclude a first-party tree: {narrowed}"
 
 
 def test_mypy_reads_the_parity_harness_and_its_tools() -> None:
