@@ -40,7 +40,7 @@ def test_runtime_dependencies_are_declared() -> None:
 def test_dev_and_app_extras_exist() -> None:
     extras = _pyproject()["project"]["optional-dependencies"]
     dev = " ".join(extras["dev"])
-    for tool in ("pytest", "pytest-asyncio", "hypothesis", "ruff", "mypy"):
+    for tool in ("pytest", "pytest-asyncio", "hypothesis", "ruff", "mypy", "pyyaml"):
         assert tool in dev, tool
     assert "pysepal" in " ".join(extras["app"])
 

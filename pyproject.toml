@@ -32,6 +32,8 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "pandas-stubs",
+    # tests/test_workflows.py reads .github/workflows/*.yaml
+    "pyyaml>=6",
 ]
 
 [tool.setuptools.packages.find]
