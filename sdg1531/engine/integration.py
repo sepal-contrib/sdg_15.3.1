@@ -31,7 +31,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from functools import partial
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 
 import ee
 
@@ -438,7 +438,10 @@ def build_vi_collection(r: ResolvedSpec, ctx: ExecutionContext) -> ee.ImageColle
                 period_end,
             )
         case _:
-            raise SpecError(f"No VI rung is wired for {r.vi_processor!r}.")
+            # ViProcessor is a closed enum, so this is unreachable -- and
+            # `assert_never` makes mypy say so at type-check time rather than
+            # waiting for the rung-coverage test to catch a new member.
+            assert_never(r.vi_processor)
 
 
 def _process_modis(

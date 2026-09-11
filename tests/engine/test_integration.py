@@ -163,7 +163,11 @@ def test_climate_collection_loads_persiann_over_the_integration_period(resolved,
 
 def test_modis_wins_the_ladder_over_landsat(ctx):
     # integration.py:45 tests the MODIS set FIRST, so a mixed selection that
-    # sensor_select.py:82-84 does not block still takes the MODIS branch.
+    # sensor_select.py:82-84 does not block still takes the MODIS branch. That
+    # precedence is now DECIDED in resolve._vi_dispatch and pinned by
+    # tests/test_resolve.py:294,309; this test reaches it through make_resolved
+    # and checks what the engine LOADS. CONSUMED_ASSETS' three-sensor row is the
+    # stronger statement (set equality on loaded ids, not a substring search).
     #
     # Three sensors, not the more obvious two: process_modis (integration.py:
     # 106-111) merges ee_asset_list[1] whenever `len(sensor_list) > 1`, with
@@ -435,6 +439,11 @@ CONSUMED_ASSETS = [
     (("MODIS MOD13Q1", "MODIS MYD13Q1", "Landsat 8"), ViProcessor.MODIS, {MODIS_MOD, MODIS_MYD}),
     (("Terra NPP",), ViProcessor.TERRA_NPP, {NPP}),
     (("Sentinel 2",), ViProcessor.SENTINEL2, {S2}),
+    # Both rungs read vi_assets[0]; a single-sensor row cannot show that, because
+    # a one-element tuple makes [0] and [-1] the same id. These two carry a second
+    # asset the rung must NOT load, which is what makes the arity falsifiable.
+    (("Terra NPP", "Sentinel 2"), ViProcessor.TERRA_NPP, {NPP}),
+    (("Sentinel 2", "Landsat 8"), ViProcessor.SENTINEL2, {S2}),
     # Exactly one: the derived-VI rung takes the single id resolve() already
     # picked between the (ndvi, evi) pair, so the EVI composite is not loaded.
     (("Derived VI Landsat",), ViProcessor.DERIVED_VI_LANDSAT, {DERIVED_NDVI}),

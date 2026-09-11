@@ -4,7 +4,8 @@ The builders under test read only a small, named set of attributes off
 ResolvedSpec, so these tests hand them a SimpleNamespace with exactly those
 attributes. Real `resolve()` output is covered by tests/test_resolve.py and by
 the parity harness; keeping the two apart means a transcription bug here cannot
-be hidden by a derivation bug there.
+be hidden by a derivation bug there -- except for the two fields named below,
+where the isolation is deliberately given up.
 
 The two exceptions are `vi_processor` and `vi_assets`, which the stub DERIVES
 (see `make_resolved`): they are the engine's dispatch key, so a hand-set value
@@ -47,7 +48,9 @@ def make_resolved(**overrides):
     set them by hand could describe a run `resolve()` cannot produce -- a MODIS
     `vi_source` under the Sentinel 2 rung, say -- and the engine test would then
     be pinning a state that never reaches the engine. Deriving them makes that
-    disagreement unrepresentable rather than merely unlikely.
+    disagreement unrepresentable through the override kwarg rather than merely
+    unlikely. (`resolved` is a SimpleNamespace, so a test could still assign the
+    attribute directly; none does.)
 
     The consequence is that a `vi_source` the LADDER refuses (an empty
     selection, an unknown sensor name, MSVI over Derived VI Landsat with
