@@ -70,7 +70,7 @@ class FakeResolved:
 
     ``scheme``, ``lc_class_combinations``, ``lc_year_start_esa`` and
     ``lc_year_end_esa`` are what the decoders in this task read; the remaining
-    three are the rest of the stats layer's surface and are here because Task 16's
+    three are the rest of the stats layer's surface and are here because the plots layer's
     plots share this stub.
     """
 

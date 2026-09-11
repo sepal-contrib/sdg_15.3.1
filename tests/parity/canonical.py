@@ -7,7 +7,7 @@ Both of those are presentation, not meaning: inserting one node near the root
 shifts every later key, so two graphs that differ by a single node can differ in
 every line of their serialization. That is why the port's one extra
 ``Image.rename`` could not be compared away by a string edit, and why the first
-pass at Task 17 reached for a corpus-wide licence over the whole indicator layer
+first pass reached for a corpus-wide licence over the whole indicator layer
 instead -- which licensed the 30-rule collapse, its rule order, the water mask and
 the cast position along with it.
 

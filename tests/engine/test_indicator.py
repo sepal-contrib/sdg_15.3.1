@@ -382,7 +382,7 @@ def test_the_rename_is_the_only_node_the_port_adds():
 
     The harness does not LICENSE that difference. It did once -- a corpus-wide
     `EXPECTED_DIVERGENCES[("*", "indicator_15_3_1")]` entry, which covered the whole
-    layer and compared none of it -- and Task 17 replaced it with
+    layer and compared none of it -- and the parity harness replaced it with
     `EXPECTED_NORMALISATIONS["indicator_band_rename"]`, a splice that removes this
     one node and requires byte equality on everything else.
     """
@@ -674,13 +674,13 @@ def test_the_silent_argument_swaps_change_the_graph(resolved, ctx):
 
 
 def test_maps_carry_the_very_resolved_spec_they_were_handed(resolved, ctx):
-    """Task 15's `fetch_transition_areas` / `fetch_areas_by_land_cover` decode class
+    """`fetch_transition_areas` / `fetch_areas_by_land_cover` decode class
     codes off `maps.resolved`."""
     assert build_indicator_maps(resolved, ctx).resolved is resolved
 
 
 def test_resolved_is_the_first_field_and_the_seven_outputs_follow(maps):
-    """Field ORDER is load-bearing, not cosmetic: `resolved` is first so Task 15
+    """Field ORDER is load-bearing, not cosmetic: `resolved` is first so the stats layer
     reads it positionally-independently of the seven images, and the seven follow in
     the canonical table order."""
     assert [field.name for field in dataclasses.fields(IndicatorMaps)] == [
@@ -756,7 +756,7 @@ def test_layer_bands_match_the_export_table(maps):
     """The EXPORT vocabulary. Trend and state carry the 3-class band; the 5-level
     band `indicator_n_category_label` selected (run_15_3_1.py:437-442, the
     range that includes its 6-entry legend) stays the STATISTICS vocabulary, which
-    Task 15's `stats/requests.py` is specified to own -- see the module docstring's
+    `stats/requests.py` owns -- see the module docstring's
     EXPECTED_DIVERGENCES note 4."""
     assert {key: layer.band for key, layer in maps.layers().items()} == {
         IndicatorLayer.LAND_COVER: "degradation",

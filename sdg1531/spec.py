@@ -408,7 +408,7 @@ class RunSpec:
             raise SpecError(f"RunSpec payload is missing {error}") from error
         except TypeError as error:
             # e.g. `periods` given as a list, `compatibility: null`, or a
-            # `transition_matrix` that isn't a list of lists of ints - Task 17's parity
+            # `transition_matrix` that isn't a list of lists of ints - the parity
             # harness re-reads spec.json off disk, so a corrupt golden must surface as a
             # SpecError with context, not an unannotated TypeError.
             raise SpecError(f"RunSpec payload is malformed: {error}") from error

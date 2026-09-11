@@ -137,7 +137,7 @@ PROD_PERFORMANCE_LABELS: Mapping[int, str] = MappingProxyType(
 # transcribed from parameter/matrix.py:49-99.
 # `# fmt: off` keeps the seven-per-row shape of the legacy table: without it
 # `ruff format` explodes the magic trailing comma to one element per line and
-# Task 18's `ruff format --check` fails on a file nobody edited.
+# `ruff format --check` fails on a file nobody edited.
 # fmt: off
 IPCC_TRANSITION_CODES: tuple[int, ...] = (
     1010, 1020, 1030, 1040, 1050, 1060, 1070,

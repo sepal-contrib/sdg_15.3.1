@@ -41,7 +41,7 @@ GAES = "users/amitghosh/sdg_module/fao/GAES_L4"
 # different lengths. conftest's make_resolved gives trend, state and performance
 # the same Period(2001, 2015), which makes WHICH period a builder reads
 # unobservable: build_state reading `r.trend` builds the right-shaped graph over
-# the wrong years and stays green. Task 10's defaults are left alone -- its suite
+# the wrong years and stays green. the shared defaults are left alone -- its suite
 # is green against them -- so every builder test here passes these instead.
 TREND = Period(2004, 2010)
 STATE = Period(2001, 2015)

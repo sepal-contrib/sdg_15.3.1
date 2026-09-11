@@ -494,7 +494,7 @@ def _expected_consumed_assets(processor: ViProcessor, vi_assets) -> set[str]:
         ("Landsat 8", "Landsat 9"),
         # Widget-unreachable (sensor_select.py:82-84 DOES block mixing MODIS
         # and Landsat, unlike the Derived-VI-Landsat case), but SensorSelection
-        # itself does not prevent constructing it, and Task 5
+        # itself does not prevent constructing it, and ``resolve``
         # (test_resolve.py:284) pins this EXACT order as the ladder's
         # precedence proof: ee_asset_list[0] is Landsat 8's id, a plain
         # string, so the legacy defect at integration.py:67-71 indexes a

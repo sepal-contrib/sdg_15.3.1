@@ -115,7 +115,7 @@ def transitions(r):
 
 
 def decoded_transitions(r):
-    """The real Task 15 output for the same chart, straight off the committed fixture.
+    """The real decoder output for the same chart, straight off the committed fixture.
 
     ``transitions`` above is hand-built and could agree with a wrong assumption about
     the frame's shape; this one cannot -- ``decode_transition_areas`` names its columns
@@ -125,7 +125,7 @@ def decoded_transitions(r):
 
 
 def decoded_pivot(r):
-    """The real Task 15 pivot the distribution chart consumes."""
+    """The real decoder pivot the distribution chart consumes."""
     df = decode_areas_by_land_cover(
         load_fixture("areas_by_land_cover.json")["groups"],
         r,

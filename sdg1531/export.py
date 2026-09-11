@@ -6,13 +6,13 @@ refuses to write that set to a BytesIO (pyogrio/raw.py:546), so the members go
 into a ``TemporaryDirectory`` that is deleted before the bytes are returned.
 
 ``sdg1531/export.py`` is the single entry in the Tier-0 guard's
-``FS_EXEMPT_FILES`` (Task 1) for exactly this reason. The in-memory ``/vsimem``
+``FS_EXEMPT_FILES`` for exactly this reason. The in-memory ``/vsimem``
 route is deliberately NOT used: it needs ``osgeo.gdal``, which is a separate GDAL
 package that no pip install of this project's declared dependencies
 (``earthengine-api``, ``pandas``, ``geopandas``) provides.
 
 EXPECTED_DIVERGENCES note -- five divergences from ``run_15_3_1.py:356-366``.
-Task 17's parity harness must carry all five:
+The parity harness must carry all five:
 
 1. **Behaviour-changing.** The legacy wrote the five members into
    ``~/module_results`` (the directory ``parameter/directory.py:7,10`` creates at

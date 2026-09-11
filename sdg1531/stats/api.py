@@ -12,8 +12,8 @@ gathers with ``return_exceptions=True`` (``:210``), so there an Exception arrive
 a *value*; :func:`_unwrap` is what turns that into a chained ``StatisticsError``
 rather than letting it fail later as an unrelated ``TypeError``.
 
-EXPECTED_DIVERGENCES note -- three divergences from the legacy. Task 17's parity
-harness must carry all three:
+EXPECTED_DIVERGENCES note -- three divergences from the legacy. The parity harness
+must carry all three:
 
 1. **Behaviour-changing.** :func:`fetch_zonal_areas` REFUSES a zone collection of
    more than 5000 features. ``zonal_statistics_to_geodataframe`` only remarked on
@@ -84,7 +84,7 @@ _MAX_ZONAL_FEATURES = 5000
 # The ORDER is the legacy's too, and is not the natural 0-1-2-3: :343-350 assigns
 # Class_0, Class_3, Class_2 then Class_1, and `decode_zonal_areas` adds the named
 # columns in this table's iteration order, so this is the field order of the
-# shapefile Task 18 writes. Users have tooling keyed on those fields; sorting the
+# shapefile this writes. Users have tooling keyed on those fields; sorting the
 # table would silently reorder them.
 _ZONAL_LABELS: Mapping[int, str] = MappingProxyType(
     {

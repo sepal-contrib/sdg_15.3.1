@@ -28,8 +28,8 @@ statistics with four categories instead of six.
 ``tests/test_stats_requests.py::test_the_statistics_vocabulary_deliberately_differs_from_the_export_vocabulary``
 fails if either drifts onto the other.
 
-EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
-harness must carry it:
+EXPECTED_DIVERGENCES note -- one divergence from the legacy. The parity harness
+must carry it:
 
 1. **Behaviour-changing, and scoped to the TRANSPORT of two requests.** The legacy
    fetched the two area tables by wrapping the reduction in ``ee.Feature(None, ...)``

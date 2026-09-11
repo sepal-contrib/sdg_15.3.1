@@ -385,7 +385,7 @@ def test_a_missing_period_endpoint_is_named_rather_than_escaping_as_a_type_error
     """`_require_year` -- a divergence with no EXPECTED_DIVERGENCES note in
     `resolve.py`. The legacy reached the same missing endpoint inside
     `min(max(None, 1992), 2022)` (indicator_model.py:156-168) and raised an
-    unannotated TypeError; resolve() names the field instead. Task 17's parity
+    unannotated TypeError; resolve() names the field instead. The parity
     register carries it as `resolve_requires_a_year`."""
     with pytest.raises(SpecError, match=re.escape(field)):
         resolve(default_spec(periods=periods))
@@ -462,7 +462,7 @@ def test_custom_scheme_drives_the_whole_vocabulary():
     )
     assert r.scheme is CUSTOM_SCHEME
     # indicator_model.py:221-227 — int(str(start) + str(end)), start-major. Built by
-    # LandCoverScheme.class_combinations (Task 3); resolve() only reads it through.
+    # LandCoverScheme.class_combinations; resolve() only reads it through.
     assert r.lc_class_combinations == (33, 31, 32, 13, 11, 12, 23, 21, 22)
     assert r.lc_class_combinations == CUSTOM_SCHEME.class_combinations
     # :231-238 — the CSV matrix wins over model.transition_matrix.
@@ -471,7 +471,7 @@ def test_custom_scheme_drives_the_whole_vocabulary():
 
 def test_custom_scheme_colours_are_sampled_by_code_order():
     # indicator_model.py:244-266 — seed(100), sample(cnames), classes sorted by code.
-    # LandCoverScheme.palette()/.color_by_class() (Task 3) own that sampling; this
+    # LandCoverScheme.palette()/.color_by_class() own that sampling; this
     # pins that resolve() surfaces them unchanged.
     r = resolve(
         default_spec(land_cover=CustomLandCoverSource("users/x/a", "users/x/b", CUSTOM_SCHEME))

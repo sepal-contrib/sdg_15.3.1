@@ -10,8 +10,8 @@ ResolvedSpec fields read here:
     integration_period, spec.vi_source, spec.vegetation_index, spec.threshold,
     spec.compatibility.derived_vi_msvi_uses_evi_asset
 
-EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
-harness must carry it:
+EXPECTED_DIVERGENCES note -- one divergence from the legacy. The parity harness
+must carry it:
 
 1. **No legacy counterpart.** The rungs that consume ``spec.threshold`` (MODIS,
    Sentinel 2, the Landsat sensors, Derived VI Landsat) narrow it with

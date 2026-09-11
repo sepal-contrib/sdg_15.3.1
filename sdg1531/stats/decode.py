@@ -11,8 +11,8 @@ two tables are written out in full, at the two sites that use them, and are
 deliberately NOT derived from :class:`~sdg1531.engine.indicator.ClassifiedLayer`.
 See ``requests.py``'s docstring for why they must be allowed to disagree.
 
-EXPECTED_DIVERGENCES note -- four divergences from the legacy. Task 17's parity
-harness must carry all four:
+EXPECTED_DIVERGENCES note -- four divergences from the legacy. The parity harness
+must carry all four:
 
 1. **Behaviour-changing.** ``zonal_statistics_to_geodataframe``
    (run_15_3_1.py:475-569) prints four progress and failure lines (:485, :543,

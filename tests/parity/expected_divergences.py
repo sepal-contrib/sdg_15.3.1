@@ -883,7 +883,7 @@ def note_modules(repo_root: Path) -> tuple[str, ...]:
 
     DERIVED, not listed. This was a hand-written tuple of seven files, and three
     more modules -- ``export.py``, ``stats/api.py``, ``stats/plots.py`` -- carried
-    notes in exactly the format parsed below, each ending "Task 17's parity harness
+    notes in exactly the format parsed below, each ending "the parity harness
     must carry all N". Sixteen declared divergences never reached the register, and
     ``test_every_module_divergence_note_is_claimed_by_the_register`` stayed green
     throughout, because the set it checked against was the set it was derived from.

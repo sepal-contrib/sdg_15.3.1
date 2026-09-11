@@ -70,7 +70,7 @@ _CUSTOM_END = "users/amitghosh/sdg_module/parity_lc_end"
 # is_custom=False, so if resolve() keys its custom-vocabulary precedence on
 # scheme.is_custom, custom_full and custom_half would collapse onto the same
 # behaviour and the half-custom defect would never be exercised. The golden CSV
-# Task 3 committed parses to a 13-class vocabulary with is_custom=True.
+# The committed CSV parses to a 13-class vocabulary with is_custom=True.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _MATRIX_CSV = _REPO_ROOT / "tests" / "data" / "ipccsx_matrix.csv"
 _CUSTOM_SCHEME = parse_custom_matrix_csv(read_matrix_csv(_MATRIX_CSV.read_text()))

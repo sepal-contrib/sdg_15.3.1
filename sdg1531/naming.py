@@ -4,8 +4,8 @@ Pure: no ``ee``, no filesystem, no network. This is the transcription of
 ``component/model/indicator_model.py:280-312`` (``IndicatorModel.folder_name``),
 with its two label defects handled explicitly and nothing else changed.
 
-EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
-harness must carry it:
+EXPECTED_DIVERGENCES note -- one divergence from the legacy. The parity harness
+must carry it:
 
 1. **Behaviour-changing, scoped to the LABEL.** :func:`run_label` is total where
    ``folder_name()`` raised. indicator_model.py:310 is

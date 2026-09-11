@@ -4,8 +4,8 @@ Replaces indicator_model.py:172-266 (nine properties, five of which re-read the
 CSV from disk through custom_lc_matrix_list :172-174) and its csv_reader
 :315-321. Pure: no file I/O, no ee, no global RNG.
 
-EXPECTED_DIVERGENCES note -- two divergences from the legacy. Task 17's parity
-harness must carry both:
+EXPECTED_DIVERGENCES note -- two divergences from the legacy. The parity harness
+must carry both:
 
 1. **Behaviour-changing, scoped to the LABEL.** :meth:`TransitionMatrix.is_default`
    compares by VALUE. indicator_model.py:305 compared the shared module-level list
@@ -90,7 +90,7 @@ class TransitionMatrix:
         accepted silently: the instance is frozen but its rows are still mutable
         lists, and :meth:`is_default` then compares ``list != tuple`` and reports
         False for a semantically-default matrix. ``from_list`` already does the
-        right thing, but nothing forced every caller (Task 5's deserializer among
+        right thing, but nothing forced every caller (``resolve``'s deserializer among
         them) through it — this makes the constructor itself safe.
 
         Without the shape check, a ragged matrix (rows of unequal length) was

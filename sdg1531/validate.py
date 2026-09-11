@@ -6,8 +6,8 @@ spec: it returns field-anchored :class:`Problem` records instead. This replaces
 the scattered ``alert.check_input`` chain at ``input_tile.py:245-330`` and the
 ``raise Exception`` at ``run_15_3_1.py:165-166``.
 
-EXPECTED_DIVERGENCES note -- four divergences from the legacy. Task 17's parity
-harness must carry all four.
+EXPECTED_DIVERGENCES note -- four divergences from the legacy. The parity harness
+must carry all four.
 
 The legacy had no total validator, so in one sense every :class:`Problem` here is
 new. What is recorded below is the narrower set that changes WHICH RUNS ARE
@@ -77,7 +77,7 @@ from sdg1531.tables import DEFAULT_LC_CODES
 __all__ = ["Problem", "check_custom_lc_codes", "validate"]
 
 # The top-level `transition_matrix` field has no vocabulary of its own — it only
-# ever pairs with the built-in 7-class IPCC scheme (Task 3's default()).
+# ever pairs with the built-in 7-class IPCC scheme (``LandCoverScheme.default()``).
 _DEFAULT_LC_CLASS_COUNT = len(DEFAULT_LC_CODES)
 
 

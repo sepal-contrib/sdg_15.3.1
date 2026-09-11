@@ -28,8 +28,8 @@ ResolvedSpec fields read here:
     lc_class_combinations, trans_matrix_flatten
 
 EXPECTED_DIVERGENCES note -- four divergences from the legacy, spread over four
-``raise`` statements and one dropped guard. Task 17's parity harness must carry
-all four:
+``raise`` statements and one dropped guard. The parity harness must carry all
+four:
 
 1. **No legacy counterpart.** A :class:`~sdg1531.spec.PixelValueMask` over
    :class:`~sdg1531.spec.EsaCciSource` whose value is not the IPCC water code 70
@@ -42,7 +42,7 @@ all four:
    from ``model.seasonality``. There is no threshold here to fall back on.
    ``sdg1531.validate`` now reports an unset mask as a fatal ``Problem``, so this
    is no longer reachable through the public API; the raise stays as the
-   total-dispatch backstop for headless replay and for Task 17's harness, neither
+   total-dispatch backstop for headless replay and for the parity harness, neither
    of which is obliged to call ``validate()``.
 3. **No legacy counterpart.** An unrecognised ``spec.land_cover`` or
    ``spec.water_mask`` arm raises ``SpecError``. Both are closed unions, so

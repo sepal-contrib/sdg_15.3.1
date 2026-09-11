@@ -1,10 +1,10 @@
 """Graph-introspection primitives shared by the engine (ee-graph) tests.
 
-Extracted verbatim from test_integration.py (Task 10) and test_productivity.py
-(Task 11), which had grown near-duplicate copies of the same walk. This code has
+Extracted verbatim from test_integration.py and test_productivity.py,
+which had grown near-duplicate copies of the same walk. This code has
 been debugged twice -- once for the `functionDefinitionValue.body` indirection
-during Task 10's fix round, once for reading through a wrapper node without
-recording it during Task 11's round 2 -- and one copy that survived both beats
+in one fix round, once for reading through a wrapper node without
+recording it in another -- and one copy that survived both beats
 three that each survived one. Task-specific walkers stay in the file that needs
 them; only the primitives every engine test file wants live here.
 

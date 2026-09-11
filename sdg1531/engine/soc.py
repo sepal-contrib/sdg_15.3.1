@@ -35,7 +35,7 @@ Three things a reader will want to change here and must not, in phase 1:
 
 ResolvedSpec fields read here:
     soc_year_start (unclamped BY DEFAULT -- :16 passes the raw period start into
-    ``calendarRange`` while :12-14 clamps only the end. The asymmetry is Task 5's to
+    ``calendarRange`` while :12-14 clamps only the end. The asymmetry is ``resolve``'s to
     apply, and ``resolve()`` gates it on
     :attr:`~sdg1531.spec.Compatibility.clamp_soc_start_year`, default ``False``; with
     that flag set the start is clamped like the end and this module is none the
@@ -43,13 +43,13 @@ ResolvedSpec fields read here:
     spec.compatibility.soc_subsequent_transition_scale
 
 EXPECTED_DIVERGENCES note -- two divergences from the legacy, both in the climate
-dispatch. Task 17's parity harness must carry both:
+dispatch. The parity harness must carry both:
 
 1. **No legacy counterpart.** An unrecognised ``spec.climate`` arm raises
    ``SpecError``. ``Climate`` is a closed union, so this is not reachable through
    the public API; the legacy's ``if not model.conversion_coef: ... else: ...``
    (:19-27) has no equivalent arm at all. It is the total-dispatch backstop for
-   headless replay and for Task 17's harness.
+   headless replay and for the parity harness.
 2. **Behaviour-changing, and it changes the graph rather than raising.**
    ``soil_organic_carbon.py:19`` tests ``if not model.conversion_coef``, i.e.
    truthiness, so a coefficient of ``0.0`` took the PER-PIXEL branch there. The

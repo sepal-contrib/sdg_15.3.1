@@ -3,8 +3,8 @@
 Transcribed from the legacy `IndicatorModel` properties and the derivations the
 science scripts kept inline. This module is the JSON half: it must not import ee.
 
-EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
-harness must carry it:
+EXPECTED_DIVERGENCES note -- one divergence from the legacy. The parity harness
+must carry it:
 
 1. **No legacy counterpart.** :func:`_require_year` raises ``SpecError`` naming the
    missing endpoint, where the legacy raised ``TypeError`` deep inside ``max()``
@@ -163,8 +163,8 @@ def _scheme(spec: RunSpec) -> LandCoverScheme:
     This picks *which* `LandCoverScheme` the run uses; it never decides whether
     that scheme is custom. `is_custom` is a stored field written once at
     construction — `False` by `LandCoverScheme.default()`, `True` by
-    `parse_custom_matrix_csv` (Task 3) — and carried through `RunSpec.to_dict()`
-    / `from_dict()` (Task 4). An attached scheme is passed through untouched, so
+    `parse_custom_matrix_csv` — and carried through `RunSpec.to_dict()`
+    / `from_dict()`. An attached scheme is passed through untouched, so
     `scheme.is_custom` stays the one answer to "did the user supply a CSV" and
     `palette()` / `color_by_class()` cannot disagree with this function.
     """
@@ -299,7 +299,7 @@ def resolve(spec: RunSpec) -> ResolvedSpec:
         lc_class_combinations=scheme.class_combinations,
         # :231-242 — the custom CSV matrix, else the (possibly edited) run matrix.
         trans_matrix_flatten=scheme.matrix.flatten(),
-        # :244-266 — the seeded sampling and the code-ordered zip live in Task 3.
+        # :244-266 — the seeded sampling and the code-ordered zip live in ``sdg1531.scheme``.
         lc_palette=scheme.palette(),
         lc_color_by_class=MappingProxyType(scheme.color_by_class()),
         # run_15_3_1.py:184-197

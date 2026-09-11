@@ -43,7 +43,7 @@ ResolvedSpec fields read here:
     lc_year_start_esa, analysis_scale, productivity_table
 
 EXPECTED_DIVERGENCES note -- four raises in this module have NO legacy
-counterpart, and Task 17's parity harness must carry all four:
+counterpart, and the parity harness must carry all four:
 
 1. Every Period bound consumed here (``trend``, ``state``, ``performance``) is
    narrowed with ``require_int`` (engine/_typing.py), which raises

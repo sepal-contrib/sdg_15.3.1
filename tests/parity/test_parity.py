@@ -346,12 +346,12 @@ def test_every_divergence_entry_matches_at_least_one_pair() -> None:
 
 
 def test_every_parity_module_carries_the_marker() -> None:
-    """`pyproject.toml` declares a `parity` marker for Task 18's CI to select on.
+    """`pyproject.toml` declares a `parity` marker for CI to select on.
 
     It was declared and applied to nothing, so `pytest -m parity` selected zero
     tests. That is not silent -- pytest exits 5, "no tests collected" -- but a job
     that tolerates 5, or that later selects a wider expression, gets a green run
-    proving nothing, and the marker is exactly the thing Task 18 will select on.
+    proving nothing, and the marker is exactly the thing CI selects on.
 
     Checked against each module's `pytestmark` ATTRIBUTE, which is what pytest
     itself reads, rather than by grepping the source for the assignment. This test

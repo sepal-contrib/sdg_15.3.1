@@ -16,7 +16,7 @@ This module is the one place that says so, for engine-wide narrowing of both kin
   resolve step guarantees is set but the type system cannot see. These raise
   `SpecError`, so unlike the casts they are port-only behaviour with NO legacy
   counterpart: the legacy passes an unset value straight into the `ee` graph. Every
-  engine module that narrows a resolved field routes through here, so Task 17's parity
+  engine module that narrows a resolved field routes through here, so the parity
   harness has ONE place to enumerate these raises and one docstring pattern to match,
   rather than a copy per module.
 

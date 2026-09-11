@@ -21,7 +21,7 @@ never reach the option.
 
 EXPECTED_DIVERGENCES note -- eight divergences from the legacy charts
 (``component/scripts/sankey.py:15-235`` and ``component/scripts/bar_plot.py:1-26``).
-Task 17's parity harness must carry all eight:
+The parity harness must carry all eight:
 
 1. **No legacy counterpart.** The rendering itself. Both legacy functions returned a
    matplotlib ``(fig, ax)`` (sankey.py:42/:235, bar_plot.py:11/:26); these return

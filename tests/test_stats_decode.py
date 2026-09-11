@@ -327,7 +327,7 @@ def test_decode_zonal_areas_adds_the_label_columns_in_table_order():
     """The named columns land in ``labels`` iteration order, not sorted by code.
 
     That is the mechanism which makes ``_ZONAL_LABELS``' own (legacy) order the field
-    order of the shapefile Task 18 writes, so it is pinned here independently of that
+    order of the shapefile the export writes, so it is pinned here independently of that
     table's contents.
     """
     geojson = load_fixture("zonal_features.json")

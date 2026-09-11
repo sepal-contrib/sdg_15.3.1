@@ -18,7 +18,7 @@ from __future__ import annotations
 __all__ = ["CSS4_HEX"]
 
 # `# fmt: off` keeps the six-per-row shape: `ruff format` would otherwise explode
-# the magic trailing comma to 148 lines and fail Task 18's `ruff format --check`.
+# the magic trailing comma to 148 lines and fail `ruff format --check`.
 # fmt: off
 CSS4_HEX: tuple[str, ...] = (
     "#F0F8FF", "#FAEBD7", "#00FFFF", "#7FFFD4", "#F0FFFF", "#F5F5DC",

@@ -27,22 +27,22 @@ deliberately no second ``export_layers()``.
 
 The seam is the images, not the vocabulary. :attr:`ClassifiedLayer.band` and
 :attr:`ClassifiedLayer.labels` are the MAP AND EXPORT vocabulary. The STATISTICS
-vocabulary is Task 15's: it carries its own tables and reads only ``.image`` from
-here -- ``_STATS_BAND`` in ``sdg1531/stats/requests.py`` and
-``_STATS_LABELS`` in ``sdg1531/stats/decode.py``, which stays free of ``ee``
-(task-15-brief.md:655-665, :310-320, :699-702). Under them the two vocabularies
+vocabulary lives in ``sdg1531.stats``: it carries its own tables and reads
+only ``.image`` from here -- ``_STATS_BAND`` in ``sdg1531/stats/requests.py``
+and ``_STATS_LABELS`` in ``sdg1531/stats/decode.py``, which stays free of
+``ee``. Under them the two vocabularies
 deliberately disagree for the trend and state layers -- statistics keep the legacy
 5-class bands, export takes the 3-class ones -- so "unifying" them would silently
-change the statistics. See EXPECTED_DIVERGENCES note 4, whose narrowing depends on
-Task 15 having landed as briefed, which it did.
+change the statistics. See EXPECTED_DIVERGENCES note 4, whose narrowing
+depends on that split, which the shipped code holds to.
 
 ResolvedSpec fields read here: none directly. :func:`build_indicator_maps` threads
 ``r`` into the sub-indicator builders and keeps it on
 :attr:`IndicatorMaps.resolved`, because the statistics layer decodes class codes
 off the run's own vocabulary.
 
-EXPECTED_DIVERGENCES note -- four divergences from the legacy. Task 17's parity
-harness must carry all four:
+EXPECTED_DIVERGENCES note -- four divergences from the legacy. The parity harness
+must carry all four:
 
 1. **Behaviour-changing, and NORMALISED rather than licensed.**
    :func:`build_indicator` ends ``.rename("indicator_15_3_1")``, where
@@ -75,7 +75,8 @@ harness must carry all four:
    (run_15_3_1.py:427-448) had no ``else`` and left both of its locals unbound for
    an unrecognised name -- an ``UnboundLocalError`` at its own ``return``. That
    totality is the whole of this entry: it does NOT license a change of band or of
-   legend on the statistics path, which Task 15 ports unchanged. See note 4.
+   legend on the statistics path, which ``sdg1531.stats`` ports unchanged.
+   See note 4.
 4. **No legacy counterpart.** The ``trajectory`` / ``state`` rows of
    :meth:`IndicatorMaps.layers` give the trend and state layers a 3-class export
    band and a 3-class legend, and the legacy has nothing to compare them against:
@@ -91,11 +92,10 @@ harness must carry all four:
    The port gives them an export band and a legend for the first time. This is a NEW
    capability, not a changed one -- and in particular it is not intended to change
    the statistics: ``indicator_n_category_label``'s ``trajectory_5_levels`` /
-   ``state_5_levels`` branches (:437-442) are ported faithfully by Task 15, whose
+   ``state_5_levels`` branches (:437-442) are ported faithfully, and
    ``_STATS_BAND`` (``stats/requests.py``) and ``_STATS_LABELS``
-   (``stats/decode.py``) keep the 5-class band and the 6-entry legend
-   (task-15-brief.md:655-665, :310-320). Task 15 has landed and does exactly that,
-   so this half of the entry is now a fact about shipped code rather than a
+   (``stats/decode.py``) keep the 5-class band and the 6-entry legend.
+   That is a fact about shipped code rather than a
    dependency: a 3-class statistics band for trend or state would make this note
    wrong in the licensing direction and must be revisited. Filing it as
    behaviour-changing instead would hand the harness a licence to wave through a
@@ -349,7 +349,7 @@ def serialize_maps(maps: IndicatorMaps) -> dict[str, str]:
 
     Keyed on ``layer.id.value``, which IS the canonical layer id:
     ``IndicatorLayer`` is a ``str`` enum, ``naming.py``'s ``LAYER_BASENAMES`` keys
-    on ``.value``, and Task 15 uses ``layer.value`` for DataFrame columns.
+    on ``.value``, and ``sdg1531.stats`` uses ``layer.value`` for DataFrame columns.
     ``.name.lower()`` agrees today only because every member's identifier happens
     to spell its own value.
     """

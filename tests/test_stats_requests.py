@@ -8,7 +8,7 @@ leaving every substring in place.
 
 The file's centrepiece is
 :func:`test_the_statistics_vocabulary_deliberately_differs_from_the_export_vocabulary`,
-which fails if ``_STATS_BAND`` or ``_STATS_LABELS`` is ever "unified" with Task 14's
+which fails if ``_STATS_BAND`` or ``_STATS_LABELS`` is ever "unified" with the engine's
 export vocabulary. See ``sdg1531/stats/requests.py``'s docstring for why they must
 be allowed to disagree.
 """
@@ -261,7 +261,7 @@ def test_productivity_state_and_trend_statistics_use_the_five_level_band(layer, 
     indicator, landcover = _operand_selections(request)
     assert indicator == {stats_band}
 
-    # Task 14's 3-class export band is on the very same image -- it appears in the
+    # The 3-class export band is on the very same image -- it appears in the
     # graph, under the .rename() that put it there -- and is deliberately not what
     # gets counted. Both halves matter: without the first, "not selected" would also
     # be satisfied by an image that never carried the band at all.
@@ -279,7 +279,7 @@ def test_each_statistics_table_lives_in_the_module_the_docs_send_readers_to():
     beside the decoder that applies it -- and it has to stay there, because
     ``decode.py`` is on ``tests/test_isolation.py``'s ee-freedom roster and importing
     ``requests`` would drag ``ee`` into it. ``sdg1531/engine/indicator.py``'s
-    docstrings send Task 17's harness to these two modules, and that prose has
+    docstrings send the parity harness to these two modules, and that prose has
     already drifted once (it named ``stats/requests.py`` for both), so the fact it
     describes is asserted here rather than trusted.
     """
@@ -326,7 +326,7 @@ def test_every_indicator_layer_has_a_statistics_band_mapping():
 
 
 def test_the_statistics_vocabulary_deliberately_differs_from_the_export_vocabulary():
-    """Task 14's export band/legend and this task's statistics band/legend must NOT
+    """The engine's export band/legend and this task's statistics band/legend must NOT
     be unified: for trend and state the legacy counted six classes off a 5-level band
     (:437-442) while the port exports three off a separate band. Collapsing the two
     tables would silently republish four-category statistics.
@@ -350,7 +350,7 @@ def test_the_statistics_vocabulary_deliberately_differs_from_the_export_vocabula
 
 
 # parameter/matrix.py:30-47, the four dicts `indicator_n_category_label` names.
-# Task 2 retyped them; this is the name each legacy branch refers to them by.
+# ``sdg1531.tables`` retyped them; this is the name each legacy branch refers to them by.
 _LEGACY_LABEL_TABLES = {
     "degradation_class": DEGRADATION_LABELS,
     "prod_trend_5_class": PROD_TREND_5_LABELS,
@@ -425,7 +425,7 @@ def _legacy_branch(statements):
 
 
 def _export_layers():
-    """Task 14's map/export vocabulary, read off a real ``IndicatorMaps``."""
+    """The map/export vocabulary, read off a real ``IndicatorMaps``."""
     image = ee.Image.constant(1)
     maps = IndicatorMaps(
         resolved=resolve(default_spec()),
@@ -525,7 +525,7 @@ def test_build_distinct_pixel_values_and_band_names_are_lists():
 
 # --- the constants whose Python TYPE is load-bearing ---------------------------
 #
-# `int` and `float` are DIFFERENT serialized graphs and Task 17 diffs the string:
+# `int` and `float` are DIFFERENT serialized graphs and the parity harness diffs the string:
 # `json.dumps` writes 10000000000000.0 for the float and 10000000000000 for the int.
 # `assert x == 1e13` cannot see that, because `1 == 1.0` in Python -- so every
 # assertion above that compares a constant with `==` is blind to its type, and every

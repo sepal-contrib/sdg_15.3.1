@@ -78,7 +78,7 @@ def test_the_test_fetchers_satisfy_the_protocol(fetcher_class) -> None:
     """Structural conformance, checked at RUNTIME.
 
     An annotation in a test file would prove nothing, and adding this module to
-    ``[tool.mypy] files`` -- ``["sdg1531", "tools", "tests/parity"]`` since Task 17,
+    ``[tool.mypy] files`` -- ``["sdg1531", "tools", "tests/parity"]``,
     not ``["sdg1531"]`` -- would not change that: an annotation asserting
     conformance restates the claim where this measures it. What it walks is the
     Protocol's own members: the names, the coroutine-ness, and the parameter NAMES,
@@ -233,7 +233,7 @@ async def test_fetch_zonal_areas_decodes_the_feature_collection() -> None:
         2.0,
     ]
     # and their ORDER is the legacy's -- :343-350 adds Class_0, Class_3, Class_2,
-    # Class_1, which is the field order of the shapefile Task 18 writes. Sorting
+    # Class_1, which is the field order of the shapefile the export writes. Sorting
     # _ZONAL_LABELS would reorder fields users have tooling keyed on, with every
     # value assertion above still green.
     assert [c for c in gdf.columns if c in set(_ZONAL_LABELS.values())] == [

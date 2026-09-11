@@ -371,8 +371,8 @@ print(json.dumps({"scanned": names, "free": free}))
 def test_the_ee_free_roster_is_every_module_that_imports_without_ee() -> None:
     """JSON_HALF, measured rather than remembered.
 
-    It went stale twice: Task 15 had to add ``sdg1531.ports`` and
-    ``sdg1531.stats.decode``, Task 16 its own two. A module that belongs on it and
+    It went stale twice: ``sdg1531.ports`` and
+    ``sdg1531.stats.decode`` had to be added, then two more. A module that belongs on it and
     is not on it is simply never tested, and nothing says so. This imports every
     module under ``sdg1531/`` with ``ee`` blocked and compares the set that
     succeeds -- so a new ee-free module joins the roster by existing.

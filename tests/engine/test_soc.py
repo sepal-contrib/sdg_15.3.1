@@ -878,7 +878,7 @@ def test_the_degradation_ladder_leaves_both_ten_boundaries_open():
 
 def test_the_stable_rung_is_the_conjunction_of_two_open_bounds():
     """:172 -- `ee.Image.And` is an instance method and keeps both operands (unlike
-    `ee.Filter.And`, the staticmethod Task 11 found discarding its receiver)."""
+    `ee.Filter.And`, the staticmethod that discards its receiver)."""
     deref, _graph, root = _root(soc_image())
 
     stable = deref(_call(_spine(root, deref, _RECEIVER_ARG)[3])["arguments"]["test"])
