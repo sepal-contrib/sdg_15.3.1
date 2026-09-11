@@ -5,6 +5,10 @@ ResolvedSpec, so these tests hand them a SimpleNamespace with exactly those
 attributes. Real `resolve()` output is covered by tests/test_resolve.py and by
 the parity harness; keeping the two apart means a transcription bug here cannot
 be hidden by a derivation bug there.
+
+The two exceptions are `vi_processor` and `vi_assets`, which the stub DERIVES
+(see `make_resolved`): they are the engine's dispatch key, so a hand-set value
+would describe a run `resolve()` cannot produce.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 from sdg1531.enums import Lceu, Trajectory, VegetationIndex
+from sdg1531.resolve import _vi_dispatch
 from sdg1531.spec import (
     Compatibility,
     EsaCciSource,
@@ -34,7 +39,22 @@ STUB_TRANS_MATRIX_FLATTEN = (0, -1, 1)
 
 
 def make_resolved(**overrides):
-    """Build a stand-in ResolvedSpec carrying every attribute the engine reads."""
+    """Build a stand-in ResolvedSpec carrying every attribute the engine reads.
+
+    `vi_processor` and `vi_assets` are DERIVED, by the real `_vi_dispatch`, from
+    whatever `vi_source` / `vegetation_index` / `compatibility` this call ends up
+    with. `build_vi_collection` dispatches on those two fields, so a stub that
+    set them by hand could describe a run `resolve()` cannot produce -- a MODIS
+    `vi_source` under the Sentinel 2 rung, say -- and the engine test would then
+    be pinning a state that never reaches the engine. Deriving them makes that
+    disagreement unrepresentable rather than merely unlikely.
+
+    The consequence is that a `vi_source` the LADDER refuses (an empty
+    selection, an unknown sensor name, MSVI over Derived VI Landsat with
+    `derived_vi_msvi_uses_evi_asset` off) now raises from this call rather than
+    from `build_vi_collection`. That is where `resolve()` raises it too;
+    tests/test_resolve.py owns those cases.
+    """
     spec = SimpleNamespace(
         vi_source=SensorSelection(names=("MODIS MOD13Q1",)),
         vegetation_index=VegetationIndex.NDVI,
@@ -80,6 +100,8 @@ def make_resolved(**overrides):
                 f"make_resolved() got an unknown override {key!r}; not an "
                 "attribute of the stub's spec or resolved namespace"
             )
+    # after the overrides, so the rung matches the vi_source the test asked for
+    resolved.vi_processor, resolved.vi_assets = _vi_dispatch(spec)
     return resolved
 
 

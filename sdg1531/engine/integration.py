@@ -3,12 +3,12 @@
 Transcribed from ``component/scripts/integration.py``. Phase 1 is a
 transcription, not a refactor: every node this module builds must match the
 legacy graph node for node, so the ugly parts (``ee.Image().constant``, the
-un-merged monthly path, the MSVI/EVI asset swap) are preserved and annotated
-rather than corrected.
+un-merged monthly path, the MODIS rung merging a second asset whatever sensor it
+belongs to) are preserved and annotated rather than corrected.
 
 ResolvedSpec fields read here:
-    integration_period, spec.vi_source, spec.vegetation_index, spec.threshold,
-    spec.compatibility.derived_vi_msvi_uses_evi_asset
+    integration_period, vi_processor, vi_assets, spec.vi_source,
+    spec.vegetation_index, spec.threshold
 
 EXPECTED_DIVERGENCES note -- one divergence from the legacy. The parity harness
 must carry it:
@@ -35,23 +35,22 @@ from typing import TYPE_CHECKING, Any
 
 import ee
 
-from sdg1531.catalog import ASSETS, SENSORS
+from sdg1531.catalog import ASSETS
 from sdg1531.engine._typing import as_collection, as_element, require_float, require_int
 from sdg1531.enums import VegetationIndex
 from sdg1531.errors import SpecError
-from sdg1531.spec import PrecomputedViAsset, SensorSelection
+from sdg1531.resolve import ResolvedSpec, ViProcessor
+from sdg1531.spec import SensorSelection
 
-if TYPE_CHECKING:  # typing only -- no runtime dependency on resolve/context
+if TYPE_CHECKING:  # typing only -- no runtime dependency on context
     from sdg1531.engine.context import ExecutionContext
-    from sdg1531.resolve import ResolvedSpec
 
 __all__ = ["build_climate_collection", "build_vi_collection"]
 
-# The ladder's membership sets, from integration.py:45, :81-83.
-_MODIS_VI_SENSORS = ("MODIS MOD13Q1", "MODIS MYD13Q1")
-# Also the membership list `cloud_mask` (integration.py:248) and
-# `apply_scale_factor` (:292) test against -- the same three legacy call
-# sites, one tuple. Changing it moves all three behaviours at once.
+# The membership list `cloud_mask` (integration.py:248) and `apply_scale_factor`
+# (:292) test against -- two legacy call sites, one tuple. Changing it moves both
+# behaviours at once. The third call site, the ladder's own test at :81-83, is
+# `resolve._LANDSAT_SENSORS` now.
 _LANDSAT_SR_SENSORS = (
     "Landsat 4",
     "Landsat 5",
@@ -352,29 +351,47 @@ def _img_scaling(img: ee.Image, scale_factor: float) -> ee.Element:
     return img.multiply(scale_factor).copyProperties(img, ["system:time_start", "system:time_end"])
 
 
+def _sensor_names(r: ResolvedSpec) -> tuple[str, ...]:
+    """The selection's sensor names, which three of the rungs still need.
+
+    Raw spec data rather than a derivation, so it is read off the spec and not
+    off a resolved field. ``RunSpec.vi_source`` is ``ViSource | None``; every
+    rung that calls this was reached through ``_vi_dispatch``'s
+    ``SensorSelection`` arm, so the narrowing below cannot fail for a
+    ``ResolvedSpec`` that ``resolve()`` produced.
+    """
+    source = r.spec.vi_source
+    if not isinstance(source, SensorSelection):
+        raise SpecError(f"Unsupported VI source: {source!r}")
+    return tuple(source.names)
+
+
 def build_vi_collection(r: ResolvedSpec, ctx: ExecutionContext) -> ee.ImageCollection:
     """Annual integrated vegetation index for the integration period.
 
-    Transcribed from integration.py:31-95 (``integrate_vi``). The sensor
-    dispatch is the ORDERED LADDER of :45-94, not a family lookup: mixed
-    selections are reachable (sensor_select.py:82-84 matches on substrings), so
-    the precedence between the branches is observable behaviour.
-    """
-    source = r.spec.vi_source
+    Transcribed from integration.py:31-95 (``integrate_vi``), less its sensor
+    dispatch: the ORDERED LADDER of :45-94 is walked once, by
+    ``sdg1531.resolve._vi_dispatch``, and this reads the rung it picked off
+    ``r.vi_processor`` and the asset ids it resolved off ``r.vi_assets``. That
+    includes the derived-VI branch of :66-71, asset swap and all, so the index
+    and the compatibility flag are not consulted here.
 
-    if isinstance(source, PrecomputedViAsset):
+    HOW MUCH of ``vi_assets`` a rung consumes differs by rung, and the
+    difference is legacy-faithful: ``_process_modis`` reads only the first two
+    entries however many sensors were selected (:106-111); Terra NPP, Sentinel 2
+    and the derived-VI composite take the first alone (:136, :59, :67-71); and
+    only ``_process_landsat_sensors`` walks the whole list (:149-162).
+    """
+    if r.vi_processor is ViProcessor.PRECOMPUTED:
         # integration.py:79-80's "GEE Asset" branch is dropped: it read a trait
         # that does not exist, and "GEE Asset" is not a key of pm.sensors so
         # :42 would KeyError first. The replacement arm is not wired yet.
         raise SpecError(
             "A precomputed VI asset is not supported in phase 1; select sensors instead."
         )
-    if not isinstance(source, SensorSelection):
-        raise SpecError(f"Unsupported VI source: {source!r}")
 
     period_start = require_int(r.integration_period.start, "integration_period.start")
     period_end = require_int(r.integration_period.end, "integration_period.end")
-    sensor_names = tuple(source.names)
     index = r.spec.vegetation_index
     # Not narrowed here: Terra NPP never reads a threshold (integration.py:
     # 134-142 -- process_terra_npp takes no threshold argument), so narrowing
@@ -382,63 +399,46 @@ def build_vi_collection(r: ResolvedSpec, ctx: ExecutionContext) -> ee.ImageColle
     # Each rung that actually consumes `threshold` narrows it itself, at the
     # point of consumption.
     threshold = r.spec.threshold
+    # `ViAsset` is `str | tuple[str, str]`: the "Derived VI Landsat" record is a
+    # PAIR, and a rung that wins the ladder over it hands that pair to
+    # `ee.ImageCollection` nested and unresolved, exactly as integration.py:
+    # 41-43 did. `Any` is what carrying that faithfully costs.
+    vi_assets: Sequence[Any] = r.vi_assets
 
-    # transcribed from integration.py:41-43
-    ee_asset_list: list[Any] = [SENSORS[name].collection_id for name in sensor_names]
-
-    if set(_MODIS_VI_SENSORS) & set(sensor_names):  # integration.py:45
-        return _process_modis(
-            sensor_names, ee_asset_list, index, threshold, period_start, period_end
-        )
-
-    if "Terra NPP" in sensor_names:  # integration.py:54
-        return _process_terra_npp(ee_asset_list, period_start, period_end)
-
-    if "Sentinel 2" in sensor_names:  # integration.py:56
-        # :59 passes sensors[0], not "Sentinel 2"; preserved.
-        return _process_sentinel2(
-            ctx.feature_collection,
-            sensor_names[0],
-            ee_asset_list[0],
-            index,
-            threshold,
-            period_start,
-            period_end,
-        )
-
-    if "Derived VI Landsat" in sensor_names:  # integration.py:66
-        assets = ee_asset_list[0]
-        if index is VegetationIndex.NDVI:
-            asset_id = assets[0]
-        elif index is VegetationIndex.EVI:
-            asset_id = assets[1]
-        elif r.spec.compatibility.derived_vi_msvi_uses_evi_asset:
-            # Preserved defect, spec 7: integration.py:67-71 is
-            # `assets[0] if vi == "ndvi" else assets[1]`, so MSVI reads the EVI
-            # composite. Flag off turns it into an error instead.
-            asset_id = assets[1]
-        else:
-            raise SpecError(
-                "Derived VI Landsat publishes no MSVI composite; the legacy "
-                "served the EVI asset instead. Enable "
-                "Compatibility.derived_vi_msvi_uses_evi_asset to reproduce it."
+    match r.vi_processor:
+        case ViProcessor.MODIS:
+            return _process_modis(
+                _sensor_names(r), vi_assets, index, threshold, period_start, period_end
             )
-        return _process_landsat_derived_vi(
-            ctx.feature_collection, asset_id, threshold, period_start, period_end
-        )
-
-    if set(_LANDSAT_SR_SENSORS) & set(sensor_names):  # integration.py:81
-        return _process_landsat_sensors(
-            ctx.feature_collection,
-            sensor_names,
-            ee_asset_list,
-            index,
-            threshold,
-            period_start,
-            period_end,
-        )
-
-    raise SpecError("No valid sensor type found in the selection.")
+        case ViProcessor.TERRA_NPP:
+            return _process_terra_npp(vi_assets, period_start, period_end)
+        case ViProcessor.SENTINEL2:
+            # :59 passes sensors[0], not "Sentinel 2"; preserved.
+            return _process_sentinel2(
+                ctx.feature_collection,
+                _sensor_names(r)[0],
+                vi_assets[0],
+                index,
+                threshold,
+                period_start,
+                period_end,
+            )
+        case ViProcessor.DERIVED_VI_LANDSAT:
+            return _process_landsat_derived_vi(
+                ctx.feature_collection, vi_assets[0], threshold, period_start, period_end
+            )
+        case ViProcessor.LANDSAT_SENSORS:
+            return _process_landsat_sensors(
+                ctx.feature_collection,
+                _sensor_names(r),
+                vi_assets,
+                index,
+                threshold,
+                period_start,
+                period_end,
+            )
+        case _:
+            raise SpecError(f"No VI rung is wired for {r.vi_processor!r}.")
 
 
 def _process_modis(

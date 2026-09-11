@@ -34,6 +34,7 @@ MODIS_MOD = "MODIS/061/MOD13Q1"
 MODIS_MYD = "MODIS/061/MYD13Q1"
 NPP = "MODIS/006/MOD17A3HGF"
 S2 = "COPERNICUS/S2_SR_HARMONIZED"
+L4 = "LANDSAT/LT04/C02/T1_L2"
 L8 = "LANDSAT/LC08/C02/T1_L2"
 L9 = "LANDSAT/LC09/C02/T1_L2"
 DERIVED_NDVI = "LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NDVI"
@@ -363,30 +364,10 @@ def test_derived_vi_msvi_is_served_the_evi_asset_by_default(ctx):
     assert DERIVED_NDVI not in graph
 
 
-def test_derived_vi_msvi_raises_when_the_compatibility_flag_is_off(ctx):
-    from sdg1531.spec import Compatibility
-
-    r = make_resolved(
-        vi_source=SensorSelection(names=("Derived VI Landsat",)),
-        vegetation_index=VegetationIndex.MSVI,
-        compatibility=Compatibility(derived_vi_msvi_uses_evi_asset=False),
-    )
-
-    with pytest.raises(SpecError):
-        build_vi_collection(r, ctx)
-
-
 def test_precomputed_vi_asset_is_rejected(ctx):
     # integration.py:79-80's "GEE Asset" branch is dropped; the replacement arm
     # is not wired in phase 1.
     r = make_resolved(vi_source=PrecomputedViAsset("users/x/vi", 30))
-
-    with pytest.raises(SpecError):
-        build_vi_collection(r, ctx)
-
-
-def test_empty_sensor_selection_raises(ctx):
-    r = make_resolved(vi_source=SensorSelection(names=()))
 
     with pytest.raises(SpecError):
         build_vi_collection(r, ctx)
@@ -431,100 +412,85 @@ def test_year_band_is_present_only_on_the_non_monthly_annual_paths(ctx):
     assert "year" not in _renamed_bands(build_vi_collection(landsat, ctx))
 
 
-def _flatten_vi_assets(vi_assets):
-    """Flatten ResolvedSpec.vi_assets's `str | tuple[str, str]` shape.
-
-    A mixed selection passes the Derived-VI-Landsat (ndvi, evi) pair through
-    NESTED (resolve.py's `ViAsset` type, integration.py:41-43) -- this pulls
-    both ids out so every one of them can be checked for individually.
-    """
-    flat: list[str] = []
-    for asset in vi_assets:
-        if isinstance(asset, tuple):
-            flat.extend(asset)
-        else:
-            flat.append(asset)
-    return flat
-
-
-def _expected_consumed_assets(processor: ViProcessor, vi_assets) -> set[str]:
-    """Which of resolve()'s `vi_assets` the winning rung actually consumes.
-
-    `_vi_dispatch` (resolve.py) returns the WHOLE per-sensor asset tuple for
-    every processor, but the matching engine rung does not always touch all
-    of it: `_process_modis` reads only `ee_asset_list[0]`/`[1]`
-    (integration.py:98-131) no matter how many sensors were selected, and
-    `_process_terra_npp` / `_process_sentinel2` / the derived-VI rung each
-    read only `ee_asset_list[0]`. Only `_process_landsat_sensors` consumes
-    every element. Asserting set equality against the RAW `vi_assets` tuple
-    is false in general -- a third MODIS-rung sensor is never touched, which
-    is exactly what the old, unconditional `⊆` check missed -- so this
-    narrows to what is actually reachable, per rung, before the comparison.
-    """
-    if processor is ViProcessor.MODIS:
-        consumed = vi_assets[:2]
-    elif processor is ViProcessor.LANDSAT_SENSORS:
-        consumed = vi_assets
-    elif processor in (
-        ViProcessor.TERRA_NPP,
-        ViProcessor.SENTINEL2,
-        ViProcessor.DERIVED_VI_LANDSAT,
-    ):
-        consumed = vi_assets[:1]
-    else:
-        raise AssertionError(f"no consumption rule recorded for {processor}")
-    return set(_flatten_vi_assets(consumed))
-
-
-@pytest.mark.parametrize(
-    "sensor_names",
-    [
-        ("MODIS MOD13Q1",),
-        ("MODIS MYD13Q1",),
-        ("MODIS MOD13Q1", "MODIS MYD13Q1"),
-        # Falsifies the old ⊆-over-the-whole-tuple invariant: _process_modis
-        # never touches ee_asset_list[2], so L8 must be ABSENT from what the
-        # engine loads even though resolve() lists it in vi_assets. This is
-        # the same selection test_modis_wins_the_ladder_over_landsat uses.
-        ("MODIS MOD13Q1", "MODIS MYD13Q1", "Landsat 8"),
-        ("Terra NPP",),
-        ("Sentinel 2",),
-        ("Derived VI Landsat",),
-        ("Landsat 4",),
-        ("Landsat 8", "Landsat 9"),
-        # Widget-unreachable (sensor_select.py:82-84 DOES block mixing MODIS
-        # and Landsat, unlike the Derived-VI-Landsat case), but SensorSelection
-        # itself does not prevent constructing it, and ``resolve``
-        # (test_resolve.py:284) pins this EXACT order as the ladder's
-        # precedence proof: ee_asset_list[0] is Landsat 8's id, a plain
-        # string, so the legacy defect at integration.py:67-71 indexes a
-        # single CHARACTER of it ("L").
-        ("Landsat 8", "Derived VI Landsat"),
-        ("Derived VI Landsat", "Landsat 8"),
-        # A non-derived rung winning while "Derived VI Landsat" rides along in
-        # the same selection: resolve.py's ViAsset passes the (ndvi, evi)
-        # pair through NESTED, and integration.py:41-43 hands that exact
-        # nested list to process_modis.
+# (selection, the rung resolve() lands it on, the asset ids that rung LOADS).
+#
+# `resolve()` hands every rung the whole per-sensor asset tuple, and the rungs
+# consume different amounts of it (integration.py): `process_modis` reads
+# ee_asset_list[0] and, when more than one sensor was selected, [1] -- never [2]
+# (:106-111); `process_terra_npp` (:136) and the Sentinel 2 (:59) and derived-VI
+# (:67-71) rungs read [0] alone; only `process_landsat_sensors` zips the whole
+# list (:149-162). Those arities are the behaviour this table pins.
+#
+# The third column is written out as LITERAL ids and not recomputed from
+# `r.vi_assets`, which is the whole point: a helper applying the same
+# per-rung rule the engine applies would agree with the engine by construction
+# and could not fail. Every id here is off the graph the engine actually built.
+CONSUMED_ASSETS = [
+    (("MODIS MOD13Q1",), ViProcessor.MODIS, {MODIS_MOD}),
+    (("MODIS MYD13Q1",), ViProcessor.MODIS, {MODIS_MYD}),
+    (("MODIS MOD13Q1", "MODIS MYD13Q1"), ViProcessor.MODIS, {MODIS_MOD, MODIS_MYD}),
+    # The MODIS rung's arity, stated: L8 is vi_assets[2], process_modis never
+    # indexes past [1], so L8 must be ABSENT from the graph even though
+    # resolve() lists it. Same selection as test_modis_wins_the_ladder_over_landsat.
+    (("MODIS MOD13Q1", "MODIS MYD13Q1", "Landsat 8"), ViProcessor.MODIS, {MODIS_MOD, MODIS_MYD}),
+    (("Terra NPP",), ViProcessor.TERRA_NPP, {NPP}),
+    (("Sentinel 2",), ViProcessor.SENTINEL2, {S2}),
+    # Exactly one: the derived-VI rung takes the single id resolve() already
+    # picked between the (ndvi, evi) pair, so the EVI composite is not loaded.
+    (("Derived VI Landsat",), ViProcessor.DERIVED_VI_LANDSAT, {DERIVED_NDVI}),
+    (("Landsat 4",), ViProcessor.LANDSAT_SENSORS, {L4}),
+    # The Landsat rung is the one that reads EVERY element.
+    (("Landsat 8", "Landsat 9"), ViProcessor.LANDSAT_SENSORS, {L8, L9}),
+    # Widget-unreachable (sensor_select.py:82-84 DOES block mixing MODIS and
+    # Landsat, unlike the Derived-VI-Landsat case), but SensorSelection itself
+    # does not prevent constructing it, and resolve (test_resolve.py:287) pins
+    # this EXACT order as the ladder's precedence proof: ee_asset_list[0] is
+    # Landsat 8's id, a plain string, so the legacy defect at integration.py:
+    # 67-71 indexes a single CHARACTER of it -- and "L" is what ee is asked to
+    # load. Nothing but the graph itself would show that.
+    (("Landsat 8", "Derived VI Landsat"), ViProcessor.DERIVED_VI_LANDSAT, {"L"}),
+    (("Derived VI Landsat", "Landsat 8"), ViProcessor.DERIVED_VI_LANDSAT, {DERIVED_NDVI}),
+    # A non-derived rung winning while "Derived VI Landsat" rides along:
+    # vi_assets[1] is the (ndvi, evi) PAIR, unresolved, and process_modis hands
+    # that pair straight to ee.ImageCollection -- which loads BOTH ids as
+    # images. Three loads off a two-sensor selection.
+    (
         ("MODIS MOD13Q1", "Derived VI Landsat"),
-    ],
-)
-def test_ladder_agrees_with_resolve_s_independent_derivation(sensor_names, ctx):
-    # Every other test in this file hands build_vi_collection the
-    # make_resolved() stub. This one alone uses the REAL resolve(), because it
-    # exists specifically to compare TWO independently written ladders --
-    # this module's, and resolve.py's _vi_dispatch -- and a stub standing in
-    # for one of them would make the comparison vacuous.
+        ViProcessor.MODIS,
+        {MODIS_MOD, DERIVED_NDVI, DERIVED_EVI},
+    ),
+]
+
+
+@pytest.mark.parametrize(("sensor_names", "processor", "loaded"), CONSUMED_ASSETS)
+def test_each_rung_loads_exactly_the_assets_it_consumes(sensor_names, processor, loaded, ctx):
+    """Per-rung consumption arity, read off the graph the engine encoded.
+
+    Every other test in this file hands build_vi_collection the make_resolved()
+    stub; this one runs the real resolve(), so the row's claim covers the whole
+    path a run takes -- the rung resolve() picks, the assets it resolves, and
+    how much of them the engine then puts into the graph.
+
+    The processor assertion is not decoration: it is what entitles the row to
+    speak for a rung. Without it a selection that silently changed rungs would
+    go on passing against an asset set that no longer describes the rung named.
+    """
     spec = default_spec(vi_source=SensorSelection(names=sensor_names), threshold=0.0)
     r = resolve(spec)
 
-    coll = build_vi_collection(r, ctx)
+    assert r.vi_processor is processor
 
-    expected = _expected_consumed_assets(r.vi_processor, r.vi_assets)
-    actual = _loaded_asset_ids(coll)
+    actual = _loaded_asset_ids(build_vi_collection(r, ctx))
 
-    assert actual == expected, (
-        f"resolve() (processor={r.vi_processor}, vi_assets={r.vi_assets!r}) says "
-        f"sensors {sensor_names} should load exactly {expected!r}, but "
-        f"engine.integration's own ladder loaded {actual!r} -- the two "
-        "independent derivations have diverged"
+    assert actual == loaded, (
+        f"the {processor.value} rung, handed vi_assets={r.vi_assets!r} for "
+        f"sensors {sensor_names}, should load exactly {loaded!r} but loaded {actual!r}"
     )
+
+
+def test_every_rung_that_builds_a_graph_has_a_consumption_row():
+    """PRECOMPUTED is the one rung that raises instead of building; the rest must
+    each be exercised above, or a rung added later inherits no arity check."""
+    covered = {processor for _, processor, _ in CONSUMED_ASSETS}
+
+    assert covered == set(ViProcessor) - {ViProcessor.PRECOMPUTED}
