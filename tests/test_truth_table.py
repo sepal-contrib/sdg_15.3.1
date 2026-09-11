@@ -114,7 +114,7 @@ def test_classify_rejects_wrong_arity(classes):
 def test_band_names_record_the_indicator_rename_divergence():
     assert PRODUCTIVITY_GPGV2.band == "productivity"
     assert PRODUCTIVITY_GPGV1.band == "productivity"
-    # §7: the legacy indicator chain never renames, so its band was "constant".
+    # The legacy indicator chain never renames, so its band was "constant".
     assert fixture_table("indicator_15_3_1")["band"] is None
     assert INDICATOR_15_3_1.band == "indicator_15_3_1"
 
@@ -137,7 +137,7 @@ def test_rule_and_truthtable_are_constructible_by_hand():
 
 
 def test_module_does_not_import_ee():
-    """`truth_table.py` is pure data: no `ee`, no pandas, no sepal_ui (spec §4).
+    """`truth_table.py` is pure data: no `ee`, no pandas, no sepal_ui.
 
     Asserted over the module's own source rather than its namespace, because a
     namespace check passes for any module that imports `ee` under another name.

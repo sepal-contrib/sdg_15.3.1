@@ -1,4 +1,4 @@
-"""The offline `ee` bootstrap that Tiers 3 and 4 sit on (spec §12).
+"""The offline `ee` bootstrap that Tiers 3 and 4 sit on.
 
 Two behaviours of earthengine-api 1.6.14 are load-bearing and are asserted here
 so that, when a release moves them, this file fails rather than the domain:

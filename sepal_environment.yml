@@ -1,10 +1,10 @@
 # The environment CI solves from, and it still serves the LIVE Voila entrypoint
 # (`ui.ipynb`, the `ci` job's nbmake step) as well as the domain suite. So it
 # deliberately carries pins `sdg1531` itself does not use: `matplotlib`, `natsort`,
-# `rasterio` and `plotly` are all `component/`'s, and spec §9 marks plotly as
-# imported nowhere even there. Dropping them is the companion spec's call (§15.6),
-# together with adding `ipecharts` for the charts the app layer will render; doing
-# it here would break the notebook this file also has to keep working.
+# `rasterio` and `plotly` are all `component/`'s, and plotly is imported nowhere
+# even there. Dropping them is the app-layer migration's call, together with adding
+# `ipecharts` for the charts the app layer will render; doing it here would break
+# the notebook this file also has to keep working.
 name: sdg_15.3.1
 channels:
   - conda-forge

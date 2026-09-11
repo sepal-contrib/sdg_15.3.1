@@ -1,4 +1,4 @@
-"""Zonal delivery: the domain returns bytes, the app writes them (D12).
+"""Zonal delivery: the domain returns bytes, the app writes them.
 
 The container-local disk is invisible or collides between users, so nothing this
 module writes outlives the call. An ESRI Shapefile is a five-file set and pyogrio
@@ -19,7 +19,7 @@ Task 17's parity harness must carry all five:
    import) and left them there beside the zip; :func:`zonal_shapefile_zip` writes
    into a ``TemporaryDirectory`` that is gone before it returns and hands the caller
    bytes. Nothing survives the call, and where the zip lands is the app layer's
-   decision (D12). This is the entry that covers the whole return-type change.
+   decision. This is the entry that covers the whole return-type change.
 2. **Behaviour-changing, scoped to member ORDER and to a missing member.** The legacy
    zipped a hard-coded suffix list, ``[".dbf", ".prj", ".shp", ".cpg", ".shx"]``
    (:359), in that order, and ``ZipFile.write`` raised ``FileNotFoundError`` for any

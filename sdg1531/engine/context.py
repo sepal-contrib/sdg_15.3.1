@@ -47,12 +47,12 @@ class ExecutionContext:
     def from_feature_collection(
         cls, feature_collection: ee.FeatureCollection, analysis_scale: int
     ) -> ExecutionContext:
-        """Build from a live collection — the phase-1 app path (spec §4)."""
+        """Build from a live collection — the phase-1 app path."""
         return cls(feature_collection=feature_collection, analysis_scale=analysis_scale)
 
     @classmethod
     def from_aoi_spec(cls, aoi: object, analysis_scale: int) -> ExecutionContext:
-        """Build from a serialized AOI — headless replay and tests (spec §4)."""
+        """Build from a serialized AOI — headless replay and tests."""
         if isinstance(aoi, AssetAoi):
             collection = ee.FeatureCollection(aoi.asset_id)
         elif isinstance(aoi, GeoJsonAoi):

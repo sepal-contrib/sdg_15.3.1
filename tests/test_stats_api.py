@@ -270,7 +270,7 @@ async def test_fetch_distinct_pixel_values_and_band_names() -> None:
 @pytest.mark.asyncio
 async def test_fetch_band_names_keeps_earth_engines_own_order() -> None:
     """select_lc.py:63-65 natsorted the list before showing it; ordering for display
-    is the app layer's (spec §4), so the port hands back what Earth Engine sent."""
+    is the app layer's, so the port hands back what Earth Engine sent."""
     fetcher = FakeFetcher([["b10", "b2", "b1"]])
 
     assert await fetch_band_names(fetcher, "users/x/a") == ("b10", "b2", "b1")

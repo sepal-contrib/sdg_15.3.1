@@ -283,7 +283,7 @@ REACHABLE = [
     # The ladder's precedence, observable: adding "Derived VI Landsat" to a Landsat
     # selection is NOT blocked, the derived branch wins over the landsat branch, and
     # integration.py:66-71 then indexes the FIRST selected sensor's asset — a plain
-    # string here — by character. Legacy behaviour, transcribed (spec §6).
+    # string here — by character. Legacy behaviour, transcribed.
     (("Landsat 8", "Derived VI Landsat"), ViProcessor.DERIVED_VI_LANDSAT, ("L",)),
     # Not reachable through the widget; pins that the branch reads sensors[0].
     (("Derived VI Landsat", "Landsat 8"), ViProcessor.DERIVED_VI_LANDSAT, (DVI_NDVI,)),
@@ -526,7 +526,8 @@ def test_derived_snapshot_matches_the_committed_golden():
 
 
 def test_the_two_data_models_share_no_field_name():
-    """Spec §13 risk 1's named mitigation, which was specified and never written.
+    """The mitigation that keeps the two data models from rotting into one, named
+    in the port's design and, until this test, never written.
 
     > "**Two data models is a standing tax.** ... Enforce with a test asserting the
     > two field-name sets are disjoint. Without it the split rots within two

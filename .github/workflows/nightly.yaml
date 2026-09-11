@@ -31,7 +31,7 @@ jobs:
         # Tier 6: a 10 km2 AOI, two years, MODIS, end to end. It catches
         # server-side errors that graph-shape tests structurally cannot see -
         # bad remap arities, missing bands. It is NOT on the PR gate, which is a
-        # known coverage hole recorded in the spec (§12, §15.7).
+        # known and accepted coverage hole.
         #
         # This is the only job that ever runs the test, so an empty selection here
         # would mean nobody ever learns it is broken. The count is asserted before

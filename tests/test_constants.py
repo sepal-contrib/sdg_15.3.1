@@ -148,7 +148,7 @@ def test_sensor_table_is_not_mutable() -> None:
 def test_asset_ids_match_the_legacy_module() -> None:
     from sdg1531.catalog import ASSETS
 
-    # parameter/sensor.py:36-47; soc_isric is dropped (zero call sites, spec §7)
+    # parameter/sensor.py:36-47; soc_isric is dropped (zero call sites)
     assert ASSETS == {
         "precipitation": "NOAA/PERSIANN-CDR",
         "land_cover_ic": "users/amitghosh/sdg_module/esa/cci_landcover",
@@ -307,10 +307,10 @@ def test_degradation_colours_key_on_the_degradation_labels() -> None:
     The four hexes lived only in ``stats/plots.py``, split across a private
     three-entry dict and a separate ``_UNKNOWN_CLASS_COLOR`` -- so an app layer
     building the seven ``visualization_*`` property sets and the map legend had to
-    reach into a private name, retype the hexes (which spec §4 forbids) or invent a
-    fourth colour for NoData that the charts would not agree with. This is the
-    derivation that keeps them one thing: the palette's keys are not a second
-    roster, they are ``DEGRADATION_LABELS``' own values.
+    reach into a private name, retype the hexes (which would be a second source of
+    truth) or invent a fourth colour for NoData that the charts would not agree
+    with. This is the derivation that keeps them one thing: the palette's keys are
+    not a second roster, they are ``DEGRADATION_LABELS``' own values.
     """
     from sdg1531.tables import DEGRADATION_COLORS, DEGRADATION_LABELS
 
@@ -340,7 +340,7 @@ def test_the_domains_colours_live_in_the_two_colour_modules() -> None:
     Both directions: a module that grows a colour fails, and a module named here
     that no longer holds one fails too, so the pair cannot go stale by rename.
     Scanned over ``iter_domain_sources()``, so the app package joins the rule the
-    day it lands -- and spec §4 puts the app layer's four viz dicts on exactly these
+    day it lands -- and the app layer's four viz dicts are built from exactly these
     values.
     """
     from hygiene_rules import iter_domain_sources

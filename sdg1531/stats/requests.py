@@ -7,12 +7,12 @@ must stay free of ``ee``.
 
 **Both tables are written out in full, per layer, and are deliberately NOT derived
 from** :class:`~sdg1531.engine.indicator.ClassifiedLayer`. That class carries the
-MAP AND EXPORT vocabulary of spec §8; this one carries what
+MAP AND EXPORT vocabulary; this one carries what
 ``indicator_n_category_label`` (run_15_3_1.py:425-450) counted. For five layers the
 two agree. For two they must not:
 
 ===========================  ===================  ======================  ==================
-Layer                        Export band (§8)     Statistics band (here)  Statistics legend
+Layer                        Export band          Statistics band (here)  Statistics legend
 ===========================  ===================  ======================  ==================
 ``PRODUCTIVITY_TREND``       ``trajectory``       ``trajectory_5_levels``  6 entries
 ``PRODUCTIVITY_STATE``       ``state``            ``state_5_levels``       6 entries
@@ -20,7 +20,7 @@ Layer                        Export band (§8)     Statistics band (here)  Stati
 
 Both are correct, for different consumers: the legacy statistics deliberately
 counted trend and state in six categories off the 5-level bands (:437-442), while
-§8 gives those layers a 3-class band and a 4-entry legend to draw and export --
+the port gives those layers a 3-class band and a 4-entry legend to draw and export --
 something the legacy never rendered at all (see
 ``sdg1531/engine/indicator.py``'s EXPECTED_DIVERGENCES note 4). Deriving one table
 from the other, or "unifying" them, would silently republish the trend and state

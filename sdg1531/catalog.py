@@ -1,7 +1,7 @@
 """Sensors, asset ids, year bounds and the two scalar helpers.
 
 The value halves of component/parameter/sensor.py, computation.py and ui.py.
-ui.py's translated labels and its four viz dicts stay in the app layer (spec §4).
+ui.py's translated labels and its four viz dicts stay in the app layer.
 
 No EXPECTED_DIVERGENCES: frozen data, retyped with every value unchanged.
 ``tools/check_transcription.py`` imports the legacy modules and diffs them against
@@ -72,7 +72,7 @@ SENSORS: Mapping[str, SensorInfo] = MappingProxyType(
 )
 
 # transcribed from parameter/sensor.py:36-47. `soc_isric` is dropped: zero call
-# sites in the whole tree (spec §7, dead-code row).
+# sites in the whole tree, so it is dead code rather than a behaviour change.
 ASSETS: Mapping[str, str] = MappingProxyType(
     {
         "precipitation": "NOAA/PERSIANN-CDR",

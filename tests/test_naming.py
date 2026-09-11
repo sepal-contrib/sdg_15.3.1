@@ -82,8 +82,8 @@ def test_normalize_str_transliterates_non_latin_scripts(raw, transliterated):
     # pysepal scripts/utils.py:140 is anyascii-backed, which *transliterates*
     # rather than strips: an AOI name outside Latin-1 must still reach the
     # same folder component the legacy would have used, or a user with such a
-    # name gets a different (or empty) result directory (spec §7, data
-    # contract). A plain NFKD ascii-fold instead silently drops the leading
+    # name gets a different (or empty) result directory -- the folder name is a
+    # data contract. A plain NFKD ascii-fold instead silently drops the leading
     # or non-Latin letters ("rsted", "odz", "Strae", "", "") - this is what
     # would have caught that.
     assert naming.normalize_str(raw) == transliterated
@@ -173,7 +173,7 @@ def test_precomputed_vi_still_produces_a_label():
 def test_matrix_edit_flips_the_label():
     # indicator_model.py:305 compares pm.default_trans_matrix with itself and is
     # permanently False, so a matrix-only edit was labelled "default" and
-    # overwrote the previous run's directory (spec §7).
+    # overwrote the previous run's directory.
     edited = TransitionMatrix.default().with_cell(0, 1, 1)
 
     assert naming.run_label(_spec()).split("_")[-2] == "default"
@@ -231,8 +231,8 @@ def test_sensor_token_both_ways(sensors, legacy, fixed):
 
 def test_sensor_token_is_total_for_a_short_unknown_name_containing_l():
     # :290 subscripts token[1], which index-errors on a token shorter than two
-    # characters (spec §7). A name outside the catalog that is itself just "l"
-    # reproduces exactly that: "l" in names[0] is True, and the catalog-token
+    # characters. A name outside the catalog that is itself just "l" reproduces
+    # exactly that: "l" in names[0] is True, and the catalog-token
     # fallback (normalize_str(name).lower()) hands back the single character
     # "l" right back — none of the catalog sensors are this short, so this is
     # the one case the fuzz strategy below (which only draws catalog names)

@@ -28,9 +28,9 @@ jobs:
       # WOULD catch it is `test_scenario_graphs_match_the_goldens`: its 112
       # comparisons run through the INSTALLED `ee.serializer` against committed
       # goldens, so a build that serialized differently would redden them. (The
-      # algorithm-table digest would not -- both its sides are committed files.) Spec §15.7(b) owns the
-      # question of pinning the fork properly; until then, read this step as a
-      # version check and not as a provenance guard.
+      # algorithm-table digest would not -- both its sides are committed files.)
+      # Pinning the fork properly is the app-layer migration's to settle; until
+      # then, read this step as a version check and not as a provenance guard.
       - name: Verify ee-api fork
         shell: micromamba-shell {0}
         run: |
@@ -61,8 +61,8 @@ jobs:
         run: pytest --nbmake ui.ipynb --nbmake-timeout=600 --nbmake-kernel=test-kernel
 
   # The `ci` job above still guards the Voila entrypoint (kernelspec + nbmake on
-  # ui.ipynb). Its replacement is the companion spec's call (§15.7), not this
-  # task's: the domain jobs below are additive, and nothing above was touched.
+  # ui.ipynb). Its replacement is the app-layer migration's call, not this port's:
+  # the domain jobs below are additive, and nothing above was touched.
 
   domain:
     name: Domain suite (offline)
@@ -109,7 +109,7 @@ jobs:
           elapsed=$(( SECONDS - start ))
           echo "offline suite took ${elapsed}s"
           if [ "$elapsed" -gt 60 ]; then
-            echo "::warning::offline suite took ${elapsed}s; spec §12 targets 60s"
+            echo "::warning::offline suite took ${elapsed}s; the target is 60s"
             echo "It includes the parity harness and gates every PR - keep it fast."
           fi
 

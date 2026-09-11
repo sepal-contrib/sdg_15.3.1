@@ -1,4 +1,4 @@
-"""The deliberate divergences from D9's byte-parity rule.
+"""The deliberate divergences from the port's byte-parity rule.
 
 **An entry here is a LICENCE TO DIFFER, and a licence is only ever as narrow as
 its patterns.** ``EXPECTED_DIVERGENCES`` is keyed on (scenario glob, layer glob),
@@ -241,7 +241,7 @@ EXPECTED_LEGACY_AND_PORT_BOTH_FAIL: frozenset[str] = frozenset({"s03", "s15", "s
 #   s03, s15, s24  refused by both trees before any graph is built.
 EXPECTED_COMPATIBILITY_DIVERGENCES: dict[str, frozenset[str]] = {
     # soc_subsequent_transition_scale=100 -- soil_organic_carbon.py:114's
-    # multiply(10) becomes multiply(100) for every year pair after the first (D13).
+    # multiply(10) becomes multiply(100) for every year pair after the first.
     "s02": frozenset({"soc", "indicator_15_3_1"}),
     "s05": frozenset({"soc", "indicator_15_3_1"}),
     "s11": frozenset({"soc", "indicator_15_3_1"}),
@@ -496,7 +496,7 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
             "zonal_shapefile_zip writes into a TemporaryDirectory that is gone "
             "before it returns and hands the caller bytes, where run_15_3_1.py:"
             "356-366 wrote the five members into ~/module_results and left them "
-            "beside the zip. Where the zip lands is the app layer's decision (D12)."
+            "beside the zip. Where the zip lands is the app layer's decision."
         ),
         "tests": (
             "test_it_leaves_nothing_behind_in_the_working_directory",
@@ -720,7 +720,7 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
             "decoders and produced a Sankey with two identically-labelled year "
             "columns. Against the corpus the fatal pair rejects s04 and s08, which "
             "stage A recorded a legacy result for -- so this refuses runs the legacy "
-            "performed, and spec §7 has no row for it."
+            "performed, and it was not a recorded port decision."
         ),
         "tests": (
             "test_an_inverted_land_cover_override_is_fatal",
@@ -735,9 +735,9 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
         "reason": (
             "soc_period_collapses (fatal) rejects a SOC period lying entirely after "
             "the CCI record, where soil_organic_carbon.py:161 selected a NEGATIVE "
-            "band index and computed something. Spec §7 mandates the rule by name, "
-            "so unlike the land-cover rules this was a recorded decision -- but it "
-            "still refuses runs the legacy performed: s04, s08, s24 and s27."
+            "band index and computed something. Unlike the land-cover rules this "
+            "one WAS a recorded port decision -- but it still refuses runs the "
+            "legacy performed: s04, s08, s24 and s27."
         ),
         "tests": (
             "test_soc_period_collapses_is_fatal",

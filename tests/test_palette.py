@@ -1,5 +1,5 @@
 """palette.py vendors matplotlib's CSS4 hex values so lc_color keeps colour parity
-without dragging matplotlib into the domain (spec §4).
+without dragging matplotlib into the domain.
 
 The legacy path is indicator_model.py:248-250:
 

@@ -1,4 +1,4 @@
-"""pyproject must actually install, and must carry the config §12 assumes exists."""
+"""pyproject must actually install, and must carry the config the suite assumes exists."""
 
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ def test_requires_python_is_312() -> None:
 def test_runtime_dependencies_are_declared() -> None:
     deps = _pyproject()["project"]["dependencies"]
     names = {d.split("[")[0].split(">")[0].split("=")[0].split("<")[0].strip() for d in deps}
-    # the domain is ee + pandas + geopandas + stdlib and nothing else (spec §4),
-    # plus anyascii: pure-Python, zero dependencies, required so
+    # the domain is ee + pandas + geopandas + stdlib and nothing else, plus
+    # anyascii: pure-Python, zero dependencies, required so
     # sdg1531.naming.normalize_str transliterates non-Latin AOI names
     # byte-identically to the legacy pysepal scripts/utils.py:140.
     assert names == {"earthengine-api", "pandas", "geopandas", "anyascii"}

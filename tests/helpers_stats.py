@@ -43,7 +43,7 @@ the same content out of ``["features"][0]["properties"]["groups"]``, because it
 wrapped the reduction in ``ee.Feature(None, ...)`` to get a ``getDownloadURL``
 (:236-240, :284-289); awaiting the ``ee.Dictionary`` itself returns the properties
 dict with no feature wrapper around it. The group lists are byte-identical either
-way -- that is the whole of why the transport swap is safe (spec §7).
+way -- that is the whole of why the transport swap is safe.
 """
 
 from __future__ import annotations

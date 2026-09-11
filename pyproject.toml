@@ -9,7 +9,7 @@ description = "SDG indicator 15.3.1 (Land Degradation Neutrality) on Google Eart
 requires-python = ">=3.12"
 dependencies = [
     # the openforis fork is installed from git by sepal_environment.yml; the pin
-    # here is the version the parity harness records and asserts (spec §12 Tier 4)
+    # here is the version the parity harness records and asserts
     "earthengine-api==1.6.14",
     "pandas>=2.2",
     "geopandas>=1.0",

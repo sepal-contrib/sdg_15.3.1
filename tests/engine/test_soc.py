@@ -1,9 +1,9 @@
 """Soil organic carbon. Transcribed from component/scripts/soil_organic_carbon.py:6-178.
 
-The interesting fact under test is D13: the first year pair is encoded at scale 100
-(:50) and every later pair at scale 10 (:114), so from year two onward the codes fall
-outside IPCC_TRANSITION_CODES entirely and every CHANGED pixel loses its stock update.
-Phase 1 preserves this byte-for-byte behind
+The interesting fact under test is the transition-scale defect: the first year pair
+is encoded at scale 100 (:50) and every later pair at scale 10 (:114), so from year
+two onward the codes fall outside IPCC_TRANSITION_CODES entirely and every CHANGED
+pixel loses its stock update. Phase 1 preserves this byte-for-byte behind
 ``Compatibility.soc_subsequent_transition_scale``.
 
 Two habits this file keeps to, both because a count over an `ee` graph is a
@@ -11,7 +11,7 @@ POST-CSE distinct-node count and cannot see a duplicated operation:
 
 * the transition scales are read as a ``{(year, year+1): scale}`` MAP keyed by the
   ``calendarRange`` windows under each operand, not counted -- the map says which
-  pair got which scale, which is the whole of D13;
+  pair got which scale, which is the whole of the defect;
 * where a count is unavoidable it is stated as ``BLOCKS`` / ``LOOP_YEARS``,
   derived from the period below and checked against the graph.
 
@@ -130,11 +130,11 @@ def year_of(node, deref, graph):
 def transition_scales(image):
     """`{(lc0 year, lc1 year): scale}` for every `lc0.multiply(k).add(lc1)` node.
 
-    This is the D13 assertion's whole substance: it reads the scale off each pair
-    together with the two years that pair came from, so it says WHICH pair got which
-    multiplier. A count could not -- and the percent-change `multiply(100)` at :164
-    is excluded structurally, because its parent is the `where` ladder, not an
-    `Image.add`.
+    This is the transition-scale assertion's whole substance: it reads the scale off
+    each pair together with the two years that pair came from, so it says WHICH pair
+    got which multiplier. A count could not -- and the percent-change
+    `multiply(100)` at :164 is excluded structurally, because its parent is the
+    `where` ladder, not an `Image.add`.
     """
     deref, graph, root = _root(image)
     scales = {}
@@ -405,7 +405,7 @@ def test_soc_transition_code_multiplies_the_first_image_by_the_scale():
     assert code_parts(10) == (1, 10, 2)
 
 
-# --- D13 in the built graph ---------------------------------------------------
+# --- the transition-scale defect in the built graph ---------------------------
 
 
 def test_the_first_pair_is_encoded_at_100_and_every_later_pair_at_10():
@@ -420,7 +420,7 @@ def test_the_first_pair_is_encoded_at_100_and_every_later_pair_at_10():
 
 
 def test_the_compatibility_flag_moves_every_later_pair_to_100():
-    """`soc_transition_code` is the only place the multiplier is spelled (D13), so
+    """`soc_transition_code` is the only place the multiplier is spelled, so
     one flag has to move every loop pair and leave the first pair alone."""
     scales = transition_scales(
         soc_image(compatibility=Compatibility(soc_subsequent_transition_scale=100))
@@ -437,10 +437,11 @@ def test_the_default_subsequent_scale_is_the_legacy_ten():
 
 def test_the_transition_and_the_change_update_only_where_the_cover_changed():
     """:115 and :141-142. Both updates are gated on `lc_time0.neq(lc_time1)`, and it
-    is that gate -- not the scale -- that confines D13's damage to changed pixels:
-    unchanged pixels keep the correct four-digit code from the first pair. Flipping
-    either `neq` to `eq` inverts which pixels are updated and is invisible to every
-    shape assertion above, so both gates and both operands are pinned here."""
+    is that gate -- not the scale -- that confines the defect's damage to changed
+    pixels: unchanged pixels keep the correct four-digit code from the first pair.
+    Flipping either `neq` to `eq` inverts which pixels are updated and is invisible
+    to every shape assertion above, so both gates and both operands are pinned
+    here."""
     deref, graph, root = _root(soc_image())
 
     transition_updates, change_updates = [], []
@@ -552,7 +553,7 @@ def test_the_carbon_change_accumulator_is_carried_across_iterations():
 def test_the_transition_code_is_carried_across_iterations():
     """:115. `lc_transition` is likewise carried -- each pass wraps the previous
     block's image in one more `.where()`, and every chain bottoms out at the first
-    pair's `Image.add` (:50). This is what makes the D13 damage cumulative: a pixel
+    pair's `Image.add` (:50). This is what makes the damage cumulative: a pixel
     that changed in year 3 keeps its scale-10 code for every later year."""
     depths, terminal = transition_depths(soc_image())
 

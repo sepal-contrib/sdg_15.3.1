@@ -44,8 +44,8 @@ whose claim is checkable is checked here rather than described:
     its own check and the account went on vouching for it.
 ``vocabulary``
     a closed list transcribed from something outside this repo -- ``ee``'s
-    encoder, the ECharts option schema, the ESRI shapefile format, the libraries
-    spec §4 bars. There is nothing in the repo to derive it from, and the honest
+    encoder, the ECharts option schema, the ESRI shapefile format, the UI libraries
+    the domain bars. There is nothing in the repo to derive it from, and the honest
     thing is to say so rather than invent a derivation that only restates the list.
 ``fixture``
     literal test data. It describes nothing but itself, so it cannot be stale.
@@ -107,12 +107,12 @@ ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/engine/test_soc.py:_COMPARISONS": "vocabulary: ee's six Image comparison operators",
     "tests/engine/test_soc.py:_RECEIVER_ARG": "vocabulary: ee's encoder -- which argument each node carries its receiver in",
     "tests/engine/test_water_mask.py:_COMPARISONS": "vocabulary: ee's six Image comparison operators",
-    "tests/hygiene_rules.py:BANNED_CALL_ATTRS": "vocabulary: the blocking and noisy calls spec §4 bars from the domain",
-    "tests/hygiene_rules.py:BANNED_CALL_NAMES": "vocabulary: the blocking and noisy calls spec §4 bars from the domain",
-    "tests/hygiene_rules.py:BANNED_PARAMS": "vocabulary: the widget-bag parameter names spec §7 names",
+    "tests/hygiene_rules.py:BANNED_CALL_ATTRS": "vocabulary: the blocking and noisy calls the domain bars",
+    "tests/hygiene_rules.py:BANNED_CALL_NAMES": "vocabulary: the blocking and noisy calls the domain bars",
+    "tests/hygiene_rules.py:BANNED_PARAMS": "vocabulary: the legacy widget-bag parameter names",
     "tests/hygiene_rules.py:FS_CALL_ATTRS": "vocabulary: the stdlib's filesystem entry points",
     "tests/hygiene_rules.py:FS_CALL_NAMES": "vocabulary: the stdlib's filesystem entry points",
-    "tests/hygiene_rules.py:FS_EXEMPT_CALLS": "vocabulary: the two calls spec D12 allows sdg1531/export.py",
+    "tests/hygiene_rules.py:FS_EXEMPT_CALLS": "vocabulary: the two calls sdg1531/export.py is allowed",
     "tests/hygiene_rules.py:FS_EXEMPT_FILES": "one direction: test_every_hygiene_exemption_names_a_file_that_exists",
     "tests/hygiene_rules.py:_TEMP_SPOOLS": "vocabulary: the tempfile entry points that put something on disk",
     "tests/hygiene_rules.py:MUTABLE_BUILTINS": "vocabulary: the stdlib factories that return a fresh mutable container",
@@ -134,7 +134,7 @@ ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/spec_factory.py:__all__": "derived: test_every_export_list_matches_its_module",
     "tests/test_constants.py:COLOUR_MODULES": "both directions: test_the_domains_colours_live_in_the_two_colour_modules",
     "tests/test_export.py:MANDATORY_MEMBERS": "vocabulary: the ESRI shapefile members a layer cannot be reopened without",
-    "tests/test_isolation.py:BANNED_UI": "vocabulary: the UI libraries spec §4 bars from the domain",
+    "tests/test_isolation.py:BANNED_UI": "vocabulary: the UI libraries the domain bars",
     "tests/test_isolation.py:JSON_HALF": "derived: test_the_ee_free_roster_is_every_module_that_imports_without_ee",
     "tests/test_naming.py:_SENSOR_NAMES": "fixture: the run_label fuzz's sample -- spread from the catalogue's own SENSORS, plus one name it does not know",
     "tests/test_network_smoke.py:AOI_GEOJSON": "fixture: the 10 km box the Tier-6 run computes over",

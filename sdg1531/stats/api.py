@@ -23,8 +23,8 @@ harness must carry all three:
    measures it is a separate, cheap request that adds one round trip.
 2. **Behaviour-changing.** :func:`fetch_band_names` returns Earth Engine's own band
    order. ``widget/select_lc.py:63-65`` fed the same list through ``natsorted``
-   before putting it in the dropdown. Display ordering is the app layer's (spec
-   §4), so the sort moves there rather than being dropped; the entry covers the
+   before putting it in the dropdown. Display ordering is the app layer's, so the
+   sort moves there rather than being dropped; the entry covers the
    ORDER of this one function's result and nothing else. (The sibling
    :func:`fetch_distinct_pixel_values` sorts, which is
    ``sdg1531/stats/decode.py``'s EXPECTED_DIVERGENCES note 2, not this module's.)

@@ -1,6 +1,6 @@
 """AST-lift the three legacy `.where()` chains into a committed fixture.
 
-Spec §12 Tier 2. The three chains are the port's biggest transcription risk:
+Stage A, Tier 2. The three chains are the port's biggest transcription risk:
 66 hand-written rules whose values a reviewer cannot check by eye. This tool
 reads them out of the legacy source with `ast`, so `sdg1531/truth_table.py`
 can be diffed against the original mechanically.

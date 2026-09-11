@@ -356,7 +356,7 @@ def test_the_collapse_is_the_legacy_chain_with_the_rename_put_back():
 
     ``legacy_chain`` is run_15_3_1.py:378-408 copied verbatim and reaches `ee`
     through none of the port's code. Insert the one deliberate node -- the
-    `.rename()` of spec §7 -- where the port puts it, and the two serialize to the
+    `.rename()` the port adds -- where the port puts it, and the two serialize to the
     same bytes. Any rule reordered, any `eq`/`lt` flipped, any operand swapped and
     any `.where` value changed breaks this.
     """
@@ -377,8 +377,8 @@ def test_the_collapse_is_the_legacy_chain_with_the_rename_put_back():
 
 
 def test_the_rename_is_the_only_node_the_port_adds():
-    """spec §7: run_15_3_1.py:411 never renames, so the legacy band is literally
-    called "constant". Nothing else about the chain moves.
+    """run_15_3_1.py:411 never renames, so the legacy band is literally called
+    "constant". Nothing else about the chain moves.
 
     The harness does not LICENSE that difference. It did once -- a corpus-wide
     `EXPECTED_DIVERGENCES[("*", "indicator_15_3_1")]` entry, which covered the whole
@@ -526,7 +526,7 @@ def test_build_indicator_takes_its_three_images_by_keyword_only():
 
 
 def test_indicator_band_is_renamed_and_cast_to_uint8():
-    """spec §7: the legacy band is called "constant" because :411 never renames."""
+    """The legacy band is called "constant" because :411 never renames."""
     productivity, land_cover, soc = fake_inputs()
     image = build_indicator(productivity=productivity, land_cover=land_cover, soc=soc)
 
@@ -682,7 +682,7 @@ def test_maps_carry_the_very_resolved_spec_they_were_handed(resolved, ctx):
 def test_resolved_is_the_first_field_and_the_seven_outputs_follow(maps):
     """Field ORDER is load-bearing, not cosmetic: `resolved` is first so Task 15
     reads it positionally-independently of the seven images, and the seven follow in
-    spec §8 order."""
+    the canonical table order."""
     assert [field.name for field in dataclasses.fields(IndicatorMaps)] == [
         "resolved",
         "land_cover",
@@ -710,9 +710,9 @@ def test_classified_layer_is_frozen(maps):
 
 
 def test_layers_returns_exactly_seven_entries_in_spec_order(maps):
-    """spec §8 table order. Asserted as a LIST: a mapping with the right seven keys
-    in a different order passes an equality on `set(layers)`, and one that keyed two
-    layers under the same id passes a `len(...) == 7` written against a set."""
+    """The canonical table order. Asserted as a LIST: a mapping with the right seven
+    keys in a different order passes an equality on `set(layers)`, and one that keyed
+    two layers under the same id passes a `len(...) == 7` written against a set."""
     layers = maps.layers()
     assert list(layers) == [
         IndicatorLayer.LAND_COVER,
@@ -753,8 +753,8 @@ def test_each_layer_carries_its_own_image(maps):
 
 
 def test_layer_bands_match_the_export_table(maps):
-    """spec §8, the EXPORT vocabulary. Trend and state carry the 3-class band; the
-    5-level band `indicator_n_category_label` selected (run_15_3_1.py:437-442, the
+    """The EXPORT vocabulary. Trend and state carry the 3-class band; the 5-level
+    band `indicator_n_category_label` selected (run_15_3_1.py:437-442, the
     range that includes its 6-entry legend) stays the STATISTICS vocabulary, which
     Task 15's `stats/requests.py` is specified to own -- see the module docstring's
     EXPECTED_DIVERGENCES note 4."""
@@ -811,8 +811,8 @@ def test_only_performance_uses_the_three_class_labels(maps):
 
 
 def test_there_is_no_export_layers_method():
-    """spec §4: layers() is the single seam -- map layers, export sources and the
-    statistics layer picker all iterate it."""
+    """layers() is the single seam -- map layers, export sources and the statistics
+    layer picker all iterate it."""
     assert not hasattr(IndicatorMaps, "export_layers")
 
 
@@ -833,7 +833,7 @@ def test_serialize_maps_is_keyed_by_the_spec_layer_ids(maps):
 
 
 def test_every_serialize_key_is_its_layer_s_own_id(maps):
-    """The key is `layer.id.name.lower()`, which is the §8 "Layer id" column and so
+    """The key is `layer.id.name.lower()`, which is the canonical layer id and so
     equals `layer.id.value` for all seven. Pinned so the two spellings cannot drift
     apart silently."""
     for key, layer in zip(serialize_maps(maps), maps.layers().values(), strict=True):
@@ -841,8 +841,8 @@ def test_every_serialize_key_is_its_layer_s_own_id(maps):
 
 
 def test_serialize_maps_encodes_the_whole_image_not_the_named_band(maps):
-    """§12 Tier 4 compares these strings old-vs-new, and the legacy assigned WHOLE
-    images to its seven output traits (run_15_3_1.py:173-202). Encoding
+    """The parity harness compares these strings old-vs-new, and the legacy assigned
+    WHOLE images to its seven output traits (run_15_3_1.py:173-202). Encoding
     `layer.image.select(layer.band)` instead would silently change every trend and
     state comparison, since those images carry two bands."""
     payload = serialize_maps(maps)
@@ -857,8 +857,8 @@ def test_serialize_maps_encodes_the_whole_image_not_the_named_band(maps):
 
 
 def test_serialization_is_stable_across_rebuilds(resolved, ctx):
-    """The parity harness compares these as plain strings (§12 Tier 4), so a graph
-    that carried a counter or a timestamp would make every run differ."""
+    """The parity harness compares these as plain strings, so a graph that carried
+    a counter or a timestamp would make every run differ."""
     assert serialize_maps(build_indicator_maps(resolved, ctx)) == serialize_maps(
         build_indicator_maps(resolved, ctx)
     )

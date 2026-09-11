@@ -238,8 +238,8 @@ def test_non_modis_msvi_is_the_transcribed_expression_over_red_and_nir(ctx, sens
     land-cover/water combination the legacy refuses, so stage A recorded a crash for
     it and there is no graph pair: `(sentinel2, msvi)`, `(landsat_pair, msvi)` and
     `(derived_vi, msvi)` reach no comparison at all. That left a hand-typed
-    60-character expression string -- the exact class of transcription D9 exists to
-    protect -- with no verification of any kind.
+    60-character expression string -- exactly the kind of transcription a
+    byte-for-byte port has to protect -- with no verification of any kind.
 
     Both rungs that call it are covered, because `_process_sentinel2` and
     `_process_landsat_sensors` reach it through separate call sites

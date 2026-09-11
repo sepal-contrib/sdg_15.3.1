@@ -1,4 +1,4 @@
-"""The extractor lifts the three legacy `.where()` chains by AST (spec §12 Tier 2).
+"""The extractor lifts the three legacy `.where()` chains by AST (stage A, Tier 2).
 
 It is the ground truth `sdg1531/truth_table.py` is checked against, so it must be
 strict: any construct it does not recognise is an error, never a silent skip.
@@ -95,7 +95,7 @@ def test_lt_one_is_encoded_as_class_zero(extracted):
 def test_band_is_the_rename_argument_or_none(extracted):
     assert _table(extracted, "productivity_final")["band"] == "productivity"
     assert _table(extracted, "productivity_final_GPG1")["band"] == "productivity"
-    # run_15_3_1.py:377-409 never calls .rename() — the §7 unnamed-band defect.
+    # run_15_3_1.py:377-409 never calls .rename() — the unnamed-band defect.
     assert _table(extracted, "indicator_15_3_1")["band"] is None
 
 

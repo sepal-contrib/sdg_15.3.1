@@ -2,8 +2,7 @@
 
 Pure: no ``ee``, no filesystem, no network. This is the transcription of
 ``component/model/indicator_model.py:280-312`` (``IndicatorModel.folder_name``),
-with the two label defects of spec §7 handled explicitly and nothing else
-changed.
+with its two label defects handled explicitly and nothing else changed.
 
 EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
 harness must carry it:
@@ -53,7 +52,7 @@ __all__ = [
 _FOLDER_RE = re.compile(r"[^a-zA-Z\d\-_]")
 _DISPLAY_RE = re.compile(r"[^a-zA-Z\d\-_ ']")
 
-# spec §8, the "Asset basename" column. Keyed by IndicatorLayer *value*.
+# The asset basename of each layer. Keyed by IndicatorLayer *value*.
 LAYER_BASENAMES: Mapping[str, str] = MappingProxyType(
     {
         IndicatorLayer.LAND_COVER.value: "land_cover",
@@ -104,8 +103,8 @@ def _sensor_token(spec: RunSpec) -> str:
     source = spec.vi_source
     if not isinstance(source, SensorSelection) or not source.names:
         # :288 index-errors on an empty selection, and the legacy has no
-        # counterpart for a precomputed asset at all (spec §7, the doubly-dead
-        # "GEE Asset" branch). Both are given a value here so run_label is total.
+        # counterpart for a precomputed asset at all -- its "GEE Asset" branch was
+        # doubly dead. Both are given a value here so run_label is total.
         return "asset" if isinstance(source, PrecomputedViAsset) else ""
 
     names = tuple(source.names)
@@ -114,9 +113,9 @@ def _sensor_token(spec: RunSpec) -> str:
     if spec.compatibility.legacy_sensor_folder_token:
         # :288 tests for a lowercase "l" in the *display* name, meaning to
         # detect Landsat; of the ten names only "Sentinel 2" has one, so the
-        # branch fires for Sentinel alone and yields "l2" (spec §7). :290 then
-        # subscripts token[1], which index-errors on a token shorter than two
-        # characters; token[1:2] keeps that path total instead.
+        # branch fires for Sentinel alone and yields "l2". :290 then subscripts
+        # token[1], which index-errors on a token shorter than two characters;
+        # token[1:2] keeps that path total instead.
         if "l" in names[0]:
             return "l" + "".join(token[1:2] for token in tokens)
         return tokens[0]
@@ -154,10 +153,10 @@ def _climate_token(climate: Climate) -> str:
 def run_label(spec: RunSpec) -> str:
     """The legacy result-folder name for ``spec``.
 
-    Transcribed from indicator_model.py:280-312. Two departures, both recorded
-    in spec §7 and neither touching the ee graph: the climate slot reads the
-    climate union's ``.token`` instead of ``int(conversion_coef * 100)`` on a
-    None default (:310) — with ``nan``/``inf`` also guarded, see
+    Transcribed from indicator_model.py:280-312. Two deliberate departures, neither
+    touching the ee graph: the climate slot reads the climate union's ``.token``
+    instead of ``int(conversion_coef * 100)`` on a None default (:310) — with
+    ``nan``/``inf`` also guarded, see
     :func:`_climate_token` — and the transition-matrix test compares by value
     instead of comparing the module-level list with itself (:305).
     """
@@ -183,7 +182,7 @@ def layer_basenames(spec: RunSpec) -> dict[str, str]:
     """The asset basename of each of the seven layers, keyed by layer id.
 
     Takes the spec so call sites stay stable if a basename ever has to vary
-    per run; spec §8's table is currently constant.
+    per run; the table is currently constant.
     """
     del spec
 
@@ -200,7 +199,7 @@ def asset_path(
 
     ``root`` is the destination folder, ``taken`` the ids the caller already
     knows about; a collision appends ``_1``, ``_2``, ... to the *id*, never to
-    the layer basename (spec D14).
+    the layer basename.
 
     Re-running with identical parameters produces an identical run label, so
     without this every re-run collides. This **reduces** collisions rather than

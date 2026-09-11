@@ -21,7 +21,7 @@ on the PR gate, rather than discovered from a build that was passing all along:
 Everything below is derived from the workflow files themselves. The one name typed
 by hand is ``ci``: the job that predates this task, whose *Verify ee-api fork*,
 *Verify notebook kernelspec* and *Test UI notebook* steps guard the still-live
-Voila entrypoint and are the companion spec's to retire (§15.7). It is named so
+Voila entrypoint and are the app-layer migration's to retire. It is named so
 that the two rules it cannot satisfy -- its scripts predate ``set -e`` and its
 kernelspec step deliberately runs outside the micromamba environment -- are
 exclusions someone wrote down, rather than rules quietly weakened for everybody.
@@ -229,9 +229,9 @@ def test_the_nightly_workflow_is_scheduled_and_dispatchable() -> None:
 
 
 def test_the_app_layer_checks_are_intact() -> None:
-    """The `ci` job guards the Voila entrypoint and is §15.7's to retire, not this
-    task's. Its kernelspec step reads ui.ipynb, so deleting the notebook makes the
-    workflow raise FileNotFoundError on the first port PR."""
+    """The `ci` job guards the Voila entrypoint and is the app-layer migration's to
+    retire, not this port's. Its kernelspec step reads ui.ipynb, so deleting the
+    notebook makes the workflow raise FileNotFoundError on the first port PR."""
     steps = _jobs(WORKFLOW_DIR / "ci.yaml")[LEGACY_JOB]["steps"]
     names = [step.get("name") for step in steps]
 
@@ -287,7 +287,7 @@ def test_no_pytest_invocation_narrows_what_its_marker_selects() -> None:
     same.
 
     The `ci` job is exempt: ``pytest --nbmake ui.ipynb`` names the notebook on
-    purpose, and it is §15.7's to retire.
+    purpose, and it is the app-layer migration's to retire.
     """
     problems = []
     for workflow, job, command in _pytest_commands():

@@ -25,8 +25,8 @@ BANNED_UI = (
     "component",
 )
 
-# spec §4: these may not import ee either. They are the JSON half, and that is
-# what makes the parameter layer test in milliseconds.
+# These may not import ee either. They are the JSON half, and that is what makes
+# the parameter layer test in milliseconds.
 JSON_HALF = (
     "sdg1531.errors",
     "sdg1531.enums",

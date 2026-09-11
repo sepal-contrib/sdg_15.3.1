@@ -1,16 +1,16 @@
 """Soil organic carbon sub-indicator: the year loop and the transition multiplier.
 
 Transcribed from ``component/scripts/soil_organic_carbon.py`` (legacy
-``soil_organic_carbon()``, lines 6-178). Phase 1 is a transcription, not a refactor
-(spec D9): every node matches the legacy graph, and the legacy's weaknesses are
-preserved and annotated rather than repaired. The two stock-change blocks below are
-near-duplicates of each other because the legacy spells them out twice; factoring
+``soil_organic_carbon()``, lines 6-178). Phase 1 is a transcription, not a refactor:
+every node matches the legacy graph, and the legacy's weaknesses are preserved and
+annotated rather than repaired. The two stock-change blocks below are near-duplicates
+of each other because the legacy spells them out twice; factoring
 them into one helper would read better and is deliberately NOT done, so this file
 stays diffable against the legacy line by line.
 
 Three things a reader will want to change here and must not, in phase 1:
 
-* **The year-two-onward transition scale is 10, and it should be 100** (D13). The
+* **The year-two-onward transition scale is 10, and it should be 100.** The
   first year pair is encoded ``lc0 * 100 + lc1`` (:50) and every later pair
   ``lc0 * 10 + lc1`` (:114). After ``TRANSLATION_MATRIX`` the class codes are
   ``{10,20,...,70}``, so scale 100 produces exactly the 49 four-digit codes of
@@ -91,8 +91,8 @@ _FIRST_PAIR_TRANSITION_SCALE = 100
 def soc_transition_code(lc0: ee.Image, lc1: ee.Image, scale: int) -> ee.Image:
     """Encode a land-cover pair as one transition code: ``lc0 * scale + lc1``.
 
-    The ONLY place the SOC transition multiplier appears (D13). The legacy spells it
-    twice with different values -- ``multiply(100)`` for the first year pair
+    The ONLY place the SOC transition multiplier appears. The legacy spells it twice
+    with different values -- ``multiply(100)`` for the first year pair
     (soil_organic_carbon.py:50) and ``multiply(10)`` for every later pair (:114) --
     which is the defect the module docstring describes. Which image carries the
     leading digits is as load-bearing as the scale itself: exchanging the operands
@@ -192,7 +192,7 @@ def build_soil_organic_carbon(r: ResolvedSpec, ctx: ExecutionContext) -> ee.Imag
     soc_time1 = soc.subtract(organic_carbon_change)  # :84
 
     # :87 -- accumulated and never read, here as in the legacy (:155 too). Kept so
-    # the parity diff stays empty; spec §7 defers the deletion to phase 2.
+    # the parity diff stays empty; the deletion is phase 2's.
     lc_images = ee.Image(lc_time0).addBands(lc_time1)
 
     soc_images = ee.Image(soc).addBands(soc_time1)  # :89
@@ -218,7 +218,8 @@ def build_soil_organic_carbon(r: ResolvedSpec, ctx: ExecutionContext) -> ee.Imag
             lc_time0.eq(lc_time1), lc_transition_time.add(ee.Image(1))
         ).where(lc_time0.neq(lc_time1), ee.Image(1))
 
-        # :114 -- the D13 defect, preserved. :115 confines it to changed pixels.
+        # :114 -- the wrong transition scale, preserved (see the module docstring).
+        # :115 confines it to changed pixels.
         lc_transition_temp = soc_transition_code(lc_time0, lc_time1, subsequent_scale)
         lc_transition = lc_transition.where(lc_time0.neq(lc_time1), lc_transition_temp)
 

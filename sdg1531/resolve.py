@@ -1,8 +1,7 @@
 """ResolvedSpec: every derivation of a run, computed once.
 
 Transcribed from the legacy `IndicatorModel` properties and the derivations the
-science scripts kept inline (spec §6). This module is the JSON half: it must not
-import ee.
+science scripts kept inline. This module is the JSON half: it must not import ee.
 
 EXPECTED_DIVERGENCES note -- one divergence from the legacy. Task 17's parity
 harness must carry it:
@@ -49,7 +48,7 @@ def _require_year(year: int | None, field: str) -> int:
 
     Not a legacy transcription: the legacy would raise ``TypeError`` deep inside
     ``max()`` for the same missing-endpoint case. ``RunSpec`` itself never
-    validates (``sdg1531.validate`` does, spec §4), so ``resolve()`` is the first
+    validates (``sdg1531.validate`` does), so ``resolve()`` is the first
     place that can name what is actually missing.
     """
     if year is None:
@@ -105,7 +104,7 @@ type ViAsset = str | tuple[str, str]
 
 
 def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[ViAsset, ...]]:
-    """integration.py:41-94 — an ordered ladder, not a family lookup (spec §6).
+    """integration.py:41-94 — an ordered ladder, not a family lookup.
 
     The "GEE Asset" rung (:79-80) is dropped as unreachable; PrecomputedViAsset
     replaces it as a first-class ViSource arm.
@@ -156,10 +155,10 @@ def _vi_dispatch(spec: RunSpec) -> tuple[ViProcessor, tuple[ViAsset, ...]]:
 def _scheme(spec: RunSpec) -> LandCoverScheme:
     """indicator_model.py:183-242 — the custom branch needs both assets AND the CSV.
 
-    Six properties repeat that test today; it is stated once here (spec §7,
-    half-custom land cover). A `CustomLandCoverSource` whose CSV has not been
-    parsed is half-custom: it falls back to the default vocabulary, carrying the
-    run's (possibly edited) transition matrix.
+    Six properties repeat that test today; it is stated once here. A
+    `CustomLandCoverSource` whose CSV has not been parsed is half-custom: it falls
+    back to the default vocabulary, carrying the run's (possibly edited) transition
+    matrix.
 
     This picks *which* `LandCoverScheme` the run uses; it never decides whether
     that scheme is custom. `is_custom` is a stored field written once at
@@ -190,36 +189,37 @@ def _json_safe(value: Any) -> Any:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedSpec:
-    """Every derivation of one run, computed once (spec §6).
+    """Every derivation of one run, computed once.
 
     Twenty fields, plus ``spec`` -- not a derivation but the ``RunSpec`` itself,
     carried along so a component that needs both has one object to take.
 
-    **Twenty fields against §6's twenty-seven derived values.** §6 counts
-    DERIVATIONS, not fields, and the two do not correspond one to one; the count is
-    reconciled here because a reader checking §6 against this declaration otherwise
-    stalls on it. Its 27 is 21 surviving legacy properties (22 less
-    ``custom_lc_matrix_list``, which §6 deletes) plus six that were duplicated or
-    inline. Where they land:
+    **Twenty fields against twenty-seven legacy derivations.** The inventory this
+    module was ported from counts DERIVATIONS, not fields, and the two do not
+    correspond one to one; the arithmetic is reconciled here because a reader
+    counting the legacy properties against this declaration otherwise stalls on it.
+    The 27 is 21 surviving ``IndicatorModel`` properties (22 less
+    ``custom_lc_matrix_list``, which the port drops) plus six the legacy duplicated
+    or kept inline in the science scripts. Where they land:
 
     * ten period-endpoint properties (``p_trend_start`` ... ``p_soc_t_end``) collapse
       onto five :class:`~sdg1531.spec.Period` fields, because an endpoint pair is one
       resolved period;
     * five live on :class:`~sdg1531.scheme.LandCoverScheme` -- ``matrix`` and the
       four ``{start,end}_{names,codes}`` -- and are reached through ``scheme``,
-      which is itself a field no §6 row names;
-    * ``vi_assets``/sensor dispatch is one §6 row and two fields here, since the rung
-      and its assets are separately useful;
-    * the rest are one row, one field.
+      which is itself none of the twenty-seven;
+    * ``vi_assets``/sensor dispatch is one derivation and two fields here, since the
+      rung and its assets are separately useful;
+    * the rest are one derivation, one field.
 
     ``lc_class_combinations``, ``trans_matrix_flatten``, ``lc_palette`` and
     ``lc_color_by_class`` are computed off ``scheme`` and flattened onto this class
     anyway, because the engine and the charts want the values without the vocabulary.
 
-    Field names are disjoint from ``RunSpec``'s. Spec §13 risk 1 names that as the
-    mitigation that keeps two data models from rotting into one, and
+    Field names are disjoint from ``RunSpec``'s. That is deliberate -- a shared
+    field name is how two data models rot into one -- and
     ``tests/test_resolve.py::test_the_two_data_models_share_no_field_name`` enforces
-    it.
+    the separation.
     """
 
     spec: RunSpec

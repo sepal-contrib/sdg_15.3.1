@@ -1,8 +1,8 @@
 """The three `.where()` collapse tables, as ordered data.
 
 Transcribed from the legacy chains, in source order, because the parity harness
-(spec §12 Tier 4) compares serialized `ee` graphs as plain strings and
-`engine/apply.py` emits one `.where()` per rule in the order given here.
+compares serialized `ee` graphs as plain strings and `engine/apply.py` emits one
+`.where()` per rule in the order given here.
 
 Encoding of a rule's operands: `(name, k)` with k >= 1 is the legacy
 `img.eq(k)`; `(name, 0)` is the legacy `img.lt(1)`, which the indicator chain
@@ -10,7 +10,8 @@ uses for its last three rows (run_15_3_1.py:406-408). No other predicate occurs.
 
 `classify()` is the one-line statement of the one-out-all-out rule and exists
 only as a test oracle for INDICATOR_15_3_1. It never emits a graph, and the UI
-layer must not call it (spec §4).
+layer must not call it: the domain owns the classification, and a second
+implementation in the app would be free to disagree with the graph.
 
 No EXPECTED_DIVERGENCES: the three ``.where()`` collapse chains as ordered data, in
 source order. ``engine/apply.py`` emits one node per rule in the order given here,
@@ -119,7 +120,8 @@ PRODUCTIVITY_GPGV1 = TruthTable(
 )
 
 # transcribed from run_15_3_1.py:377-409. The legacy chain has no .rename(), so
-# its band was literally "constant"; the band below is the §7 divergence.
+# its band was literally "constant"; the band below is the rename the port adds,
+# declared as `engine/indicator.py`'s EXPECTED_DIVERGENCES note 1.
 INDICATOR_15_3_1 = TruthTable(
     rules=(
         _i(3, 3, 3, 3),

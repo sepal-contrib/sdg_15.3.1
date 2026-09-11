@@ -1,4 +1,5 @@
-"""Tier 0 guard 4 — the AST hygiene walk (spec §7 defect register, §4 UI boundary).
+"""Tier 0 guard 4 — the AST hygiene walk: the legacy defects that must not be
+re-introduced, and the UI boundary the domain may not cross.
 
 Runs over the domain package and, once it exists, the app package. Every rule is
 also exercised against a planted violation, so the guard cannot silently rot into
@@ -119,8 +120,8 @@ def test_export_module_may_read_back_the_zipped_bytes() -> None:
 
 
 def test_export_module_exemption_does_not_cover_every_filesystem_call() -> None:
-    # the exemption is for the to_file/read_bytes round trip only (spec D12), not a
-    # blanket pass for sdg1531/export.py
+    # the exemption is for the to_file/read_bytes round trip only, not a blanket
+    # pass for sdg1531/export.py
     src = '__all__ = ["f"]\nfrom pathlib import Path\ndef f():\n    return Path.home()\n'
     assert "filesystem" in _rules(src, rel_path="sdg1531/export.py")
 
@@ -333,8 +334,8 @@ def test_temp_spool_is_rejected_in_the_imported_form_too(expr: str) -> None:
 
 
 def test_export_module_may_spool_the_directory_it_zips() -> None:
-    # spec D12: zonal_shapefile_zip has to give the shapefile driver a directory to
-    # write into, and deletes it before returning
+    # zonal_shapefile_zip has to give the shapefile driver a directory to write
+    # into, and deletes it before returning
     src = '__all__ = ["f"]\nimport tempfile\ndef f():\n    return tempfile.TemporaryDirectory()\n'
     assert "filesystem" not in _rules(src, rel_path="sdg1531/export.py")
     assert "filesystem" in _rules(src, rel_path="sdg1531/stats/decode.py")

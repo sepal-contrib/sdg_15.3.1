@@ -60,7 +60,7 @@ Task 17's parity harness must carry all eight:
    :data:`~sdg1531.tables.DEGRADATION_COLORS` keys on the untranslated names, so the
    same three hex values now land in every locale.
 8. **No legacy counterpart.** The ``title`` argument ``barh_plot`` took (:20) is
-   dropped -- display strings are the app layer's (spec §4). The two axis names are
+   dropped -- display strings are the app layer's. The two axis names are
    NOT dropped: bar_plot.py:17 and :19 hardcode them in English rather than routing
    them through the message catalogue, so they are transcriptions, not translations.
 """

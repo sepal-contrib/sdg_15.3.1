@@ -1,9 +1,9 @@
 """Land-cover sub-indicator: the water mask and the degradation stack.
 
 Transcribed from ``component/scripts/land_cover.py`` (legacy ``land_cover()``,
-lines 6-111). Phase 1 is a transcription, not a refactor (spec D9): every node
-matches the legacy graph, and the legacy's weaknesses are preserved and
-annotated rather than repaired.
+lines 6-111). Phase 1 is a transcription, not a refactor: every node matches the
+legacy graph, and the legacy's weaknesses are preserved and annotated rather than
+repaired.
 
 Two of those weaknesses are worth naming here, because both look like bugs to a
 reader who has not seen the legacy:
@@ -229,7 +229,7 @@ def build_land_cover(r: ResolvedSpec, ctx: ExecutionContext) -> LandCoverMaps:
     # :98-102 -- byte convention 1 degraded / 2 stable / 3 improved. The
     # INT16_MIN -> 0 entry is unreachable: the remap above has no defaultValue,
     # so unmatched pixels are masked rather than set to INT16_MIN. Transcribed as
-    # found (D9).
+    # found rather than pruned, so the graph stays byte-identical.
     landcover_degredation = (
         landcover_degredation.remap([1, 0, -1, INT16_MIN], [3, 2, 1, 0])
         .uint16()

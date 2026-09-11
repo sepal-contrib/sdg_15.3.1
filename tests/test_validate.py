@@ -1,4 +1,5 @@
-"""sdg1531.validate — the total validator (spec §4 "two total functions", §7)."""
+"""sdg1531.validate — the total validator: it never raises and never rejects a
+half-filled spec, it returns field-anchored Problem records."""
 
 import math
 from dataclasses import replace
@@ -674,8 +675,8 @@ def test_validate_never_raises(spec):
 
 
 def test_validate_does_not_import_ee():
-    # The JSON half of the domain must stay importable without earthengine-api
-    # (spec §4). Run in a subprocess: the session ee fixture in conftest.py has
+    # The JSON half of the domain must stay importable without earthengine-api.
+    # Run in a subprocess: the session ee fixture in conftest.py has
     # already put `ee` in sys.modules for the in-process tests.
     proc = run_python("import sys, sdg1531.validate; assert 'ee' not in sys.modules")
     assert proc.returncode == 0, proc.stdout + proc.stderr

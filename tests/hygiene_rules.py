@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 from conftest import REPO_ROOT
 
-# the packages the walk covers, by name (spec §12 Tier 0: "over both sdg1531/ and
-# the app package"). Missing roots are skipped so this holds before the app lands.
+# the packages the walk covers, by name: the domain and the app package. Missing
+# roots are skipped so this holds before the app lands.
 ROOTS = ("sdg1531", "app")
 
 BANNED_PARAMS = frozenset({"output", "model", "aoi_model", "alert"})
@@ -52,8 +52,8 @@ FS_CALL_ATTRS = (
     | _TEMP_SPOOLS
 )
 # zonal_shapefile_zip must give the shapefile driver a directory to write into, then
-# round-trip a GeoDataFrame through it and read the zipped result back as bytes (spec
-# D12) — that spool-write-read trio is the only filesystem access sdg1531/export.py is
+# round-trip a GeoDataFrame through it and read the zipped result back as bytes —
+# that spool-write-read trio is the only filesystem access sdg1531/export.py is
 # allowed; everything else there (mkdir, rmtree, home, and every OTHER temp spool) is
 # still flagged like anywhere else in the domain.
 FS_EXEMPT_FILES = frozenset({"sdg1531/export.py"})

@@ -77,8 +77,8 @@ class TransitionMatrix:
 
     widget/transition_matrix.py:46 index-assigns into the module-level
     ``pm.default_trans_matrix``; under Solara that is one user's edit leaking into
-    every other session in the worker (spec §7). Editing goes through
-    :meth:`with_cell`, which returns a new instance.
+    every other session in the worker. Editing goes through :meth:`with_cell`, which
+    returns a new instance.
     """
 
     rows: tuple[tuple[int, ...], ...]

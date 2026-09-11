@@ -11,7 +11,7 @@ and :211, read nowhere.  ``lc_pixel_check`` (:70) is not a science parameter; it
 
 No EXPECTED_DIVERGENCES: the legacy input traits as plain data, with no computation and
 no validation. Two traits are dropped -- ``start_lc_band`` and ``end_lc_band``,
-bound at input_tile.py:209/:211 and read nowhere (spec §6) -- so dropping them
+bound at input_tile.py:209/:211 and read nowhere -- so dropping them
 changes nothing that ran. ``Compatibility``'s flags select between legacy and
 corrected behaviour; each flag's effect is recorded by the module it reaches.
 """
@@ -214,8 +214,9 @@ class FixedClimate:
     def token(self) -> str:
         # indicator_model.py:310 - int() truncation preserved.
         #
-        # Known, faithfully-transcribed legacy defect (not fixed here, per D9): over the
-        # slider's real domain (climate_regime.py:29, step=0.01, 101 values) int(c*100)
+        # Known legacy defect, transcribed rather than fixed: phase 1 reproduces the
+        # legacy graphs byte for byte, so repairs are phase 2's. Over the slider's
+        # real domain (climate_regime.py:29, step=0.01, 101 values) int(c*100)
         # is not injective - float rounding gives only 99 distinct tokens, e.g. 0.28 and
         # 0.29 both truncate to "cr28", 0.56 and 0.57 both to "cr56". folder_name() uses
         # this token as both a directory component and the glob prefix for the
@@ -296,9 +297,11 @@ type LandCoverSource = EsaCciSource | CustomLandCoverSource
 
 @dataclass(frozen=True, slots=True)
 class Compatibility:
-    """The four legacy-behaviour flags of the defect register (spec §7).
+    """The four flags that select between a legacy defect and its repair.
 
-    Every default reproduces the legacy behaviour, and the whole record is inside
+    Each one names a place where the legacy does something demonstrably wrong; the
+    module each flag reaches spells out what that defect is. Every default
+    reproduces the legacy behaviour, and the whole record is inside
     ``RunSpec.fingerprint()`` - flipping a flag is a different run.
     """
 

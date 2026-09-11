@@ -78,7 +78,8 @@ def test_productivity_chain_has_one_where_per_rule(ee_offline):
 
 
 def test_band_name_argument_wins_over_the_table_band(ee_offline):
-    """engine/indicator.py renames the same table to indicator_15_3_1 (§7)."""
+    """engine/indicator.py renames the same table to indicator_15_3_1, where the
+    legacy chain renamed nothing at all."""
     a = ee.Image(7)
     table = TruthTable(rules=(Rule(inputs=(("a", 1),), value=1),), band="tabled")
     built = apply_truth_table([a], table, "overridden")

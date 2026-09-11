@@ -1,8 +1,9 @@
-"""Initialise `ee` offline, for graph-shape and parity tests (spec §12 Tier 3).
+"""Initialise `ee` offline, for graph-shape and parity tests (Tier 3).
 
 Three private behaviours of earthengine-api 1.6.14 are relied on here. When one
 of them moves, this file breaks and Tiers 3 and 4 break with it — that is a
-fixture regression, not a domain regression (spec §13 risk 5).
+fixture regression, not a domain regression -- a known and accepted risk of
+building graph tests on private `ee` internals.
 
 1. `ee.Initialize(credentials=...)` only duck-types the credential: it reads
    `.quota_project_id`, calls `.with_quota_project(None)` and reads

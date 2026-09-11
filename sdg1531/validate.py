@@ -16,8 +16,8 @@ rule accepting one it refused. The rest are transcriptions of ``input_tile.py``'
 own checks, or non-fatal warnings, which leave the Process button enabled and
 therefore change nothing about what runs -- ``state_period_too_short``,
 ``soc_start_before_cci``, ``land_cover_start_before_cci`` and
-``half_custom_land_cover`` are all of that kind, and spec §7 reasoned about the
-first explicitly.
+``half_custom_land_cover`` are all of that kind; the first of those was
+deliberately left non-fatal, for the reason note 1 quotes.
 
 1. **Behaviour-changing, and it refuses runs the legacy performed.** The three
    land-cover period rules of :func:`_land_cover_period_problems` have no legacy
@@ -27,16 +27,16 @@ first explicitly.
    decoders and produced a Sankey with two identically-labelled year columns;
    ``land_cover_start_before_cci`` (warning) reports the clamp. Measured against the
    parity corpus, the fatal pair rejects s04 and s08 -- configurations stage A
-   recorded a legacy result for. Spec §7 has no row for any of the three, and the
-   trade-off it reasoned about for ``state_period_too_short`` ("Making it fatal
-   would refuse configurations the legacy accepts") was not re-applied here; the
+   recorded a legacy result for. None of the three was a recorded port decision,
+   and the trade-off that kept ``state_period_too_short`` a warning ("making it
+   fatal would refuse configurations the legacy accepts") was not re-applied; the
    justification is that the failure it prevents is downstream and unattributable,
    at ``sankey_option``, rather than a masked layer.
 2. **Behaviour-changing, and it refuses runs the legacy performed.**
    ``soc_period_collapses`` (fatal, :func:`_soc_period_problems`) rejects a SOC
    period lying entirely after the CCI record, where soil_organic_carbon.py:161
-   selected a negative band index. Spec §7 mandates it by name, so unlike note 1
-   this was a recorded decision; it is here because it still refuses configurations
+   selected a negative band index. This one WAS a recorded port decision, unlike
+   note 1; it is here because it still refuses configurations
    the legacy ran -- s04, s08, s24 and s27 in the corpus.
 3. **Behaviour-changing.** ``non_finite_climate_coefficient`` (fatal,
    :func:`_climate_problems`) rejects ``nan``/``inf``. Nothing in the legacy ever
@@ -267,7 +267,7 @@ def _vi_source_problems(spec: RunSpec) -> tuple[Problem, ...]:
     source = spec.vi_source
     if isinstance(source, PrecomputedViAsset):
         # integration.py:80 read a trait that never existed; the arm is offered
-        # as data but no UI sets it yet (spec §7).
+        # as data but no UI sets it yet.
         return (
             Problem(
                 field="vi_source",

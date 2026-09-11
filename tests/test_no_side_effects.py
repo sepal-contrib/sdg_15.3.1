@@ -2,7 +2,7 @@
 
 parameter/directory.py:7,10 calls mkdir at import today, and parameter/__init__.py
 star-imports it, so importing any legacy science module creates ~/module_results.
-The port forbids that outright (spec §4, §7).
+The port forbids that outright: importing the domain must touch nothing.
 """
 
 from __future__ import annotations

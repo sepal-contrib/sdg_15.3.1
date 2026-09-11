@@ -1,7 +1,8 @@
 """RunSpec -> the legacy IndicatorModel. Stage A only.
 
-This is the single reviewed adapter between the two data models (D2: there is no
-live UI adapter). It runs against the legacy tree, so it imports ``component``.
+This is the single reviewed adapter between the two data models, and the port
+deliberately ships no live UI adapter beside it. It runs against the legacy tree,
+so it imports ``component``.
 It is deliberately dumb: every mapping below is a line-for-line reading of
 component/model/indicator_model.py's traits, and nothing here is imported by
 sdg1531.

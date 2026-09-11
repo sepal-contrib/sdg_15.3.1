@@ -2,13 +2,13 @@
 
 Every list in the legacy module is a shared mutable module-level default;
 widget/transition_matrix.py:46 index-assigns into one of them, which under Solara
-leaks one user's matrix into every other session in the worker (spec §7).
-Tuples make that impossible.
+leaks one user's matrix into every other session in the worker. Tuples make
+that impossible.
 
 No EXPECTED_DIVERGENCES: ``parameter/matrix.py`` and the two ``ui.py`` legend dicts,
 retyped as tuples and ``MappingProxyType`` with every value unchanged. Freezing
 them fixes the process-wide shared mutable default of ``widget/transition_matrix.py:46``,
-which spec §7 records as no divergence: it is unobservable within a single run,
+which is not a graph divergence: it is unobservable within a single run,
 and the widget that wrote into them is not ported.
 """
 
@@ -65,7 +65,7 @@ DEFAULT_LC_CLASS_NAMES: tuple[str, ...] = (
 # transcribed from parameter/ui.py:61-69. The legacy keys are cm.classes.*,
 # which are byte-identical to matrix.py's hardcoded English lc_class in the `en`
 # catalogue; keying on the same strings is what keeps the Sankey from KeyError-ing
-# the day an es/ or fr/ catalogue is added (spec §10).
+# the day an es/ or fr/ catalogue is added.
 DEFAULT_LC_COLORS: Mapping[str, str] = MappingProxyType(
     {
         "Tree-covered areas": "#02A000",
@@ -95,7 +95,7 @@ DEGRADATION_LABELS: Mapping[int, str] = MappingProxyType(
 # :72-75 spreads for the productivity, land cover, soc and indicator layers -- so
 # `tuple(DEGRADATION_COLORS.values())[1:]` is the palette of a {"min": 1, "max": 3}
 # visualisation, and the app layer builds those from here rather than retyping the
-# hexes (spec §4 bars re-deriving colours in the app layer).
+# hexes: re-deriving colours in the app layer is exactly how the two drift apart.
 #
 # There is deliberately NO palette beside PROD_PERFORMANCE_LABELS. The legacy has
 # none: parameter/ui.py defines exactly two colour dicts, and performance -- like

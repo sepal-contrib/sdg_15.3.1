@@ -1,12 +1,12 @@
 """Capture `ee.data.getAlgorithms()` to a committed fixture.
 
-Spec §12 Tier 3: the offline `ee` fixture needs a real algorithm table. With an
-empty table `ee.Image(0).where(...)` raises `AttributeError: 'NoneType' object
-has no attribute 'call'`, because `ApiFunction.lookupInternal` returns None
+Tier 3: the offline `ee` fixture needs a real algorithm table. With an empty table
+`ee.Image(0).where(...)` raises `AttributeError: 'NoneType' object has no attribute
+'call'`, because `ApiFunction.lookupInternal` returns None
 (ee/apifunction.py:145-155) — so the table is load-bearing, not decoration.
 
 This tool needs credentials and network. Run it by hand when the pinned
-earthengine-api version changes; CI never runs it (spec §13 risk 5).
+earthengine-api version changes; CI never runs it.
 
 Run:  python tools/capture_ee_algorithms.py --project <your-gcp-project>
 """

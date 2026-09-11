@@ -46,7 +46,7 @@ def test_default_matrix_is_the_legacy_table() -> None:
 def test_module_default_cannot_be_mutated_through_an_instance() -> None:
     """widget/transition_matrix.py:46 index-assigns into pm.default_trans_matrix
     in place. Under Solara that leaks one user's matrix into every session in the
-    worker (spec §7). Neither route may exist any more."""
+    worker. Neither route may exist any more."""
     m = TransitionMatrix.default()
 
     with pytest.raises(dataclasses.FrozenInstanceError):

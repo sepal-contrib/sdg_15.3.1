@@ -19,9 +19,9 @@ class DomainError(Exception):
     stdlib, both deliberate -- a bad index into a matrix is an ordinary programming
     error and reads better as one. ``RunSpec.from_dict`` wraps the deserialization
     path, so those two reach a caller only through direct construction and through
-    ``with_cell``, which spec §4 names as the app's editing path for the
-    transition-matrix widget: an app layer catching ``DomainError`` around a cell
-    edit must catch ``IndexError`` beside it.
+    ``with_cell``, the app's editing path for the transition-matrix widget: an app
+    layer catching ``DomainError`` around a cell edit must catch ``IndexError``
+    beside it.
     """
 
 

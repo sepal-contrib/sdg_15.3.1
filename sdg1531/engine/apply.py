@@ -10,10 +10,10 @@ run_15_3_1.py:377-409, which are three copies of the same chain:
 
 `.And()` nests left-associatively, and the rules are emitted in the order the
 table lists them: both are what keeps the encoded graph byte-identical to the
-legacy one (spec D9). A rule's class 0 emits `.lt(1)`, matching
-run_15_3_1.py:406-408; every other class k emits `.eq(k)`.
+legacy one. A rule's class 0 emits `.lt(1)`, matching run_15_3_1.py:406-408; every
+other class k emits `.eq(k)`.
 
-The UI layer must never call this (spec §4); a Tier-0 guard enforces it.
+The UI layer must never call this; a Tier-0 guard enforces it.
 
 No EXPECTED_DIVERGENCES: the emitter for ``truth_table``'s rules, one ``.where()`` per
 rule in the order given. Every graph it builds is byte-compared against the legacy

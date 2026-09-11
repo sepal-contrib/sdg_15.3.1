@@ -328,7 +328,7 @@ def test_every_indicator_layer_has_a_statistics_band_mapping():
 def test_the_statistics_vocabulary_deliberately_differs_from_the_export_vocabulary():
     """Task 14's export band/legend and this task's statistics band/legend must NOT
     be unified: for trend and state the legacy counted six classes off a 5-level band
-    (:437-442) while spec §8 exports three off a separate band. Collapsing the two
+    (:437-442) while the port exports three off a separate band. Collapsing the two
     tables would silently republish four-category statistics.
     """
     export = _export_layers()

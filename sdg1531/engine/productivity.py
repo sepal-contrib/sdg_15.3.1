@@ -15,7 +15,7 @@ share: ``ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))``.
 discarded and the expression encodes as ``Filter.and([lte(end)])`` -- **the
 start bound never reaches the graph**, and each of these four periods is open
 at its lower end. The legacy spells it exactly this way (productivity.py:
-430-432, :465-470, :532-537, :119-123), so reproducing it is what D9 requires;
+430-432, :465-470, :532-537, :119-123), so a transcription must reproduce it;
 ``test_year_filters_silently_drop_their_lower_bound`` pins it so that a later
 "fix" to ``ee.Filter.And(gte, lte)`` -- which WOULD change the graph and break
 parity -- cannot land silently.
@@ -418,9 +418,10 @@ def build_performance(r: ResolvedSpec, ctx: ExecutionContext, vi: ee.ImageCollec
 
     # compute 90th percentile by unit. `ctx` supplies the geometry only: the
     # scale is read off the ResolvedSpec because the legacy reads model.scale
-    # (productivity.py:144), and D9 keeps it there. ExecutionContext carries its
-    # own analysis_scale that nothing in sdg1531/ reads -- deliberately not used
-    # here, so Tasks 12-17 do not each re-decide which copy is authoritative.
+    # (productivity.py:144), and a transcription keeps it there. ExecutionContext
+    # carries its own analysis_scale that nothing in sdg1531/ reads -- deliberately
+    # not used here, so Tasks 12-17 do not each re-decide which copy is
+    # authoritative.
     percentile_90 = ndvi_id.reduceRegion(
         reducer=ee.Reducer.percentile([90]).group(groupField=1, groupName="code"),
         geometry=ctx.geometry,

@@ -509,10 +509,11 @@ def test_year_filters_silently_drop_their_lower_bound(ctx):
     # `ee.Filter.gte("year", start).And(ee.Filter.lte("year", end))` the
     # receiver is discarded: the expression encodes as `Filter.and([lte(end)])`
     # and the START bound never reaches the graph. The legacy spells it exactly
-    # this way (productivity.py:430-432, :465-470, :532-537, :119-123), so D9
-    # requires reproducing it -- but a later "fix" to `ee.Filter.And(gte, lte)`
-    # WOULD change the graph and break parity, so it is pinned rather than left
-    # to a comment. A correct fix belongs in phase 2 with a golden update.
+    # this way (productivity.py:430-432, :465-470, :532-537, :119-123), so a
+    # transcription must reproduce it -- but a later "fix" to
+    # `ee.Filter.And(gte, lte)` WOULD change the graph and break parity, so it is
+    # pinned rather than left to a comment. A correct fix belongs in phase 2 with
+    # a golden update.
     trajectory = trajectory_for(Trajectory.NDVI_TREND)
     performance = build_performance(resolved_spec(lceu=Lceu.GAES), ctx, fake_vi_collection())
 
@@ -797,9 +798,9 @@ def test_productivity_collapse_emits_one_where_per_rule():
 def test_productivity_collapse_assigns_each_rule_s_value_in_table_order():
     # The count above is a post-CSE node count and says nothing about ORDER or
     # about WHICH class each rule assigns; the chain's nesting says both. This
-    # is what ties the emitted graph to the table data (spec D9: same nodes, in
-    # the same order), and it fails if any cell of the table is edited, if two
-    # rules are transposed, or if a rule is dropped.
+    # is what ties the emitted graph to the table data -- same nodes, in the same
+    # order -- and it fails if any cell of the table is edited, if two rules are
+    # transposed, or if a rule is dropped.
     img = _collapse(PRODUCTIVITY_GPGV2)
 
     assert [value for _test, value in _where_chain(img)] == [

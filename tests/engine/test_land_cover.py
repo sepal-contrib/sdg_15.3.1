@@ -327,7 +327,7 @@ def test_degradation_remaps_the_scheme_tables_then_the_byte_convention():
     scheme's own two tables, then -1/0/1 are renumbered to the 1/2/3 byte
     convention. The INT16_MIN -> 0 entry is unreachable -- the first remap has no
     defaultValue, so unmatched pixels are masked, not set to INT16_MIN -- and is
-    transcribed as found (D9)."""
+    transcribed as found, so the graph stays byte-identical."""
     stack = stack_for().stack
     deref, _graph, node = band_subtree(stack, "degradation")
 

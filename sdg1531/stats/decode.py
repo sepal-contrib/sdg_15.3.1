@@ -107,9 +107,10 @@ def _field(entry: Any, key: str, *, what: str) -> Any:
 
     The unknown-*code* paths below already raise a domain error; the missing-*key*
     paths used to surface as a bare ``KeyError('lc_comb')`` from four frames down,
-    which is a milder form of the same "error with no context" that spec §7's fix is
-    about. ``TypeError`` is caught alongside because a group entry that is not a
-    mapping at all (a bare string, say) fails at the subscript rather than the lookup.
+    which is a milder form of the same "error with no context" that note 1 of the
+    module docstring is about. ``TypeError`` is caught alongside because a group
+    entry that is not a mapping at all (a bare string, say) fails at the subscript
+    rather than the lookup.
     """
     try:
         return entry[key]
@@ -189,7 +190,7 @@ def decode_areas_by_land_cover(
     Reads ``r.scheme``. The class column is named for ``layer.value`` -- the snake
     id -- where the legacy named it for the translated widget string it was called
     with (run_15_3_1.py:297, ``indicator_name``); display strings are the app
-    layer's (spec §4). See the module docstring's EXPECTED_DIVERGENCES note 4.
+    layer's. See the module docstring's EXPECTED_DIVERGENCES note 4.
     """
     # transcribed from run_15_3_1.py:291-297
     labels = _STATS_LABELS[layer]

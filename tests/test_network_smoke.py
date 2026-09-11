@@ -1,4 +1,4 @@
-"""Tier 6: one live end-to-end run against Earth Engine (spec §12).
+"""Tier 6: one live end-to-end run against Earth Engine.
 
 Marked ``network``, so the PR gate (``pytest -m "not network"``) never selects it
 and the nightly workflow is the only thing that runs it. It catches server-side
@@ -164,7 +164,7 @@ _COUNTED_LAYERS = (
     IndicatorLayer.PRODUCTIVITY_STATE,
 )
 
-# The export band of each counted layer (spec §8), written out rather than read off
+# The export band of each counted layer, written out rather than read off
 # the ClassifiedLayer the assertion checks -- a band read from the same object it is
 # compared with would agree with itself whatever it said.
 BANDS: Mapping[IndicatorLayer, str] = {

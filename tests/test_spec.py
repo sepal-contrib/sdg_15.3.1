@@ -542,7 +542,7 @@ def test_fingerprint_is_stable_across_round_trips():
 
 
 def test_fingerprint_changes_when_any_compatibility_flag_changes():
-    # Spec §7: the flags are inside the fingerprint - a flipped flag is a different run.
+    # The flags are inside the fingerprint - a flipped flag is a different run.
     spec = golden_spec()
     variants = [
         Compatibility(soc_subsequent_transition_scale=100),
