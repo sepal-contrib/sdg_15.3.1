@@ -420,8 +420,7 @@ def build_performance(r: ResolvedSpec, ctx: ExecutionContext, vi: ee.ImageCollec
     # scale is read off the ResolvedSpec because the legacy reads model.scale
     # (productivity.py:144), and a transcription keeps it there. ExecutionContext
     # carries its own analysis_scale that nothing in sdg1531/ reads -- deliberately
-    # not used here, so Tasks 12-17 do not each re-decide which copy is
-    # authoritative.
+    # not used here, so no engine module re-decides which copy is authoritative.
     percentile_90 = ndvi_id.reduceRegion(
         reducer=ee.Reducer.percentile([90]).group(groupField=1, groupName="code"),
         geometry=ctx.geometry,

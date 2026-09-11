@@ -26,7 +26,7 @@ from tests.ee_offline import initialize_offline_ee, load_ee_algorithms  # noqa: 
 def ee_offline():
     """Initialise `ee` once per session with no network and no credentials.
 
-    `autouse=True` is deliberate: Tasks 10-17 build `ee` objects inside plain helper
+    `autouse=True` is deliberate: the engine suites build `ee` objects inside plain helper
     functions (`make_resolved`, `_ctx()`, `_StubMaps.__init__`) that cannot request a
     fixture, and their tests never name `ee_offline`. Autouse gives every test in the
     suite an initialised `ee` before its body runs. A test may still take `ee_offline`
