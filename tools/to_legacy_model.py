@@ -50,6 +50,7 @@ import ee
 
 from component.model.indicator_model import IndicatorModel
 from sdg1531.spec import (
+    AdminAoi,
     AssetAoi,
     AssetBandMask,
     CustomLandCoverSource,
@@ -153,6 +154,10 @@ def _feature_collection(aoi: Any) -> Any:
         return ee.FeatureCollection(aoi.asset_id)
     if isinstance(aoi, GeoJsonAoi):
         return ee.FeatureCollection(aoi.geojson)
+    if isinstance(aoi, AdminAoi):
+        import pygaul
+
+        return pygaul.Items(admin=aoi.admin_code)
     raise TypeError(f"unsupported aoi arm: {type(aoi).__name__}")
 
 

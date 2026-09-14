@@ -21,7 +21,7 @@ from dataclasses import dataclass
 import ee
 
 from sdg1531.errors import SpecError
-from sdg1531.spec import AssetAoi, GeoJsonAoi
+from sdg1531.spec import AdminAoi, AssetAoi, GeoJsonAoi
 
 __all__ = ["ExecutionContext"]
 
@@ -57,6 +57,12 @@ class ExecutionContext:
             collection = ee.FeatureCollection(aoi.asset_id)
         elif isinstance(aoi, GeoJsonAoi):
             collection = ee.FeatureCollection(aoi.geojson)
+        elif isinstance(aoi, AdminAoi):
+            import pygaul
+
+            # The same call pysepal's GEE admin branch makes (admin.py:283), so a
+            # restored run reduces over the identical collection the picker produced.
+            collection = pygaul.Items(admin=aoi.admin_code)
         else:
             raise SpecError(f"unsupported aoi arm: {type(aoi).__name__}")
         return cls(feature_collection=collection, analysis_scale=analysis_scale)

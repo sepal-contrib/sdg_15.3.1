@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from pysepal.solara.components.aoi.aoi_result import AoiResult
 
-from sdg1531.spec import AoiSpec, AssetAoi, GeoJsonAoi
+from sdg1531.spec import AdminAoi, AoiSpec, AssetAoi, GeoJsonAoi
 
 __all__ = ("to_domain_aoi",)
 
@@ -38,16 +38,15 @@ def to_domain_aoi(result: AoiResult | None) -> AoiSpec | None:
     ``None`` in means ``None`` out: an unselected AOI is a normal state before
     the user has chosen, and ``validate()`` is what reports it.
 
-    Only ``ASSET`` and ``DRAW`` convert today, matching the domain's two
-    ``AoiSpec`` arms. ``ADMIN0``/``ADMIN1``/``ADMIN2`` (and the local-only
-    ``SHAPE``/``POINTS`` methods) fall through to ``None``, not because they
-    are unselected but because there is nowhere to put them yet: a GEE-bound
-    ADMIN selection has no client-side geometry to hand ``GeoJsonAoi``
-    (``AoiResult.get_gdf_async()`` returns ``None`` for GEE results, and
-    ``fetch_admin_bounds_async()`` returns only a bounding box), and the
-    domain's union has no arm that can hold an ``ee.FeatureCollection``. That
-    is a design decision for the domain, not something this adapter can paper
-    over -- this ``None`` is a placeholder for that gap, not an oversight.
+    ``ASSET``, ``DRAW`` and the three ``ADMIN0``/``ADMIN1``/``ADMIN2`` methods
+    convert, matching the domain's three ``AoiSpec`` arms. An ADMIN selection
+    carries no client-side geometry (``AoiResult.get_gdf_async()`` returns
+    ``None`` for GEE results, and ``fetch_admin_bounds_async()`` returns only
+    a bounding box), so it becomes ``AdminAoi`` -- the GAUL leaf code, not a
+    polygon -- which is enough for ``ExecutionContext.from_aoi_spec`` to
+    rebuild the same collection through ``pygaul``. The local-only
+    ``SHAPE``/``POINTS`` methods still fall through to ``None``: they have no
+    domain arm at all.
     """
     if result is None:
         return None
@@ -64,6 +63,11 @@ def to_domain_aoi(result: AoiResult | None) -> AoiSpec | None:
         geojson = result.spec.geo_json if result.spec else None
         if geojson:
             return GeoJsonAoi(geojson=geojson, name=name)
+        return None
+
+    if result.method in ("ADMIN0", "ADMIN1", "ADMIN2"):
+        if result.admin:
+            return AdminAoi(admin_code=str(result.admin), name=name)
         return None
 
     return None

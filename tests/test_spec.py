@@ -15,6 +15,7 @@ from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
 from sdg1531.errors import SpecError
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
+    AdminAoi,
     AssetAoi,
     AssetBandMask,
     Compatibility,
@@ -32,6 +33,7 @@ from sdg1531.spec import (
     SensorSelection,
     SubPeriods,
 )
+from tests.spec_factory import default_spec
 
 
 def test_period_defaults_to_an_empty_pair():
@@ -92,6 +94,7 @@ def test_every_union_arm_carries_a_stable_kind_tag():
     kinds = {
         AssetAoi.kind,
         GeoJsonAoi.kind,
+        AdminAoi.kind,
         SensorSelection.kind,
         PrecomputedViAsset.kind,
         PerPixelClimate.kind,
@@ -105,6 +108,7 @@ def test_every_union_arm_carries_a_stable_kind_tag():
     assert kinds == {
         "asset",
         "geojson",
+        "admin",
         "sensors",
         "precomputed_vi",
         "per_pixel",
@@ -291,6 +295,7 @@ AOIS = st.one_of(
         RINGS,
         ASSET_IDS,
     ),
+    st.builds(AdminAoi, admin_code=st.from_regex(r"\A[0-9]{1,6}\Z"), name=ASSET_IDS),
 )
 
 VI_SOURCES = st.one_of(
@@ -396,6 +401,11 @@ def test_a_custom_scheme_keeps_is_custom_through_the_round_trip():
     restored = RunSpec.from_dict(json.loads(json.dumps(spec.to_dict())))
     assert restored.land_cover.scheme.is_custom is True
     assert restored == spec
+
+
+def test_an_admin_aoi_round_trips_through_json():
+    spec = default_spec(aoi=AdminAoi(admin_code="185", name="COL"))
+    assert RunSpec.from_dict(spec.to_dict()).aoi == AdminAoi(admin_code="185", name="COL")
 
 
 def test_to_dict_is_json_serializable_for_a_bare_spec():

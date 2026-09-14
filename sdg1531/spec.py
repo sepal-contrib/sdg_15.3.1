@@ -29,6 +29,7 @@ from sdg1531.errors import SpecError
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 
 __all__ = [
+    "AdminAoi",
     "AoiSpec",
     "AssetAoi",
     "AssetBandMask",
@@ -151,14 +152,29 @@ class AssetAoi:
 
 @dataclass(frozen=True, slots=True)
 class GeoJsonAoi:
-    """An AOI held as geometry (``AoiView`` methods ``ADMIN`` and ``DRAW``)."""
+    """An AOI held as geometry (``AoiView`` method ``DRAW``)."""
 
     geojson: Mapping[str, Any]
     name: str
     kind: ClassVar[str] = "geojson"
 
 
-type AoiSpec = AssetAoi | GeoJsonAoi
+@dataclass(frozen=True, slots=True)
+class AdminAoi:
+    """An AOI held as a GAUL 2024 code (``AoiView`` methods ``ADMIN0``/``1``/``2``).
+
+    The code, not the polygon: the engine reads geometry from
+    ``ExecutionContext.feature_collection``, never from here, so this arm only has
+    to identify the selection well enough to rebuild that collection and to
+    survive ``to_dict()``/``from_dict()``.
+    """
+
+    admin_code: str
+    name: str
+    kind: ClassVar[str] = "admin"
+
+
+type AoiSpec = AssetAoi | GeoJsonAoi | AdminAoi
 
 
 # ------------------------------------------------------------------------- vi source
@@ -473,6 +489,8 @@ def _aoi_to_json(aoi: AoiSpec) -> Json:
             return _arm(AssetAoi.kind, asset_id=asset_id, name=name)
         case GeoJsonAoi(geojson=geojson, name=name):
             return _arm(GeoJsonAoi.kind, geojson=dict(geojson), name=name)
+        case AdminAoi(admin_code=admin_code, name=name):
+            return _arm(AdminAoi.kind, admin_code=admin_code, name=name)
         case _:
             raise SpecError(f"aoi: cannot serialize a {type(aoi).__name__} value: {aoi!r}")
 
@@ -483,6 +501,8 @@ def _aoi_from_json(payload: Json) -> AoiSpec:
         return AssetAoi(asset_id=payload["asset_id"], name=payload["name"])
     if kind == GeoJsonAoi.kind:
         return GeoJsonAoi(geojson=payload["geojson"], name=payload["name"])
+    if kind == AdminAoi.kind:
+        return AdminAoi(admin_code=payload["admin_code"], name=payload["name"])
     raise SpecError(f"aoi: unknown kind {kind!r}")
 
 

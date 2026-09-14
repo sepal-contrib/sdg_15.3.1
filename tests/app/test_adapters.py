@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
 from pysepal.scripts.gee_interface import GEEInterface
 from pysepal.solara.components.aoi.aoi_result import AoiResult
 from pysepal.solara.components.aoi.aoi_spec import AoiSpec as PysepalAoiSpec
 
 from app.adapters import to_domain_aoi
 from sdg1531.ports import InfoFetcher
-from sdg1531.spec import AssetAoi, GeoJsonAoi
+from sdg1531.spec import AdminAoi, AssetAoi, GeoJsonAoi
 
 
 def _params(func) -> list[str]:
@@ -62,13 +63,14 @@ def test_a_drawn_result_becomes_the_geojson_arm():
     assert aoi.geojson == geometry
 
 
-def test_an_admin_result_is_none_pending_a_geometry_decision():
-    """ADMIN has no domain arm yet -- see ``to_domain_aoi``'s docstring. This
-    is not "nothing selected"; it is a real selection this adapter cannot
-    place yet."""
-    spec = PysepalAoiSpec(method="ADMIN1", admin_codes=("101", "1001"))
-    result = AoiResult(method="ADMIN1", name="COL_x", admin="1001", spec=spec)
-    assert to_domain_aoi(result) is None
+@pytest.mark.parametrize("method", ["ADMIN0", "ADMIN1", "ADMIN2"])
+def test_an_admin_selection_becomes_an_admin_aoi(method):
+    result = AoiResult(method=method, name="COL_Cundinamarca", admin="3431", gee=True)
+    assert to_domain_aoi(result) == AdminAoi(admin_code="3431", name="COL_Cundinamarca")
+
+
+def test_an_admin_selection_without_a_code_is_not_convertible():
+    assert to_domain_aoi(AoiResult(method="ADMIN1", name="x", admin=None, gee=True)) is None
 
 
 def test_no_selection_is_none_not_an_error():

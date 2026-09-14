@@ -15,7 +15,7 @@ import pytest
 
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.errors import SpecError
-from sdg1531.spec import AssetAoi, GeoJsonAoi
+from sdg1531.spec import AdminAoi, AssetAoi, GeoJsonAoi
 
 ASSET = "projects/test/assets/some_aoi"
 
@@ -84,6 +84,15 @@ def test_from_aoi_spec_geojson_arm(ee_offline):
     built = ExecutionContext.from_aoi_spec(GeoJsonAoi(GEOJSON, "drawn"), 100)
     assert built.analysis_scale == 100
     assert built.feature_collection.serialize() == ee.FeatureCollection(GEOJSON).serialize()
+
+
+def test_from_aoi_spec_builds_an_admin_collection_through_pygaul():
+    import pygaul
+
+    built = ExecutionContext.from_aoi_spec(AdminAoi(admin_code="185", name="COL"), 300)
+    assert isinstance(built.feature_collection, ee.FeatureCollection)
+    assert built.feature_collection.serialize() == pygaul.Items(admin="185").serialize()
+    assert built.analysis_scale == 300
 
 
 def test_from_aoi_spec_rejects_an_unknown_arm(ee_offline):
