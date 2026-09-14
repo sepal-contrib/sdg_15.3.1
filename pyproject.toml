@@ -20,11 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-app = [
-    "pysepal>=3.8.3,<4",
-    "solara",
-    "ipecharts>=1.0.8",
-]
+app = ["solara", "ipecharts"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
@@ -38,7 +34,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["sdg1531*"]
+include = ["sdg1531*", "app*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -82,10 +78,14 @@ strict = true
 # ee graphs match, and `tools/to_legacy_model.py` is the sole adapter every golden
 # was recorded through. Both are fully annotated and both used to read as checked
 # while mypy never opened them.
-files = ["sdg1531", "tools", "tests/parity"]
+files = ["sdg1531", "app", "tools", "tests/parity"]
 
 [[tool.mypy.overrides]]
-module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*"]
+# pysepal ships no stubs. It is also not pinned in the `app` extra above (it comes
+# from the editable checkout the app-layer plan installs), so the `lint` CI job,
+# which only installs `dev`, never has it either -- `app/` needs the same
+# missing-imports pass ee and the geo stack already get.
+module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*", "pysepal.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

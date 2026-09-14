@@ -76,7 +76,7 @@ from sdg1531.resolve import ResolvedSpec
 from sdg1531.spec import SubPeriods
 
 SUITE_ROOT = REPO_ROOT / "tests"
-EXPORT_ROOTS = ("sdg1531", "tests", "tools")
+EXPORT_ROOTS = ("sdg1531", "tests", "tools", "app")
 
 _ACCOUNT_PREFIXES = (
     "derived:",

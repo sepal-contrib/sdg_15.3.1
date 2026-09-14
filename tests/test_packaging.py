@@ -43,12 +43,16 @@ def test_dev_and_app_extras_exist() -> None:
     dev = " ".join(extras["dev"])
     for tool in ("pytest", "pytest-asyncio", "hypothesis", "ruff", "mypy", "pyyaml"):
         assert tool in dev, tool
-    assert "pysepal" in " ".join(extras["app"])
+    app = " ".join(extras["app"])
+    # pysepal is installed from the editable checkout, not pinned here, so this
+    # only names the runtime deps pyproject itself must declare.
+    for tool in ("solara", "ipecharts"):
+        assert tool in app, tool
 
 
-def test_only_the_domain_package_is_discovered() -> None:
+def test_only_the_domain_and_app_packages_are_discovered() -> None:
     find = _pyproject()["tool"]["setuptools"]["packages"]["find"]
-    assert find["include"] == ["sdg1531*"]
+    assert find["include"] == ["sdg1531*", "app*"]
     # the legacy tree must never be shipped
     assert "component" not in " ".join(find.get("include", []))
 
