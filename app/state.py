@@ -48,18 +48,28 @@ STEP_PREFIXES: Mapping[str, tuple[str, ...]] = MappingProxyType(
 )
 
 
+def _owns(prefix: str, field: str) -> bool:
+    """True when `prefix` claims `field`: itself, or one of its dotted children.
+
+    The one place this rule is written. ``problems_for`` and the coverage test in
+    ``tests/app/test_state.py`` both call it, rather than each keeping its own copy
+    that could drift out of sync with the other.
+    """
+    return field == prefix or field.startswith(prefix + ".")
+
+
 def problems_for(step: str, spec: RunSpec) -> tuple[Problem, ...]:
     """Every problem this step owns.
 
     Safe on every render: ``validate()`` is total and never raises, for any
-    input, including a spec the user has only half filled in.
+    input, including a spec the user has only half filled in. ``step`` is not:
+    an unknown step name is a programming error, not a half-filled form, and
+    ``STEP_PREFIXES[step]`` raises ``KeyError`` for it rather than silently
+    returning no problems, which would hide the bug behind a step that simply
+    never shows any.
     """
     prefixes = STEP_PREFIXES[step]
-    return tuple(
-        p
-        for p in validate(spec)
-        if any(p.field == prefix or p.field.startswith(prefix + ".") for prefix in prefixes)
-    )
+    return tuple(p for p in validate(spec) if any(_owns(prefix, p.field) for prefix in prefixes))
 
 
 def is_runnable(spec: RunSpec) -> bool:
