@@ -43,11 +43,12 @@ def test_dev_and_app_extras_exist() -> None:
     dev = " ".join(extras["dev"])
     for tool in ("pytest", "pytest-asyncio", "hypothesis", "ruff", "mypy", "pyyaml"):
         assert tool in dev, tool
-    app = " ".join(extras["app"])
-    # pysepal is installed from the editable checkout, not pinned here, so this
-    # only names the runtime deps pyproject itself must declare.
-    for tool in ("solara", "ipecharts"):
-        assert tool in app, tool
+    # Exact equality, not a substring check: tests/test_plots.py transcribes
+    # OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS from the ipecharts 1.0.x
+    # sources, so a dropped version floor here is a real regression -- and one a
+    # substring check already missed once. pysepal is installed from the editable
+    # checkout, not pinned here, so it is deliberately absent from this list.
+    assert extras["app"] == ["solara", "ipecharts>=1.0.8"]
 
 
 def test_only_the_domain_and_app_packages_are_discovered() -> None:
