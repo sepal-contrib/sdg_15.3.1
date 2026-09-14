@@ -64,9 +64,10 @@ def test_a_drawn_result_becomes_the_geojson_arm():
 
 
 @pytest.mark.parametrize("method", ["ADMIN0", "ADMIN1", "ADMIN2"])
-def test_an_admin_selection_becomes_an_admin_aoi(method):
-    result = AoiResult(method=method, name="COL_Cundinamarca", admin="3431", gee=True)
-    assert to_domain_aoi(result) == AdminAoi(admin_code="3431", name="COL_Cundinamarca")
+@pytest.mark.parametrize("code", ["3431", "9110"])
+def test_an_admin_selection_becomes_an_admin_aoi(method, code):
+    result = AoiResult(method=method, name="COL_Cundinamarca", admin=code, gee=True)
+    assert to_domain_aoi(result) == AdminAoi(admin_code=code, name="COL_Cundinamarca")
 
 
 def test_an_admin_selection_without_a_code_is_not_convertible():

@@ -90,22 +90,26 @@ def test_spec_module_does_not_import_ee():
 # ----------------------------------------------------------------------- unions
 
 
-def test_every_union_arm_carries_a_stable_kind_tag():
-    kinds = {
-        AssetAoi.kind,
-        GeoJsonAoi.kind,
-        AdminAoi.kind,
-        SensorSelection.kind,
-        PrecomputedViAsset.kind,
-        PerPixelClimate.kind,
-        FixedClimate.kind,
-        JrcSeasonalityMask.kind,
-        PixelValueMask.kind,
-        AssetBandMask.kind,
-        EsaCciSource.kind,
-        CustomLandCoverSource.kind,
+def _kind_tags() -> dict[str, str]:
+    """Every dataclass DEFINED in ``sdg1531.spec`` (not merely imported into it,
+    which is why ``__module__`` is checked) that carries a ``kind: ClassVar[str]``
+    tag, keyed by class name. Derived by introspection instead of hand-listed on
+    both sides of an assertion: a roster built that way shrinks and grows with
+    itself and cannot notice an arm nobody remembered to add to it -- exactly
+    the failure this test used to have."""
+    return {
+        name: obj.kind
+        for name, obj in vars(sdg1531.spec).items()
+        if dataclasses.is_dataclass(obj)
+        and obj.__module__ == sdg1531.spec.__name__
+        and isinstance(getattr(obj, "kind", None), str)
     }
-    assert kinds == {
+
+
+def test_every_union_arm_carries_a_stable_kind_tag():
+    tags = _kind_tags()
+    assert len(tags) >= 11, tags  # the scan must find something, or this is vacuous
+    assert set(tags.values()) == {
         "asset",
         "geojson",
         "admin",

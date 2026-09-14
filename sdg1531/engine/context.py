@@ -60,9 +60,15 @@ class ExecutionContext:
         elif isinstance(aoi, AdminAoi):
             import pygaul
 
-            # The same call pysepal's GEE admin branch makes (admin.py:283), so a
+            # The same call pysepal's GEE admin branch makes (admin.py:282), so a
             # restored run reduces over the identical collection the picker produced.
-            collection = pygaul.Items(admin=aoi.admin_code)
+            try:
+                collection = pygaul.Items(admin=aoi.admin_code)
+            except ValueError as error:
+                # GAUL codes are versioned, so a stored spec can hold a code a
+                # picker accepted under an older numbering -- an unresolvable
+                # code is a spec problem, not a domain bug.
+                raise SpecError(f"unsupported admin code: {aoi.admin_code!r} ({error})") from error
         else:
             raise SpecError(f"unsupported aoi arm: {type(aoi).__name__}")
         return cls(feature_collection=collection, analysis_scale=analysis_scale)

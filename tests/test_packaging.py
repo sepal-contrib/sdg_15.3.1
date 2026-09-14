@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import ast
+import sys
 import tomllib
 from fnmatch import fnmatch
+from pathlib import Path
 
 from conftest import REPO_ROOT
+
+# Import names that don't match their PyPI distribution name. Everything else
+# in `sdg1531`'s import set (pandas, geopandas, anyascii, pygaul, ...) is
+# declared under the same name it's imported as.
+_IMPORT_TO_DISTRIBUTION = {"ee": "earthengine-api"}
 
 
 def _pyproject() -> dict:
@@ -28,14 +36,46 @@ def test_requires_python_is_312() -> None:
     assert _pyproject()["project"]["requires-python"] == ">=3.12"
 
 
+def _imported_top_level_modules(package_dir: Path) -> frozenset[str]:
+    """Every top-level module imported anywhere under ``package_dir``, at
+    module scope or inside a function body. ``ast.walk`` reaches both --
+    module-level-only would miss ``pygaul``, which
+    ``ExecutionContext.from_aoi_spec`` imports inside the function so the
+    domain pays for it only on the path that uses it."""
+    modules: set[str] = set()
+    for path in sorted(package_dir.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules.update(alias.name.split(".")[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                modules.add(node.module.split(".")[0])
+    return frozenset(modules)
+
+
 def test_runtime_dependencies_are_declared() -> None:
+    """Derived from what ``sdg1531`` actually imports, not transcribed from the
+    manifest: a hardcoded copy of the dependency set stays green while the
+    domain grows an undeclared import, which is exactly what happened when
+    ``sdg1531.engine.context`` picked up ``pygaul`` -- the previous version of
+    this test compared the manifest to a literal copy of itself and could not
+    have caught it. ``anyascii`` is the one entry here worth a note: it is
+    pure-Python and zero-dependency, so it is easy to mistake for incidental,
+    but ``sdg1531.naming.normalize_str`` needs it to transliterate non-Latin
+    AOI names byte-identically to the legacy ``pysepal scripts/utils.py:140``.
+    """
     deps = _pyproject()["project"]["dependencies"]
-    names = {d.split("[")[0].split(">")[0].split("=")[0].split("<")[0].strip() for d in deps}
-    # the domain is ee + pandas + geopandas + stdlib and nothing else, plus
-    # anyascii: pure-Python, zero dependencies, required so
-    # sdg1531.naming.normalize_str transliterates non-Latin AOI names
-    # byte-identically to the legacy pysepal scripts/utils.py:140.
-    assert names == {"earthengine-api", "pandas", "geopandas", "anyascii"}
+    declared = {d.split("[")[0].split(">")[0].split("=")[0].split("<")[0].strip() for d in deps}
+
+    imported = _imported_top_level_modules(REPO_ROOT / "sdg1531")
+    third_party = imported - set(sys.stdlib_module_names) - {"sdg1531"}
+    assert third_party, "the scan found no third-party import at all -- it is not looking"
+
+    required = {_IMPORT_TO_DISTRIBUTION.get(name, name) for name in third_party}
+    missing = required - declared
+    assert missing == set(), (
+        f"sdg1531 imports {sorted(missing)} but pyproject.toml only declares {sorted(declared)}"
+    )
 
 
 def test_dev_and_app_extras_exist() -> None:

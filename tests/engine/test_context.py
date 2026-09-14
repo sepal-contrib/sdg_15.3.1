@@ -86,13 +86,22 @@ def test_from_aoi_spec_geojson_arm(ee_offline):
     assert built.feature_collection.serialize() == ee.FeatureCollection(GEOJSON).serialize()
 
 
-def test_from_aoi_spec_builds_an_admin_collection_through_pygaul():
+@pytest.mark.parametrize("admin_code", ["185", "101"])  # Colombia, Algeria (GAUL 2024 ADMIN0)
+def test_from_aoi_spec_builds_an_admin_collection_through_pygaul(admin_code, ee_offline):
     import pygaul
 
-    built = ExecutionContext.from_aoi_spec(AdminAoi(admin_code="185", name="COL"), 300)
+    built = ExecutionContext.from_aoi_spec(AdminAoi(admin_code=admin_code, name="COL"), 300)
     assert isinstance(built.feature_collection, ee.FeatureCollection)
-    assert built.feature_collection.serialize() == pygaul.Items(admin="185").serialize()
+    assert built.feature_collection.serialize() == pygaul.Items(admin=admin_code).serialize()
     assert built.analysis_scale == 300
+
+
+def test_from_aoi_spec_wraps_an_unresolvable_admin_code_as_a_spec_error(ee_offline):
+    """GAUL codes are versioned (``62`` was Colombia's code before GAUL 2024), so
+    a stored spec can hold one ``pygaul`` no longer resolves. That is a spec
+    problem, and must surface as the domain's own error, not pygaul's."""
+    with pytest.raises(SpecError, match="62"):
+        ExecutionContext.from_aoi_spec(AdminAoi(admin_code="62", name="COL"), 300)
 
 
 def test_from_aoi_spec_rejects_an_unknown_arm(ee_offline):

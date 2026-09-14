@@ -37,3 +37,7 @@ dependencies:
     - git+https://github.com/openforis/earthengine-api.git@v1.6.14#egg=earthengine-api&subdirectory=python
     - plotly>=5.2.2,<6.0
     - ee-extra<2025.7.2
+    # conda-forge tops out at 0.3.4, which predates the GAUL 2024 schema the
+    # ADMIN aoi arm's codes assume -- pinned here, not in `dependencies:`, so
+    # the solve cannot silently substitute the older schema.
+    - pygaul>=0.4.2

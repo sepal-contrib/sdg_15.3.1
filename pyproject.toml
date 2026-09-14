@@ -17,6 +17,11 @@ dependencies = [
     # transliterates non-Latin AOI names byte-identically to the legacy
     # pysepal scripts/utils.py:140, which is also anyascii-backed.
     "anyascii>=0.3.2",
+    # ExecutionContext.from_aoi_spec rebuilds an ADMIN aoi through pygaul.Items,
+    # spelled exactly as pysepal's own GEE admin branch spells it. pysepal itself
+    # pins exactly this floor for the GAUL 2024 schema (iso3_code, gaul0_code
+    # columns) the arm's codes assume, so this pin tracks pysepal's, not a guess.
+    "pygaul>=0.4.2",
 ]
 
 [project.optional-dependencies]

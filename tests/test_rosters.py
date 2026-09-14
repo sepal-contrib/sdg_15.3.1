@@ -138,6 +138,7 @@ ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/test_isolation.py:JSON_HALF": "derived: test_the_ee_free_roster_is_every_module_that_imports_without_ee",
     "tests/test_naming.py:_SENSOR_NAMES": "fixture: the run_label fuzz's sample -- spread from the catalogue's own SENSORS, plus one name it does not know",
     "tests/test_network_smoke.py:AOI_GEOJSON": "fixture: the 10 km box the Tier-6 run computes over",
+    "tests/test_packaging.py:_IMPORT_TO_DISTRIBUTION": "vocabulary: import names that don't match their PyPI distribution name",
     "tests/test_plots.py:BAR_SERIES_KEYS": "vocabulary: the ECharts option schema, via ipecharts 1.0.x",
     "tests/test_plots.py:OPTION_KEYS": "vocabulary: the ECharts option schema, via ipecharts 1.0.x",
     "tests/test_plots.py:SANKEY_SERIES_KEYS": "vocabulary: the ECharts option schema, via ipecharts 1.0.x",
