@@ -89,6 +89,12 @@ def _harvest_problem_fields(source: str) -> frozenset[str]:
     swallows what it cannot follow is exactly as blind as the plain-literal
     harvester it replaces.
 
+    That guarantee covers only a call whose callee is the bare name `Problem`.
+    An aliased name (`_P = Problem; _P(field=...)`) or an attribute-qualified
+    call (`mod.Problem(field=...)`) is skipped silently, not raised --
+    `validate.py` imports `Problem` directly and never aliases it, so neither
+    shape appears in the file this harvester actually reads.
+
     Over-approximation is fine and expected: `check_custom_lc_codes` (whose
     `Problem`s `validate()` never actually emits, since nothing calls it) still
     contributes its two fields. A "must be owned" guard is safe to be too
@@ -204,10 +210,12 @@ def test_every_problem_field_is_owned_by_exactly_one_step():
     sentinel = {"", "aoi", "water_mask", "transition_matrix"}
     missing_sentinel = sorted(sentinel - fields)
     assert not missing_sentinel, (
-        f"the harvester found none of {missing_sentinel} -- it has gone blind, "
-        "not the routing table"
+        f"the harvester did not find {missing_sentinel} -- it has gone blind, not the routing table"
     )
 
+    # No `if field` filter: "" (the whole-spec field) must clear this ownership
+    # check exactly like any other field. Excluding it would leave a second step
+    # free to claim "" alongside Run with nothing here to notice.
     owners = {
         field: [
             step
@@ -215,7 +223,6 @@ def test_every_problem_field_is_owned_by_exactly_one_step():
             if any(_owns(p, field) for p in prefixes)
         ]
         for field in fields
-        if field  # the whole-spec field "" is the Run step's, handled below
     }
     unowned = sorted(f for f, o in owners.items() if not o)
     shared = sorted(f for f, o in owners.items() if len(o) > 1)
@@ -238,6 +245,7 @@ def test_runtime_validate_never_emits_a_field_the_ast_harvest_missed():
         default_spec(transition_matrix=TransitionMatrix(rows=((1,),))),
     )
     observed = {p.field for spec in corpus for p in validate(spec)}
+    assert observed, "the runtime corpus provoked no problems at all -- it has gone stale"
     missing = sorted(observed - _all_emitted_fields())
     assert missing == [], f"validate() emitted fields the AST harvest missed: {missing}"
 
