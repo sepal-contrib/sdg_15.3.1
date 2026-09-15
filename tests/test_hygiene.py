@@ -131,6 +131,19 @@ def test_module_level_call_is_rejected() -> None:
     assert "module-level-call" in _rules(src)
 
 
+def test_solara_server_setup_is_exempt_only_in_the_shell() -> None:
+    src = "__all__ = []\nfrom pysepal.solara import setup_solara_server\nsetup_solara_server()\n"
+    assert "module-level-call" not in _rules(src, rel_path="app/page.py")
+    assert "module-level-call" in _rules(src, rel_path="app/other.py")
+
+
+def test_solara_server_setup_exemption_does_not_cover_every_module_level_call() -> None:
+    # the exemption is for setup_solara_server() only, not a blanket pass for
+    # every import-time call app/page.py happens to make
+    src = '__all__ = []\nimport os\nos.makedirs("/tmp/x")\n'
+    assert "module-level-call" in _rules(src, rel_path="app/page.py")
+
+
 @pytest.mark.parametrize(
     "value",
     [

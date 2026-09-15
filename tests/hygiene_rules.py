@@ -58,6 +58,14 @@ FS_CALL_ATTRS = (
 # still flagged like anywhere else in the domain.
 FS_EXEMPT_FILES = frozenset({"sdg1531/export.py"})
 FS_EXEMPT_CALLS = frozenset({"to_file", "read_bytes", "TemporaryDirectory"})
+# app/page.py calls setup_solara_server() at module level. Solara reads
+# solara.server.settings.assets.* while building its static-asset routes, which
+# happens as soon as the app module is imported -- before any kernel starts or
+# component renders -- so the call cannot be deferred into on_kernel_start or
+# Sdg1531App without racing that read. It is the one call this project makes
+# there; it is idempotent (setup_solara_server's own docstring: "a repeated call
+# is cheap... does nothing" once the same locations are already merged).
+MODULE_LEVEL_CALL_EXEMPT = frozenset({("app/page.py", "setup_solara_server")})
 ENGINE_PREFIX = "sdg1531/engine/"
 ENGINE_MODULE = "sdg1531/engine.py"
 # "resolved"/"r" missed the common instance-attribute spelling (self.resolved) and the
@@ -219,7 +227,20 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
 
     for node in body:
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-            add(node, "module-level-call", "import-time call; the package must be side-effect free")
+            fn = node.value.func
+            call_name = (
+                fn.id
+                if isinstance(fn, ast.Name)
+                else fn.attr
+                if isinstance(fn, ast.Attribute)
+                else None
+            )
+            if (rel_path, call_name) not in MODULE_LEVEL_CALL_EXEMPT:
+                add(
+                    node,
+                    "module-level-call",
+                    "import-time call; the package must be side-effect free",
+                )
 
         if isinstance(node, (ast.Assign, ast.AnnAssign)):
             for target_name, value in _binding_targets(node):

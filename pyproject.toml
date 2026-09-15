@@ -115,8 +115,18 @@ ignore_missing_imports = true
 # ee/__init__.py re-exports FeatureCollection, Image, Geometry etc. via plain
 # `from .x import Y`, with no `__all__` — strict mode's implicit-reexport check
 # otherwise treats every one of those as private to the submodule it came from.
-module = ["ee"]
+# solara/__init__.py and solara/lab/__init__.py do the same for `component`,
+# `on_kernel_start` and the rest of the public API `app/` renders through.
+module = ["ee", "solara", "solara.lab"]
 implicit_reexport = true
+
+[[tool.mypy.overrides]]
+# pysepal's with_sepal_sessions (app/page.py's session-authenticated entrypoint
+# decorator) carries no return annotation and pysepal ships no py.typed marker,
+# so strict mode's disallow_untyped_decorators sees it as untyped. Scoped to the
+# one file that applies it rather than relaxed project-wide.
+module = ["app.page"]
+disallow_untyped_decorators = false
 
 [tool.commitizen]
 version = "1.2.0"
