@@ -4,8 +4,8 @@
 ``Page`` wraps it with SEPAL session authentication for the Solara server.
 
 ``steps_data`` is unsorted -- its DISPLAY order is list order, not ``id``. AOI
-is first and Run is last; the tasks that follow insert Productivity, Land
-cover and SOC between them.
+is first and Run is last; Productivity sits between them, and the tasks that
+follow insert Land cover and SOC the same way.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
 from app.steps.aoi import AoiStep
+from app.steps.productivity import ProductivityStep
 from app.steps.run import RunStep
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
@@ -80,6 +81,13 @@ def Sdg1531App() -> None:
                 "icon": "mdi-map-marker-check",
                 "display": "step",
                 "content": [AoiStep(spec=spec, map_=sepal_map)],
+            },
+            {
+                "id": 2,
+                "name": msg("step.productivity"),
+                "icon": "mdi-sprout-outline",
+                "display": "step",
+                "content": [ProductivityStep(spec=spec)],
             },
             {
                 "id": 5,

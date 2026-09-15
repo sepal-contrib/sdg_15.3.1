@@ -53,7 +53,8 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     one of those for its shape (id/name/icon/display), but this check alone
     cannot tell a placeholder widget from the real AOI step, since both are
     ``len(content) == 1`` -- ``test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map``
-    below proves that identity instead.
+    and ``test_the_productivity_step_shares_the_aoi_step_s_spec``
+    below prove that identity instead.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -73,14 +74,20 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     }
     assert mapapp.right_panel_content == []
     assert mapapp.right_panel_open is False
-    assert len(mapapp.steps_data) == 2
+    assert len(mapapp.steps_data) == 3
     aoi_step = mapapp.steps_data[0]
     assert aoi_step["id"] == 1
     assert aoi_step["name"] == msg("step.aoi")
     assert aoi_step["icon"] == "mdi-map-marker-check"
     assert aoi_step["display"] == "step"
     assert len(aoi_step["content"]) == 1
-    run_step = mapapp.steps_data[1]
+    productivity_step = mapapp.steps_data[1]
+    assert productivity_step["id"] == 2
+    assert productivity_step["name"] == msg("step.productivity")
+    assert productivity_step["icon"] == "mdi-sprout-outline"
+    assert productivity_step["display"] == "step"
+    assert len(productivity_step["content"]) == 1
+    run_step = mapapp.steps_data[2]
     assert run_step["id"] == 5
     assert run_step["name"] == msg("step.run")
     assert run_step["icon"] == "mdi-play-circle-outline"
@@ -113,6 +120,28 @@ def test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map(monkeypatch):
     assert isinstance(captured.get("spec"), solara.Reactive)
     assert isinstance(captured["spec"].value, RunSpec)
     assert isinstance(captured.get("map_"), SepalMap)
+
+
+def test_the_productivity_step_shares_the_aoi_step_s_spec(monkeypatch):
+    """Same concern as the AOI check above, one step over: a private copy of
+    ``RunSpec`` here would let Productivity edit a spec Run never sees."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["aoi_spec"] = spec
+
+    @solara.component
+    def _spy_productivity_step(*, spec: Any = None) -> None:
+        captured["productivity_spec"] = spec
+
+    monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(page_module, "ProductivityStep", _spy_productivity_step)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["productivity_spec"] is captured["aoi_spec"]
 
 
 def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeypatch):

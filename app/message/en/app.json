@@ -18,6 +18,15 @@
     "description": "Choose the area the indicator is computed over.",
     "selected": "Selected: {name}"
   },
+  "productivity": {
+    "description": "Vegetation index, trend method and ecological units.",
+    "sensors": "Sensors",
+    "index": "Vegetation index",
+    "trajectory": "Trend method",
+    "lceu": "Ecological units",
+    "lookup": "Lookup table",
+    "threshold": "VI threshold"
+  },
   "run": {
     "description": "Build the indicator from the configuration above.",
     "start_year": "Start year",
