@@ -25,7 +25,6 @@ from pysepal.solara import (
 from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
-from app.state import STEP_PREFIXES  # noqa: F401  (kept for the steps that follow)
 from app.steps.aoi import AoiStep
 from sdg1531.spec import RunSpec
 

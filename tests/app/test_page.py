@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import reacton.core
 import solara
 from pysepal.mapping.sepal_map import SepalMap
@@ -9,6 +11,7 @@ from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app.message import messages, msg
+from sdg1531.spec import RunSpec
 
 
 def test_page_is_a_solara_component():
@@ -46,8 +49,11 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     genuinely non-empty expected value (an empty map, a wrong title, a wrong
     panel config, no language selector). It still cannot tell a misspelled
     ``right_panel_content`` kwarg from the correct one: it is legitimately
-    ``[]`` until a later task gives it content -- but ``steps_data`` is no
-    longer one of those, now that Task 5 puts the AOI step in it.
+    ``[]`` until a later task gives it content. ``steps_data`` is no longer
+    one of those for its shape (id/name/icon/display), but this check alone
+    cannot tell a placeholder widget from the real AOI step, since both are
+    ``len(content) == 1`` -- ``test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map``
+    below proves that identity instead.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -77,3 +83,27 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
     assert offered == set(messages.available_locales())
+
+
+def test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map(monkeypatch):
+    """``steps_data[0]["content"]`` above is checked only by length: a
+    placeholder widget, or the AOI step built with ``map_=None``, both pass
+    it. Substituting a spy for ``AoiStep`` and reading what ``Sdg1531App``
+    actually calls it with proves the identity instead -- the same reactive
+    ``Sdg1531App`` holds, not a private copy, and the real ``SepalMap``, not
+    ``None`` (which silently drops the DRAW method from the picker; a
+    plausible copy-paste once Tasks 6-9 add steps that take no map)."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured.update(spec=spec, map_=map_)
+
+    monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert isinstance(captured.get("spec"), solara.Reactive)
+    assert isinstance(captured["spec"].value, RunSpec)
+    assert isinstance(captured.get("map_"), SepalMap)

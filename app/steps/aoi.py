@@ -6,7 +6,7 @@ local to the server, which do not exist in a SEPAL container.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import solara
 from pysepal.solara.components.aoi import AoiView
@@ -30,7 +30,7 @@ def apply_selection(spec: solara.Reactive[RunSpec], selection: AoiResult | None)
 
 @solara.component
 def AoiStep(spec: solara.Reactive[RunSpec], map_: Any) -> None:
-    aoi_selection = solara.use_reactive(None)
+    aoi_selection = solara.use_reactive(cast("AoiResult | None", None))
     aoi_loading = solara.use_reactive(False)
 
     def on_selection(value: AoiResult | None) -> None:
@@ -47,6 +47,9 @@ def AoiStep(spec: solara.Reactive[RunSpec], map_: Any) -> None:
         map_=map_,
         gee=True,
     )
+
+    if spec.value.aoi is not None:
+        solara.Markdown(msg("aoi.selected", name=spec.value.aoi.name))
 
     for problem in problems_for("aoi", spec.value):
         solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)

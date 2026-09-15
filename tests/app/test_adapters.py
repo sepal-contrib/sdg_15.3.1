@@ -83,3 +83,18 @@ def test_no_selection_is_none_not_an_error():
     """The AOI step renders before the user has chosen anything; that is a
     normal state, and validate() is what reports it as a problem."""
     assert to_domain_aoi(None) is None
+
+
+@pytest.mark.parametrize("method", ["SHAPE", "POINTS"])
+def test_a_local_file_method_has_no_domain_arm(method):
+    """SHAPE and POINTS read paths local to the machine that ran the picker,
+    which a SEPAL container does not have -- they have no domain arm at all,
+    unlike ASSET/DRAW/ADMIN which merely need a non-empty payload to convert.
+    A bogus arm for either method would silently persist a path the run can
+    never read; this is what stands between that and ``None``."""
+    result = AoiResult(
+        method=method,
+        name="local",
+        spec=PysepalAoiSpec(method=method, pathname="/home/user/local.shp"),
+    )
+    assert to_domain_aoi(result) is None
