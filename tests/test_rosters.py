@@ -103,6 +103,7 @@ NOT_DOMAIN_PACKAGES = ("tests", "tools")
 
 ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/_subprocess.py:__all__": "derived: test_every_export_list_matches_its_module",
+    "tests/app/render_helpers.py:__all__": "derived: test_every_export_list_matches_its_module",
     "tests/app/test_scaffolding.py:_UNTRANSLATED_FR_KEYS": "both directions: test_the_catalogue_is_valid",
     "tests/engine/test_context.py:GEOJSON": "fixture: the AOI polygon the context tests build from",
     "tests/engine/test_indicator.py:_BAND_PRESERVING": "vocabulary: ee's encoder -- the nodes that hand a band list through",

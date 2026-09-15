@@ -64,7 +64,7 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     }
     assert mapapp.right_panel_content == []
     assert mapapp.right_panel_open is False
-    assert len(mapapp.steps_data) == 3
+    assert len(mapapp.steps_data) == 4
     aoi_step = mapapp.steps_data[0]
     assert aoi_step["id"] == 1
     assert aoi_step["name"] == msg("step.aoi")
@@ -77,7 +77,13 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert productivity_step["icon"] == "mdi-sprout-outline"
     assert productivity_step["display"] == "step"
     assert len(productivity_step["content"]) == 1
-    run_step = mapapp.steps_data[2]
+    land_cover_step = mapapp.steps_data[2]
+    assert land_cover_step["id"] == 3
+    assert land_cover_step["name"] == msg("step.land_cover")
+    assert land_cover_step["icon"] == "mdi-terrain"
+    assert land_cover_step["display"] == "step"
+    assert len(land_cover_step["content"]) == 1
+    run_step = mapapp.steps_data[3]
     assert run_step["id"] == 5
     assert run_step["name"] == msg("step.run")
     assert run_step["icon"] == "mdi-play-circle-outline"
@@ -132,6 +138,28 @@ def test_the_productivity_step_shares_the_aoi_step_s_spec(monkeypatch):
     assert rc is not None
 
     assert captured["productivity_spec"] is captured["aoi_spec"]
+
+
+def test_the_land_cover_step_shares_the_aoi_step_s_spec(monkeypatch):
+    """Same concern as the two checks above, one step further: a private copy
+    of ``RunSpec`` here would let Land cover edit a spec Run never sees."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["aoi_spec"] = spec
+
+    @solara.component
+    def _spy_land_cover_step(*, spec: Any = None) -> None:
+        captured["land_cover_spec"] = spec
+
+    monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(page_module, "LandCoverStep", _spy_land_cover_step)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["land_cover_spec"] is captured["aoi_spec"]
 
 
 def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeypatch):

@@ -45,6 +45,15 @@
       "calculate": "Calculate based on land cover and soil texture"
     }
   },
+  "land_cover": {
+    "description": "Land cover source, transitions and the water mask.",
+    "source": "Land cover source",
+    "water_mask": "Water mask",
+    "esa": "ESA CCI",
+    "custom": "Custom assets",
+    "start_asset": "Start land cover asset",
+    "end_asset": "End land cover asset"
+  },
   "run": {
     "description": "Build the indicator from the configuration above.",
     "start_year": "Start year",
