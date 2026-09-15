@@ -63,6 +63,11 @@ _UNTRANSLATED_FR_KEYS = frozenset(
         "run.build",
         "run.built",
         "run.blocked",
+        "layers.title",
+        "layers.description",
+        "layers.show",
+        "layers.shown",
+        "layers.build_first",
     }
 )
 

@@ -129,8 +129,11 @@ implicit_reexport = true
 # return annotation, so strict mode's disallow_untyped_calls flags every call
 # into it. Every step under app/steps renders its description and its own
 # validation problems through it (see AoiStep), so this belongs on the package,
-# not one file at a time.
-module = ["app.steps.*"]
+# not one file at a time. app.panels.* joins it for the same reason -- every
+# panel renders a description through Markdown too (see MapLayersPanel);
+# app.page, app.adapters and app.state are logic rather than UI and stay off
+# this list.
+module = ["app.steps.*", "app.panels.*"]
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]

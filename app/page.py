@@ -26,6 +26,7 @@ from pysepal.solara import (
 from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
+from app.panels.map_layers import MapLayersPanel
 from app.steps.aoi import AoiStep
 from app.steps.land_cover import LandCoverStep
 from app.steps.productivity import ProductivityStep
@@ -161,8 +162,15 @@ def Sdg1531App() -> None:
             "width": 450,
             "description": msg("panel.description"),
         },
-        right_panel_content=[],
-        right_panel_open=False,
+        right_panel_content=[
+            {
+                "title": msg("layers.title"),
+                "icon": "mdi-layers",
+                "content": [MapLayersPanel(maps=maps, map_=sepal_map, gee_interface=gee_interface)],
+                "description": msg("layers.description"),
+            },
+        ],
+        right_panel_open=True,
         theme_state=theme_state,
         locales=messages.available_locales(),
     )

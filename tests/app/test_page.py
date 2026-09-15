@@ -37,14 +37,14 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     the rendered box at all under that mistake -- and, unlike a grep, it also
     catches a dropped or misspelled kwarg for every field this task gives a
     genuinely non-empty expected value (an empty map, a wrong title, a wrong
-    panel config, no language selector). It still cannot tell a misspelled
-    ``right_panel_content`` kwarg from the correct one: it is legitimately
-    ``[]`` until a later task gives it content. ``steps_data`` is no longer
-    one of those for its shape (id/name/icon/display), but this check alone
-    cannot tell a placeholder widget from the real AOI step, since both are
-    ``len(content) == 1`` -- ``test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map``
-    and ``test_the_productivity_step_shares_the_aoi_step_s_spec``
-    below prove that identity instead.
+    panel config, no language selector). ``right_panel_content`` and
+    ``steps_data`` are checked only by shape here (title/icon/description,
+    ``len(content) == 1``) -- this check alone cannot tell a placeholder
+    widget from the real ``MapLayersPanel`` or AOI step, since both would
+    pass it -- ``test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee_interface``,
+    ``test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map`` and
+    ``test_the_productivity_step_shares_the_aoi_step_s_spec`` below prove
+    identity instead.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -62,8 +62,13 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
         "width": 450,
         "description": msg("panel.description"),
     }
-    assert mapapp.right_panel_content == []
-    assert mapapp.right_panel_open is False
+    assert len(mapapp.right_panel_content) == 1
+    layers_section = mapapp.right_panel_content[0]
+    assert layers_section["title"] == msg("layers.title")
+    assert layers_section["icon"] == "mdi-layers"
+    assert layers_section["description"] == msg("layers.description")
+    assert len(layers_section["content"]) == 1
+    assert mapapp.right_panel_open is True
     assert len(mapapp.steps_data) == 5
     aoi_step = mapapp.steps_data[0]
     assert aoi_step["id"] == 1
@@ -217,6 +222,39 @@ def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeyp
     assert captured["maps"].value is None
     assert isinstance(captured["ctx"], solara.Reactive)
     assert captured["ctx"].value is None
+
+
+def test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee_interface(
+    monkeypatch,
+):
+    """``right_panel_content[0]["content"]`` above is checked only by length:
+    a placeholder widget, or a panel built with ``map_=None``, both pass it.
+    Substituting a spy for ``MapLayersPanel`` and reading what ``Sdg1531App``
+    actually calls it with proves the identity instead -- the same ``maps``
+    reactive the Run step writes into (not a private copy that would never
+    see a Build), the real ``SepalMap`` the layers must be drawn onto, and
+    the real session-backed ``gee_interface``."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
+        captured["run_maps"] = maps
+
+    @solara.component
+    def _spy_map_layers_panel(
+        *, maps: Any = None, map_: Any = None, gee_interface: Any = None
+    ) -> None:
+        captured.update(panel_maps=maps, map_=map_, gee_interface=gee_interface)
+
+    monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(page_module, "MapLayersPanel", _spy_map_layers_panel)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["panel_maps"] is captured["run_maps"]
+    assert isinstance(captured["map_"], SepalMap)
+    assert captured["gee_interface"] is not None
 
 
 def test_the_steps_are_in_the_sub_indicator_order():

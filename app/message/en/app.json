@@ -67,5 +67,12 @@
     "build": "Build",
     "built": "Built {count} layers",
     "blocked": "Fix the problems above before building."
+  },
+  "layers": {
+    "title": "Layers",
+    "description": "Add the computed layers to the map.",
+    "show": "Show on map",
+    "shown": "Added {count} layers to the map",
+    "build_first": "Build the indicator first."
   }
 }
