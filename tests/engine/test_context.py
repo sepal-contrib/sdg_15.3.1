@@ -86,7 +86,16 @@ def test_from_aoi_spec_geojson_arm(ee_offline):
     assert built.feature_collection.serialize() == ee.FeatureCollection(GEOJSON).serialize()
 
 
-@pytest.mark.parametrize("admin_code", ["185", "101"])  # Colombia, Algeria (GAUL 2024 ADMIN0)
+@pytest.mark.parametrize(
+    "admin_code",
+    ["185", "1001"],  # Colombia (ADMIN0, 3 digits), Adrar (ADMIN1, 4 digits)
+    # Different lengths so a length-preserving transform (`[:3]`) cannot pass
+    # both cases by coincidence. No leading-zero case: checked
+    # `pygaul.Names(content_level=0/1/2)` and no real GAUL 2024 code at any
+    # level has one, so a `str(int(code))` mutation is unwitnessable here --
+    # it is caught instead by the app-adapter test, whose codes need not be
+    # real GAUL entries.
+)
 def test_from_aoi_spec_builds_an_admin_collection_through_pygaul(admin_code, ee_offline):
     import pygaul
 

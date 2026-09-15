@@ -64,7 +64,12 @@ def test_a_drawn_result_becomes_the_geojson_arm():
 
 
 @pytest.mark.parametrize("method", ["ADMIN0", "ADMIN1", "ADMIN2"])
-@pytest.mark.parametrize("code", ["3431", "9110"])
+# "3431" and "04321" differ in both length and leading zero: the adapter
+# never validates against pygaul (see the docstring below), so unlike the
+# domain-side context test these need not be real GAUL entries, and can be
+# picked specifically to kill a shape-preserving transform -- `[:4]` or
+# `.lstrip("0")` -- that a same-length, no-leading-zero pair would miss.
+@pytest.mark.parametrize("code", ["3431", "04321"])
 def test_an_admin_selection_becomes_an_admin_aoi(method, code):
     result = AoiResult(method=method, name="COL_Cundinamarca", admin=code, gee=True)
     assert to_domain_aoi(result) == AdminAoi(admin_code=code, name="COL_Cundinamarca")

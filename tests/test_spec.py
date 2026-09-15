@@ -107,21 +107,25 @@ def _kind_tags() -> dict[str, str]:
 
 
 def test_every_union_arm_carries_a_stable_kind_tag():
-    tags = _kind_tags()
-    assert len(tags) >= 11, tags  # the scan must find something, or this is vacuous
-    assert set(tags.values()) == {
-        "asset",
-        "geojson",
-        "admin",
-        "sensors",
-        "precomputed_vi",
-        "per_pixel",
-        "fixed",
-        "jrc_seasonality",
-        "pixel_value",
-        "asset_band",
-        "esa_cci",
-        "custom",
+    # A full dict comparison, not `set(tags.values()) == {...}`: the set form
+    # collapses two classes sharing one kind into a single element, so a
+    # duplicate tag (which would make `_aoi_from_json` and its siblings
+    # decode the wrong class) would pass unnoticed. Comparing the whole
+    # mapping keeps class and kind paired, and pins the exact count too --
+    # no separate floor needed, vacuous or otherwise.
+    assert _kind_tags() == {
+        "AssetAoi": "asset",
+        "GeoJsonAoi": "geojson",
+        "AdminAoi": "admin",
+        "SensorSelection": "sensors",
+        "PrecomputedViAsset": "precomputed_vi",
+        "PerPixelClimate": "per_pixel",
+        "FixedClimate": "fixed",
+        "JrcSeasonalityMask": "jrc_seasonality",
+        "PixelValueMask": "pixel_value",
+        "AssetBandMask": "asset_band",
+        "EsaCciSource": "esa_cci",
+        "CustomLandCoverSource": "custom",
     }
 
 
