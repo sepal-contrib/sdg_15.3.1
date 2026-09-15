@@ -1,8 +1,9 @@
-"""Sensors, index, trajectory, ecological units, lookup, threshold, climate."""
+"""Sensors, index, trajectory, ecological units, lookup and the VI threshold."""
 
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 import ipyvuetify
 import pytest
@@ -12,10 +13,20 @@ from app.message import msg
 from app.steps.productivity import ProductivityStep, selectable_trajectories
 from sdg1531.catalog import DISABLED_TRAJECTORIES, SENSORS
 from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
-from sdg1531.spec import PrecomputedViAsset, RunSpec, SensorSelection
-from tests.spec_factory import default_spec
+from sdg1531.spec import PeriodOverride, PrecomputedViAsset, RunSpec, SensorSelection
+from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 _MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
+
+# `Trajectory` has four members and one (`S_RES_TREND`) is disabled -- named
+# explicitly rather than derived from `selectable_trajectories()` itself, so a
+# regression that narrows the function (e.g. to just `(UE_TREND,)`) has
+# something independent to disagree with.
+_EXPECTED_SELECTABLE_TRAJECTORIES = (
+    Trajectory.NDVI_TREND,
+    Trajectory.P_RES_TREND,
+    Trajectory.UE_TREND,
+)
 
 
 def _markdown_texts(node: object) -> list[str]:
@@ -65,11 +76,12 @@ def test_the_step_renders():
 
 def test_the_disabled_trajectory_is_not_offered():
     """S_RES_TREND raises in the engine and validate() rejects it, so offering
-    it would build a spec the user cannot run."""
-    offered = selectable_trajectories()
-    assert Trajectory.S_RES_TREND in DISABLED_TRAJECTORIES
-    assert Trajectory.S_RES_TREND not in offered
-    assert Trajectory.UE_TREND in offered
+    it would build a spec the user cannot run. Pinned against the explicit
+    membership, not against ``selectable_trajectories()``'s own output --
+    comparing the function to itself cannot catch it silently narrowing to,
+    say, only ``UE_TREND``."""
+    assert set(Trajectory) - set(DISABLED_TRAJECTORIES) == set(_EXPECTED_SELECTABLE_TRAJECTORIES)
+    assert selectable_trajectories() == _EXPECTED_SELECTABLE_TRAJECTORIES
 
 
 def test_choosing_an_index_leaves_everything_else_alone():
@@ -83,8 +95,10 @@ def test_choosing_an_index_leaves_everything_else_alone():
 
 def test_the_widgets_show_the_current_spec_values():
     """Reads the real render tree -- each control's label, current value and
-    offered choices -- rather than an extracted helper's return value. The
-    disabled trajectory is checked here too: not merely absent from
+    offered choices -- rather than an extracted helper's return value.
+    Expected label text is computed through ``msg()`` (the catalogue), not
+    hardcoded English, so a translation does not break this. The disabled
+    trajectory is checked here too: not merely absent from
     ``selectable_trajectories()`` in isolation, but actually missing from the
     rendered Select's own ``items``."""
     spec = solara.reactive(default_spec(threshold=0.42))
@@ -99,17 +113,19 @@ def test_the_widgets_show_the_current_spec_values():
     assert sensors.v_model == ["MODIS MOD13Q1"]
 
     assert index.label == msg("productivity.index")
-    assert index.items == [v.value for v in VegetationIndex]
-    assert index.v_model == VegetationIndex.NDVI.value
+    assert index.items == [msg(f"productivity.index_value.{v.value}") for v in VegetationIndex]
+    assert index.v_model == msg("productivity.index_value.ndvi")
 
     assert trajectory.label == msg("productivity.trajectory")
-    assert trajectory.items == [t.value for t in selectable_trajectories()]
-    assert Trajectory.S_RES_TREND.value not in trajectory.items
-    assert trajectory.v_model == Trajectory.NDVI_TREND.value
+    assert trajectory.items == [
+        msg(f"productivity.trajectory_value.{t.value}") for t in _EXPECTED_SELECTABLE_TRAJECTORIES
+    ]
+    assert msg("productivity.trajectory_value.s_res_trend") not in trajectory.items
+    assert trajectory.v_model == msg("productivity.trajectory_value.ndvi_trend")
 
     assert lceu.label == msg("productivity.lceu")
-    assert lceu.items == [u.value for u in Lceu]
-    assert lceu.v_model == Lceu.GAES.value
+    assert lceu.items == [msg(f"productivity.lceu_value.{u.value}") for u in Lceu]
+    assert lceu.v_model == msg("productivity.lceu_value.gaes")
 
     assert lookup.label == msg("productivity.lookup")
     assert lookup.items == [p.value for p in ProductivityLookup]
@@ -123,18 +139,56 @@ def test_the_widgets_show_the_current_spec_values():
     assert slider.v_model == 0.42
 
 
-def test_an_unset_threshold_defaults_the_slider_to_zero():
-    """The legacy slider defaulted to 0 (input_tile.py:31-39); every sensor
-    but Terra NPP requires a resolved float threshold (engine/integration.py
-    EXPECTED_DIVERGENCES note 1) while ``validate()`` has no rule for it. A
-    control that instead defaulted to ``None`` would leave a spec
-    ``is_runnable()`` accepts but ``build()`` rejects for every other sensor.
-    """
+def test_every_label_and_the_description_route_through_msg(monkeypatch):
+    """Every other assertion in this file compares a rendered label against
+    ``msg()``'s own English return value, so a hardcoded English literal in
+    place of a ``msg()`` call would satisfy all of them by coincidence.
+    Substituting a distinguishing stand-in for ``msg`` instead proves each
+    rendered string is really that call's OUTPUT, not a literal that happens
+    to match it -- including the two catalogue-keyed value labels, which a
+    literal could not reproduce for more than one locale anyway."""
+
+    def _fake_msg(key: str, **_: object) -> str:
+        return f"<{key}>"
+
+    monkeypatch.setattr("app.steps.productivity.msg", _fake_msg)
+
+    spec = solara.reactive(default_spec())
+    box, rc = solara.render(ProductivityStep(spec=spec), handle_error=False)
+    assert rc is not None
+
+    assert _markdown_texts(box)[0] == "<p><productivity.description></p>"
+
+    sensors, index, trajectory, lceu, lookup = _selects(box)
+    assert sensors.label == "<productivity.sensors>"
+    assert index.label == "<productivity.index>"
+    assert index.v_model == "<productivity.index_value.ndvi>"
+    assert trajectory.label == "<productivity.trajectory>"
+    assert trajectory.v_model == "<productivity.trajectory_value.ndvi_trend>"
+    assert lceu.label == "<productivity.lceu>"
+    assert lceu.v_model == "<productivity.lceu_value.gaes>"
+    assert lookup.label == "<productivity.lookup>"
+
+    slider = _slider(box)
+    assert slider.label == "<productivity.threshold>"
+
+
+def test_an_unset_threshold_is_committed_to_the_spec_not_merely_displayed():
+    """The legacy slider's ``v_model`` was BOUND to the model
+    (input_tile.py:31-39), so its 0 default landed in the model at first
+    paint. Every sensor but Terra NPP requires a resolved float threshold
+    (engine/integration.py EXPECTED_DIVERGENCES note 1) and ``validate()``
+    has no rule for it, so a slider that only DISPLAYS 0.0 while leaving
+    ``spec.threshold`` at ``None`` reopens exactly the gap this control
+    exists to close: Build stays enabled and then fails with ``SpecError``
+    for every sensor but Terra NPP. Assert the spec itself, not just the
+    widget's own ``v_model``."""
     spec = solara.reactive(default_spec())
     assert spec.value.threshold is None
     box, rc = solara.render(ProductivityStep(spec=spec), handle_error=False)
     assert rc is not None
     assert _slider(box).v_model == 0.0
+    assert spec.value.threshold == 0.0
 
 
 def test_a_precomputed_vi_asset_does_not_crash_the_sensors_widget():
@@ -169,7 +223,7 @@ def test_changing_the_index_updates_only_vegetation_index():
     _sensors, index, _trajectory, _lceu, _lookup = _selects(box)
     before = spec.value
 
-    index.v_model = VegetationIndex.EVI.value
+    index.v_model = msg("productivity.index_value.evi")
 
     assert spec.value.vegetation_index is VegetationIndex.EVI
     assert spec.value.evolve(vegetation_index=before.vegetation_index) == before
@@ -182,7 +236,7 @@ def test_changing_the_trajectory_updates_only_trajectory():
     _sensors, _index, trajectory, _lceu, _lookup = _selects(box)
     before = spec.value
 
-    trajectory.v_model = Trajectory.UE_TREND.value
+    trajectory.v_model = msg("productivity.trajectory_value.ue_trend")
 
     assert spec.value.trajectory is Trajectory.UE_TREND
     assert spec.value.evolve(trajectory=before.trajectory) == before
@@ -195,7 +249,7 @@ def test_changing_the_lceu_updates_only_lceu():
     _sensors, _index, _trajectory, lceu, _lookup = _selects(box)
     before = spec.value
 
-    lceu.v_model = Lceu.AEZ.value
+    lceu.v_model = msg("productivity.lceu_value.aez")
 
     assert spec.value.lceu is Lceu.AEZ
     assert spec.value.evolve(lceu=before.lceu) == before
@@ -243,15 +297,30 @@ def test_moving_the_threshold_slider_updates_only_threshold():
             default_spec(aoi=None),
             [],
         ),
+        (
+            # A non-fatal problem this step owns: `periods.state` falls back
+            # to `periods.overall` (2000-2020 in `DEFAULT_PERIODS`), and a
+            # baseline under four years leaves it fully masked. Both branches
+            # of the problems loop render as plain `<p>...</p>` in this
+            # file's other cases (all fatal, all bold) -- this is the only
+            # case that exercises the non-bold `else` arm, so a mutation that
+            # always bolds (or never does) has something here to catch it.
+            default_spec(periods=replace(DEFAULT_PERIODS, state=PeriodOverride(2018, 2020))),
+            [
+                "<p>The productivity state period is shorter than four years, so its "
+                "baseline is empty and the state layer will be fully masked.</p>"
+            ],
+        ),
     ],
 )
 def test_the_step_renders_only_its_own_text(spec, expected_extra):
     """Pins what the step actually shows: a fully-configured spec shows only
     the description; a spec with a fatal problem THIS step owns (no sensors,
-    or the disabled trajectory) shows that problem's text; and a spec whose
-    only fatal problem belongs to ANOTHER step (missing AOI) shows neither --
-    the case that actually distinguishes ``problems_for("productivity", ...)``
-    from ``validate(...)``."""
+    or the disabled trajectory) shows that problem's text, bolded; a spec
+    with a non-fatal problem THIS step owns shows that problem's text
+    unbolded; and a spec whose only fatal problem belongs to ANOTHER step
+    (missing AOI) shows neither -- the case that actually distinguishes
+    ``problems_for("productivity", ...)`` from ``validate(...)``."""
     spec_r = solara.reactive(spec)
     box, rc = solara.render(ProductivityStep(spec=spec_r), handle_error=False)
     assert rc is not None
