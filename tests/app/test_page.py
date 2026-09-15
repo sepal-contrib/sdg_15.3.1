@@ -44,11 +44,10 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     the rendered box at all under that mistake -- and, unlike a grep, it also
     catches a dropped or misspelled kwarg for every field this task gives a
     genuinely non-empty expected value (an empty map, a wrong title, a wrong
-    panel config, no language selector). It cannot tell a misspelled
-    ``steps_data``/``right_panel_content`` kwarg from the correct one, though:
-    both are legitimately ``[]`` at this task, and a typo there leaves the
-    trait at its equally-empty default -- Tasks 5-13 close that gap once those
-    fields carry real content this check can also pin.
+    panel config, no language selector). It still cannot tell a misspelled
+    ``right_panel_content`` kwarg from the correct one: it is legitimately
+    ``[]`` until a later task gives it content -- but ``steps_data`` is no
+    longer one of those, now that Task 5 puts the AOI step in it.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -68,7 +67,13 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     }
     assert mapapp.right_panel_content == []
     assert mapapp.right_panel_open is False
-    assert mapapp.steps_data == []
+    assert len(mapapp.steps_data) == 1
+    aoi_step = mapapp.steps_data[0]
+    assert aoi_step["id"] == 1
+    assert aoi_step["name"] == msg("step.aoi")
+    assert aoi_step["icon"] == "mdi-map-marker-check"
+    assert aoi_step["display"] == "step"
+    assert len(aoi_step["content"]) == 1
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
     assert offered == set(messages.available_locales())

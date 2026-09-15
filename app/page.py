@@ -3,7 +3,8 @@
 ``Sdg1531App`` holds the layout so the same code can serve both runtimes;
 ``Page`` wraps it with SEPAL session authentication for the Solara server.
 
-The steps are empty at this task and are filled in by the tasks that follow.
+The AOI step is the first entry in ``steps_data``; the tasks that follow add
+the rest.
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ from pysepal.solara import (
 from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
+from app.state import STEP_PREFIXES  # noqa: F401  (kept for the steps that follow)
+from app.steps.aoi import AoiStep
+from sdg1531.spec import RunSpec
 
 __all__ = ("Page", "Sdg1531App")
 
@@ -41,6 +45,8 @@ def _on_kernel_start() -> Callable[[], None]:
 def Sdg1531App() -> None:
     """The MapApp shell: five configuration steps, results in the right panel."""
     setup_theme_colors()
+
+    spec = solara.use_reactive(RunSpec())
 
     gee_interface = get_current_gee_interface()
     theme_state = get_current_theme_state()
@@ -62,7 +68,15 @@ def Sdg1531App() -> None:
         app_title=msg("app.title"),
         app_icon="mdi-earth",
         main_map=[sepal_map],
-        steps_data=[],
+        steps_data=[
+            {
+                "id": 1,
+                "name": msg("step.aoi"),
+                "icon": "mdi-map-marker-check",
+                "display": "step",
+                "content": [AoiStep(spec=spec, map_=sepal_map)],
+            },
+        ],
         right_panel_config={
             "title": msg("panel.title"),
             "icon": "mdi-chart-box-outline",

@@ -25,6 +25,8 @@ _UNTRANSLATED_FR_KEYS = frozenset(
         "step.land_cover",
         "step.soc",
         "step.run",
+        "aoi.description",
+        "aoi.selected",
     }
 )
 

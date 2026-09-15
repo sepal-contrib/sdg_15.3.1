@@ -13,5 +13,9 @@
     "land_cover": "Land cover",
     "soc": "Soil organic carbon",
     "run": "Run"
+  },
+  "aoi": {
+    "description": "Choose the area the indicator is computed over.",
+    "selected": "Selected: {name}"
   }
 }

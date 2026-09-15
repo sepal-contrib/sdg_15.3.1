@@ -117,8 +117,21 @@ ignore_missing_imports = true
 # otherwise treats every one of those as private to the submodule it came from.
 # solara/__init__.py and solara/lab/__init__.py do the same for `component`,
 # `on_kernel_start` and the rest of the public API `app/` renders through.
-module = ["ee", "solara", "solara.lab"]
+# solara.hooks and solara.components need the same treatment one level down:
+# `solara/__init__.py`'s own `from .hooks import *` / `from .components import *`
+# only re-exports what those submodules themselves expose, and each imports its
+# public names (``use_reactive``, ``Markdown``, ...) the same unstarred way.
+module = ["ee", "solara", "solara.lab", "solara.hooks", "solara.components"]
 implicit_reexport = true
+
+[[tool.mypy.overrides]]
+# solara.Markdown (solara/components/markdown.py) has untyped parameters and no
+# return annotation, so strict mode's disallow_untyped_calls flags every call
+# into it. Every step under app/steps renders its description and its own
+# validation problems through it (see AoiStep), so this belongs on the package,
+# not one file at a time.
+module = ["app.steps.*"]
+disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 # pysepal's with_sepal_sessions (app/page.py's session-authenticated entrypoint
