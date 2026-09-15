@@ -10,15 +10,19 @@ import pytest
 import solara
 
 from app.message import msg
-from app.state import problems_for
+from app.state import is_runnable, problems_for
 from app.steps.soc import SocStep
-from sdg1531.spec import PeriodOverride
+from sdg1531.catalog import L4_START
+from sdg1531.resolve import resolve
+from sdg1531.spec import Period, PeriodOverride
 from tests.app.render_helpers import find_widgets, markdown_texts
 from tests.spec_factory import default_spec
 
 # Same range the legacy's PickerLineSOC offers (component/widget/picker_line_soc.py:8):
-# `range(sensor_max_year, L4_start - 1, -1)`, i.e. last year down to 1982.
-_YEARS = list(range(date.today().year - 1, 1981, -1))
+# `range(sensor_max_year, L4_start - 1, -1)`, i.e. last year down to 1982. `L4_START`
+# comes from `sdg1531.catalog` -- the same constant `app/steps/soc.py` imports --
+# rather than a second hardcoded `1981`, so the two cannot drift apart.
+_YEARS = list(range(date.today().year - 1, L4_START - 1, -1))
 
 
 def _selects(box: object) -> tuple[object, object]:
@@ -139,6 +143,32 @@ def test_changing_one_bound_leaves_the_other_alone():
     assert spec.value.periods.soc == PeriodOverride(2000, 2010)
 
 
+def test_a_half_filled_override_leaves_the_spec_runnable():
+    """Setting only ONE bound is a state the two independent year Selects
+    reach naturally, one click before the other -- and it must stay usable
+    while it lasts. Unlike ``periods.overall`` (whose own half-filled state
+    reaches ``resolve()``'s empty ``max()`` and raises a bare ``ValueError``,
+    per ``app.state.is_runnable``'s docstring), ``PeriodOverride.resolve()``
+    fills a missing bound from ``periods.overall`` itself, so a half-filled
+    OVERRIDE never reaches that gap. Pinned directly against ``is_runnable``
+    and ``resolve()``'s own output, through the real widget, not just the
+    leaf field -- a regression that reintroduced the `overall`-style gap for
+    overrides too would fail here even though the leaf value is still
+    correct."""
+    spec = solara.reactive(default_spec())
+    assert is_runnable(spec.value)  # fully configured before this step touches it
+
+    box, rc = solara.render(SocStep(spec=spec), handle_error=False)
+    assert rc is not None
+    start, _end = _selects(box)
+
+    start.v_model = 1995
+
+    assert spec.value.periods.soc == PeriodOverride(1995, None)
+    assert is_runnable(spec.value)
+    assert resolve(spec.value).soc_period == Period(1995, spec.value.periods.overall.end)
+
+
 def test_every_label_and_the_description_route_through_msg(monkeypatch):
     """Every other assertion in this file compares a rendered label against
     ``msg()``'s own English return value, so a hardcoded English literal in
@@ -168,7 +198,12 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     [
         (default_spec(), []),
         (
-            default_spec(periods=replace(default_spec().periods, soc=PeriodOverride(1980, 2015))),
+            # 1985, not the 1980 `test_a_soc_start_before_the_cci_range_warns_
+            # rather_than_blocks` above uses (that value is the brief's own,
+            # transcribed verbatim): 1985 is a year the control's own `_YEARS`
+            # actually offers, so this case is reachable through the rendered
+            # widget, not just through `problems_for` directly.
+            default_spec(periods=replace(default_spec().periods, soc=PeriodOverride(1985, 2015))),
             [
                 "<p>The soil organic carbon period starts before the CCI land "
                 "cover record (1992); the years before it contribute no land "

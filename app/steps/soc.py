@@ -17,6 +17,7 @@ import solara
 
 from app.message import msg
 from app.state import problems_for
+from sdg1531.catalog import L4_START
 from sdg1531.spec import PeriodOverride, RunSpec
 
 __all__ = ("SocStep",)
@@ -46,7 +47,12 @@ def SocStep(spec: solara.Reactive[RunSpec]) -> None:
     # overall period set to 2001-2015 the run uses soc_period 2001-2015, so a
     # control showing "2000" would state a start year the run does not use. An
     # empty control says "not overridden", which is the truth.
-    years = list(range(date.today().year - 1, 1981, -1))
+    #
+    # `L4_START` (1982), not a repeated literal: `sdg1531.catalog` already
+    # owns this constant (it is the legacy's own `L4_start`, per
+    # picker_line_soc.py's `YEAR_RANGE`); `date.today().year - 1` has no
+    # equivalent to import since the domain has no notion of "this year".
+    years = list(range(date.today().year - 1, L4_START - 1, -1))
 
     solara.Select(
         label=msg("soc.start"),

@@ -59,10 +59,14 @@ def build_steps_data(
     component body, so ``tests/app/test_page.py`` can call
     ``build_steps_data()`` bare to pin step order (id, name, icon, display)
     without a real spec, map or reactive to hand it. Each step's own content
-    is built only once its required reactives are actually present -- both
-    so a bare call never constructs an element from a ``None`` a real step
-    would reject, and so ``mypy --strict`` sees every constructor call with
-    its arguments correctly narrowed away from ``None``.
+    is built only once its required reactives are actually present, guarded
+    with plain ``is not None`` checks -- calling a step with ``None`` would
+    not actually raise (an inert element descriptor is built either way, per
+    the paragraph above), so this buys nothing at runtime. It exists solely
+    so ``mypy --strict`` narrows each ``Reactive[...] | None`` argument away
+    from ``None`` before it reaches a step that declares a bare
+    ``Reactive[...]`` parameter; measured by deleting the guards, which
+    leaves every test green and produces one ``mypy`` error per guard removed.
     """
     aoi_content: list[object] = (
         [AoiStep(spec=spec, map_=sepal_map)] if spec is not None and sepal_map is not None else []
