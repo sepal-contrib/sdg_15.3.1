@@ -22,6 +22,7 @@ from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
 from app.state import is_runnable, problems_for
+from sdg1531.catalog import L4_START
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps, build_indicator_maps
 from sdg1531.resolve import resolve
@@ -67,7 +68,7 @@ def RunStep(
     # `SpecError: soc.start must be set before a run can be resolved` when it is
     # unset, while `validate()` has no rule for it. Without this control a user
     # who has set an AOI, sensors and the threshold still cannot complete a run.
-    years = list(range(date.today().year - 1, 1981, -1))
+    years = list(range(date.today().year - 1, L4_START - 1, -1))
     overall = spec.value.periods.overall
 
     solara.Select(
