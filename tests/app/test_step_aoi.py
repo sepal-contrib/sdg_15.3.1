@@ -119,7 +119,9 @@ def test_the_view_is_wired_to_apply_the_selection_and_excludes_local_methods(mon
         map_: Any = None,
         gee: Any = None,
     ) -> None:
-        captured.update(value=value, on_value=on_value, loading=loading, methods=methods, map_=map_, gee=gee)
+        captured.update(
+            value=value, on_value=on_value, loading=loading, methods=methods, map_=map_, gee=gee
+        )
 
     monkeypatch.setattr("app.steps.aoi.AoiView", _spy_aoi_view)
 
