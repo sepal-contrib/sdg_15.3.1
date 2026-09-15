@@ -50,9 +50,12 @@ def Sdg1531App() -> None:
     # map share this kernel's authenticated session instead of building its own.
     sepal_map = SepalMap(gee=True, theme_state=theme_state, gee_interface=gee_interface)
 
-    # Mounted before anything that calls use_notifications(): on the first
-    # render before the provider's effect fires, the hook returns a silent
-    # no-op notifier.
+    # Mounted before anything that calls use_notifications(): the bus is
+    # created during render, via solara.use_memo (not an effect), specifically
+    # so sibling components in the same render pass can resolve a real
+    # notifier -- mounted later, a consumer would get the NoopNotifier
+    # fallback instead, which warns loudly (a UserWarning, once per call
+    # site), not silently.
     NotificationProvider()
 
     MapApp.element(

@@ -58,13 +58,16 @@ FS_CALL_ATTRS = (
 # still flagged like anywhere else in the domain.
 FS_EXEMPT_FILES = frozenset({"sdg1531/export.py"})
 FS_EXEMPT_CALLS = frozenset({"to_file", "read_bytes", "TemporaryDirectory"})
-# app/page.py calls setup_solara_server() at module level. Solara reads
-# solara.server.settings.assets.* while building its static-asset routes, which
-# happens as soon as the app module is imported -- before any kernel starts or
-# component renders -- so the call cannot be deferred into on_kernel_start or
-# Sdg1531App without racing that read. It is the one call this project makes
-# there; it is idempotent (setup_solara_server's own docstring: "a repeated call
-# is cheap... does nothing" once the same locations are already merged).
+# app/page.py calls setup_solara_server() at module level. Measured, not
+# assumed: deferring the call into on_kernel_start or Sdg1531App drops
+# custom.css from 11011 bytes of real pysepal rules to a 15-byte stub, loses
+# the FontAwesome pin, and the sepalui.solara.setup log lines never appear at
+# import -- because Solara reads solara.server.settings.assets.* while
+# building its static-asset routes, before any kernel starts or component
+# renders. It is the one call this project makes there. It is NOT idempotent
+# -- three calls in one process measured three distinct temp asset
+# directories, each leaking the last -- which is a reason to call it exactly
+# once at import, not a reason repeated calls would be harmless.
 MODULE_LEVEL_CALL_EXEMPT = frozenset({("app/page.py", "setup_solara_server")})
 ENGINE_PREFIX = "sdg1531/engine/"
 ENGINE_MODULE = "sdg1531/engine.py"
@@ -228,14 +231,11 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
     for node in body:
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
             fn = node.value.func
-            call_name = (
-                fn.id
-                if isinstance(fn, ast.Name)
-                else fn.attr
-                if isinstance(fn, ast.Attribute)
-                else None
-            )
-            if (rel_path, call_name) not in MODULE_LEVEL_CALL_EXEMPT:
+            # Bare-name match only: an attribute call spelled the same way
+            # (`something.setup_solara_server()`) is a different call entirely
+            # and must not ride along on the name.
+            bare_name = fn.id if isinstance(fn, ast.Name) else None
+            if (rel_path, bare_name) not in MODULE_LEVEL_CALL_EXEMPT:
                 add(
                     node,
                     "module-level-call",

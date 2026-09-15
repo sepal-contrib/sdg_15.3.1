@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import inspect
-
 import reacton.core
 import solara
+from pysepal.mapping.sepal_map import SepalMap
+from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
+from app.message import messages, msg
 
 
 def test_page_is_a_solara_component():
@@ -25,10 +26,49 @@ def test_the_shell_renders():
     assert rc is not None
 
 
-def test_the_shell_uses_mapapp_element_not_the_constructor():
-    """`MapApp(...)` builds a widget outside Solara's render tree and the
-    layout silently does not update. `MapApp.element(...)` is the only
-    supported form."""
-    source = inspect.getsource(page_module)
-    assert "MapApp.element(" in source
-    assert "MapApp(" not in source.replace("MapApp.element(", "")
+def _find_widget(root: object, cls: type) -> object | None:
+    """The first ``cls`` instance in the render tree, walking ``.children``."""
+    if isinstance(root, cls):
+        return root
+    for child in getattr(root, "children", None) or []:
+        found = _find_widget(child, cls)
+        if found is not None:
+            return found
+    return None
+
+
+def test_the_shell_builds_a_correctly_configured_mapapp():
+    """A source grep for ``MapApp.element(`` only proves a spelling. This is
+    the behavioural check that dominates it: ``MapApp(...)`` builds a widget
+    outside Reacton's render tree, so no ``MapApp`` instance is reachable from
+    the rendered box at all under that mistake -- and, unlike a grep, it also
+    catches a dropped or misspelled kwarg for every field this task gives a
+    genuinely non-empty expected value (an empty map, a wrong title, a wrong
+    panel config, no language selector). It cannot tell a misspelled
+    ``steps_data``/``right_panel_content`` kwarg from the correct one, though:
+    both are legitimately ``[]`` at this task, and a typo there leaves the
+    trait at its equally-empty default -- Tasks 5-13 close that gap once those
+    fields carry real content this check can also pin.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    mapapp = _find_widget(box, MapApp)
+    assert mapapp is not None, "no MapApp in the render tree; MapApp(...) builds outside it"
+
+    assert mapapp.app_title == msg("app.title")
+    assert mapapp.app_icon == "mdi-earth"
+    assert len(mapapp.main_map) == 1
+    assert isinstance(mapapp.main_map[0], SepalMap)
+    assert mapapp.right_panel_config == {
+        "title": msg("panel.title"),
+        "icon": "mdi-chart-box-outline",
+        "width": 450,
+        "description": msg("panel.description"),
+    }
+    assert mapapp.right_panel_content == []
+    assert mapapp.right_panel_open is False
+    assert mapapp.steps_data == []
+    assert len(mapapp.language_selector) == 1
+    offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
+    assert offered == set(messages.available_locales())

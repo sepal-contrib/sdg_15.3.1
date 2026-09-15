@@ -9,8 +9,9 @@ found for ``NOTE_MODULES`` was to stop writing the roster down and DERIVE it fro
 source scan. This file generalises that, in two layers.
 
 **The scan.** :func:`iter_string_rosters` finds every collection of string
-constants assigned at module level or in a class body under ``tests/``: the four
-literal containers, the ``frozenset({...})`` wrappings, a dict's KEYS, and any
+constants -- or of tuples of them, a composite-key roster such as ``(path, call
+name)`` pairs -- assigned at module level or in a class body under ``tests/``: the
+four literal containers, the ``frozenset({...})`` wrappings, a dict's KEYS, and any
 combination of those built with an operator or a ``*`` spread. A roster in one of
 those shapes cannot appear without ``ROSTER_ACCOUNTS`` gaining an entry, because
 the two are compared in both directions. A roster assembled some other way -- by a
@@ -19,7 +20,11 @@ such roster today, and the claim is worth exactly the shapes it covers. It cover
 one shape fewer until fix round 1, where a one-key dict was read as a lookup
 rather than a roster: that exemption hid ``EXPECTED_NORMALISATIONS`` and
 ``HELD_CONSTANT``, two hand-maintained parity registers, from the scan written
-because hand-maintained rosters go stale.
+because hand-maintained rosters go stale. It covered one shape fewer again at the
+app layer's own fix round 1: a frozenset of 2-tuples (``MODULE_LEVEL_CALL_EXEMPT``)
+was invisible for the same reason -- an element that is not itself a bare string
+was read as "not a roster" -- and a wholly bogus entry in it passed 883 tests
+green.
 
 ``ROSTER_ACCOUNTS`` is itself a hand-maintained roster -- the last one -- and it is
 the only kind that cannot rot by omission, since the thing it must cover is
@@ -66,7 +71,7 @@ from pathlib import Path
 import pytest
 from _subprocess import run_python
 from conftest import REPO_ROOT
-from hygiene_rules import FS_EXEMPT_FILES, ROOTS
+from hygiene_rules import FS_EXEMPT_FILES, MODULE_LEVEL_CALL_EXEMPT, ROOTS
 from test_isolation import JSON_HALF
 from test_resolve import RESOLVED_FIELD, SUB_PERIODS
 from test_validate import SENSOR_NAMES
@@ -98,6 +103,7 @@ NOT_DOMAIN_PACKAGES = ("tests", "tools")
 
 ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/_subprocess.py:__all__": "derived: test_every_export_list_matches_its_module",
+    "tests/app/test_scaffolding.py:_UNTRANSLATED_FR_KEYS": "both directions: test_the_catalogue_is_valid",
     "tests/engine/test_context.py:GEOJSON": "fixture: the AOI polygon the context tests build from",
     "tests/engine/test_indicator.py:_BAND_PRESERVING": "vocabulary: ee's encoder -- the nodes that hand a band list through",
     "tests/engine/test_indicator.py:_OPERANDS": "vocabulary: the three band names build_indicator collapses",
@@ -115,6 +121,7 @@ ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/hygiene_rules.py:FS_EXEMPT_CALLS": "vocabulary: the two calls sdg1531/export.py is allowed",
     "tests/hygiene_rules.py:FS_EXEMPT_FILES": "one direction: test_every_hygiene_exemption_names_a_file_that_exists",
     "tests/hygiene_rules.py:_TEMP_SPOOLS": "vocabulary: the tempfile entry points that put something on disk",
+    "tests/hygiene_rules.py:MODULE_LEVEL_CALL_EXEMPT": "both directions: test_every_module_level_call_exemption_names_a_real_call",
     "tests/hygiene_rules.py:MUTABLE_BUILTINS": "vocabulary: the stdlib factories that return a fresh mutable container",
     "tests/hygiene_rules.py:MUTABLE_CHECK_EXEMPT_NAMES": "vocabulary: the two attribute lists the interpreter itself reads",
     "tests/hygiene_rules.py:RESOLVED_NAMES": "vocabulary: the spellings a ResolvedSpec is threaded through under",
@@ -168,13 +175,33 @@ def _is_docstring(node: ast.stmt) -> bool:
     )
 
 
+def _is_stringy(element: ast.expr) -> bool:
+    """A bare string literal, or a tuple made entirely of them.
+
+    A composite-key roster -- ``MODULE_LEVEL_CALL_EXEMPT`` is a ``frozenset`` of
+    ``(path, call name)`` pairs -- is still a roster of strings, just structured
+    ones; a 2-tuple element was invisible to the plain-``Constant`` check until
+    fix round 1, so it never had to earn a ``ROSTER_ACCOUNTS`` entry and a wholly
+    bogus entry in it passed the whole suite green.
+    """
+    if isinstance(element, ast.Constant) and isinstance(element.value, str):
+        return True
+    if isinstance(element, ast.Tuple):
+        return bool(element.elts) and all(
+            isinstance(e, ast.Constant) and isinstance(e.value, str) for e in element.elts
+        )
+    return False
+
+
 def _string_elements(value: ast.expr) -> list[ast.expr] | None:
-    """The elements of ``value`` when every one of them is a string literal.
+    """The elements of ``value`` when every one of them is a string literal, or a
+    tuple of them.
 
     Covers the four literal containers, the ``frozenset({...})`` / ``tuple([...])``
     wrappings, and a dict, whose KEYS are the roster (``RESOLVED_FIELD`` is keyed
     on sub-period names). ``None`` when ``value`` is anything else, or when one
-    element is not a plain string -- a mixed container is not a roster of names.
+    element is not stringy in that sense -- a mixed container is not a roster of
+    names.
 
     A roster built from another one contributes the literal elements of both
     operands. ``FS_CALL_ATTRS`` is ``frozenset({...}) | _TEMP_SPOOLS``, and a
@@ -209,7 +236,7 @@ def _string_elements(value: ast.expr) -> list[ast.expr] | None:
     elements = [e for e in elements if not isinstance(e, ast.Starred)]
     if not elements:
         return None
-    if not all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in elements):
+    if not all(_is_stringy(e) for e in elements):
         return None
     return elements
 
@@ -273,9 +300,14 @@ def test_the_scan_still_finds_rosters() -> None:
         ('X = frozenset({"a", "b"}) - frozenset({"b"})', {"X": 2}),
         ('X = {"a": 1}', {"X": 1}),
         ('class C:\n    X = ("a", "b")\n', {"C.X": 2}),
-        # not rosters: a dict assembled from another mapping, and a mixed container
+        # a composite-key roster: elements are (path, name) pairs, not bare names
+        ('X = frozenset({("a", "b")})', {"X": 1}),
+        ('X = frozenset({("a", "b"), ("c", "d")})', {"X": 2}),
+        # not rosters: a dict assembled from another mapping, a mixed container,
+        # and a tuple element with a non-string member
         ("X = {**OTHER}", {}),
         ('X = ("a", 1)', {}),
+        ('X = frozenset({("a", 1)})', {}),
     ],
 )
 def test_the_scan_sees_a_roster_however_it_is_assembled(
@@ -288,7 +320,9 @@ def test_the_scan_sees_a_roster_however_it_is_assembled(
     exact failure this file exists to prevent. ``|`` was generalised then and its
     siblings were not, so ``+``, ``-``, a ``*`` spread and a class body were all
     still invisible -- as was a one-key dict, which hid two live parity registers
-    behind the reasoning that a dict that small is a lookup rather than a roster.
+    behind the reasoning that a dict that small is a lookup rather than a roster,
+    and a composite-key roster, which hid ``MODULE_LEVEL_CALL_EXEMPT`` behind the
+    reasoning that an element which is not itself a string is not a roster entry.
     """
     assert _module_rosters(ast.parse(source)) == expected
 
@@ -457,6 +491,37 @@ def test_every_hygiene_exemption_names_a_file_that_exists() -> None:
     missing = sorted(rel for rel in FS_EXEMPT_FILES if not (REPO_ROOT / rel).is_file())
 
     assert missing == [], f"filesystem exemptions for files that do not exist: {missing}"
+
+
+def _module_level_call_names(tree: ast.Module) -> set[str]:
+    """Every bare-name call made at module level -- what a MODULE_LEVEL_CALL_EXEMPT
+    entry has to match, spelled the same way ``hygiene_rules.check_source`` reads it."""
+    return {
+        node.value.func.id
+        for node in tree.body
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+    }
+
+
+def test_every_module_level_call_exemption_names_a_real_call() -> None:
+    """Both directions in one assertion, the liveness FS_EXEMPT_FILES stops short
+    of: an entry is dead text -- the same failure as an exemption for a file that
+    has moved -- if its file does not exist, OR if that file makes no module-level
+    call by that name any more. A wholly bogus entry (a file that does not exist, a
+    call never made) must fail here rather than pass 883 other tests green."""
+    problems = []
+    for rel_path, call_name in MODULE_LEVEL_CALL_EXEMPT:
+        path = REPO_ROOT / rel_path
+        if not path.is_file():
+            problems.append(f"{rel_path}: no such file")
+            continue
+        made = _module_level_call_names(ast.parse(path.read_text(encoding="utf-8")))
+        if call_name not in made:
+            problems.append(f"{rel_path}: makes no module-level call named {call_name!r}")
+
+    assert problems == [], problems
 
 
 def test_the_sub_period_roster_is_every_sub_period_field() -> None:

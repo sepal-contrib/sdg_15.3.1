@@ -12,14 +12,34 @@ def test_app_exports_nothing():
     assert app.__all__ == ()
 
 
+# Task 14 owns translations, so fr's overlay is a deliberate partial one until
+# then. Pinned exactly rather than excluded wholesale: a task after this one
+# that adds another English key with no fr translation must fail here, not
+# silently grow the debt with nothing recording that it happened.
+_UNTRANSLATED_FR_KEYS = frozenset(
+    {
+        "panel.title",
+        "panel.description",
+        "step.aoi",
+        "step.productivity",
+        "step.land_cover",
+        "step.soc",
+        "step.run",
+    }
+)
+
+
 def test_the_catalogue_is_valid():
     """catalog() validates English at import; check() covers every other locale.
 
-    ``missing_key`` (a locale simply has not caught up with English yet) is
-    excluded: Task 14 owns translations and app.json's fr overlay is a
-    deliberate partial one until then. Any other code -- placeholder
-    mismatch, bad plural, shape mismatch -- is a real translation defect and
-    must still be empty.
+    ``missing_key`` is allowed only for exactly ``_UNTRANSLATED_FR_KEYS``. Any
+    other code -- placeholder mismatch, bad plural, shape mismatch -- or any
+    missing key beyond that pinned set, is a real translation defect and must
+    still be empty.
     """
-    problems = tuple(p for p in messages.check() if p.code != "missing_key")
-    assert problems == ()
+    problems = messages.check()
+    missing = {p.key for p in problems if p.code == "missing_key"}
+    other = tuple(p for p in problems if p.code != "missing_key")
+
+    assert missing == _UNTRANSLATED_FR_KEYS
+    assert other == ()
