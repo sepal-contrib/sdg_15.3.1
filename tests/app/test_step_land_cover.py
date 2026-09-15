@@ -11,7 +11,9 @@ import solara
 from app.message import msg
 from app.state import problems_for
 from app.steps.land_cover import LandCoverStep
+from sdg1531.scheme import LandCoverScheme
 from sdg1531.spec import (
+    AssetBandMask,
     CustomLandCoverSource,
     EsaCciSource,
     JrcSeasonalityMask,
@@ -75,6 +77,18 @@ def test_the_widgets_show_the_current_spec_values():
     assert slider.v_model == 6
 
 
+def test_the_slider_reads_the_spec_s_own_threshold_not_a_constant():
+    """``default_spec()``'s own threshold (6) happens to collide with what an
+    earlier version of this step hardcoded as a display fallback, so that
+    fixture alone cannot tell "reads the spec" from "always shows 6" apart.
+    A second, distinct value closes that gap: replacing the read with any
+    single constant cannot satisfy both this and the test above at once."""
+    spec = solara.reactive(default_spec(water_mask=JrcSeasonalityMask(threshold=11)))
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+    assert _slider(box).v_model == 11
+
+
 def test_the_custom_source_shows_asset_text_fields_with_their_current_values():
     spec = solara.reactive(
         default_spec(
@@ -94,15 +108,35 @@ def test_the_custom_source_shows_asset_text_fields_with_their_current_values():
     assert end_field.v_model == "users/x/end"
 
 
-def test_a_non_jrc_water_mask_does_not_crash_the_slider():
+@pytest.mark.parametrize(
+    "other_mask", [PixelValueMask(value=5), AssetBandMask(asset_id="x", band="y")]
+)
+def test_a_non_jrc_water_mask_shows_an_honest_note_instead_of_a_fabricated_threshold(other_mask):
     """``water_mask`` is a union; two of its arms (``PixelValueMask``,
-    ``AssetBandMask``) have no ``.threshold`` at all. A truthiness guard
-    (``if current.water_mask``) would still reach ``.threshold`` and raise
-    ``AttributeError`` -- only ``isinstance`` protects this render."""
-    spec = solara.reactive(default_spec(water_mask=PixelValueMask(value=5)))
+    ``AssetBandMask``) have no ``.threshold`` at all -- and, more to the
+    point, no JRC seasonality threshold really exists to show for either.
+    Showing a slider anyway (fixed at some fallback number) would let a
+    single accidental nudge silently discard the configured arm; the note
+    is what stands in for a threshold this control cannot represent."""
+    spec = solara.reactive(default_spec(water_mask=other_mask))
     box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
     assert rc is not None
-    assert _slider(box).v_model == 6
+    assert find_widgets(box, ipyvuetify.Slider) == []
+    assert spec.value.water_mask == other_mask  # untouched
+    assert f"<p>{msg('land_cover.water_mask_other_arm')}</p>" in markdown_texts(box)
+
+
+def test_an_unset_water_mask_is_seeded_to_the_domain_default():
+    """``water_mask=None`` is ``missing_water_mask`` (fatal) -- genuinely
+    unset, unlike the other two arms above, so this is the one case the step
+    may commit a default for, mirroring productivity.py's ``_seed_threshold``.
+    Seeded to ``RunSpec.water_mask``'s own default (8), not the unexplained 6
+    an earlier version of this step hardcoded as a display-only fallback."""
+    spec = solara.reactive(default_spec(water_mask=None))
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+    assert spec.value.water_mask == JrcSeasonalityMask(threshold=8)
+    assert _slider(box).v_model == 8
 
 
 def test_changing_the_source_to_custom_updates_only_land_cover():
@@ -174,6 +208,33 @@ def test_changing_the_end_asset_updates_only_that_field():
     assert spec.value.evolve(land_cover=before.land_cover) == before
 
 
+def test_editing_either_asset_field_preserves_an_existing_scheme():
+    """``dataclasses.replace(custom_source, ...)`` is what makes ``scheme``
+    survive an edit -- rebuilding a fresh ``CustomLandCoverSource(start_asset=
+    ..., end_asset=...)`` instead would silently drop it back to ``None``,
+    downgrading a spec carrying a real transition-matrix vocabulary to the
+    non-fatal ``half_custom_land_cover`` (remapped through the default IPCC
+    one instead)."""
+    scheme = LandCoverScheme.default()
+    spec = solara.reactive(
+        default_spec(
+            land_cover=CustomLandCoverSource(start_asset="a", end_asset="b", scheme=scheme),
+            water_mask=JrcSeasonalityMask(threshold=9),
+        )
+    )
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+    start_field, end_field = find_widgets(box, ipyvuetify.TextField)
+
+    start_field.v_model = "users/x/new-start"
+    assert spec.value.land_cover.scheme == scheme
+
+    end_field.v_model = "users/x/new-end"
+    assert spec.value.land_cover == CustomLandCoverSource(
+        start_asset="users/x/new-start", end_asset="users/x/new-end", scheme=scheme
+    )
+
+
 def test_changing_the_water_mask_threshold_updates_only_water_mask():
     # land_cover is a CustomLandCoverSource here, not default_spec()'s own
     # EsaCciSource() -- a handler that also (wrongly) resets land_cover back
@@ -222,6 +283,18 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
 
     slider = _slider(box)
     assert slider.label == "<land_cover.water_mask>"
+
+
+def test_the_other_arm_note_routes_through_msg(monkeypatch):
+    def _fake_msg(key: str, **_: object) -> str:
+        return f"<{key}>"
+
+    monkeypatch.setattr("app.steps.land_cover.msg", _fake_msg)
+
+    spec = solara.reactive(default_spec(water_mask=PixelValueMask(value=5)))
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+    assert "<p><land_cover.water_mask_other_arm></p>" in markdown_texts(box)
 
 
 @pytest.mark.parametrize(
@@ -277,6 +350,6 @@ def test_the_step_renders_only_its_own_text(spec, expected_extra):
     box, rc = solara.render(LandCoverStep(spec=spec_r), handle_error=False)
     assert rc is not None
     assert markdown_texts(box) == [
-        "<p>Land cover source, transitions and the water mask.</p>",
+        "<p>Land cover source and the water mask.</p>",
         *expected_extra,
     ]

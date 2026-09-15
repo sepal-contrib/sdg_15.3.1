@@ -49,6 +49,7 @@ _UNTRANSLATED_FR_KEYS = frozenset(
         "land_cover.description",
         "land_cover.source",
         "land_cover.water_mask",
+        "land_cover.water_mask_other_arm",
         "land_cover.esa",
         "land_cover.custom",
         "land_cover.start_asset",

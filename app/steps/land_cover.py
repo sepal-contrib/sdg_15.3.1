@@ -14,7 +14,15 @@ validate() problem into a dead end.
 ``water_mask`` is a three-arm union too (``JrcSeasonalityMask``,
 ``PixelValueMask``, ``AssetBandMask``), plus ``None`` for "not chosen yet".
 Only the JRC arm has a control, matching how the productivity step's
-``vi_source`` control only ever writes ``SensorSelection``.
+``vi_source`` control only ever writes ``SensorSelection`` -- but unlike that
+field, this one has no truthy "nothing selected" state to fall back to: a
+``PixelValueMask``/``AssetBandMask`` is a real, complete choice this step
+just does not offer a control for, so the threshold slider renders only when
+``water_mask`` actually IS the JRC arm, and a plain note stands in for it
+otherwise rather than fabricating a threshold that does not exist. ``None``
+is genuinely unset (``missing_water_mask``, fatal) and is the one case this
+step commits a real default for, on mount -- mirroring productivity.py's
+``_seed_threshold`` for its own genuinely-unset field.
 """
 
 from __future__ import annotations
@@ -48,6 +56,18 @@ def _source_labels() -> dict[str, str]:
 
 @solara.component
 def LandCoverStep(spec: solara.Reactive[RunSpec]) -> None:
+    def _seed_water_mask() -> None:
+        # `None` is the domain's genuinely-unset state (`missing_water_mask`,
+        # fatal) -- not one of the three real arms -- so it is the one case
+        # this control may safely commit a default for, the way
+        # productivity.py's `_seed_threshold` does for its own unset field.
+        # `RunSpec.water_mask`'s own default_factory is
+        # `JrcSeasonalityMask(threshold=8)`; seed exactly that.
+        if spec.value.water_mask is None:
+            spec.set(spec.value.evolve(water_mask=JrcSeasonalityMask(threshold=8)))
+
+    solara.use_effect(_seed_water_mask, [])
+
     solara.Markdown(msg("land_cover.description"))
 
     current = spec.value
@@ -92,17 +112,20 @@ def LandCoverStep(spec: solara.Reactive[RunSpec]) -> None:
 
     # isinstance, not a truthiness guard: `water_mask` is `WaterMaskSpec | None`,
     # and the other two arms (`PixelValueMask`, `AssetBandMask`) have no
-    # `.threshold` at all.
-    threshold = (
-        current.water_mask.threshold if isinstance(current.water_mask, JrcSeasonalityMask) else 6
-    )
-    solara.SliderInt(
-        label=msg("land_cover.water_mask"),
-        value=threshold,
-        min=1,
-        max=12,
-        on_value=lambda v: spec.set(spec.value.evolve(water_mask=JrcSeasonalityMask(threshold=v))),
-    )
+    # `.threshold` at all. Rendered only when the arm actually matches --
+    # never a fabricated number for an arm this control cannot represent.
+    if isinstance(current.water_mask, JrcSeasonalityMask):
+        solara.SliderInt(
+            label=msg("land_cover.water_mask"),
+            value=current.water_mask.threshold,
+            min=1,
+            max=12,
+            on_value=lambda v: spec.set(
+                spec.value.evolve(water_mask=JrcSeasonalityMask(threshold=v))
+            ),
+        )
+    elif current.water_mask is not None:
+        solara.Markdown(msg("land_cover.water_mask_other_arm"))
 
     for problem in problems_for("land_cover", spec.value):
         solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)

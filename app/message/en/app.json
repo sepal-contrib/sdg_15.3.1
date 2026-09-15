@@ -46,9 +46,10 @@
     }
   },
   "land_cover": {
-    "description": "Land cover source, transitions and the water mask.",
+    "description": "Land cover source and the water mask.",
     "source": "Land cover source",
     "water_mask": "Water mask",
+    "water_mask_other_arm": "A different water mask is already configured; this control only edits the seasonality threshold.",
     "esa": "ESA CCI",
     "custom": "Custom assets",
     "start_asset": "Start land cover asset",
