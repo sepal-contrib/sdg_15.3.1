@@ -20,6 +20,8 @@
   },
   "run": {
     "description": "Build the indicator from the configuration above.",
+    "start_year": "Start year",
+    "end_year": "End year",
     "build": "Build",
     "built": "Built {count} layers",
     "blocked": "Fix the problems above before building."

@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 
+from sdg1531.resolve import resolve
 from sdg1531.spec import RunSpec
 from sdg1531.validate import Problem, validate
 
@@ -73,5 +74,33 @@ def problems_for(step: str, spec: RunSpec) -> tuple[Problem, ...]:
 
 
 def is_runnable(spec: RunSpec) -> bool:
-    """No fatal problem anywhere. Warnings do not block a run."""
-    return not any(p.fatal for p in validate(spec))
+    """No fatal problem anywhere, AND the spec actually resolves.
+
+    ``validate()`` alone is not enough: it has no rule for every field
+    ``resolve()`` requires. ``periods.overall`` is the standing example --
+    left unset, it propagates as ``None`` through every sub-period that falls
+    back to it, and ``validate()`` reports nothing wrong. ``resolve()`` is not
+    total the way ``validate()`` is, though: an overall period with neither
+    endpoint set raises ``SpecError`` deriving the first year it needs, but
+    one with a START and no END yet -- a state the Run step's two independent
+    year Selects reach naturally between picking one and the other -- reaches
+    ``_integration_period()``'s ``max()`` over an all-``None`` tuple and
+    raises a bare ``ValueError`` instead (measured, not assumed: see
+    ``tests/app/test_step_run.py``). This is called on every render exactly
+    like ``validate()`` is, so it has to be just as total: ANY exception from
+    ``resolve()`` means "not runnable" here, matching ``validate()``'s own
+    "a bug must not break the form" catch-all rather than special-casing each
+    shape ``resolve()`` can fail on.
+
+    Asking ``resolve()`` itself, rather than reimplementing its requirements
+    here, is what keeps this guard from rotting out of sync with the engine --
+    and it costs nothing to ask on every render: ``resolve()`` imports no
+    ``ee`` and touches no network.
+    """
+    if any(p.fatal for p in validate(spec)):
+        return False
+    try:
+        resolve(spec)
+    except Exception:
+        return False
+    return True

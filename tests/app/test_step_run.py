@@ -10,6 +10,7 @@ refuses -- notifies the error and leaves both reactives untouched.
 from __future__ import annotations
 
 import re
+from datetime import date
 
 import ipyvuetify
 import pytest
@@ -46,6 +47,13 @@ _SPEC_WITH_A_RUN_PROBLEM = default_spec(
     )
 )
 
+# One fatal problem (field="aoi") that belongs to the AOI step, not Run -- the
+# case that actually distinguishes `problems_for("run", ...)` from `validate(...)`,
+# and `is_runnable` from `not problems_for("run", ...)`. Both mutations pass
+# every OTHER parametrization in this file, since those only ever use a spec
+# whose problems Run owns or a spec with none at all.
+_SPEC_WITH_ANOTHER_STEPS_PROBLEM = default_spec(aoi=None)
+
 
 def _markdown_texts(node: object) -> list[str]:
     """Every rendered markdown paragraph under ``node``, in tree order.
@@ -73,6 +81,14 @@ def _find_widget(root: object, cls: type) -> object | None:
         if found is not None:
             return found
     return None
+
+
+def _find_widgets(root: object, cls: type) -> list[object]:
+    """Every ``cls`` instance in the render tree, in tree order."""
+    found = [root] if isinstance(root, cls) else []
+    for child in getattr(root, "children", None) or []:
+        found.extend(_find_widgets(child, cls))
+    return found
 
 
 class _FakeNotifier:
@@ -127,13 +143,19 @@ def test_build_touches_no_network():
                 "<p>Fix the problems above before building.</p>",
             ],
         ),
+        (
+            _SPEC_WITH_ANOTHER_STEPS_PROBLEM,
+            ["<p>Fix the problems above before building.</p>"],
+        ),
     ],
 )
 def test_the_step_renders_only_its_own_text(spec, expected_extra):
-    """Pins what the step actually shows, in both states: a runnable spec
-    shows only the description, and a spec with a fatal problem THIS step
-    owns shows that problem's text and the blocked notice -- not just that
-    the render did not raise."""
+    """Pins what the step actually shows, in three states: a runnable spec
+    shows only the description; a spec with a fatal problem THIS step owns
+    shows that problem's text and the blocked notice; and a spec whose only
+    fatal problem belongs to ANOTHER step (missing AOI) shows the blocked
+    notice but NOT that other step's problem text -- the "only" half of this
+    test's name, which nothing else here exercises."""
     spec_r = solara.reactive(spec)
     maps = solara.reactive(None)
     ctx = solara.reactive(None)
@@ -145,13 +167,105 @@ def test_the_step_renders_only_its_own_text(spec, expected_extra):
     ]
 
 
+def test_the_year_selects_show_the_current_overall_period_and_the_legacy_range():
+    """component/widget/picker_line.py:13-27's YEAR_RANGE, transcribed:
+    `range(sensor_max_year, L4_start - 1, -1)` -- descending, no default. Both
+    Selects share it; only their label and current value differ."""
+    spec = solara.reactive(default_spec())
+    maps = solara.reactive(None)
+    ctx = solara.reactive(None)
+    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    assert rc is not None
+
+    expected_years = list(range(date.today().year - 1, 1981, -1))
+    start_select, end_select = _find_widgets(box, ipyvuetify.Select)
+
+    assert start_select.label == msg("run.start_year")
+    assert start_select.v_model == 2000
+    assert start_select.items == expected_years
+
+    assert end_select.label == msg("run.end_year")
+    assert end_select.v_model == 2020
+    assert end_select.items == expected_years
+
+
+def test_selecting_a_start_year_updates_only_that_endpoint():
+    """A real change on the rendered widget -- not the extracted `evolve()`
+    call -- proves the first Select is wired to `overall.start`, leaves
+    `overall.end` and every other field untouched, and does not silently
+    swap the two Selects' callbacks."""
+    spec = solara.reactive(default_spec())
+    maps = solara.reactive(None)
+    ctx = solara.reactive(None)
+    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    assert rc is not None
+
+    start_select, _end_select = _find_widgets(box, ipyvuetify.Select)
+    before = spec.value
+
+    start_select.v_model = 1995
+
+    assert spec.value.periods.overall == Period(start=1995, end=2020)
+    assert spec.value.evolve(periods=before.periods) == before
+
+
+def test_the_step_survives_a_half_filled_overall_period_between_the_two_selects():
+    """The two year Selects are independent widgets: a real user sets one
+    before the other, leaving `overall` with a start and no end (or the
+    reverse) for at least one render. `resolve()` raises a bare `ValueError`
+    for that state, not `SpecError` (see `app.state.is_runnable`'s
+    docstring) -- this proves the step does not crash then, and correctly
+    keeps Build disabled until both endpoints are set.
+    """
+    spec = solara.reactive(default_spec(periods=SubPeriods()))
+    maps = solara.reactive(None)
+    ctx = solara.reactive(None)
+    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    assert rc is not None
+
+    start_select, end_select = _find_widgets(box, ipyvuetify.Select)
+    button = _find_widget(box, ipyvuetify.Btn)
+    assert button.disabled is True  # neither endpoint set yet
+
+    start_select.v_model = 2000  # start only -- the state that used to crash
+
+    assert spec.value.periods.overall == Period(start=2000, end=None)
+    assert button.disabled is True  # still not runnable, and no crash
+
+    end_select.v_model = 2020
+
+    assert spec.value.periods.overall == Period(start=2000, end=2020)
+    assert button.disabled is False
+
+
+def test_selecting_an_end_year_updates_only_that_endpoint():
+    spec = solara.reactive(default_spec())
+    maps = solara.reactive(None)
+    ctx = solara.reactive(None)
+    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    assert rc is not None
+
+    _start_select, end_select = _find_widgets(box, ipyvuetify.Select)
+    before = spec.value
+
+    end_select.v_model = 2010
+
+    assert spec.value.periods.overall == Period(start=2000, end=2010)
+    assert spec.value.evolve(periods=before.periods) == before
+
+
 @pytest.mark.parametrize(
     ("spec", "expected_disabled"),
-    [(default_spec(), False), (_SPEC_WITH_A_RUN_PROBLEM, True)],
+    [
+        (default_spec(), False),
+        (_SPEC_WITH_A_RUN_PROBLEM, True),
+        (_SPEC_WITH_ANOTHER_STEPS_PROBLEM, True),
+    ],
 )
 def test_the_build_button_is_disabled_exactly_when_not_runnable(spec, expected_disabled):
-    """``is_runnable`` -- not a length check on ``problems_for`` -- gates the
-    button, so a problem some OTHER step owns still disables it here."""
+    """``is_runnable`` -- not a length check on ``problems_for("run", ...)``
+    -- gates the button, so a problem some OTHER step owns still disables it
+    here (the third case: missing AOI, a problem Run's own loop never shows)."""
     spec_r = solara.reactive(spec)
     maps = solara.reactive(None)
     ctx = solara.reactive(None)
@@ -162,12 +276,21 @@ def test_the_build_button_is_disabled_exactly_when_not_runnable(spec, expected_d
     assert button is not None
     assert button.disabled is expected_disabled
     assert button.color == "primary"
+    assert button.children == [msg("run.build")]
 
 
 def test_clicking_build_fills_the_reactives_and_reports_success(monkeypatch):
     """A real click on the rendered widget -- not a captured spy -- proves
     the button is wired to ``build()``, that BOTH reactives it hands back are
-    written, and that the count in the success toast is the real one."""
+    written, and that the toast and the context are the real ones.
+
+    The expected count (7) and scale (250, MODIS MOD13Q1's -- see
+    ``sdg1531.catalog.SENSORS``) are literals computed independently of
+    ``maps``/``ctx``, not read back off the very objects the click just
+    wrote: a build that quietly handed back the wrong context (a mismatched
+    scale for the zonal stats and export region -- see ``build()``'s
+    docstring) would still pass an ``isinstance``-only check.
+    """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.steps.run.use_notifications", lambda: fake)
 
@@ -185,7 +308,8 @@ def test_clicking_build_fills_the_reactives_and_reports_success(monkeypatch):
 
     assert isinstance(maps.value, IndicatorMaps)
     assert isinstance(ctx.value, ExecutionContext)
-    assert fake.successes == [msg("run.built", count=len(maps.value.layers()))]
+    assert ctx.value.analysis_scale == 250
+    assert fake.successes == [msg("run.built", count=7)]
     assert fake.errors == []
 
 
@@ -213,11 +337,3 @@ def test_clicking_build_on_a_spec_resolve_refuses_notifies_the_error_and_writes_
     assert ctx.value is None
     assert fake.errors == ["vi_source is not set"]
     assert fake.successes == []
-
-
-def test_the_step_renders():
-    spec = solara.reactive(default_spec())
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    _box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
-    assert rc is not None

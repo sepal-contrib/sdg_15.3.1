@@ -346,3 +346,30 @@ def test_a_spec_with_only_a_warning_is_runnable():
     problems = validate(spec)
     assert problems and not any(p.fatal for p in problems)
     assert is_runnable(spec) is True
+
+
+def test_a_spec_with_no_overall_period_is_not_runnable_even_though_validate_is_silent():
+    """`validate()` has no rule for `periods.overall`: left unset, it
+    propagates as `None` through every sub-period that falls back to it, and
+    every period check returns clean -- `validate()` sees nothing wrong.
+    `resolve()` raises `SpecError` deriving the first year it needs. This is
+    exactly the gap `is_runnable` must ask `resolve()` about directly, since
+    `validate()` cannot see it at all.
+    """
+    spec = default_spec(periods=SubPeriods())
+    assert validate(spec) == ()
+    assert is_runnable(spec) is False
+
+
+def test_a_half_filled_overall_period_is_not_runnable_and_does_not_raise():
+    """`resolve()` is not total the way `validate()` is: an overall period
+    with a START and no END yet reaches `_integration_period()`'s `max()`
+    over an all-`None` tuple and raises a bare `ValueError`, not `SpecError`
+    (measured, not assumed). `is_runnable` must swallow that too -- the Run
+    step's two independent year Selects reach exactly this state between
+    picking one year and the other, and a render that raises takes the whole
+    app down.
+    """
+    spec = default_spec(periods=replace(DEFAULT_PERIODS, overall=Period(start=2000, end=None)))
+    assert validate(spec) == ()
+    assert is_runnable(spec) is False
