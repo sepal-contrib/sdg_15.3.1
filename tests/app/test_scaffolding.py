@@ -27,6 +27,10 @@ _UNTRANSLATED_FR_KEYS = frozenset(
         "step.run",
         "aoi.description",
         "aoi.selected",
+        "run.description",
+        "run.build",
+        "run.built",
+        "run.blocked",
     }
 )
 

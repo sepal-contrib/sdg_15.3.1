@@ -73,13 +73,19 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     }
     assert mapapp.right_panel_content == []
     assert mapapp.right_panel_open is False
-    assert len(mapapp.steps_data) == 1
+    assert len(mapapp.steps_data) == 2
     aoi_step = mapapp.steps_data[0]
     assert aoi_step["id"] == 1
     assert aoi_step["name"] == msg("step.aoi")
     assert aoi_step["icon"] == "mdi-map-marker-check"
     assert aoi_step["display"] == "step"
     assert len(aoi_step["content"]) == 1
+    run_step = mapapp.steps_data[1]
+    assert run_step["id"] == 5
+    assert run_step["name"] == msg("step.run")
+    assert run_step["icon"] == "mdi-play-circle-outline"
+    assert run_step["display"] == "step"
+    assert len(run_step["content"]) == 1
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
     assert offered == set(messages.available_locales())
@@ -107,3 +113,32 @@ def test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map(monkeypatch):
     assert isinstance(captured.get("spec"), solara.Reactive)
     assert isinstance(captured["spec"].value, RunSpec)
     assert isinstance(captured.get("map_"), SepalMap)
+
+
+def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeypatch):
+    """The Run step must read the SAME ``RunSpec`` reactive the AOI step
+    writes -- a private copy would let Run build against a stale spec -- and
+    ``maps``/``ctx`` must be real, writable reactives the Build trigger can
+    populate, not ``None`` placeholders that would make every panel after it
+    unable to receive a result."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["aoi_spec"] = spec
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
+        captured.update(run_spec=spec, maps=maps, ctx=ctx)
+
+    monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["run_spec"] is captured["aoi_spec"]
+    assert isinstance(captured["maps"], solara.Reactive)
+    assert captured["maps"].value is None
+    assert isinstance(captured["ctx"], solara.Reactive)
+    assert captured["ctx"].value is None

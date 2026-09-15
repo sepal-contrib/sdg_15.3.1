@@ -3,8 +3,9 @@
 ``Sdg1531App`` holds the layout so the same code can serve both runtimes;
 ``Page`` wraps it with SEPAL session authentication for the Solara server.
 
-The AOI step is the first entry in ``steps_data``; the tasks that follow add
-the rest.
+``steps_data`` is unsorted -- its DISPLAY order is list order, not ``id``. AOI
+is first and Run is last; the tasks that follow insert Productivity, Land
+cover and SOC between them.
 """
 
 from __future__ import annotations
@@ -26,6 +27,9 @@ from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
 from app.steps.aoi import AoiStep
+from app.steps.run import RunStep
+from sdg1531.engine.context import ExecutionContext
+from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import RunSpec
 
 __all__ = ("Page", "Sdg1531App")
@@ -46,6 +50,8 @@ def Sdg1531App() -> None:
     setup_theme_colors()
 
     spec = solara.use_reactive(RunSpec())
+    maps: solara.Reactive[IndicatorMaps | None] = solara.use_reactive(None)
+    ctx: solara.Reactive[ExecutionContext | None] = solara.use_reactive(None)
 
     gee_interface = get_current_gee_interface()
     theme_state = get_current_theme_state()
@@ -74,6 +80,13 @@ def Sdg1531App() -> None:
                 "icon": "mdi-map-marker-check",
                 "display": "step",
                 "content": [AoiStep(spec=spec, map_=sepal_map)],
+            },
+            {
+                "id": 5,
+                "name": msg("step.run"),
+                "icon": "mdi-play-circle-outline",
+                "display": "step",
+                "content": [RunStep(spec=spec, maps=maps, ctx=ctx)],
             },
         ],
         right_panel_config={

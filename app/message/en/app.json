@@ -17,5 +17,11 @@
   "aoi": {
     "description": "Choose the area the indicator is computed over.",
     "selected": "Selected: {name}"
+  },
+  "run": {
+    "description": "Build the indicator from the configuration above.",
+    "build": "Build",
+    "built": "Built {count} layers",
+    "blocked": "Fix the problems above before building."
   }
 }
