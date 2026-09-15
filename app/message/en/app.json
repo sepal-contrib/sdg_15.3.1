@@ -55,6 +55,11 @@
     "start_asset": "Start land cover asset",
     "end_asset": "End land cover asset"
   },
+  "soc": {
+    "description": "The period soil organic carbon change is measured over.",
+    "start": "Start year",
+    "end": "End year"
+  },
   "run": {
     "description": "Build the indicator from the configuration above.",
     "start_year": "Start year",

@@ -4,8 +4,8 @@
 ``Page`` wraps it with SEPAL session authentication for the Solara server.
 
 ``steps_data`` is unsorted -- its DISPLAY order is list order, not ``id``. AOI
-is first and Run is last; Productivity and Land cover sit between them, and
-the next task inserts SOC the same way.
+is first and Run is last; Productivity, Land cover and SOC sit between them,
+in that order (see ``build_steps_data``).
 """
 
 from __future__ import annotations
@@ -30,13 +30,88 @@ from app.steps.aoi import AoiStep
 from app.steps.land_cover import LandCoverStep
 from app.steps.productivity import ProductivityStep
 from app.steps.run import RunStep
+from app.steps.soc import SocStep
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import RunSpec
 
-__all__ = ("Page", "Sdg1531App")
+__all__ = ("Page", "Sdg1531App", "build_steps_data")
 
 setup_solara_server(extra_asset_locations=[])
+
+
+def build_steps_data(
+    spec: solara.Reactive[RunSpec] | None = None,
+    sepal_map: SepalMap | None = None,
+    maps: solara.Reactive[IndicatorMaps | None] | None = None,
+    ctx: solara.Reactive[ExecutionContext | None] | None = None,
+) -> list[dict[str, object]]:
+    """The five configuration steps, in DISPLAY order.
+
+    List position, not ``id``, is what orders them -- ``MapApp.vue`` returns
+    ``steps_data`` as given. AOI -> Productivity -> Land cover -> SOC -> Run
+    (design decision A6); Run's own ``id`` reads 5 even though SOC (id 4) was
+    the task added after it.
+
+    Every argument defaults to ``None`` so this is reachable with no render
+    context at all -- calling a ``@solara.component`` function outside a
+    render pass builds an inert element descriptor, never executes the
+    component body, so ``tests/app/test_page.py`` can call
+    ``build_steps_data()`` bare to pin step order (id, name, icon, display)
+    without a real spec, map or reactive to hand it. Each step's own content
+    is built only once its required reactives are actually present -- both
+    so a bare call never constructs an element from a ``None`` a real step
+    would reject, and so ``mypy --strict`` sees every constructor call with
+    its arguments correctly narrowed away from ``None``.
+    """
+    aoi_content: list[object] = (
+        [AoiStep(spec=spec, map_=sepal_map)] if spec is not None and sepal_map is not None else []
+    )
+    productivity_content: list[object] = [ProductivityStep(spec=spec)] if spec is not None else []
+    land_cover_content: list[object] = [LandCoverStep(spec=spec)] if spec is not None else []
+    soc_content: list[object] = [SocStep(spec=spec)] if spec is not None else []
+    run_content: list[object] = (
+        [RunStep(spec=spec, maps=maps, ctx=ctx)]
+        if spec is not None and maps is not None and ctx is not None
+        else []
+    )
+    return [
+        {
+            "id": 1,
+            "name": msg("step.aoi"),
+            "icon": "mdi-map-marker-check",
+            "display": "step",
+            "content": aoi_content,
+        },
+        {
+            "id": 2,
+            "name": msg("step.productivity"),
+            "icon": "mdi-sprout-outline",
+            "display": "step",
+            "content": productivity_content,
+        },
+        {
+            "id": 3,
+            "name": msg("step.land_cover"),
+            "icon": "mdi-terrain",
+            "display": "step",
+            "content": land_cover_content,
+        },
+        {
+            "id": 4,
+            "name": msg("step.soc"),
+            "icon": "mdi-layers-outline",
+            "display": "step",
+            "content": soc_content,
+        },
+        {
+            "id": 5,
+            "name": msg("step.run"),
+            "icon": "mdi-play-circle-outline",
+            "display": "step",
+            "content": run_content,
+        },
+    ]
 
 
 @solara.lab.on_kernel_start
@@ -75,36 +150,7 @@ def Sdg1531App() -> None:
         app_title=msg("app.title"),
         app_icon="mdi-earth",
         main_map=[sepal_map],
-        steps_data=[
-            {
-                "id": 1,
-                "name": msg("step.aoi"),
-                "icon": "mdi-map-marker-check",
-                "display": "step",
-                "content": [AoiStep(spec=spec, map_=sepal_map)],
-            },
-            {
-                "id": 2,
-                "name": msg("step.productivity"),
-                "icon": "mdi-sprout-outline",
-                "display": "step",
-                "content": [ProductivityStep(spec=spec)],
-            },
-            {
-                "id": 3,
-                "name": msg("step.land_cover"),
-                "icon": "mdi-terrain",
-                "display": "step",
-                "content": [LandCoverStep(spec=spec)],
-            },
-            {
-                "id": 5,
-                "name": msg("step.run"),
-                "icon": "mdi-play-circle-outline",
-                "display": "step",
-                "content": [RunStep(spec=spec, maps=maps, ctx=ctx)],
-            },
-        ],
+        steps_data=build_steps_data(spec=spec, sepal_map=sepal_map, maps=maps, ctx=ctx),
         right_panel_config={
             "title": msg("panel.title"),
             "icon": "mdi-chart-box-outline",

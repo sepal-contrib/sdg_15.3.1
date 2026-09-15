@@ -64,7 +64,7 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     }
     assert mapapp.right_panel_content == []
     assert mapapp.right_panel_open is False
-    assert len(mapapp.steps_data) == 4
+    assert len(mapapp.steps_data) == 5
     aoi_step = mapapp.steps_data[0]
     assert aoi_step["id"] == 1
     assert aoi_step["name"] == msg("step.aoi")
@@ -83,7 +83,13 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert land_cover_step["icon"] == "mdi-terrain"
     assert land_cover_step["display"] == "step"
     assert len(land_cover_step["content"]) == 1
-    run_step = mapapp.steps_data[3]
+    soc_step = mapapp.steps_data[3]
+    assert soc_step["id"] == 4
+    assert soc_step["name"] == msg("step.soc")
+    assert soc_step["icon"] == "mdi-layers-outline"
+    assert soc_step["display"] == "step"
+    assert len(soc_step["content"]) == 1
+    run_step = mapapp.steps_data[4]
     assert run_step["id"] == 5
     assert run_step["name"] == msg("step.run")
     assert run_step["icon"] == "mdi-play-circle-outline"
@@ -162,6 +168,28 @@ def test_the_land_cover_step_shares_the_aoi_step_s_spec(monkeypatch):
     assert captured["land_cover_spec"] is captured["aoi_spec"]
 
 
+def test_the_soc_step_shares_the_aoi_step_s_spec(monkeypatch):
+    """Same concern as the two checks above, one step further: a private copy
+    of ``RunSpec`` here would let SOC edit a spec Run never sees."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["aoi_spec"] = spec
+
+    @solara.component
+    def _spy_soc_step(*, spec: Any = None) -> None:
+        captured["soc_spec"] = spec
+
+    monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(page_module, "SocStep", _spy_soc_step)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["soc_spec"] is captured["aoi_spec"]
+
+
 def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeypatch):
     """The Run step must read the SAME ``RunSpec`` reactive the AOI step
     writes -- a private copy would let Run build against a stale spec -- and
@@ -189,3 +217,24 @@ def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeyp
     assert captured["maps"].value is None
     assert isinstance(captured["ctx"], solara.Reactive)
     assert captured["ctx"].value is None
+
+
+def test_the_steps_are_in_the_sub_indicator_order():
+    """AOI -> Productivity -> Land cover -> SOC -> Run (design decision A6).
+    Position is what orders them: MapApp renders `steps_data` as given, so a
+    step appended in the wrong place displays in the wrong place however its
+    `id` reads.
+
+    Compared against `msg(...)` rather than English literals so the assertion
+    pins ORDER without also pinning the copy, and so it does not break when
+    Task 14 adds locales.
+    """
+    steps = page_module.build_steps_data()
+    assert [step["id"] for step in steps] == [1, 2, 3, 4, 5]
+    assert [step["name"] for step in steps] == [
+        msg("step.aoi"),
+        msg("step.productivity"),
+        msg("step.land_cover"),
+        msg("step.soc"),
+        msg("step.run"),
+    ]
