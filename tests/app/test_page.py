@@ -12,6 +12,7 @@ from pysepal.sepalwidgets.vue_app import MapApp
 from app import page as page_module
 from app.message import messages, msg
 from sdg1531.spec import RunSpec
+from tests.app.render_helpers import find_widget
 
 
 def test_page_is_a_solara_component():
@@ -27,17 +28,6 @@ def test_the_shell_renders():
     cheapest possible guard against that."""
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
-
-
-def _find_widget(root: object, cls: type) -> object | None:
-    """The first ``cls`` instance in the render tree, walking ``.children``."""
-    if isinstance(root, cls):
-        return root
-    for child in getattr(root, "children", None) or []:
-        found = _find_widget(child, cls)
-        if found is not None:
-            return found
-    return None
 
 
 def test_the_shell_builds_a_correctly_configured_mapapp():
@@ -59,7 +49,7 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    mapapp = _find_widget(box, MapApp)
+    mapapp = find_widget(box, MapApp)
     assert mapapp is not None, "no MapApp in the render tree; MapApp(...) builds outside it"
 
     assert mapapp.app_title == msg("app.title")

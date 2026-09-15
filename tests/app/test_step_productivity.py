@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import replace
 
 import ipyvuetify
@@ -14,9 +13,8 @@ from app.steps.productivity import ProductivityStep, selectable_trajectories
 from sdg1531.catalog import DISABLED_TRAJECTORIES, SENSORS
 from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
 from sdg1531.spec import PeriodOverride, PrecomputedViAsset, RunSpec, SensorSelection
+from tests.app.render_helpers import find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
-
-_MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
 
 # `Trajectory` has four members and one (`S_RES_TREND`) is disabled -- named
 # explicitly rather than derived from `selectable_trajectories()` itself, so a
@@ -29,41 +27,16 @@ _EXPECTED_SELECTABLE_TRAJECTORIES = (
 )
 
 
-def _markdown_texts(node: object) -> list[str]:
-    """Every rendered markdown paragraph under ``node``, in tree order.
-
-    See ``tests/app/test_step_aoi.py`` for why this reads ``.template``
-    rather than an extracted helper.
-    """
-    texts = []
-    template = getattr(node, "template", None)
-    if isinstance(template, str) and "solara-markdown" in template:
-        match = _MARKDOWN_RE.search(template)
-        if match:
-            texts.append(match.group(1).strip())
-    for child in getattr(node, "children", None) or ():
-        texts.extend(_markdown_texts(child))
-    return texts
-
-
-def _find_widgets(root: object, cls: type) -> list[object]:
-    """Every ``cls`` instance in the render tree, in tree order."""
-    found = [root] if isinstance(root, cls) else []
-    for child in getattr(root, "children", None) or []:
-        found.extend(_find_widgets(child, cls))
-    return found
-
-
 def _selects(box: object) -> tuple[object, object, object, object, object]:
     """The step's five ``ipyvuetify.Select`` widgets, in source order:
     sensors (multiple), index, trajectory, lceu, lookup."""
-    widgets = _find_widgets(box, ipyvuetify.Select)
+    widgets = find_widgets(box, ipyvuetify.Select)
     assert len(widgets) == 5
     return tuple(widgets)  # type: ignore[return-value]
 
 
 def _slider(box: object) -> object:
-    sliders = _find_widgets(box, ipyvuetify.Slider)
+    sliders = find_widgets(box, ipyvuetify.Slider)
     assert len(sliders) == 1
     return sliders[0]
 
@@ -157,7 +130,7 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     box, rc = solara.render(ProductivityStep(spec=spec), handle_error=False)
     assert rc is not None
 
-    assert _markdown_texts(box)[0] == "<p><productivity.description></p>"
+    assert markdown_texts(box)[0] == "<p><productivity.description></p>"
 
     sensors, index, trajectory, lceu, lookup = _selects(box)
     assert sensors.label == "<productivity.sensors>"
@@ -324,7 +297,7 @@ def test_the_step_renders_only_its_own_text(spec, expected_extra):
     spec_r = solara.reactive(spec)
     box, rc = solara.render(ProductivityStep(spec=spec_r), handle_error=False)
     assert rc is not None
-    assert _markdown_texts(box) == [
+    assert markdown_texts(box) == [
         "<p>Vegetation index, trend method and ecological units.</p>",
         *expected_extra,
     ]

@@ -9,7 +9,6 @@ refuses -- notifies the error and leaves both reactives untouched.
 
 from __future__ import annotations
 
-import re
 from datetime import date
 
 import ipyvuetify
@@ -21,9 +20,8 @@ from app.steps.run import RunStep, build
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import Period, PeriodOverride, RunSpec, SubPeriods
+from tests.app.render_helpers import find_widget, find_widgets, markdown_texts
 from tests.spec_factory import default_spec
-
-_MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
 
 # Every non-overall sub-period pinned to a range that resolves on its own,
 # independent of `overall` -- so inverting `overall` below trips only
@@ -53,42 +51,6 @@ _SPEC_WITH_A_RUN_PROBLEM = default_spec(
 # every OTHER parametrization in this file, since those only ever use a spec
 # whose problems Run owns or a spec with none at all.
 _SPEC_WITH_ANOTHER_STEPS_PROBLEM = default_spec(aoi=None)
-
-
-def _markdown_texts(node: object) -> list[str]:
-    """Every rendered markdown paragraph under ``node``, in tree order.
-
-    See ``tests/app/test_step_aoi.py`` for why this reads ``.template``
-    rather than an extracted helper.
-    """
-    texts = []
-    template = getattr(node, "template", None)
-    if isinstance(template, str) and "solara-markdown" in template:
-        match = _MARKDOWN_RE.search(template)
-        if match:
-            texts.append(match.group(1).strip())
-    for child in getattr(node, "children", None) or ():
-        texts.extend(_markdown_texts(child))
-    return texts
-
-
-def _find_widget(root: object, cls: type) -> object | None:
-    """The first ``cls`` instance in the render tree, walking ``.children``."""
-    if isinstance(root, cls):
-        return root
-    for child in getattr(root, "children", None) or []:
-        found = _find_widget(child, cls)
-        if found is not None:
-            return found
-    return None
-
-
-def _find_widgets(root: object, cls: type) -> list[object]:
-    """Every ``cls`` instance in the render tree, in tree order."""
-    found = [root] if isinstance(root, cls) else []
-    for child in getattr(root, "children", None) or []:
-        found.extend(_find_widgets(child, cls))
-    return found
 
 
 class _FakeNotifier:
@@ -161,7 +123,7 @@ def test_the_step_renders_only_its_own_text(spec, expected_extra):
     ctx = solara.reactive(None)
     box, rc = solara.render(RunStep(spec=spec_r, maps=maps, ctx=ctx), handle_error=False)
     assert rc is not None
-    assert _markdown_texts(box) == [
+    assert markdown_texts(box) == [
         "<p>Build the indicator from the configuration above.</p>",
         *expected_extra,
     ]
@@ -178,7 +140,7 @@ def test_the_year_selects_show_the_current_overall_period_and_the_legacy_range()
     assert rc is not None
 
     expected_years = list(range(date.today().year - 1, 1981, -1))
-    start_select, end_select = _find_widgets(box, ipyvuetify.Select)
+    start_select, end_select = find_widgets(box, ipyvuetify.Select)
 
     assert start_select.label == msg("run.start_year")
     assert start_select.v_model == 2000
@@ -200,7 +162,7 @@ def test_selecting_a_start_year_updates_only_that_endpoint():
     box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
     assert rc is not None
 
-    start_select, _end_select = _find_widgets(box, ipyvuetify.Select)
+    start_select, _end_select = find_widgets(box, ipyvuetify.Select)
     before = spec.value
 
     start_select.v_model = 1995
@@ -223,8 +185,8 @@ def test_the_step_survives_a_half_filled_overall_period_between_the_two_selects(
     box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
     assert rc is not None
 
-    start_select, end_select = _find_widgets(box, ipyvuetify.Select)
-    button = _find_widget(box, ipyvuetify.Btn)
+    start_select, end_select = find_widgets(box, ipyvuetify.Select)
+    button = find_widget(box, ipyvuetify.Btn)
     assert button.disabled is True  # neither endpoint set yet
 
     start_select.v_model = 2000  # start only -- the state that used to crash
@@ -245,7 +207,7 @@ def test_selecting_an_end_year_updates_only_that_endpoint():
     box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
     assert rc is not None
 
-    _start_select, end_select = _find_widgets(box, ipyvuetify.Select)
+    _start_select, end_select = find_widgets(box, ipyvuetify.Select)
     before = spec.value
 
     end_select.v_model = 2010
@@ -272,7 +234,7 @@ def test_the_build_button_is_disabled_exactly_when_not_runnable(spec, expected_d
     box, rc = solara.render(RunStep(spec=spec_r, maps=maps, ctx=ctx), handle_error=False)
     assert rc is not None
 
-    button = _find_widget(box, ipyvuetify.Btn)
+    button = find_widget(box, ipyvuetify.Btn)
     assert button is not None
     assert button.disabled is expected_disabled
     assert button.color == "primary"
@@ -300,7 +262,7 @@ def test_clicking_build_fills_the_reactives_and_reports_success(monkeypatch):
     box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
     assert rc is not None
 
-    button = _find_widget(box, ipyvuetify.Btn)
+    button = find_widget(box, ipyvuetify.Btn)
     assert button is not None
     assert button.disabled is False
 
@@ -328,7 +290,7 @@ def test_clicking_build_on_a_spec_resolve_refuses_notifies_the_error_and_writes_
     box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
     assert rc is not None
 
-    button = _find_widget(box, ipyvuetify.Btn)
+    button = find_widget(box, ipyvuetify.Btn)
     assert button is not None
 
     button.click()  # a programmatic click bypasses the `disabled` UI hint

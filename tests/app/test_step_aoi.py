@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 import pytest
@@ -13,28 +12,7 @@ from pysepal.solara.components.aoi.aoi_spec import AoiSpec as PysepalAoiSpec
 from app.state import problems_for
 from app.steps.aoi import AoiStep, apply_selection
 from sdg1531.spec import AdminAoi, AssetAoi, RunSpec
-
-_MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
-
-
-def _markdown_texts(node: object) -> list[str]:
-    """Every rendered markdown paragraph under ``node``, in tree order.
-
-    Reads the real render tree (each ``solara.Markdown`` becomes a
-    ``VuetifyTemplate`` whose ``template`` embeds the rendered HTML), so this
-    sees exactly what a user would: not just that the component "did not
-    raise", but which text -- the description, a selection, a validation
-    problem -- actually appears.
-    """
-    texts = []
-    template = getattr(node, "template", None)
-    if isinstance(template, str) and "solara-markdown" in template:
-        match = _MARKDOWN_RE.search(template)
-        if match:
-            texts.append(match.group(1).strip())
-    for child in getattr(node, "children", None) or ():
-        texts.extend(_markdown_texts(child))
-    return texts
+from tests.app.render_helpers import markdown_texts
 
 
 def _asset_selection(asset_id: str = "users/x/aoi", name: str = "aoi") -> AoiResult:
@@ -164,4 +142,4 @@ def test_the_step_renders_only_its_own_text(aoi, expected):
     spec = solara.reactive(RunSpec().evolve(aoi=aoi))
     box, rc = solara.render(AoiStep(spec=spec, map_=None), handle_error=False)
     assert rc is not None
-    assert _markdown_texts(box) == expected
+    assert markdown_texts(box) == expected
