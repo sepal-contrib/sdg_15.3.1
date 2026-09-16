@@ -46,6 +46,7 @@ from app.steps.land_cover import LandCoverStep
 from app.steps.productivity import ProductivityStep
 from app.steps.run import BuildOutcome, RunStep
 from app.steps.soc import SocStep
+from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
 __all__ = ("TabDescriptor", "WorkflowTabs", "workflow_tabs")
@@ -75,6 +76,7 @@ def workflow_tabs(
     outcome: BuildOutcome | None = None,
     gee_interface: Any = None,
     sepal_client: Any = None,
+    shown_layers: solara.Reactive[frozenset[IndicatorLayer]] | None = None,
 ) -> list[TabDescriptor]:
     """The ten workflow tabs, in DISPLAY order: AOI -> Productivity -> Land
     cover -> SOC -> Run -> Layers -> Transitions -> Results -> Zonal ->
@@ -134,7 +136,19 @@ def workflow_tabs(
             None,
             msg("layers.title"),
             "mdi-layers",
-            [MapLayersPanel(maps=maps, map_=sepal_map, gee_interface=gee_interface)],
+            [
+                MapLayersPanel(
+                    maps=maps,
+                    map_=sepal_map,
+                    gee_interface=gee_interface,
+                    # `MapLayersPanel.shown` already defaults to an
+                    # internally-owned frozenset when no `Reactive` is given
+                    # (the bare `workflow_tabs()` call this docstring
+                    # describes), so `None` here means exactly that -- not a
+                    # narrowing guard like the ones above.
+                    shown=shown_layers if shown_layers is not None else frozenset[IndicatorLayer](),
+                )
+            ],
         ),
         TabDescriptor(
             None,
@@ -300,6 +314,7 @@ def WorkflowTabs(
     spec: solara.Reactive[RunSpec],
     sepal_map: SepalMap,
     outcome: BuildOutcome,
+    shown_layers: solara.Reactive[frozenset[IndicatorLayer]],
     gee_interface: Any = None,
     sepal_client: Any = None,
 ) -> None:
@@ -331,6 +346,7 @@ def WorkflowTabs(
         outcome=outcome,
         gee_interface=gee_interface,
         sepal_client=sepal_client,
+        shown_layers=shown_layers,
     )
     has_maps = outcome.maps is not None
     aoi_index = next(i for i, tab in enumerate(tabs) if tab.step == "aoi")

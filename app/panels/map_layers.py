@@ -8,10 +8,13 @@ snake id (frozen under decision D9; the domain's own docstring says the
 translated display label is the app layer's job).
 
 A table replaces the earlier single "show everything" button: each row adds or
-removes its own layer. The shown set is this panel's OWN state
-(``solara.use_state``), never read back from ``map_.find_layer`` -- the map's
-live widget state changes without telling Solara, so a row driven from it
-would not re-render when it did.
+removes its own layer. The shown set is never read back from
+``map_.find_layer`` -- the map's live widget state changes without telling
+Solara, so a row driven from it would not re-render when it did. It lives in
+a ``solara.Reactive`` instead, threaded down from ``page.py`` (see
+``MapLayersPanel``'s own ``shown`` docstring) so the same set drives the
+floating legend (``app/panels/legend.py``) too, not a second, independent
+notion of "on the map".
 
 Adding a layer is GEE work (it fetches a map id), so it follows
 ``docs/guides/solara-gee-patterns.md``'s Async Button Convention: one
@@ -184,17 +187,34 @@ def MapLayersPanel(
     maps: IndicatorMaps | None,
     map_: Any,
     gee_interface: Any,
+    shown: solara.Reactive[frozenset[IndicatorLayer]] | frozenset[IndicatorLayer] = frozenset[
+        IndicatorLayer
+    ](),
 ) -> None:
     """``gee_interface`` is accepted for parity with the other right-panel
     sections (``page.py`` passes the same three objects to each one) but goes
     unused here: ``map_.add_ee_layer_async`` already carries the session-backed
     interface the map itself was constructed with.
+
+    ``shown`` follows ``solara.use_reactive``'s own flexible-argument shape: a
+    plain value (the default, and every test that does not care) makes this
+    panel own its state exactly as it always has; a ``Reactive`` -- ``page.py``
+    passes one, shared with ``MapLegend`` -- makes the set visible to that
+    sibling component instead of staying this panel's private copy.
     """
     solara.Markdown(msg("layers.description"))
 
     notifications = use_notifications()
 
-    shown, set_shown = solara.use_state(frozenset[IndicatorLayer]())
+    # `shown_reactive.set` -- unlike `use_state`'s own setter, which this
+    # replaced -- takes a plain value, not an updater callable, so every
+    # update below reads `.value` fresh rather than closing over a snapshot.
+    # `Reactive` is a stable, persistent object (the same one across this
+    # component's renders, and across renders of the sibling `MapLegend` that
+    # shares it), so a fresh `.value` read from inside a later callback is
+    # never stale the way a captured render-time snapshot would be.
+    shown_reactive = solara.use_reactive(shown)
+    shown_ids = shown_reactive.value
     pending_id, set_pending_id = solara.use_state(cast("IndicatorLayer | None", None))
 
     task = solara.lab.use_task(
@@ -215,7 +235,7 @@ def MapLayersPanel(
             # a real ambiguity: at runtime `use_task` awaits the coroutine and
             # stores its result, never the coroutine object.
             outcome = cast("_AddOutcome", task.value)
-            set_shown(lambda current: current | {outcome.layer_id})
+            shown_reactive.value = shown_reactive.value | {outcome.layer_id}
             notifications.success(msg("layers.added", name=layer_name(outcome.layer_id)))
 
     # Unconditional, ahead of the `maps is None` return below: the number of
@@ -240,15 +260,15 @@ def MapLayersPanel(
         # off, rather than leaving old-run tiles shown next to -- or instead
         # of -- the new run's.
         cancel()
-        for layer_id in shown:
+        for layer_id in shown_ids:
             map_.remove_layer(layer_id.value, none_ok=True)
-        set_shown(frozenset())
+        shown_reactive.value = frozenset()
 
     # Keyed on `maps` alone -- identity/equality of the whole `IndicatorMaps`,
     # never one of its fields, is what "a different run" means here (see
     # `page.py`'s `outcome` comment on why `==` is the right comparison for a
     # frozen dataclass built fresh per run). Fires on the first render too
-    # (nothing to remove: `shown` is still empty) and again when `maps`
+    # (nothing to remove: `shown_ids` is still empty) and again when `maps`
     # becomes `None` (the spec is no longer runnable) -- both are required by
     # the task, not only the "changed to a different runnable spec" case.
     solara.use_effect(clear_stale_layers, [maps])
@@ -262,7 +282,7 @@ def MapLayersPanel(
 
     def remove(layer_id: IndicatorLayer) -> None:
         map_.remove_layer(layer_id.value, none_ok=True)
-        set_shown(lambda current: current - {layer_id})
+        shown_reactive.value = shown_reactive.value - {layer_id}
 
     if maps is None:
         solara.Markdown(msg("layers.build_first"))
@@ -276,7 +296,7 @@ def MapLayersPanel(
             for layer_id, layer in maps.layers().items():
                 _LayerRow(
                     name=layer_name(layer_id),
-                    is_shown=layer_id in shown,
+                    is_shown=layer_id in shown_ids,
                     is_pending=task.pending and pending_id == layer_id,
                     on_add=_bind_add(start, layer_id, layer),
                     on_remove=_bind_remove(remove, layer_id),

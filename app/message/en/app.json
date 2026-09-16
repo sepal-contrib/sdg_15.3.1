@@ -85,6 +85,17 @@
     },
     "build_first": "Build the indicator first."
   },
+  "legend": {
+    "classes": {
+      "land_cover": { "1": "Degraded", "2": "Stable", "3": "Improved" },
+      "soc": { "1": "Degraded", "2": "Stable", "3": "Improved" },
+      "productivity": { "1": "Degraded", "2": "Stable", "3": "Improved" },
+      "productivity_trend": { "1": "Degraded", "2": "Stable", "3": "Improved" },
+      "productivity_state": { "1": "Degraded", "2": "Stable", "3": "Improved" },
+      "productivity_performance": { "1": "Degraded", "2": "Not degraded" },
+      "indicator_15_3_1": { "1": "Degraded", "2": "Stable", "3": "Improved" }
+    }
+  },
   "transitions": {
     "title": "Transitions",
     "description": "Land cover transitions between the start and end years.",

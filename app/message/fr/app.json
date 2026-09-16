@@ -89,6 +89,17 @@
     },
     "build_first": "Construisez d'abord l'indicateur."
   },
+  "legend": {
+    "classes": {
+      "land_cover": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
+      "soc": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
+      "productivity": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
+      "productivity_trend": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
+      "productivity_state": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
+      "productivity_performance": { "1": "Dégradé", "2": "Non dégradé" },
+      "indicator_15_3_1": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" }
+    }
+  },
   "transitions": {
     "title": "Transitions",
     "description": "Transitions de la couverture terrestre entre les années de début et de fin.",

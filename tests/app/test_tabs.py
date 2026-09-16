@@ -380,9 +380,9 @@ def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_
 
     @solara.component
     def _spy_map_layers_panel(
-        *, maps: Any = None, map_: Any = None, gee_interface: Any = None
+        *, maps: Any = None, map_: Any = None, gee_interface: Any = None, shown: Any = None
     ) -> None:
-        captured.update(panel_maps=maps, map_=map_, gee_interface=gee_interface)
+        captured.update(panel_maps=maps, map_=map_, gee_interface=gee_interface, panel_shown=shown)
 
     monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(tabs_module, "MapLayersPanel", _spy_map_layers_panel)
@@ -400,6 +400,30 @@ def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_
     assert captured["panel_maps"] is captured["outcome"].maps
     assert captured["map_"] is mapapp.main_map[0]
     assert captured["gee_interface"] is not None
+    assert isinstance(captured["panel_shown"], solara.Reactive)
+
+
+def test_the_layers_panel_and_the_legend_share_the_same_shown_reactive(monkeypatch):
+    """Task 24: a private copy of the shown set in either consumer would let
+    one add a layer the other never finds out about."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_map_layers_panel(*, shown: Any = None, **_kwargs: Any) -> None:
+        captured["panel_shown"] = shown
+
+    @solara.component
+    def _spy_map_legend(*, maps: Any = None, shown: Any = None) -> None:
+        captured["legend_shown"] = shown
+
+    monkeypatch.setattr(tabs_module, "MapLayersPanel", _spy_map_layers_panel)
+    monkeypatch.setattr(page_module, "MapLegend", _spy_map_legend)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert isinstance(captured["panel_shown"], solara.Reactive)
+    assert captured["panel_shown"] is captured["legend_shown"]
 
 
 def test_the_results_panel_is_wired_with_the_shared_outcome_and_gee_interface(monkeypatch):

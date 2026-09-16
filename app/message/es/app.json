@@ -89,6 +89,17 @@
     },
     "build_first": "Construya primero el indicador."
   },
+  "legend": {
+    "classes": {
+      "land_cover": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
+      "soc": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
+      "productivity": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
+      "productivity_trend": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
+      "productivity_state": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
+      "productivity_performance": { "1": "Degradado", "2": "No degradado" },
+      "indicator_15_3_1": { "1": "Degradado", "2": "Estable", "3": "Mejorado" }
+    }
+  },
   "transitions": {
     "title": "Transiciones",
     "description": "Transiciones de la cobertura del suelo entre los años inicial y final.",

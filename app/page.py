@@ -36,8 +36,10 @@ from pysepal.solara import (
 from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
+from app.panels.legend import MapLegend
 from app.steps.run import build_outcome
 from app.tabs import WorkflowTabs
+from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
 __all__ = ("Page", "Sdg1531App")
@@ -69,6 +71,14 @@ def Sdg1531App() -> None:
     # (`periods.overall`, say) recomputes it.
     outcome = solara.use_memo(lambda: build_outcome(spec.value), [spec.value])
 
+    # Shared with `MapLegend` below and threaded into `WorkflowTabs` ->
+    # `MapLayersPanel`: which layers are on the map is state two independent
+    # components both need, not something either owns privately. Lives here,
+    # next to `spec`, rather than in `app/state.py` -- that module holds pure
+    # derivations over `RunSpec` and owns no reactive of its own; this is the
+    # same kind of per-render shared reactive `spec` already is.
+    shown_layers = solara.use_reactive(frozenset[IndicatorLayer]())
+
     gee_interface = get_current_gee_interface()
     theme_state = get_current_theme_state()
 
@@ -95,6 +105,12 @@ def Sdg1531App() -> None:
     # site), not silently.
     NotificationProvider()
 
+    # Mounted as `MapApp`'s SIBLING, not inside `right_panel_content`: the
+    # legend's own Vue template is `position: fixed` bottom-centre, so it
+    # stays visible over the map regardless of which workflow tab is active
+    # (the same placement pysepal's own demo app uses).
+    MapLegend(maps=outcome.maps, shown=shown_layers)
+
     MapApp.element(
         app_title=msg("app.title"),
         app_icon="mdi-earth",
@@ -119,6 +135,7 @@ def Sdg1531App() -> None:
                         spec=spec,
                         sepal_map=sepal_map,
                         outcome=outcome,
+                        shown_layers=shown_layers,
                         gee_interface=gee_interface,
                         sepal_client=get_current_sepal_client(),
                     )
