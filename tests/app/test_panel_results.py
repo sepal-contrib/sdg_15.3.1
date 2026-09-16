@@ -24,6 +24,7 @@ import solara
 
 from app.message import msg
 from app.panels.results import RESULTS_LAYER, ResultsPanel
+from sdg1531.enums import IndicatorLayer
 from tests.app.render_helpers import find_widget, markdown_texts
 from tests.helpers_stats import FakeResolved
 
@@ -81,6 +82,33 @@ _FRAME = pd.DataFrame(
         "Area": [1.0, 2.0, 3.0],
     }
 )
+
+
+def test_results_layer_is_pinned_to_the_indicator_not_a_free_parameter():
+    """``RESULTS_LAYER`` used to be provable only against itself: ``_FRAME``
+    above names its class column ``RESULTS_LAYER.value``, and
+    ``test_clicking_compute_fetches_pivots_and_mounts_the_real_chart_option``
+    below asserts the code used ``RESULTS_LAYER`` -- so flipping the constant
+    to ``IndicatorLayer.SOC`` moves both sides together and every test in this
+    file (this one excepted) stays green.
+
+    Which layer belongs here is not a free parameter: it is the SDG 15.3.1
+    indicator's own class breakdown, the module's headline output, not one of
+    the six intermediate layers. The legacy result tile's own bar chart
+    (``ResultTile.bar_plot``, ``input_tile.py:349-364``, frozen under D9)
+    pivoted on exactly this -- ``compute_stats_by_lc``'s ``indicator_name``
+    parameter defaults to the literal string ``"Indicator 15.3.1"``
+    (``run_15_3_1.py:254``), and ``sdg1531/stats/decode.py``'s own
+    ``_STATS_LABELS`` table cites that same legacy line range (``:446-448``,
+    ``indicator_n_category_label``) against ``IndicatorLayer.INDICATOR_15_3_1``.
+    That fact is cited rather than imported: ``tests/parity/test_parity.py``'s
+    ``test_stage_b_never_imports_the_legacy_tree`` asserts, over the whole
+    session's ``sys.modules``, that nothing outside Stage A ever imports the
+    frozen ``component`` tree -- importing it here to read the default live
+    would fail that guard the moment both suites run in one session, which
+    every verification command for this branch does.
+    """
+    assert RESULTS_LAYER is IndicatorLayer.INDICATOR_15_3_1
 
 
 async def _wait_for(predicate: Callable[[], bool], timeout: float = 2.0) -> bool:
