@@ -136,10 +136,10 @@ def test_the_panel_renders_before_a_run(monkeypatch):
         handle_error=False,
     )
     assert rc is not None
-    # Not `zonal.description` too: that copy lives once, in `page.py`'s
-    # section dict, which `MapApp` renders under the section title -- the
-    # panel itself must not render it a second time.
-    assert markdown_texts(box) == [f"<p>{msg('zonal.build_first')}</p>"]
+    assert markdown_texts(box) == [
+        f"<p>{msg('zonal.description')}</p>",
+        f"<p>{msg('zonal.build_first')}</p>",
+    ]
     assert find_widget(box, ipyvuetify.Btn) is None  # no dead button before Build
     assert fake.tracked == []  # nothing to show yet, so nothing was started
 
@@ -161,7 +161,10 @@ def test_the_panel_waits_for_both_maps_and_context(monkeypatch):
         handle_error=False,
     )
     assert rc is not None
-    assert markdown_texts(box) == [f"<p>{msg('zonal.build_first')}</p>"]
+    assert markdown_texts(box) == [
+        f"<p>{msg('zonal.description')}</p>",
+        f"<p>{msg('zonal.build_first')}</p>",
+    ]
     assert find_widget(box, ipyvuetify.Btn) is None
 
 

@@ -30,10 +30,10 @@ def test_the_panel_renders_before_a_run():
         ExportsPanel(maps=None, ctx=None, spec=RunSpec(), gee_interface=None), handle_error=False
     )
     assert rc is not None
-    # Not `exports.description` too: that copy lives once, in `page.py`'s
-    # section dict, which `MapApp` renders under the section title -- the
-    # panel itself must not render it a second time.
-    assert markdown_texts(box) == [f"<p>{msg('exports.build_first')}</p>"]
+    assert markdown_texts(box) == [
+        f"<p>{msg('exports.description')}</p>",
+        f"<p>{msg('exports.build_first')}</p>",
+    ]
     assert find_widget(box, ipyvuetify.Btn) is None  # no dead launcher before Build
 
 
@@ -51,7 +51,10 @@ def test_the_panel_waits_for_both_maps_and_context():
         handle_error=False,
     )
     assert rc is not None
-    assert markdown_texts(box) == [f"<p>{msg('exports.build_first')}</p>"]
+    assert markdown_texts(box) == [
+        f"<p>{msg('exports.description')}</p>",
+        f"<p>{msg('exports.build_first')}</p>",
+    ]
     assert find_widget(box, ipyvuetify.Btn) is None
 
 
@@ -146,5 +149,6 @@ def test_the_launcher_is_wired_with_the_localized_label_and_the_threaded_gee_int
     assert captured["button_text"] is True
     assert captured["block"] is True
     assert captured["gee_interface"] is sentinel_gee_interface
-    # No stray description or "build first" text now that a build exists.
-    assert markdown_texts(box) == []
+    # The description still shows (it's not conditional on a build); no
+    # stray "build first" text now that one exists.
+    assert markdown_texts(box) == [f"<p>{msg('exports.description')}</p>"]

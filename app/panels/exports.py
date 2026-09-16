@@ -108,11 +108,8 @@ def ExportsPanel(
     panel calling ``get_current_gee_interface()`` itself can raise
     ``SepalSessionError`` even though the page-level lookup succeeds.
     """
-    # No `solara.Markdown(msg("exports.description"))` here: `page.py`'s section
-    # dict already carries that same string as the right-panel section's own
-    # `description`, which `MapApp` renders under the section title. Rendering
-    # it a second time here duplicated the sentence on screen for the Layers
-    # panel (Task 10); this panel drops it up front instead.
+    solara.Markdown(msg("exports.description"))
+
     if maps is None or ctx is None:
         solara.Markdown(msg("exports.build_first"))
         return

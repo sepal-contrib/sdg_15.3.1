@@ -148,10 +148,10 @@ def test_the_panel_renders_with_no_maps(monkeypatch):
         MapLayersPanel(maps=None, map_=None, gee_interface=None), handle_error=False
     )
     assert rc is not None
-    # Not `layers.description` too: that copy lives once, in `page.py`'s
-    # section dict, which `MapApp` renders under the section title -- the
-    # panel itself must not render it a second time.
-    assert markdown_texts(box) == [f"<p>{msg('layers.build_first')}</p>"]
+    assert markdown_texts(box) == [
+        f"<p>{msg('layers.description')}</p>",
+        f"<p>{msg('layers.build_first')}</p>",
+    ]
     assert find_widget(box, ipyvuetify.Btn) is None  # no dead button before Build
     assert fake.tracked == []  # nothing to show yet, so nothing was started
 

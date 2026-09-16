@@ -110,6 +110,8 @@ def ZonalPanel(
     gee_interface: Any,
     sepal_client: Any,
 ) -> None:
+    solara.Markdown(msg("zonal.description"))
+
     notifications = use_notifications()
     current_maps = maps
     current_ctx = ctx
@@ -204,11 +206,6 @@ def ZonalPanel(
 
     download_btn_props = use_task_button(download_task, on_start=start_download)
 
-    # No `solara.Markdown(msg("zonal.description"))` here: `page.py`'s section
-    # dict already carries that same string as the right-panel section's own
-    # `description`, which `MapApp` renders under the section title. Rendering
-    # it a second time here duplicated the sentence on screen for the Layers
-    # panel (Task 10); this panel drops it up front instead.
     if current_maps is None or current_ctx is None:
         solara.Markdown(msg("zonal.build_first"))
         return

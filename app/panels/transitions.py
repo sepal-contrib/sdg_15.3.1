@@ -68,6 +68,8 @@ def TransitionsPanel(
     ctx: ExecutionContext | None,
     gee_interface: Any,
 ) -> None:
+    solara.Markdown(msg("transitions.description"))
+
     notifications = use_notifications()
     option: solara.Reactive[dict[str, Any] | None] = solara.use_reactive(None)
     current_maps = maps
@@ -133,10 +135,6 @@ def TransitionsPanel(
         [option.value],
     )
 
-    # No `solara.Markdown(msg("transitions.description"))` here: `page.py`'s
-    # section dict renders no `description` for this panel either, since the
-    # panel would otherwise duplicate the sentence on screen -- see
-    # `ResultsPanel`'s identical comment.
     if current_maps is None or current_ctx is None:
         solara.Markdown(msg("transitions.build_first"))
         return
