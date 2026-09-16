@@ -198,7 +198,7 @@ def test_the_land_cover_step_shares_the_aoi_step_s_spec(monkeypatch):
         captured["aoi_spec"] = spec
 
     @solara.component
-    def _spy_land_cover_step(*, spec: Any = None) -> None:
+    def _spy_land_cover_step(*, spec: Any = None, gee_interface: Any = None) -> None:
         captured["land_cover_spec"] = spec
 
     monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)

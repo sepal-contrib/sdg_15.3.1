@@ -17,6 +17,7 @@ dialog, say) to put there.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import solara
 from pysepal.mapping.sepal_map import SepalMap
@@ -57,6 +58,7 @@ def build_workflow_sections(
     sepal_map: SepalMap | None = None,
     maps: solara.Reactive[IndicatorMaps | None] | None = None,
     ctx: solara.Reactive[ExecutionContext | None] | None = None,
+    gee_interface: Any = None,
 ) -> list[dict[str, object]]:
     """The five configuration steps, as ``right_panel_content`` sections, in DISPLAY order.
 
@@ -91,7 +93,12 @@ def build_workflow_sections(
         [AoiStep(spec=spec, map_=sepal_map)] if spec is not None and sepal_map is not None else []
     )
     productivity_content: list[object] = [ProductivityStep(spec=spec)] if spec is not None else []
-    land_cover_content: list[object] = [LandCoverStep(spec=spec)] if spec is not None else []
+    # No `gee_interface is not None` guard: `LandCoverStep`'s own parameter already
+    # defaults to `None` (`AssetSelectComponent` falls back to the session
+    # interface), so there is no bare `Reactive[...]` for mypy to narrow here.
+    land_cover_content: list[object] = (
+        [LandCoverStep(spec=spec, gee_interface=gee_interface)] if spec is not None else []
+    )
     soc_content: list[object] = [SocStep(spec=spec)] if spec is not None else []
     run_content: list[object] = (
         [RunStep(spec=spec, maps=maps, ctx=ctx)]
@@ -169,7 +176,9 @@ def Sdg1531App() -> None:
             "description": msg("panel.description"),
         },
         right_panel_content=[
-            *build_workflow_sections(spec=spec, sepal_map=sepal_map, maps=maps, ctx=ctx),
+            *build_workflow_sections(
+                spec=spec, sepal_map=sepal_map, maps=maps, ctx=ctx, gee_interface=gee_interface
+            ),
             {
                 "title": msg("layers.title"),
                 "icon": "mdi-layers",

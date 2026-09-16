@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
+from typing import Any
 
 import ipyvuetify
 import pytest
@@ -24,6 +26,45 @@ from tests.app.render_helpers import find_widgets, markdown_texts
 from tests.spec_factory import default_spec
 
 
+class StubGee:
+    """Enough of ``GEEInterface`` for the custom arm's mount-time asset
+    listing (``get_folder_async``/``get_assets_async``), for the per-selection
+    type check a real pick runs (``get_asset_async``), and for this step's own
+    pixel-value pre-flight (``get_info_async``). ``pixel_responses`` is
+    consumed in call order, one entry per ``fetch_distinct_pixel_values``
+    call -- start asset first, then end asset, mirroring ``FakeFetcher`` in
+    ``tests/helpers_stats.py``.
+    """
+
+    def __init__(self, pixel_responses: list[Any] | None = None) -> None:
+        self._pixel_responses = list(pixel_responses or [])
+
+    async def get_folder_async(self) -> str:
+        return "users/stub"
+
+    async def get_assets_async(self, folder: str) -> list[dict[str, str]]:
+        return [
+            {"id": "users/x/new-start", "type": "IMAGE"},
+            {"id": "users/x/new-end", "type": "IMAGE"},
+        ]
+
+    async def get_asset_async(self, asset_id: str) -> dict[str, str]:
+        return {"type": "IMAGE"}
+
+    async def get_info_async(self, ee_object: Any = None, tag: Any = None) -> Any:
+        return self._pixel_responses.pop(0) if self._pixel_responses else []
+
+
+async def _wait_for(predicate: Any, timeout: float = 2.0) -> bool:
+    """Give a scheduled ``use_task`` coroutine a chance to run on the live loop."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not predicate():
+        if asyncio.get_running_loop().time() > deadline:
+            return False
+        await asyncio.sleep(0.01)
+    return True
+
+
 def _select(box: object) -> object:
     selects = find_widgets(box, ipyvuetify.Select)
     assert len(selects) == 1
@@ -34,6 +75,19 @@ def _slider(box: object) -> object:
     sliders = find_widgets(box, ipyvuetify.Slider)
     assert len(sliders) == 1
     return sliders[0]
+
+
+def _render(spec: solara.Reactive[Any], gee_interface: Any = None) -> tuple[object, object]:
+    """Render on a running loop -- the custom arm's picker schedules its own
+    asset-listing task at mount, which needs one even when a test never
+    touches the picker itself."""
+
+    async def main() -> tuple[object, object]:
+        return solara.render(
+            LandCoverStep(spec=spec, gee_interface=gee_interface), handle_error=False
+        )
+
+    return asyncio.run(main())
 
 
 def test_the_step_renders():
@@ -67,8 +121,8 @@ def test_the_widgets_show_the_current_spec_values():
     assert source.items == [msg("land_cover.esa"), msg("land_cover.custom")]
     assert source.v_model == msg("land_cover.esa")
 
-    # No custom-asset text fields while ESA CCI is selected.
-    assert find_widgets(box, ipyvuetify.TextField) == []
+    # No asset pickers while ESA CCI is selected.
+    assert find_widgets(box, ipyvuetify.Combobox) == []
 
     slider = _slider(box)
     assert slider.label == msg("land_cover.water_mask")
@@ -89,23 +143,21 @@ def test_the_slider_reads_the_spec_s_own_threshold_not_a_constant():
     assert _slider(box).v_model == 11
 
 
-def test_the_custom_source_shows_asset_text_fields_with_their_current_values():
+def test_the_custom_source_shows_asset_pickers_with_their_current_values():
     spec = solara.reactive(
         default_spec(
             land_cover=CustomLandCoverSource(start_asset="users/x/start", end_asset="users/x/end")
         )
     )
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    box, rc = _render(spec, gee_interface=StubGee())
     assert rc is not None
 
     source = _select(box)
     assert source.v_model == msg("land_cover.custom")
 
-    start_field, end_field = find_widgets(box, ipyvuetify.TextField)
-    assert start_field.label == msg("land_cover.start_asset")
-    assert start_field.v_model == "users/x/start"
-    assert end_field.label == msg("land_cover.end_asset")
-    assert end_field.v_model == "users/x/end"
+    start_picker, end_picker = find_widgets(box, ipyvuetify.Combobox)
+    assert start_picker.v_model == "users/x/start"
+    assert end_picker.v_model == "users/x/end"
 
 
 @pytest.mark.parametrize(
@@ -141,11 +193,16 @@ def test_an_unset_water_mask_is_seeded_to_the_domain_default():
 
 def test_changing_the_source_to_custom_updates_only_land_cover():
     spec = solara.reactive(default_spec())
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
-    assert rc is not None
     before = spec.value
 
-    _select(box).v_model = msg("land_cover.custom")
+    async def main() -> None:
+        box, rc = solara.render(
+            LandCoverStep(spec=spec, gee_interface=StubGee()), handle_error=False
+        )
+        assert rc is not None
+        _select(box).v_model = msg("land_cover.custom")
+
+    asyncio.run(main())
 
     assert spec.value.land_cover == CustomLandCoverSource(start_asset="", end_asset="")
     assert spec.value.evolve(land_cover=before.land_cover) == before
@@ -155,17 +212,22 @@ def test_changing_the_source_back_to_esa_updates_only_land_cover():
     spec = solara.reactive(
         default_spec(land_cover=CustomLandCoverSource(start_asset="a", end_asset="b"))
     )
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
-    assert rc is not None
     before = spec.value
 
-    _select(box).v_model = msg("land_cover.esa")
+    async def main() -> None:
+        box, rc = solara.render(
+            LandCoverStep(spec=spec, gee_interface=StubGee()), handle_error=False
+        )
+        assert rc is not None
+        _select(box).v_model = msg("land_cover.esa")
+
+    asyncio.run(main())
 
     assert spec.value.land_cover == EsaCciSource()
     assert spec.value.evolve(land_cover=before.land_cover) == before
 
 
-def test_changing_the_start_asset_updates_only_that_field():
+def test_choosing_the_start_asset_writes_only_that_field():
     # water_mask is deliberately NOT default_spec()'s own JrcSeasonalityMask(6):
     # a handler that also (wrongly) resets water_mask to the domain default
     # would otherwise be a no-op against it and this test would not notice.
@@ -175,12 +237,22 @@ def test_changing_the_start_asset_updates_only_that_field():
             water_mask=JrcSeasonalityMask(threshold=9),
         )
     )
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
-    assert rc is not None
-    start_field, _end_field = find_widgets(box, ipyvuetify.TextField)
     before = spec.value
 
-    start_field.v_model = "users/x/new-start"
+    async def main() -> None:
+        box, rc = solara.render(
+            LandCoverStep(spec=spec, gee_interface=StubGee()), handle_error=False
+        )
+        assert rc is not None
+        start_picker, _end_picker = find_widgets(box, ipyvuetify.Combobox)
+
+        start_picker.v_model = "users/x/new-start"
+
+        assert await _wait_for(lambda: spec.value.land_cover.start_asset == "users/x/new-start"), (
+            "the picker never published the chosen asset"
+        )
+
+    asyncio.run(main())
 
     assert spec.value.land_cover == CustomLandCoverSource(
         start_asset="users/x/new-start", end_asset="b"
@@ -188,19 +260,29 @@ def test_changing_the_start_asset_updates_only_that_field():
     assert spec.value.evolve(land_cover=before.land_cover) == before
 
 
-def test_changing_the_end_asset_updates_only_that_field():
+def test_choosing_the_end_asset_writes_only_that_field():
     spec = solara.reactive(
         default_spec(
             land_cover=CustomLandCoverSource(start_asset="a", end_asset="b"),
             water_mask=JrcSeasonalityMask(threshold=9),
         )
     )
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
-    assert rc is not None
-    _start_field, end_field = find_widgets(box, ipyvuetify.TextField)
     before = spec.value
 
-    end_field.v_model = "users/x/new-end"
+    async def main() -> None:
+        box, rc = solara.render(
+            LandCoverStep(spec=spec, gee_interface=StubGee()), handle_error=False
+        )
+        assert rc is not None
+        _start_picker, end_picker = find_widgets(box, ipyvuetify.Combobox)
+
+        end_picker.v_model = "users/x/new-end"
+
+        assert await _wait_for(lambda: spec.value.land_cover.end_asset == "users/x/new-end"), (
+            "the picker never published the chosen asset"
+        )
+
+    asyncio.run(main())
 
     assert spec.value.land_cover == CustomLandCoverSource(
         start_asset="a", end_asset="users/x/new-end"
@@ -208,7 +290,7 @@ def test_changing_the_end_asset_updates_only_that_field():
     assert spec.value.evolve(land_cover=before.land_cover) == before
 
 
-def test_editing_either_asset_field_preserves_an_existing_scheme():
+def test_choosing_either_asset_preserves_an_existing_scheme():
     """``dataclasses.replace(custom_source, ...)`` is what makes ``scheme``
     survive an edit -- rebuilding a fresh ``CustomLandCoverSource(start_asset=
     ..., end_asset=...)`` instead would silently drop it back to ``None``,
@@ -222,17 +304,65 @@ def test_editing_either_asset_field_preserves_an_existing_scheme():
             water_mask=JrcSeasonalityMask(threshold=9),
         )
     )
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
-    assert rc is not None
-    start_field, end_field = find_widgets(box, ipyvuetify.TextField)
 
-    start_field.v_model = "users/x/new-start"
-    assert spec.value.land_cover.scheme == scheme
+    async def main() -> None:
+        box, rc = solara.render(
+            LandCoverStep(spec=spec, gee_interface=StubGee()), handle_error=False
+        )
+        assert rc is not None
+        start_picker, end_picker = find_widgets(box, ipyvuetify.Combobox)
 
-    end_field.v_model = "users/x/new-end"
+        start_picker.v_model = "users/x/new-start"
+        assert await _wait_for(lambda: spec.value.land_cover.start_asset == "users/x/new-start")
+        assert spec.value.land_cover.scheme == scheme
+
+        end_picker.v_model = "users/x/new-end"
+        assert await _wait_for(lambda: spec.value.land_cover.end_asset == "users/x/new-end")
+
+    asyncio.run(main())
+
     assert spec.value.land_cover == CustomLandCoverSource(
         start_asset="users/x/new-start", end_asset="users/x/new-end", scheme=scheme
     )
+
+
+def test_choosing_both_assets_reports_a_pixel_mismatch_as_a_notification(monkeypatch):
+    """``validate()`` cannot run this check itself -- it needs a GEE round
+    trip -- so a custom asset outside the classification is reported through
+    a notification instead of a ``Problem`` in ``problems_for``. 99 is
+    outside ``DEFAULT_LC_CODES`` (10-70), so the end asset's subset check
+    fails; the start asset's values are all in range, so it stays quiet."""
+    errors: list[str] = []
+
+    class _FakeNotifier:
+        def error(self, message: str) -> None:
+            errors.append(message)
+
+    monkeypatch.setattr("app.steps.land_cover.use_notifications", lambda: _FakeNotifier())
+
+    spec = solara.reactive(
+        default_spec(land_cover=CustomLandCoverSource(start_asset="", end_asset=""))
+    )
+    gee = StubGee(pixel_responses=[["10", "20"], ["99"]])
+
+    async def main() -> None:
+        box, rc = solara.render(LandCoverStep(spec=spec, gee_interface=gee), handle_error=False)
+        assert rc is not None
+        start_picker, end_picker = find_widgets(box, ipyvuetify.Combobox)
+
+        start_picker.v_model = "users/x/new-start"
+        assert await _wait_for(lambda: spec.value.land_cover.start_asset == "users/x/new-start")
+
+        end_picker.v_model = "users/x/new-end"
+        assert await _wait_for(lambda: spec.value.land_cover.end_asset == "users/x/new-end")
+
+        assert await _wait_for(lambda: errors), "the pixel-value check never ran"
+
+    asyncio.run(main())
+
+    assert errors == [
+        "The asset contains pixel values that the transition matrix does not define: [99]."
+    ]
 
 
 def test_changing_the_water_mask_threshold_updates_only_water_mask():
@@ -242,11 +372,16 @@ def test_changing_the_water_mask_threshold_updates_only_water_mask():
     spec = solara.reactive(
         default_spec(land_cover=CustomLandCoverSource(start_asset="a", end_asset="b"))
     )
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
-    assert rc is not None
     before = spec.value
 
-    _slider(box).v_model = 9
+    async def main() -> None:
+        box, rc = solara.render(
+            LandCoverStep(spec=spec, gee_interface=StubGee()), handle_error=False
+        )
+        assert rc is not None
+        _slider(box).v_model = 9
+
+    asyncio.run(main())
 
     assert spec.value.water_mask == JrcSeasonalityMask(threshold=9)
     assert spec.value.evolve(water_mask=before.water_mask) == before
@@ -268,18 +403,19 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     spec = solara.reactive(
         default_spec(land_cover=CustomLandCoverSource(start_asset="a", end_asset="b"))
     )
-    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    box, rc = _render(spec, gee_interface=StubGee())
     assert rc is not None
 
-    assert markdown_texts(box)[0] == "<p><land_cover.description></p>"
+    texts = markdown_texts(box)
+    assert texts[0] == "<p><land_cover.description></p>"
+    # AssetSelectComponent's own label is pysepal's, not this step's -- the
+    # picker gets its label from the catalogue via a caption above it instead.
+    assert "<p><land_cover.start_asset></p>" in texts
+    assert "<p><land_cover.end_asset></p>" in texts
 
     source = _select(box)
     assert source.label == "<land_cover.source>"
     assert source.v_model == "<land_cover.custom>"
-
-    start_field, end_field = find_widgets(box, ipyvuetify.TextField)
-    assert start_field.label == "<land_cover.start_asset>"
-    assert end_field.label == "<land_cover.end_asset>"
 
     slider = _slider(box)
     assert slider.label == "<land_cover.water_mask>"
@@ -304,6 +440,8 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
         (
             default_spec(land_cover=CustomLandCoverSource(start_asset="", end_asset="")),
             [
+                "<p>Start land cover asset</p>",
+                "<p>End land cover asset</p>",
                 "<p><strong>Select the start land cover asset.</strong></p>",
                 "<p><strong>Select the end land cover asset.</strong></p>",
             ],
@@ -315,9 +453,11 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
             # `else` arm of the problems loop.
             default_spec(land_cover=CustomLandCoverSource(start_asset="a", end_asset="b")),
             [
+                "<p>Start land cover asset</p>",
+                "<p>End land cover asset</p>",
                 "<p>Custom land cover assets are set without a transition matrix "
                 "file, so their pixel codes are remapped through the default "
-                "IPCC vocabulary.</p>"
+                "IPCC vocabulary.</p>",
             ],
         ),
         (
@@ -347,7 +487,7 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
 )
 def test_the_step_renders_only_its_own_text(spec, expected_extra):
     spec_r = solara.reactive(spec)
-    box, rc = solara.render(LandCoverStep(spec=spec_r), handle_error=False)
+    box, rc = _render(spec_r, gee_interface=StubGee())
     assert rc is not None
     assert markdown_texts(box) == [
         "<p>Land cover source and the water mask.</p>",
