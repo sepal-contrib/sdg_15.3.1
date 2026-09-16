@@ -81,5 +81,13 @@
     "compute": "Compute statistics",
     "computed": "Statistics ready",
     "build_first": "Build the indicator first."
+  },
+  "zonal": {
+    "title": "Zonal statistics",
+    "description": "Indicator areas per administrative zone.",
+    "compute": "Compute zonal statistics",
+    "download": "Download shapefile",
+    "ready": "Zonal statistics ready",
+    "build_first": "Build the indicator first."
   }
 }

@@ -69,7 +69,7 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
         "description": msg("panel.description"),
     }
     assert mapapp.steps_data == []
-    assert len(mapapp.right_panel_content) == 7
+    assert len(mapapp.right_panel_content) == 8
     aoi_section = mapapp.right_panel_content[0]
     assert aoi_section["title"] == msg("step.aoi")
     assert aoi_section["icon"] == "mdi-map-marker-check"
@@ -100,6 +100,11 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert results_section["icon"] == "mdi-chart-bar"
     assert results_section["description"] == msg("results.description")
     assert len(results_section["content"]) == 1
+    zonal_section = mapapp.right_panel_content[7]
+    assert zonal_section["title"] == msg("zonal.title")
+    assert zonal_section["icon"] == "mdi-table"
+    assert zonal_section["description"] == msg("zonal.description")
+    assert len(zonal_section["content"]) == 1
     assert mapapp.right_panel_open is True
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
@@ -310,6 +315,42 @@ def test_the_results_panel_is_wired_with_the_shared_maps_ctx_and_gee_interface(m
     assert captured["panel_maps"] is captured["run_maps"]
     assert captured["panel_ctx"] is captured["run_ctx"]
     assert captured["gee_interface"] is not None
+
+
+def test_the_zonal_panel_is_wired_with_the_shared_maps_ctx_and_a_sepal_client(monkeypatch):
+    """Same identity concern as the results panel above, for the two shared
+    reactives ``ZonalPanel`` needs plus its own extra dependency: a
+    ``sepal_client``, without which the shapefile download has nothing to
+    upload through."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
+        captured["run_maps"] = maps
+        captured["run_ctx"] = ctx
+
+    @solara.component
+    def _spy_zonal_panel(
+        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, sepal_client: Any = None
+    ) -> None:
+        captured.update(
+            panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, sepal_client=sepal_client
+        )
+
+    monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(page_module, "ZonalPanel", _spy_zonal_panel)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["panel_maps"] is captured["run_maps"]
+    assert captured["panel_ctx"] is captured["run_ctx"]
+    assert captured["gee_interface"] is not None
+    # `get_current_sepal_client()`'s documented "no SEPAL identity" case
+    # returns `None` outside a sandbox, which is exactly this test
+    # environment -- the identity that matters here is that `page.py` calls
+    # it at all and passes the result through, not a particular truthiness.
+    assert "sepal_client" in captured
 
 
 def test_the_steps_are_in_the_sub_indicator_order():

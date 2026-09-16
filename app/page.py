@@ -23,6 +23,7 @@ from pysepal.mapping.sepal_map import SepalMap
 from pysepal.sepalwidgets.vue_app import MapApp
 from pysepal.solara import (
     get_current_gee_interface,
+    get_current_sepal_client,
     get_current_theme_state,
     setup_sessions,
     setup_solara_server,
@@ -34,6 +35,7 @@ from pysepal.solara.notifications import NotificationProvider
 from app.message import messages, msg
 from app.panels.map_layers import MapLayersPanel
 from app.panels.results import ResultsPanel
+from app.panels.zonal import ZonalPanel
 from app.steps.aoi import AoiStep
 from app.steps.land_cover import LandCoverStep
 from app.steps.productivity import ProductivityStep
@@ -177,6 +179,19 @@ def Sdg1531App() -> None:
                 "icon": "mdi-chart-bar",
                 "content": [ResultsPanel(maps=maps, ctx=ctx, gee_interface=gee_interface)],
                 "description": msg("results.description"),
+            },
+            {
+                "title": msg("zonal.title"),
+                "icon": "mdi-table",
+                "content": [
+                    ZonalPanel(
+                        maps=maps,
+                        ctx=ctx,
+                        gee_interface=gee_interface,
+                        sepal_client=get_current_sepal_client(),
+                    )
+                ],
+                "description": msg("zonal.description"),
             },
         ],
         right_panel_open=True,
