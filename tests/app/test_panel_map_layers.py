@@ -334,6 +334,40 @@ def test_clicking_cancel_while_pending_stops_the_add_without_marking_it_shown(mo
     assert _add_button_labels(box)[0] == [msg("layers.add")]
 
 
+def test_the_other_rows_add_is_disabled_while_one_is_pending(monkeypatch):
+    """One component-level ``use_task`` (the brief forbade a hook per row):
+    clicking a SECOND row's Add while the first is still in flight would not
+    queue it, it would REPLACE it -- the first row's add silently abandoned,
+    with no toast and no explanation on either row. Disabling every other
+    row's Add while one is pending (``external_busy``, see ``_LayerRow``)
+    turns that into a click that cannot be made, rather than one that
+    silently does nothing.
+    """
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
+    fake_map = _RecordingMap()
+
+    async def main():
+        box, rc = solara.render(
+            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
+            handle_error=False,
+        )
+        assert rc is not None
+        buttons = find_widgets(box, ipyvuetify.Btn)
+        buttons[0].click()  # start LAND_COVER's add
+        await asyncio.sleep(0)  # let the task begin, before its own `sleep(0)` resolves
+
+        buttons = find_widgets(box, ipyvuetify.Btn)
+        assert buttons[0].disabled is False  # the pending row's own button: cancel, never disabled
+        assert buttons[1].disabled is True  # every OTHER row: disabled while busy elsewhere
+
+        assert await _wait_for(lambda: fake.successes or fake.errors)
+        buttons = find_widgets(box, ipyvuetify.Btn)
+        assert buttons[1].disabled is False  # re-enabled once nothing is pending
+
+    asyncio.run(main())
+
+
 @solara.component
 def _Harness(maps_reactive: solara.Reactive[_FakeMaps | None], map_: object) -> None:
     """Lets a test swap the ``maps`` PROP on an already-mounted

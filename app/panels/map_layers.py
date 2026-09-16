@@ -24,6 +24,17 @@ in-flight one. NOT one task per row -- that would call ``use_task`` a number
 of times that depends on ``maps.layers()``, a hook inside a loop. Removing is
 synchronous and local, so it needs no task.
 
+One task also means one layer can draw at a time: clicking a second row's
+Add while the first is still in flight does not queue it, it REPLACES it
+(the same ``task(...)`` call that started the first now starts the second).
+The abandoned layer never lands on the map and no row ends up wrongly marked
+shown, so this was never a correctness bug -- but the first row simply
+reverted to "Add" with no toast, which read as the click having done
+nothing. Every OTHER row's Add is disabled (``external_busy``, see
+``_LayerRow``) while one is pending, so the interaction cannot be started
+rather than being started and silently dropped -- weighed against seven
+one-or-two-second adds becoming serial, which seemed the smaller cost.
+
 Task 20 made ``maps`` a derivation of the run spec: change the spec, and
 ``maps`` is a new object describing a different run. Every tile this panel
 already drew is then from the run BEFORE it -- the same silently-wrong-data
@@ -151,6 +162,7 @@ def _LayerRow(
     name: str,
     is_shown: bool,
     is_pending: bool,
+    is_busy_elsewhere: bool,
     on_add: Callable[[], None],
     on_remove: Callable[[], None],
     on_cancel: Callable[[], None],
@@ -165,6 +177,14 @@ def _LayerRow(
     ``is_shown``, but both are whole child components, each with its own
     stable hook count, so branching on which one to mount does not touch
     ``_LayerRow``'s.
+
+    ``is_busy_elsewhere`` -- another row's add in flight, this one's not --
+    reaches ``TaskButtonComponent`` as ``external_busy``: disabled Add, same
+    as its own docstring's "child component loading" case. Without it, a
+    click here would abandon the OTHER row's add task (one component-level
+    ``use_task``, so starting this one cancels it) with no toast and no
+    explanation on either row -- disabling is what turns a click that does
+    nothing into a click that cannot be made.
     """
     with rv.Html(tag="tr"):
         rv.Html(tag="td", children=[name])
@@ -175,6 +195,7 @@ def _LayerRow(
                 TaskButtonComponent(
                     label=msg("layers.add"),
                     running=is_pending,
+                    external_busy=is_busy_elsewhere,
                     on_start=on_add,
                     on_cancel=on_cancel,
                     small=True,
@@ -298,6 +319,7 @@ def MapLayersPanel(
                     name=layer_name(layer_id),
                     is_shown=layer_id in shown_ids,
                     is_pending=task.pending and pending_id == layer_id,
+                    is_busy_elsewhere=task.pending and pending_id != layer_id,
                     on_add=_bind_add(start, layer_id, layer),
                     on_remove=_bind_remove(remove, layer_id),
                     on_cancel=cancel,
