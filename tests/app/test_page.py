@@ -249,11 +249,17 @@ def test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee
     monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(page_module, "MapLayersPanel", _spy_map_layers_panel)
 
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
+    mapapp = find_widget(box, MapApp)
+    assert mapapp is not None
+
     assert captured["panel_maps"] is captured["run_maps"]
-    assert isinstance(captured["map_"], SepalMap)
+    # `is`, not `isinstance`: a second, unrelated SepalMap would still pass an
+    # isinstance check while drawing the seven layers onto a map the user is
+    # not looking at -- `mapapp.main_map[0]` is the one actually in the tree.
+    assert captured["map_"] is mapapp.main_map[0]
     assert captured["gee_interface"] is not None
 
 

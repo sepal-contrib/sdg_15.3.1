@@ -282,6 +282,26 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
             if not exempt and (name in FS_CALL_NAMES or attr in FS_CALL_ATTRS):
                 add(node, "filesystem", f"{name or attr}() touches the filesystem")
 
+            if name == "use_task" or attr == "use_task":
+                prefer_threaded_kw = next(
+                    (kw for kw in node.keywords if kw.arg == "prefer_threaded"), None
+                )
+                passes_false = (
+                    prefer_threaded_kw is not None
+                    and isinstance(prefer_threaded_kw.value, ast.Constant)
+                    and prefer_threaded_kw.value.value is False
+                )
+                if not passes_false:
+                    add(
+                        node,
+                        "use-task-prefer-threaded",
+                        "use_task(...) must pass prefer_threaded=False -- a second "
+                        "event loop breaks GEEInterface's locks and its cached "
+                        "httpx client under contention only, so a missing or "
+                        "True value can look fine until it doesn't "
+                        "(docs/guides/solara-gee-patterns.md)",
+                    )
+
             if (
                 (name == "replace" or attr == "replace")
                 and node.args

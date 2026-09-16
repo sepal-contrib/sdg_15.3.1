@@ -359,3 +359,39 @@ def test_the_export_exemption_does_not_cover_every_temp_spool() -> None:
     # exactly the leak the rule is for
     src = '__all__ = ["f"]\nimport tempfile\ndef f():\n    return tempfile.mkstemp()\n'
     assert "filesystem" in _rules(src, rel_path="sdg1531/export.py")
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "solara.lab.use_task(f, dependencies=None, raise_error=False)",
+        "use_task(f, dependencies=None, raise_error=False)",
+        "solara.lab.use_task(f, dependencies=None, raise_error=False, prefer_threaded=True)",
+        "use_task(f, dependencies=None, prefer_threaded=other_flag)",
+    ],
+)
+def test_use_task_without_prefer_threaded_false_is_rejected(call: str) -> None:
+    # docs/guides/solara-gee-patterns.md: a second event loop breaks
+    # GEEInterface's locks and its cached httpx client only under contention, so
+    # a missing (default True) or a True/non-literal value can look fine in
+    # light testing and still be wrong -- this is a case a render-time
+    # assertion cannot reach, since the Task object exposes no such attribute.
+    src = f'__all__ = ["g"]\ndef g(f):\n    return {call}\n'
+    assert "use-task-prefer-threaded" in _rules(src, rel_path="app/probe.py")
+
+
+def test_use_task_with_prefer_threaded_false_is_accepted() -> None:
+    src = (
+        '__all__ = ["g"]\n'
+        "def g(f):\n"
+        "    return solara.lab.use_task(\n"
+        "        f, dependencies=None, raise_error=False, prefer_threaded=False\n"
+        "    )\n"
+    )
+    assert "use-task-prefer-threaded" not in _rules(src, rel_path="app/probe.py")
+
+
+def test_a_similarly_named_call_is_not_treated_as_use_task() -> None:
+    # use_task_button is a different function; the rule must match the exact name
+    src = '__all__ = ["g"]\ndef g():\n    return use_task_button(task, on_start=start)\n'
+    assert "use-task-prefer-threaded" not in _rules(src, rel_path="app/probe.py")

@@ -54,6 +54,16 @@ _TWO_LAYERS = {
     IndicatorLayer.SOC: _FakeLayer("soc"),
 }
 
+# LAND_COVER and SOC both take `layer_vis_params`'s default branch, so a fixture
+# built only from them cannot tell a correct per-layer mapping from one constant
+# vis dict shared by every layer: PRODUCTIVITY_PERFORMANCE is the only id with a
+# genuinely different `layer_vis_params(...)` result (min=1, max=2, a 2-colour
+# palette), so it is the layer that makes that distinction actually testable.
+_THREE_LAYERS = {
+    **_TWO_LAYERS,
+    IndicatorLayer.PRODUCTIVITY_PERFORMANCE: _FakeLayer("productivity_performance"),
+}
+
 
 class _RecordingMap:
     """Records every ``add_ee_layer_async`` call.
@@ -105,10 +115,13 @@ class _FakeNotifier:
         self.successes: list[str] = []
         self.errors: list[str] = []
         self.tracked: list[tuple[str, int | None]] = []
+        self.trackers: list[_FakeTracker] = []
 
     def track(self, title: str, total_steps: int | None = None) -> _FakeTracker:
         self.tracked.append((title, total_steps))
-        return _FakeTracker()
+        tracker = _FakeTracker()
+        self.trackers.append(tracker)
+        return tracker
 
     def success(self, message: str) -> None:
         self.successes.append(message)
@@ -136,10 +149,11 @@ def test_the_panel_renders_with_no_maps(monkeypatch):
         MapLayersPanel(maps=maps, map_=None, gee_interface=None), handle_error=False
     )
     assert rc is not None
-    assert markdown_texts(box) == [
-        f"<p>{msg('layers.description')}</p>",
-        f"<p>{msg('layers.build_first')}</p>",
-    ]
+    # Not `layers.description` too: that copy lives once, in `page.py`'s
+    # section dict, which `MapApp` renders under the section title -- the
+    # panel itself must not render it a second time.
+    assert markdown_texts(box) == [f"<p>{msg('layers.build_first')}</p>"]
+    assert find_widget(box, ipyvuetify.Btn) is None  # no dead button before Build
     assert fake.tracked == []  # nothing to show yet, so nothing was started
 
 
@@ -154,16 +168,36 @@ def test_vis_params_come_from_the_domain_palette():
     assert vis["max"] == 3
 
 
+def test_the_performance_layer_gets_its_own_two_class_vis():
+    """``sdg1531/tables.py`` deliberately ships no palette for
+    ``PROD_PERFORMANCE_LABELS`` and hands that choice to whichever phase first
+    renders the layer -- this one. It is the only id ``layer_vis_params``
+    treats differently, so it is what makes a "one constant vis for every
+    layer" regression actually detectable."""
+    from sdg1531.tables import DEGRADATION_COLORS
+
+    vis = layer_vis_params(IndicatorLayer.PRODUCTIVITY_PERFORMANCE)
+    assert vis["min"] == 1
+    assert vis["max"] == 2
+    assert vis["palette"] == list(DEGRADATION_COLORS.values())[1:3]
+
+
 def test_clicking_show_draws_every_layer_and_reports_the_real_count(monkeypatch):
     """A real click on the rendered button -- not a captured spy -- proves the
     task is wired to the domain's layers and that the toast carries the real
-    count once every layer has been drawn."""
+    count once every layer has been drawn.
+
+    Three layers, not two: ``layer_vis_params`` only tells
+    ``PRODUCTIVITY_PERFORMANCE`` apart from everything else, so a fixture of
+    just LAND_COVER + SOC cannot distinguish a correct per-layer mapping from
+    one constant vis dict reused for all seven layers.
+    """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
     fake_map = _RecordingMap()
 
     async def main():
-        maps = solara.reactive(_FakeMaps(_TWO_LAYERS))
+        maps = solara.reactive(_FakeMaps(_THREE_LAYERS))
         box, rc = solara.render(
             MapLayersPanel(maps=maps, map_=fake_map, gee_interface=None),
             handle_error=False,
@@ -171,14 +205,28 @@ def test_clicking_show_draws_every_layer_and_reports_the_real_count(monkeypatch)
         assert rc is not None
         button = find_widget(box, ipyvuetify.Btn)
         assert button is not None
+        assert button.children == [msg("layers.show")]
         button.click()
         assert await _wait_for(lambda: fake.successes or fake.errors)
 
     asyncio.run(main())
 
-    assert {call["name"] for call in fake_map.calls} == {"land_cover", "soc"}
-    assert fake.tracked == [(msg("layers.show"), 2)]
-    assert fake.successes == [msg("layers.shown", count=2)]
+    recorded = {call["name"]: call for call in fake_map.calls}
+    assert recorded.keys() == {layer.label for layer in _THREE_LAYERS.values()}
+    # `.select(layer.band)`, not `.image` alone: `ClassifiedLayer.image` may
+    # carry more bands than the one this panel is meant to draw (trend and
+    # state both do), and the fake's `select` bakes the band into the result,
+    # so a dropped `.select(...)` shows up as the bare `_FakeImage` instead.
+    for name, call in recorded.items():
+        assert call["image"] == f"{name}:{name}_band"
+    # Per layer, not one dict shared by all three -- the mapping this panel
+    # exists to own, not re-derive.
+    assert {name: call["vis_params"] for name, call in recorded.items()} == {
+        layer.label: layer_vis_params(layer_id) for layer_id, layer in _THREE_LAYERS.items()
+    }
+    assert fake.tracked == [(msg("layers.show"), 3)]
+    assert fake.trackers[0].steps == [layer.label for layer in _THREE_LAYERS.values()]
+    assert fake.successes == [msg("layers.shown", count=3)]
     assert fake.errors == []
 
 

@@ -137,8 +137,10 @@ def MapLayersPanel(
     # above if it moves below the conditional return, so it stays up here too.
     btn_props = use_task_button(task, on_start=start)
 
-    solara.Markdown(msg("layers.description"))
-
+    # No `solara.Markdown(msg("layers.description"))` here: `page.py`'s section
+    # dict already carries that same string as the right-panel section's own
+    # `description`, which `MapApp` renders under the section title. Rendering
+    # it a second time here duplicated the sentence on screen.
     if current_maps is None:
         solara.Markdown(msg("layers.build_first"))
         return
