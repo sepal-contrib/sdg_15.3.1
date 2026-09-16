@@ -40,6 +40,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -169,7 +170,7 @@ def _marker_expressions() -> set[str]:
     }
 
 
-def _runs_the_selection(command: str) -> bool:
+def _runs_the_selection(workflow: str, job: str, command: str) -> bool:
     """Whether this invocation RUNS what its marker selects, or does something less.
 
     Decided from the WHOLE argument set, by allowlist: a run carries its marker
@@ -182,19 +183,24 @@ def _runs_the_selection(command: str) -> bool:
     invocation does not count as the job's run, so adding a flag to a CI test command
     is a decision recorded here.
 
-    The one exception: bare paths naming only WHOLE known test targets (see
-    `_names_only_whole_known_targets`), with only reporting flags beside them. The
-    `app` job runs two -- it cannot use the domain suite's marker at all, since it
-    needs a `pysepal>=4` floor the rest of the suite's environment does not carry --
-    and running every test under trees the workflow names outright is as much "the
-    selection" as a marker run is. `--collect-only` is deliberately not among the
-    flags this allows beside them, so the app job's own counting guard still fails
-    this the way every other one does.
+    The one exception: a MARKER-LESS invocation, measured against `job`'s OWN
+    counting guard instead (`_covers_its_own_job`) -- the `app` job cannot use the
+    domain suite's marker at all, since it needs a `pysepal>=4` floor the rest of the
+    suite's environment does not carry. An earlier version of this exception
+    allowlisted "a bare path naming a whole known test directory or top-level
+    module" directly, with no reference to which JOB it was in -- which let `domain`
+    swap its marker for a bare `tests/engine` or `tests/test_spec.py` and pass this
+    check while running a fraction of what its own guard still claimed. Comparing
+    against the job's OWN guard, rather than a shape any job could claim, closes
+    that: `domain`'s guard still claims ~1057, and `tests/engine` alone never
+    contains it.
     """
     arguments = list(_arguments(command))
-    selection = _selection_arguments(tuple(arguments))
-    if _names_only_whole_known_targets(selection):
-        return True
+    if not any(argument == "-m" for argument in arguments):
+        selection = _selection_arguments(tuple(arguments))
+        if any(a in ("--collect-only", "--co") for a in selection):
+            return False  # a counting guard is still never "the run"
+        return _covers_its_own_job(workflow, job, selection)
     while arguments:
         argument = arguments.pop(0)
         if argument == "-m":  # the marker expression, measured by the rules below
@@ -247,44 +253,93 @@ def _collected_directories(arguments: tuple[str, ...]) -> frozenset[str]:
     )
 
 
+def _collected_node_ids(arguments: tuple[str, ...]) -> frozenset[str]:
+    """The pytest node ids ``pytest <arguments>`` collects."""
+    return frozenset(
+        line.strip() for line in _collect(arguments).stdout.splitlines() if "::" in line
+    )
+
+
+def _python_files() -> tuple[str, ...]:
+    """The glob patterns pytest actually discovers test modules with.
+
+    Read from this repo's own ``[tool.pytest.ini_options]`` rather than assumed, so
+    a future ``python_files`` override in ``pyproject.toml`` cannot silently drift
+    from what `_test_directories` scans for. Pytest's own default -- ``test_*.py``
+    AND ``*_test.py`` -- applies when the repo declares none, which is exactly what
+    "no override" means to pytest itself: a ``test_*.py``-only scan here once missed
+    a genuinely collectible ``some_widget_test.py``.
+    """
+    config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = config.get("tool", {}).get("pytest", {}).get("ini_options", {}).get("python_files")
+    if declared is None:
+        return ("test_*.py", "*_test.py")
+    return tuple(declared.split()) if isinstance(declared, str) else tuple(declared)
+
+
 @functools.cache
 def _test_directories() -> frozenset[str]:
-    """Every directory under ``tests/`` that holds at least one ``test_*.py``
-    module, relative to the repo root."""
+    """Every directory under ``tests/`` that holds at least one module pytest's own
+    `_python_files` patterns would collect, relative to the repo root."""
     return frozenset(
-        p.parent.relative_to(REPO_ROOT).as_posix() for p in (REPO_ROOT / "tests").rglob("test_*.py")
+        p.parent.relative_to(REPO_ROOT).as_posix()
+        for pattern in _python_files()
+        for p in (REPO_ROOT / "tests").rglob(pattern)
     )
 
 
 @functools.cache
-def _top_level_test_modules() -> frozenset[str]:
-    """Every ``test_*.py`` module directly under ``tests/`` (not in a
-    subdirectory), relative to the repo root.
-
-    Naming one of these outright -- ``tests/test_workflows.py``, say -- is as
-    much a deliberately-chosen, unnarrowed target as naming a whole test
-    directory is: there is no larger tree it could have named instead and
-    didn't. A file inside a SUBdirectory does not get this benefit of the
-    doubt -- ``tests/app/test_state.py`` could always have named the whole of
-    ``tests/app``, so it is still measured against that as a possible
-    narrowing.
-    """
-    return frozenset(
-        p.relative_to(REPO_ROOT).as_posix() for p in (REPO_ROOT / "tests").glob("test_*.py")
+def _job_has_guard(workflow: str, job: str) -> bool:
+    """Whether `job` declares at least one ``--collect-only``-flavoured pytest
+    invocation, structurally -- regardless of how many tests that invocation
+    currently collects. Kept separate from `_own_guard_node_ids` because an
+    empty COLLECTION (`tests/app` under an interpreter without pysepal 4) and
+    an ABSENT guard must not be read as the same thing: the former still has
+    something to be a (vacuous) superset of, the latter has nothing at all."""
+    return any(
+        any(a in ("--collect-only", "--co") for a in _selection_arguments(_arguments(command)))
+        for w, j, command in _pytest_commands()
+        if (w, j) == (workflow, job)
     )
 
 
-def _names_only_whole_known_targets(selection: tuple[str, ...]) -> bool:
-    """Whether every token in ``selection`` is, on its own, either a whole known
-    test directory or a whole top-level test module -- and there is at least
-    one. The `app` job's ``tests/app tests/test_workflows.py`` line is two such
-    tokens; its ``tests/app`` alone is one. Neither has anything left to narrow:
-    each token names the largest tree it could have named, so this is as much
-    "the selection" as a marker run is.
+@functools.cache
+def _own_guard_node_ids(workflow: str, job: str) -> frozenset[str]:
+    """The union of node ids every ``--collect-only``-flavoured pytest invocation in
+    `job` collects -- what the job's OWN counting guard claims it will run. May
+    legitimately be empty (see `_job_has_guard`)."""
+    ids: set[str] = set()
+    for w, j, command in _pytest_commands():
+        if (w, j) != (workflow, job):
+            continue
+        arguments = _selection_arguments(_arguments(command))
+        if any(a in ("--collect-only", "--co") for a in arguments):
+            ids |= _collected_node_ids(arguments)
+    return frozenset(ids)
+
+
+def _covers_its_own_job(workflow: str, job: str, selection: tuple[str, ...]) -> bool:
+    """Whether a MARKER-LESS `selection` runs at least as much as it should: a node-id
+    SUPERSET of `job`'s own counting guard, if it declares one, else the same
+    whole-default-suite comparison a marker-based invocation gets from `_marker_pair`.
+
+    Superset, not equality: the `app` job's run line covers
+    ``tests/test_workflows.py`` too, which its own guard never claimed to run, and
+    that is additive, not a narrowing -- only running FEWER than the guard claimed is.
+    A guard whose OWN collection is currently empty (`tests/app` without pysepal 4)
+    is a vacuous subset of anything -- correctly so, since the emptiness there is
+    `test_every_test_directory_is_reached_by_some_job`'s claim to check, not this one's.
     """
-    return bool(selection) and all(
-        token in _test_directories() or token in _top_level_test_modules() for token in selection
-    )
+    if _job_has_guard(workflow, job):
+        return _own_guard_node_ids(workflow, job) <= _collected_node_ids(selection)
+    return _collected_node_ids(selection) == _collected_node_ids(())
+
+
+def _in_app_subtree(directory: str) -> bool:
+    """Whether `directory` is ``tests/app`` itself or nested under it. `tests/app`
+    is flat today, but the crediting rule below must not silently stop applying the
+    day it isn't."""
+    return directory == "tests/app" or directory.startswith("tests/app/")
 
 
 def _job_requires_app_tests(workflow: str, job: str) -> bool:
@@ -356,7 +411,7 @@ def test_every_pytest_job_actually_executes_its_selection() -> None:
     running = {
         (workflow, job)
         for workflow, job, command in _pytest_commands()
-        if job != LEGACY_JOB and _runs_the_selection(command)
+        if job != LEGACY_JOB and _runs_the_selection(workflow, job, command)
     }
 
     idle = sorted(invoking - running)
@@ -383,28 +438,45 @@ def test_no_pytest_invocation_narrows_what_its_marker_selects() -> None:
     The `ci` job is exempt: ``pytest --nbmake ui.ipynb`` names the notebook on
     purpose, and it is the app-layer migration's to retire.
 
-    A command that selects nothing but WHOLE known test targets (see
-    `_names_only_whole_known_targets`), ``--collect-only`` aside, is exempt for a
-    different reason: it has nothing left to narrow, and ``_marker_pair`` finds no
-    ``-m`` in it, so "whole" would otherwise be the entire suite -- comparing the
-    `app` job's ``tests/app tests/test_workflows.py`` line against that would flag
-    every directory-scoped job as narrowing, forever, including a job that runs
-    MORE than one such target (which this compares as one selection, not the sum
-    of two). ``test_every_test_directory_is_reached_by_some_job`` is what actually
-    checks a directory-scoped job reaches its directory.
+    A MARKER-LESS invocation -- one with no ``-m`` at all -- is measured differently:
+    ``_marker_pair`` finds nothing in it, so "whole" would otherwise be the entire
+    domain suite, and the `app` job's own ``tests/app tests/test_workflows.py`` line
+    would misread as narrowed from ~1057 to 173 even though it is correct. Such an
+    invocation is instead compared against `job`'s OWN counting guard
+    (`_covers_its_own_job`), and must be a node-id SUPERSET of it. An earlier version
+    of this exemption instead allowlisted any bare path naming a whole known test
+    directory or top-level module, with no reference to the job it was in -- which
+    let `domain` swap its marker for a bare ``tests/engine`` or
+    ``tests/test_spec.py`` and pass this check while its own
+    ``--collect-only`` guard still (truthfully) reported ~1057 selected and the run
+    line executed a fraction of that. Comparing against the job's own guard rather
+    than a shape any job could claim closes that.
     """
     problems = []
     for workflow, job, command in _pytest_commands():
         if job == LEGACY_JOB:
             continue
         arguments = _selection_arguments(_arguments(command))
-        without_collect_only = tuple(a for a in arguments if a not in ("--collect-only", "--co"))
-        if _names_only_whole_known_targets(without_collect_only):
+        marker = _marker_pair(arguments)
+        if marker:
+            selected = _collected(arguments)
+            whole = _collected(marker)
+            if selected != whole:
+                problems.append(
+                    f"{workflow}:{job}: `{command.strip()}` selects {selected} of {whole}"
+                )
             continue
-        selected = _collected(arguments)
-        whole = _collected(_marker_pair(arguments))
-        if selected != whole:
-            problems.append(f"{workflow}:{job}: `{command.strip()}` selects {selected} of {whole}")
+        if any(a in ("--collect-only", "--co") for a in arguments):
+            continue  # the job's own counting guard; nothing to compare it against
+        if not _covers_its_own_job(workflow, job, arguments):
+            has_guard = _job_has_guard(workflow, job)
+            baseline = (
+                len(_own_guard_node_ids(workflow, job))
+                if has_guard
+                else len(_collected_node_ids(()))
+            )
+            run = len(_collected_node_ids(arguments))
+            problems.append(f"{workflow}:{job}: `{command.strip()}` runs {run} of {baseline}")
 
     assert problems == [], problems
 
@@ -428,30 +500,37 @@ def test_every_test_directory_is_reached_by_some_job() -> None:
         if job == LEGACY_JOB:
             continue
         arguments = _selection_arguments(_arguments(command))
+        if any(a in ("--collect-only", "--co") for a in arguments):
+            continue  # a counting guard executes nothing, so it "reaches" nothing
         for directory in _collected_directories(arguments):
-            if directory == "tests/app" and not _job_requires_app_tests(workflow, job):
+            if _in_app_subtree(directory) and not _job_requires_app_tests(workflow, job):
                 continue
             reached.setdefault(directory, set()).add((workflow, job))
 
     unreached = sorted(directories - set(reached))
 
-    # tests/app's own collection is empty here for an environment reason no
-    # workflow file can express: without pysepal 4, the directory always
-    # collects zero, whichever job's invocation names it. Excusing it -- and
-    # ONLY it, and ONLY when it is the sole problem -- keeps this from either
-    # passing vacuously (silently dropping the check) or failing spuriously
-    # (blaming the workflow files for a gap this interpreter cannot see past).
-    excused = None
-    if unreached == ["tests/app"] and not _HAVE_PYSEPAL_4:
-        excused = unreached.pop()
+    # tests/app (or anything nested under it) collects empty here for an
+    # environment reason no workflow file can express: without pysepal 4, the
+    # whole subtree always collects zero, whichever job's invocation names it.
+    # Excusing it -- and ONLY the app subtree, and ONLY when nothing OUTSIDE it
+    # is also unreached -- keeps this from either passing vacuously (silently
+    # dropping the check) or failing spuriously (blaming the workflow files
+    # for a gap this interpreter cannot see past).
+    app_subtree_unreached = [d for d in unreached if _in_app_subtree(d)]
+    other_unreached = [d for d in unreached if not _in_app_subtree(d)]
+
+    excused: list[str] = []
+    if not _HAVE_PYSEPAL_4 and app_subtree_unreached and not other_unreached:
+        excused = app_subtree_unreached
+        unreached = []
 
     assert unreached == [], (
         f"directories no job's pytest invocation collects a test from: {unreached}"
     )
 
-    if excused is not None:
+    if excused:
         pytest.skip(
-            f"pysepal.i18n is missing here, so {excused!r}'s own collection is empty "
+            f"pysepal.i18n is missing here, so {excused}'s own collection is empty "
             "no matter which job's invocation names it; this environment cannot "
             "verify whether it is reached. Run under an environment with pysepal>=4 "
             "(e.g. the sdg_app env) to check it."
