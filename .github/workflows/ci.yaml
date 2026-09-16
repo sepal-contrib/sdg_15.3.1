@@ -113,6 +113,50 @@ jobs:
             echo "It includes the parity harness and gates every PR - keep it fast."
           fi
 
+  app:
+    name: app layer (pysepal 4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # the conftest guard is silent by default so a pysepal-3 environment can still
+      # run the domain suite; here an empty collection is the exact failure this job
+      # exists to catch, so make it loud.
+      SDG_REQUIRE_APP_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: sepal_environment.yml
+          cache-environment: true
+
+      - name: Install the package, the app extra and test extras
+        shell: micromamba-shell {0}
+        # `[app,dev]`, not `[dev]`: the app extra carries the pysepal>=4 floor that
+        # `sepal_environment.yml`'s `pysepal<4` pin would otherwise leave in place.
+        # pip resolves the newer floor and replaces the conda-installed pysepal.
+        run: pip install -e ".[app,dev]"
+
+      - name: Run the app suite
+        shell: micromamba-shell {0}
+        run: |
+          set -euo pipefail
+          status=0
+          pytest tests/app --collect-only -q > collected-app.txt || status=$?
+          selected=$(awk '/::/ {n++} END {print n+0}' collected-app.txt)
+          if [ "$status" -eq 5 ] || [ "$selected" -eq 0 ]; then
+            cat collected-app.txt
+            echo "::error::tests/app collected nothing; the app suite is not running"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            cat collected-app.txt
+            echo "::error::collecting tests/app failed; nothing ran"
+            exit 1
+          fi
+          echo "selected ${selected} app tests"
+          pytest tests/app -q --durations=10
+
   lint:
     name: ruff + mypy --strict
     runs-on: ubuntu-latest

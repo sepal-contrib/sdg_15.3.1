@@ -27,6 +27,11 @@ dependencies = [
 [project.optional-dependencies]
 app = [
     "solara",
+    # `app/` imports `pysepal.i18n`, which is 4.0-only. Without this floor the extra
+    # installs cleanly against the `pysepal<4` that `sepal_environment.yml` pins and
+    # every module under `app/` fails to import -- which `tests/app/conftest.py` then
+    # converts into an empty collection rather than an error.
+    "pysepal>=4.0.0rc2",
     # tests/test_plots.py transcribes OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS
     # from the ipecharts 1.0.x sources; an unfloored install could resolve a later
     # release whose ECharts option schema no longer matches those rosters.

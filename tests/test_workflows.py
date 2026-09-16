@@ -16,7 +16,12 @@ on the PR gate, rather than discovered from a build that was passing all along:
   path -- which is measured here rather than enumerated, because the flags that can
   do it are an open list and the count they produce is not;
 * a lint or type command narrower than the one a developer runs locally;
-* a step whose failure does not fail the job.
+* a step whose failure does not fail the job;
+* a directory of tests no job's invocation reaches at all -- a job that counts the
+  WHOLE suite does not move when one whole subtree collects nothing, so
+  ``tests/app``'s 158 tests vanished behind its own conftest's silent
+  ``collect_ignore_glob`` for the entirety of the app layer's development,
+  unnoticed by every rule above.
 
 Everything below is derived from the workflow files themselves. The one name typed
 by hand is ``ci``: the job that predates this task, whose *Verify ee-api fork*,
@@ -30,6 +35,7 @@ exclusions someone wrote down, rather than rules quietly weakened for everybody.
 from __future__ import annotations
 
 import functools
+import importlib.util
 import re
 import shlex
 import subprocess
@@ -46,6 +52,11 @@ WORKFLOWS = sorted(WORKFLOW_DIR.glob("*.y*ml"))
 
 LEGACY_JOB = "ci"
 APP_LAYER_STEPS = ("Verify ee-api fork", "Verify notebook kernelspec", "Test UI notebook")
+
+# tests/app/conftest.py's own check, read the same way here: that file's silence
+# (and the RuntimeError its SDG_REQUIRE_APP_TESTS opt-in raises instead) both key
+# off this fact, and this module needs the same fact to know what it can measure.
+_HAVE_PYSEPAL_4 = importlib.util.find_spec("pysepal.i18n") is not None
 
 # `pytest -m <expr>`, in any of the three quotings a shell accepts.
 _MARKER_FLAG = re.compile(r"""-m\s+(?:"([^"]+)"|'([^']+)'|([^\s|)]+))""")
@@ -170,8 +181,19 @@ def _runs_the_selection(command: str) -> bool:
     pytest release from being wrong again. Anything not on the allowlist means this
     invocation does not count as the job's run, so adding a flag to a CI test command
     is a decision recorded here.
+
+    The one exception: a bare path naming a WHOLE known test directory, with only
+    reporting flags beside it. The `app` job runs one -- it cannot use the domain
+    suite's marker at all, since it needs a `pysepal>=4` floor the rest of the suite's
+    environment does not carry -- and running every test under a directory the
+    workflow names outright is as much "the selection" as a marker run is.
+    `--collect-only` is deliberately not among the flags this allows beside it, so
+    the app job's own counting guard still fails this the way every other one does.
     """
     arguments = list(_arguments(command))
+    selection = _selection_arguments(tuple(arguments))
+    if len(selection) == 1 and selection[0] in _test_directories():
+        return True
     while arguments:
         argument = arguments.pop(0)
         if argument == "-m":  # the marker expression, measured by the rules below
@@ -184,8 +206,10 @@ def _runs_the_selection(command: str) -> bool:
 
 
 @functools.cache
-def _collected(arguments: tuple[str, ...]) -> int:
-    """How many tests ``pytest <arguments>`` selects, from a clean subprocess."""
+def _collect(arguments: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+    """``pytest <arguments> --collect-only`` in a clean subprocess, cached so every
+    rule below that measures a selection reads off the same run rather than
+    spawning its own."""
     proc = subprocess.run(
         [
             sys.executable,
@@ -204,7 +228,45 @@ def _collected(arguments: tuple[str, ...]) -> int:
     )
     # 0 = tests collected, 5 = none collected; anything else is a collection error
     assert proc.returncode in (0, 5), f"{arguments} did not collect:\n{proc.stdout}{proc.stderr}"
-    return sum(1 for line in proc.stdout.splitlines() if "::" in line)
+    return proc
+
+
+def _collected(arguments: tuple[str, ...]) -> int:
+    """How many tests ``pytest <arguments>`` selects."""
+    return sum(1 for line in _collect(arguments).stdout.splitlines() if "::" in line)
+
+
+def _collected_directories(arguments: tuple[str, ...]) -> frozenset[str]:
+    """The repo-root-relative directories ``pytest <arguments>`` collects at least
+    one test from, read off each collected node id's file half."""
+    return frozenset(
+        Path(line.split("::", 1)[0]).parent.as_posix()
+        for line in _collect(arguments).stdout.splitlines()
+        if "::" in line
+    )
+
+
+@functools.cache
+def _test_directories() -> frozenset[str]:
+    """Every directory under ``tests/`` that holds at least one ``test_*.py``
+    module, relative to the repo root."""
+    return frozenset(
+        p.parent.relative_to(REPO_ROOT).as_posix() for p in (REPO_ROOT / "tests").rglob("test_*.py")
+    )
+
+
+def _job_requires_app_tests(workflow: str, job: str) -> bool:
+    """Whether ``job`` (in the workflow file named ``workflow``) declares
+    ``tests/app/conftest.py``'s loud opt-in in its own ``env:``.
+
+    The conftest guard's silence keys on ``pysepal.i18n``'s importability, not on
+    this flag -- so a job would appear to collect ``tests/app`` whenever the
+    interpreter running THIS test happens to have pysepal 4, whether or not that
+    job's own workflow environment does. This flag is the one thing the workflow
+    file itself commits to (the guard raises without it), so a directory this
+    fragile is credited to a job only when the job has made that commitment.
+    """
+    return _jobs(WORKFLOW_DIR / workflow)[job].get("env", {}).get("SDG_REQUIRE_APP_TESTS") == "1"
 
 
 def test_the_workflow_glob_found_the_workflows() -> None:
@@ -215,7 +277,7 @@ def test_the_workflow_glob_found_the_workflows() -> None:
 
 
 def test_ci_yaml_declares_the_pr_gate_jobs() -> None:
-    assert sorted(_jobs(WORKFLOW_DIR / "ci.yaml")) == ["ci", "domain", "lint"]
+    assert sorted(_jobs(WORKFLOW_DIR / "ci.yaml")) == ["app", "ci", "domain", "lint"]
 
 
 def test_the_nightly_workflow_is_scheduled_and_dispatchable() -> None:
@@ -288,18 +350,78 @@ def test_no_pytest_invocation_narrows_what_its_marker_selects() -> None:
 
     The `ci` job is exempt: ``pytest --nbmake ui.ipynb`` names the notebook on
     purpose, and it is the app-layer migration's to retire.
+
+    A command that selects a WHOLE known test directory, ``--collect-only`` aside,
+    is exempt for a different reason: it has nothing left to narrow, and
+    ``_marker_pair`` finds no ``-m`` in it, so "whole" would otherwise be the
+    entire suite -- comparing the `app` job's ``tests/app`` line against that would
+    flag every directory-scoped job as narrowing, forever.
+    ``test_every_test_directory_is_reached_by_some_job`` is what actually checks a
+    directory-scoped job reaches its directory.
     """
     problems = []
     for workflow, job, command in _pytest_commands():
         if job == LEGACY_JOB:
             continue
         arguments = _selection_arguments(_arguments(command))
+        without_collect_only = tuple(a for a in arguments if a not in ("--collect-only", "--co"))
+        if len(without_collect_only) == 1 and without_collect_only[0] in _test_directories():
+            continue
         selected = _collected(arguments)
         whole = _collected(_marker_pair(arguments))
         if selected != whole:
             problems.append(f"{workflow}:{job}: `{command.strip()}` selects {selected} of {whole}")
 
     assert problems == [], problems
+
+
+def test_every_test_directory_is_reached_by_some_job() -> None:
+    """A directory no job collects is a suite that cannot fail.
+
+    The module's other rules all ask a question about a JOB -- does it run its
+    selection, is it switched off, can a step fail quietly. This one asks the
+    question none of them did, and the one that was actually false: is every
+    directory of tests in this repo reached at all? `tests/app` was not, for the
+    whole of the app layer's development. `sepal_environment.yml` pins
+    `pysepal<4`, `app/` imports the 4.0-only `pysepal.i18n`, and
+    `tests/app/conftest.py` turns the resulting ImportError into an empty
+    collection -- so 158 tests vanished without moving the count the `domain`
+    job asserts, which is over the whole selection and still saw ~1057.
+    """
+    directories = _test_directories()
+    reached: dict[str, set[tuple[str, str]]] = {}
+    for workflow, job, command in _pytest_commands():
+        if job == LEGACY_JOB:
+            continue
+        arguments = _selection_arguments(_arguments(command))
+        for directory in _collected_directories(arguments):
+            if directory == "tests/app" and not _job_requires_app_tests(workflow, job):
+                continue
+            reached.setdefault(directory, set()).add((workflow, job))
+
+    unreached = sorted(directories - set(reached))
+
+    # tests/app's own collection is empty here for an environment reason no
+    # workflow file can express: without pysepal 4, the directory always
+    # collects zero, whichever job's invocation names it. Excusing it -- and
+    # ONLY it, and ONLY when it is the sole problem -- keeps this from either
+    # passing vacuously (silently dropping the check) or failing spuriously
+    # (blaming the workflow files for a gap this interpreter cannot see past).
+    excused = None
+    if unreached == ["tests/app"] and not _HAVE_PYSEPAL_4:
+        excused = unreached.pop()
+
+    assert unreached == [], (
+        f"directories no job's pytest invocation collects a test from: {unreached}"
+    )
+
+    if excused is not None:
+        pytest.skip(
+            f"pysepal.i18n is missing here, so {excused!r}'s own collection is empty "
+            "no matter which job's invocation names it; this environment cannot "
+            "verify whether it is reached. Run under an environment with pysepal>=4 "
+            "(e.g. the sdg_app env) to check it."
+        )
 
 
 def test_no_job_or_step_is_switched_off_by_a_condition() -> None:

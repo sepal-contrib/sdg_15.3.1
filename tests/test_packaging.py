@@ -14,8 +14,8 @@ from conftest import REPO_ROOT
 # Distributions declared here that no scanned import currently needs. Empty
 # today -- every one of `earthengine-api`/`pandas`/`geopandas`/`anyascii`/
 # `pygaul` is imported somewhere under `sdg1531`. A future entry needs a
-# reason written down beside it, the way `pysepal`'s absence from the `app`
-# extra is written down below.
+# reason written down beside it, the way the `app` extra's `pysepal` and
+# `ipecharts` floors each carry one below.
 _DECLARED_BUT_NOT_IMPORTED: frozenset[str] = frozenset()
 
 
@@ -174,9 +174,9 @@ def test_dev_and_app_extras_exist() -> None:
     # Exact equality, not a substring check: tests/test_plots.py transcribes
     # OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS from the ipecharts 1.0.x
     # sources, so a dropped version floor here is a real regression -- and one a
-    # substring check already missed once. pysepal is installed from the editable
-    # checkout, not pinned here, so it is deliberately absent from this list.
-    assert extras["app"] == ["solara", "ipecharts>=1.0.8"]
+    # substring check already missed once. The pysepal floor is load-bearing too:
+    # below 4.0.0rc2 `pysepal.i18n` does not exist, and `app/` imports it.
+    assert extras["app"] == ["solara", "pysepal>=4.0.0rc2", "ipecharts>=1.0.8"]
 
 
 def test_only_the_domain_and_app_packages_are_discovered() -> None:
