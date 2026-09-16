@@ -75,6 +75,13 @@
     "shown": "Added {count} layers to the map",
     "build_first": "Build the indicator first."
   },
+  "transitions": {
+    "title": "Transitions",
+    "description": "Land cover transitions between the start and end years.",
+    "compute": "Compute transitions",
+    "computed": "Transitions ready",
+    "build_first": "Build the indicator first."
+  },
   "results": {
     "title": "Results",
     "description": "Class areas per land cover type.",

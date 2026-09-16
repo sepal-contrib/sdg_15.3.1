@@ -36,6 +36,7 @@ from app.message import messages, msg
 from app.panels.exports import ExportsPanel
 from app.panels.map_layers import MapLayersPanel
 from app.panels.results import ResultsPanel
+from app.panels.transitions import TransitionsPanel
 from app.panels.zonal import ZonalPanel
 from app.steps.aoi import AoiStep
 from app.steps.land_cover import LandCoverStep
@@ -174,6 +175,12 @@ def Sdg1531App() -> None:
                 "icon": "mdi-layers",
                 "content": [MapLayersPanel(maps=maps, map_=sepal_map, gee_interface=gee_interface)],
                 "description": msg("layers.description"),
+            },
+            {
+                "title": msg("transitions.title"),
+                "icon": "mdi-transit-transfer",
+                "content": [TransitionsPanel(maps=maps, ctx=ctx, gee_interface=gee_interface)],
+                "description": msg("transitions.description"),
             },
             {
                 "title": msg("results.title"),
