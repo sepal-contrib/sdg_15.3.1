@@ -155,7 +155,13 @@ jobs:
             exit 1
           fi
           echo "selected ${selected} app tests"
-          pytest tests/app -q --durations=10
+          # tests/test_workflows.py's directory-reachability rule can only evaluate
+          # its tests/app claim where pysepal>=4 is importable -- this job is the
+          # only place in CI that is true, so it runs the module here too, on top
+          # of tests/app itself. The count above already proved tests/app on its
+          # own is non-empty, so folding test_workflows.py's own tests into one
+          # combined count cannot hide an empty tests/app behind them.
+          pytest tests/app tests/test_workflows.py -q --durations=10
 
   lint:
     name: ruff + mypy --strict

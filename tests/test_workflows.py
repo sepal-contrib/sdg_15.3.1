@@ -182,17 +182,18 @@ def _runs_the_selection(command: str) -> bool:
     invocation does not count as the job's run, so adding a flag to a CI test command
     is a decision recorded here.
 
-    The one exception: a bare path naming a WHOLE known test directory, with only
-    reporting flags beside it. The `app` job runs one -- it cannot use the domain
-    suite's marker at all, since it needs a `pysepal>=4` floor the rest of the suite's
-    environment does not carry -- and running every test under a directory the
-    workflow names outright is as much "the selection" as a marker run is.
-    `--collect-only` is deliberately not among the flags this allows beside it, so
-    the app job's own counting guard still fails this the way every other one does.
+    The one exception: bare paths naming only WHOLE known test targets (see
+    `_names_only_whole_known_targets`), with only reporting flags beside them. The
+    `app` job runs two -- it cannot use the domain suite's marker at all, since it
+    needs a `pysepal>=4` floor the rest of the suite's environment does not carry --
+    and running every test under trees the workflow names outright is as much "the
+    selection" as a marker run is. `--collect-only` is deliberately not among the
+    flags this allows beside them, so the app job's own counting guard still fails
+    this the way every other one does.
     """
     arguments = list(_arguments(command))
     selection = _selection_arguments(tuple(arguments))
-    if len(selection) == 1 and selection[0] in _test_directories():
+    if _names_only_whole_known_targets(selection):
         return True
     while arguments:
         argument = arguments.pop(0)
@@ -252,6 +253,37 @@ def _test_directories() -> frozenset[str]:
     module, relative to the repo root."""
     return frozenset(
         p.parent.relative_to(REPO_ROOT).as_posix() for p in (REPO_ROOT / "tests").rglob("test_*.py")
+    )
+
+
+@functools.cache
+def _top_level_test_modules() -> frozenset[str]:
+    """Every ``test_*.py`` module directly under ``tests/`` (not in a
+    subdirectory), relative to the repo root.
+
+    Naming one of these outright -- ``tests/test_workflows.py``, say -- is as
+    much a deliberately-chosen, unnarrowed target as naming a whole test
+    directory is: there is no larger tree it could have named instead and
+    didn't. A file inside a SUBdirectory does not get this benefit of the
+    doubt -- ``tests/app/test_state.py`` could always have named the whole of
+    ``tests/app``, so it is still measured against that as a possible
+    narrowing.
+    """
+    return frozenset(
+        p.relative_to(REPO_ROOT).as_posix() for p in (REPO_ROOT / "tests").glob("test_*.py")
+    )
+
+
+def _names_only_whole_known_targets(selection: tuple[str, ...]) -> bool:
+    """Whether every token in ``selection`` is, on its own, either a whole known
+    test directory or a whole top-level test module -- and there is at least
+    one. The `app` job's ``tests/app tests/test_workflows.py`` line is two such
+    tokens; its ``tests/app`` alone is one. Neither has anything left to narrow:
+    each token names the largest tree it could have named, so this is as much
+    "the selection" as a marker run is.
+    """
+    return bool(selection) and all(
+        token in _test_directories() or token in _top_level_test_modules() for token in selection
     )
 
 
@@ -351,13 +383,15 @@ def test_no_pytest_invocation_narrows_what_its_marker_selects() -> None:
     The `ci` job is exempt: ``pytest --nbmake ui.ipynb`` names the notebook on
     purpose, and it is the app-layer migration's to retire.
 
-    A command that selects a WHOLE known test directory, ``--collect-only`` aside,
-    is exempt for a different reason: it has nothing left to narrow, and
-    ``_marker_pair`` finds no ``-m`` in it, so "whole" would otherwise be the
-    entire suite -- comparing the `app` job's ``tests/app`` line against that would
-    flag every directory-scoped job as narrowing, forever.
-    ``test_every_test_directory_is_reached_by_some_job`` is what actually checks a
-    directory-scoped job reaches its directory.
+    A command that selects nothing but WHOLE known test targets (see
+    `_names_only_whole_known_targets`), ``--collect-only`` aside, is exempt for a
+    different reason: it has nothing left to narrow, and ``_marker_pair`` finds no
+    ``-m`` in it, so "whole" would otherwise be the entire suite -- comparing the
+    `app` job's ``tests/app tests/test_workflows.py`` line against that would flag
+    every directory-scoped job as narrowing, forever, including a job that runs
+    MORE than one such target (which this compares as one selection, not the sum
+    of two). ``test_every_test_directory_is_reached_by_some_job`` is what actually
+    checks a directory-scoped job reaches its directory.
     """
     problems = []
     for workflow, job, command in _pytest_commands():
@@ -365,7 +399,7 @@ def test_no_pytest_invocation_narrows_what_its_marker_selects() -> None:
             continue
         arguments = _selection_arguments(_arguments(command))
         without_collect_only = tuple(a for a in arguments if a not in ("--collect-only", "--co"))
-        if len(without_collect_only) == 1 and without_collect_only[0] in _test_directories():
+        if _names_only_whole_known_targets(without_collect_only):
             continue
         selected = _collected(arguments)
         whole = _collected(_marker_pair(arguments))
