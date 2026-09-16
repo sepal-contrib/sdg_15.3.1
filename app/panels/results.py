@@ -4,10 +4,10 @@ The panel fetches, the domain decodes and builds the chart option, ipecharts
 renders it. No statistics arithmetic lives here.
 
 Follows ``docs/guides/solara-gee-patterns.md``'s Async Button Convention: the
-task snapshots ``maps.value``/``ctx.value`` at click time instead of reading
-them live, returns an outcome instead of mutating reactive state from inside
-itself, and a ``solara.use_effect`` with the full dependency list mirrors that
-outcome into the chart option and a toast.
+task snapshots ``maps``/``ctx`` at click time instead of reading them live,
+returns an outcome instead of mutating reactive state from inside itself, and
+a ``solara.use_effect`` with the full dependency list mirrors that outcome
+into the chart option and a toast.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ async def _compute(
     """Fetch one snapshot of class areas and build the chart option from it.
 
     ``request`` is a snapshot taken at click time (``ResultsPanel.start``),
-    never a live read of ``maps.value``/``ctx.value`` -- the guide's rule
+    never a live read of ``maps``/``ctx`` -- the guide's rule
     against reading reactive inputs after a task has started.
     """
     with notifications.track(msg("results.compute"), total_steps=2) as task:
@@ -75,14 +75,14 @@ async def _compute(
 
 @solara.component
 def ResultsPanel(
-    maps: solara.Reactive[IndicatorMaps | None],
-    ctx: solara.Reactive[ExecutionContext | None],
+    maps: IndicatorMaps | None,
+    ctx: ExecutionContext | None,
     gee_interface: Any,
 ) -> None:
     notifications = use_notifications()
     option: solara.Reactive[dict[str, Any] | None] = solara.use_reactive(None)
-    current_maps = maps.value
-    current_ctx = ctx.value
+    current_maps = maps
+    current_ctx = ctx
 
     task = solara.lab.use_task(
         _compute, dependencies=None, raise_error=False, prefer_threaded=False
@@ -115,14 +115,14 @@ def ResultsPanel(
     )
 
     def start() -> None:
-        # Snapshot both reactives here, at click time -- not inside `_compute`,
-        # which the guide's rule bans from reading live reactive inputs once it
-        # is running as a background task. `maps` and `ctx` are set by two
-        # separate assignments in `RunStep.on_build`, so a render can observe
-        # one set with the other still `None`; `start` is only ever wired to a
-        # button rendered when both are already not-`None` below, but the guard
-        # is repeated so the closure stays total rather than assuming its
-        # caller's care.
+        # Snapshot both here, at click time -- not inside `_compute`, which the
+        # guide's rule bans from reading live reactive inputs once it is running
+        # as a background task. `maps` and `ctx` come from the same `BuildOutcome`
+        # (`build_outcome` sets both together, never one without the other), so
+        # this can't observe one set with the other still `None` in practice --
+        # `start` is only ever wired to a button rendered when both are already
+        # not-`None` below, but the guard is repeated so the closure stays total
+        # rather than assuming its caller's care.
         if current_maps is not None and current_ctx is not None:
             task(
                 gee_interface,

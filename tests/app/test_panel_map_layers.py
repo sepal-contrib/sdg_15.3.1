@@ -144,9 +144,8 @@ def test_the_panel_renders_with_no_maps(monkeypatch):
     """Shown before Build has run."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
-    maps = solara.reactive(None)
     box, rc = solara.render(
-        MapLayersPanel(maps=maps, map_=None, gee_interface=None), handle_error=False
+        MapLayersPanel(maps=None, map_=None, gee_interface=None), handle_error=False
     )
     assert rc is not None
     # Not `layers.description` too: that copy lives once, in `page.py`'s
@@ -197,9 +196,8 @@ def test_clicking_show_draws_every_layer_and_reports_the_real_count(monkeypatch)
     fake_map = _RecordingMap()
 
     async def main():
-        maps = solara.reactive(_FakeMaps(_THREE_LAYERS))
         box, rc = solara.render(
-            MapLayersPanel(maps=maps, map_=fake_map, gee_interface=None),
+            MapLayersPanel(maps=_FakeMaps(_THREE_LAYERS), map_=fake_map, gee_interface=None),
             handle_error=False,
         )
         assert rc is not None
@@ -240,9 +238,8 @@ def test_every_layer_gets_a_stable_key_so_a_second_click_replaces_not_accumulate
     fake_map = _RecordingMap()
 
     async def main():
-        maps = solara.reactive(_FakeMaps(_TWO_LAYERS))
         box, rc = solara.render(
-            MapLayersPanel(maps=maps, map_=fake_map, gee_interface=None),
+            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
             handle_error=False,
         )
         assert rc is not None
@@ -268,52 +265,23 @@ def test_every_layer_gets_a_stable_key_so_a_second_click_replaces_not_accumulate
     assert second_keys == first_keys
 
 
-def test_the_task_uses_the_snapshot_taken_at_click_time_not_a_live_read(monkeypatch):
-    """A Build that lands WHILE Show on map is still running must not change
-    what that in-flight click draws -- the guide's rule against reading a
-    live reactive input from inside a task after it has started."""
-    fake = _FakeNotifier()
-    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
-
-    async def main():
-        maps = solara.reactive(_FakeMaps(_TWO_LAYERS))
-
-        def _land_a_new_build_mid_flight() -> None:
-            maps.value = _FakeMaps({IndicatorLayer.PRODUCTIVITY: _FakeLayer("productivity")})
-
-        fake_map = _RecordingMap(on_first_call=_land_a_new_build_mid_flight)
-        box, rc = solara.render(
-            MapLayersPanel(maps=maps, map_=fake_map, gee_interface=None),
-            handle_error=False,
-        )
-        assert rc is not None
-        button = find_widget(box, ipyvuetify.Btn)
-        assert button is not None
-        button.click()
-        assert await _wait_for(lambda: fake.successes or fake.errors)
-        return fake_map, maps
-
-    fake_map, maps = asyncio.run(main())
-
-    # The click drew the snapshot taken when it started, not the maps that
-    # landed mid-flight, and the toast's count agrees with that snapshot.
-    assert {call["name"] for call in fake_map.calls} == {"land_cover", "soc"}
-    assert fake.successes == [msg("layers.shown", count=2)]
-    # The mutation itself DID take effect -- proving this is a real snapshot,
-    # not a coincidence of maps.value never actually changing.
-    assert list(maps.value.layers()) == [IndicatorLayer.PRODUCTIVITY]
-
-
 def test_the_layers_snapshot_is_taken_synchronously_inside_the_click_handler(monkeypatch):
-    """The stronger, timing-independent version of the test above: a task
-    scheduled with ``solara.lab.use_task`` never runs any of its body until
-    the event loop is given a turn, so if ``.layers()`` is read where the
-    guide requires -- inside the synchronous click handler, before ``task(...)``
-    schedules anything -- it has already been called exactly once by the time
+    """``maps`` is a plain value now, not a reactive a build can mutate out
+    from under a running task -- Task 20 removed the reactive that made a
+    live-read even possible, so the click-time-snapshot concern this used to
+    share a module with (a Build landing mid-flight) cannot recur at this
+    panel any more; see ``tests/app/test_page.py``'s staleness regression
+    test for where that guarantee now lives (the shared spec, one level up).
+
+    What is still worth pinning here: a task scheduled with
+    ``solara.lab.use_task`` never runs any of its body until the event loop
+    is given a turn, so if ``.layers()`` is read where the guide requires --
+    inside the synchronous click handler, before ``task(...)`` schedules
+    anything -- it has already been called exactly once by the time
     ``button.click()`` returns, with no ``await`` in between. A version that
-    instead handed the reactive (or the whole ``IndicatorMaps``) into the task
-    and called ``.layers()`` from inside it would still show zero calls here,
-    because that task has not had a turn to run yet.
+    instead handed the whole ``IndicatorMaps`` into the task and called
+    ``.layers()`` from inside it would still show zero calls here, because
+    that task has not had a turn to run yet.
     """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
@@ -329,10 +297,9 @@ def test_the_layers_snapshot_is_taken_synchronously_inside_the_click_handler(mon
 
     async def main() -> int:
         counting_maps = _CountingMaps(_TWO_LAYERS)
-        maps = solara.reactive(counting_maps)
         fake_map = _RecordingMap()
         box, rc = solara.render(
-            MapLayersPanel(maps=maps, map_=fake_map, gee_interface=None),
+            MapLayersPanel(maps=counting_maps, map_=fake_map, gee_interface=None),
             handle_error=False,
         )
         assert rc is not None
@@ -359,9 +326,8 @@ def test_a_layer_that_fails_reports_the_error_and_no_success(monkeypatch):
     fake_map = _RecordingMap(fail_on="soc")
 
     async def main():
-        maps = solara.reactive(_FakeMaps(_TWO_LAYERS))
         box, rc = solara.render(
-            MapLayersPanel(maps=maps, map_=fake_map, gee_interface=None),
+            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
             handle_error=False,
         )
         assert rc is not None

@@ -128,10 +128,11 @@ def ProductivityStep(spec: solara.Reactive[RunSpec]) -> None:
     # every sensor rung except Terra NPP narrows `spec.threshold` with
     # `require_float` and raises `SpecError` when it is None (engine/integration.py
     # EXPECTED_DIVERGENCES note 1), while `validate()` has no rule for it. So with
-    # no control here, `is_runnable()` returns True, the Build button is enabled,
-    # and pressing it fails for every sensor but Terra NPP. `_seed_threshold` above
-    # is what actually closes that gap; this fallback only keeps the display in
-    # sync during the one render before the effect commits it.
+    # no control here, `is_runnable()` returns True but `build_outcome()` refuses
+    # for every sensor but Terra NPP -- exactly the narrower case its own `except`
+    # exists for (see `app/steps/run.py`). `_seed_threshold` above is what
+    # actually closes that gap; this fallback only keeps the display in sync
+    # during the one render before the effect commits it.
     solara.SliderFloat(
         label=msg("productivity.threshold"),
         value=current.threshold if current.threshold is not None else 0.0,

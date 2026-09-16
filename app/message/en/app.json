@@ -61,11 +61,10 @@
     "end": "End year"
   },
   "run": {
-    "description": "Build the indicator from the configuration above.",
+    "description": "Choose the overall period the indicator runs over; its status appears below.",
     "start_year": "Start year",
     "end_year": "End year",
-    "build": "Build",
-    "built": "Built {count} layers",
+    "ready": { "one": "Ready: {count} layer", "other": "Ready: {count} layers" },
     "blocked": "Fix the problems above before building."
   },
   "layers": {

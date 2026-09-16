@@ -131,10 +131,8 @@ def test_the_panel_renders_before_a_run(monkeypatch):
     """Shown before Build has run."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.zonal.use_notifications", lambda: fake)
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
     box, rc = solara.render(
-        ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=None),
+        ZonalPanel(maps=None, ctx=None, gee_interface=None, sepal_client=None),
         handle_error=False,
     )
     assert rc is not None
@@ -147,15 +145,19 @@ def test_the_panel_renders_before_a_run(monkeypatch):
 
 
 def test_the_panel_waits_for_both_maps_and_context(monkeypatch):
-    """``maps`` and ``ctx`` land via two separate assignments in
-    ``RunStep.on_build``, so a render can observe one set with the other
-    still ``None``. The panel must not show Compute until both have landed."""
+    """``maps`` and ``ctx`` land together, from one ``build_outcome`` call --
+    but they are still two separate fields on that ``BuildOutcome``, so
+    nothing stops a caller handing in one without the other. The panel must
+    not show Compute until both have landed."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.zonal.use_notifications", lambda: fake)
-    maps = solara.reactive(_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=300)))
-    ctx = solara.reactive(None)
     box, rc = solara.render(
-        ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=None),
+        ZonalPanel(
+            maps=_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=300)),
+            ctx=None,
+            gee_interface=None,
+            sepal_client=None,
+        ),
         handle_error=False,
     )
     assert rc is not None
@@ -193,10 +195,13 @@ def test_clicking_compute_fetches_with_the_zonal_scale_not_the_analysis_scale(mo
     monkeypatch.setattr("app.panels.zonal.fetch_zonal_areas", fake_fetch)
 
     async def main():
-        maps = solara.reactive(maps_obj)
-        ctx = solara.reactive(_FakeCtx(zones))
         box, rc = solara.render(
-            ZonalPanel(maps=maps, ctx=ctx, gee_interface="the-interface", sepal_client=None),
+            ZonalPanel(
+                maps=maps_obj,
+                ctx=_FakeCtx(zones),
+                gee_interface="the-interface",
+                sepal_client=None,
+            ),
             handle_error=False,
         )
         assert rc is not None
@@ -234,10 +239,13 @@ def test_a_failed_compute_reports_the_error_and_shows_no_table(monkeypatch):
     monkeypatch.setattr("app.panels.zonal.fetch_zonal_areas", failing_fetch)
 
     async def main():
-        maps = solara.reactive(_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100)))
-        ctx = solara.reactive(_FakeCtx(object()))
         box, rc = solara.render(
-            ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=None),
+            ZonalPanel(
+                maps=_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100)),
+                ctx=_FakeCtx(object()),
+                gee_interface=None,
+                sepal_client=None,
+            ),
             handle_error=False,
         )
         assert rc is not None
@@ -254,15 +262,22 @@ def test_a_failed_compute_reports_the_error_and_shows_no_table(monkeypatch):
     assert (msg("zonal.download"),) not in _buttons(box)
 
 
-def test_the_compute_task_uses_the_snapshot_taken_at_click_time_not_a_live_read(monkeypatch):
-    """A Build that lands WHILE Compute is still running must not change
-    what that in-flight click fetches -- the guide's rule against reading a
-    live reactive input from inside a task after it has started."""
+def test_the_compute_task_receives_the_click_snapshot_not_a_later_read(monkeypatch):
+    """``maps`` is a plain value now, not a reactive a later build could
+    mutate out from under a running task -- Task 20 removed the reactive
+    that made a live-read even possible (the staleness the panel used to be
+    vulnerable to lived one level up, in ``page.py``; see
+    ``tests/app/test_page.py``'s staleness regression test for where that
+    guarantee now lives). What is still worth pinning here is that
+    ``_compute`` receives the SAME object ``ZonalPanel`` was rendered with,
+    snapshotted into ``start_compute()`` at click time -- not, say, a value
+    it re-reads from some other source at call time.
+    """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.zonal.use_notifications", lambda: fake)
 
     calls: list[Any] = []
-    first_maps = _FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100))
+    the_maps = _FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100))
 
     async def recording_fetch(gee_interface, maps, zones, *, scale):
         calls.append(maps)
@@ -272,22 +287,20 @@ def test_the_compute_task_uses_the_snapshot_taken_at_click_time_not_a_live_read(
     monkeypatch.setattr("app.panels.zonal.fetch_zonal_areas", recording_fetch)
 
     async def main():
-        maps = solara.reactive(first_maps)
-        ctx = solara.reactive(_FakeCtx(object()))
         box, rc = solara.render(
-            ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=None),
+            ZonalPanel(
+                maps=the_maps, ctx=_FakeCtx(object()), gee_interface=None, sepal_client=None
+            ),
             handle_error=False,
         )
         assert rc is not None
         button = _buttons(box)[(msg("zonal.compute"),)]
-        button.click()  # fully synchronous snapshot, before any await happens
-        # Land a new build mid-flight -- must not change what this click reads.
-        maps.value = _FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=999))
+        button.click()
         assert await _wait_for(lambda: fake.successes or fake.errors)
 
     asyncio.run(main())
 
-    assert calls == [first_maps]
+    assert calls == [the_maps]
     assert fake.successes == [msg("zonal.ready")]
 
 
@@ -314,10 +327,13 @@ def test_clicking_download_writes_the_zip_bytes_with_overwrite_and_the_right_tar
     sepal_client = _FakeSepalClient()
 
     async def main():
-        maps = solara.reactive(_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100)))
-        ctx = solara.reactive(_FakeCtx(object()))
         box, rc = solara.render(
-            ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=sepal_client),
+            ZonalPanel(
+                maps=_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100)),
+                ctx=_FakeCtx(object()),
+                gee_interface=None,
+                sepal_client=sepal_client,
+            ),
             handle_error=False,
         )
         assert rc is not None
@@ -360,10 +376,13 @@ def test_a_failed_download_reports_the_error_and_does_not_pretend_to_succeed(mon
     sepal_client = _FakeSepalClient()
 
     async def main():
-        maps = solara.reactive(_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100)))
-        ctx = solara.reactive(_FakeCtx(object()))
         box, rc = solara.render(
-            ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=sepal_client),
+            ZonalPanel(
+                maps=_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=100)),
+                ctx=_FakeCtx(object()),
+                gee_interface=None,
+                sepal_client=sepal_client,
+            ),
             handle_error=False,
         )
         assert rc is not None

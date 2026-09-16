@@ -1,24 +1,34 @@
-"""The Run step: the overall period, whole-spec problems, and Build.
+"""The Run step: the overall period, and what the current spec derives.
 
-Build is SYNCHRONOUS by design. ``resolve()`` and ``build_indicator_maps()``
-construct ``ee`` graphs and make no request -- the domain's own suite proves it,
-running entirely offline against a mock credential. So this needs no
-``use_task``: it produces maps, or it raises -- ``SpecError`` for most refusals,
-but not only that: an overall period with a start and no end yet (a state the
-two year Selects below reach naturally, one endpoint at a time) makes
-``resolve()`` raise a bare ``ValueError`` instead (see ``app.state.is_runnable``'s
-docstring). ``on_build`` below and ``is_runnable`` both treat any exception from
-``resolve()`` as a build that cannot proceed, rather than trusting ``SpecError``
-to be the only shape it takes.
+Deriving the maps and the context is pure ``ee`` graph construction -- no
+network, no task, no spinner. ``resolve()`` and ``build_indicator_maps()``
+make no request; the domain's own suite proves it, running entirely offline
+against a mock credential (``tests/app/test_step_run.py``'s
+``test_build_touches_no_network``). ``build_outcome`` below runs this on
+every render (``app/page.py`` wraps it in ``use_memo``, keyed on the spec)
+rather than behind a button: a button guarding a 19ms pure function guards
+nothing, and a stored copy behind a reactive is exactly what let a stale
+build survive a later spec edit -- the whole reason this step no longer
+takes writable ``maps``/``ctx`` reactives at all.
+
+``build_outcome`` is total: it never raises, for any spec. ``is_runnable`` is
+asked first so an ordinary half-filled form produces a plain empty outcome
+rather than an error message the user cannot act on -- this step already
+renders ``problems_for("run", ...)`` and ``msg("run.blocked")`` for that
+state. The ``except`` in ``build_outcome`` is for the narrower case
+``is_runnable`` cannot see: ``resolve()`` succeeds and
+``build_indicator_maps()`` still refuses (``spec.threshold`` unresolved is
+the standing example -- ``validate()`` has no rule for it). That refusal used
+to surface as an error toast from the Build button's handler; it must stay
+visible now that there is no handler to catch it.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import date
 
 import solara
-from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
 from app.state import is_runnable, problems_for
@@ -28,7 +38,7 @@ from sdg1531.engine.indicator import IndicatorMaps, build_indicator_maps
 from sdg1531.resolve import resolve
 from sdg1531.spec import Period, RunSpec
 
-__all__ = ("RunStep", "build")
+__all__ = ("BuildOutcome", "RunStep", "build", "build_outcome")
 
 
 def build(spec: RunSpec) -> tuple[IndicatorMaps, ExecutionContext]:
@@ -45,14 +55,42 @@ def build(spec: RunSpec) -> tuple[IndicatorMaps, ExecutionContext]:
     return build_indicator_maps(resolved, ctx), ctx
 
 
-@solara.component
-def RunStep(
-    spec: solara.Reactive[RunSpec],
-    maps: solara.Reactive[IndicatorMaps | None],
-    ctx: solara.Reactive[ExecutionContext | None],
-) -> None:
-    notifications = use_notifications()
+@dataclass(frozen=True, slots=True)
+class BuildOutcome:
+    """What the spec currently derives: maps and context, or the reason it does not.
 
+    Carries the error text rather than raising, because this is computed during
+    render now, not inside a button handler that could catch and toast. A spec
+    the user is halfway through editing is the normal case, not an exception.
+    """
+
+    maps: IndicatorMaps | None = None
+    ctx: ExecutionContext | None = None
+    error: str | None = None
+
+
+def build_outcome(spec: RunSpec) -> BuildOutcome:
+    """Derive the whole run from the spec. Total: never raises, for any spec.
+
+    ``is_runnable`` is asked first so an ordinary half-filled form produces a
+    plain empty outcome rather than an error message the user cannot act on --
+    the Run step already renders ``problems_for("run", ...)`` and
+    ``msg("run.blocked")`` for that state. The ``except`` below is for the
+    narrower case ``is_runnable`` cannot see: ``resolve()`` succeeds and
+    ``build_indicator_maps()`` still refuses. That path used to surface as an
+    error toast from the Build button's handler; it must stay visible.
+    """
+    if not is_runnable(spec):
+        return BuildOutcome()
+    try:
+        maps, ctx = build(spec)
+    except Exception as error:  # see `is_runnable`'s own catch-all
+        return BuildOutcome(error=str(error))
+    return BuildOutcome(maps=maps, ctx=ctx)
+
+
+@solara.component
+def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
     solara.Markdown(msg("run.description"))
 
     for problem in problems_for("run", spec.value):
@@ -88,26 +126,9 @@ def RunStep(
         ),
     )
 
-    runnable = is_runnable(spec.value)
-
-    def on_build() -> None:
-        # Not `except SpecError`: `disabled=not runnable` above keeps a normal
-        # click from ever reaching an unresolvable spec, but the guard here
-        # still has to be as total as `is_runnable` is -- resolve() can raise
-        # a bare ValueError, not just SpecError (see this module's docstring).
-        try:
-            maps.value, ctx.value = build(spec.value)
-        except Exception as error:
-            notifications.error(str(error))
-            return
-        notifications.success(msg("run.built", count=len(maps.value.layers())))
-
-    solara.Button(
-        label=msg("run.build"),
-        on_click=on_build,
-        disabled=not runnable,
-        color="primary",
-    )
-
-    if not runnable:
+    if outcome.error is not None:
+        solara.Markdown(f"**{outcome.error}**")
+    elif outcome.maps is not None:
+        solara.Markdown(msg("run.ready", count=len(outcome.maps.layers())))
+    else:
         solara.Markdown(msg("run.blocked"))

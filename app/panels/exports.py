@@ -28,6 +28,7 @@ from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import ClassifiedLayer, IndicatorMaps
 from sdg1531.enums import IndicatorLayer
 from sdg1531.naming import LAYER_BASENAMES
+from sdg1531.spec import RunSpec
 
 __all__ = ("ExportsPanel", "export_sources")
 
@@ -83,9 +84,9 @@ def export_sources(maps: IndicatorMaps, ctx: ExecutionContext) -> tuple[ExportSo
 
 @solara.component
 def ExportsPanel(
-    maps: solara.Reactive[IndicatorMaps | None],
-    ctx: solara.Reactive[Any],
-    spec: Any,
+    maps: IndicatorMaps | None,
+    ctx: ExecutionContext | None,
+    spec: RunSpec,
     gee_interface: Any,
 ) -> None:
     """``spec`` is accepted but unused, for the same reason ``MapLayersPanel``
@@ -112,12 +113,12 @@ def ExportsPanel(
     # `description`, which `MapApp` renders under the section title. Rendering
     # it a second time here duplicated the sentence on screen for the Layers
     # panel (Task 10); this panel drops it up front instead.
-    if maps.value is None or ctx.value is None:
+    if maps is None or ctx is None:
         solara.Markdown(msg("exports.build_first"))
         return
 
     ExportLauncher(
-        sources=export_sources(maps.value, ctx.value),
+        sources=export_sources(maps, ctx),
         label=msg("exports.button"),
         button_text=True,
         block=True,

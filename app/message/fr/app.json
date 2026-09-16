@@ -61,11 +61,14 @@
     "end": "Année de fin"
   },
   "run": {
-    "description": "Construire l'indicateur à partir de la configuration ci-dessus.",
+    "description": "Choisissez la période globale sur laquelle l'indicateur s'exécute ; son état apparaît ci-dessous.",
     "start_year": "Année de début",
     "end_year": "Année de fin",
-    "build": "Construire",
-    "built": "{count} couches construites",
+    "ready": {
+      "one": "Prêt : {count} couche",
+      "other": "Prêt : {count} couches",
+      "many": "Prêt : {count} de couches"
+    },
     "blocked": "Corrigez les problèmes ci-dessus avant de construire."
   },
   "layers": {

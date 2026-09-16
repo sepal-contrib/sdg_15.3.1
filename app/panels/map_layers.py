@@ -5,8 +5,8 @@ which layers exist, what they are called, or how they are coloured. Colours come
 from the domain palette so the map and the exported assets agree.
 
 Follows ``docs/guides/solara-gee-patterns.md``'s Async Button Convention: the
-task snapshots ``maps.value`` at click time instead of reading it live, returns
-an outcome instead of notifying from inside itself, and a ``solara.use_effect``
+task snapshots ``maps`` at click time instead of reading it live, returns an
+outcome instead of notifying from inside itself, and a ``solara.use_effect``
 with the full dependency list mirrors that outcome into a toast.
 """
 
@@ -55,8 +55,8 @@ async def _add_layers(
     """Draw one snapshot of layers onto the map.
 
     ``layers`` is a snapshot taken at click time (``MapLayersPanel.start``),
-    never a live read of ``maps.value`` -- the guide's rule against reading
-    reactive inputs after a task has started. ``key=layer_id.value`` is what
+    never a live read of ``maps`` -- the guide's rule against reading reactive
+    inputs after a task has started. ``key=layer_id.value`` is what
     makes a second click replace each layer instead of accumulating another
     copy of it: a stable, locale-invariant identity, independent of
     ``layer.label`` (used below only as the display name and the progress-step
@@ -81,7 +81,7 @@ async def _add_layers(
 
 @solara.component
 def MapLayersPanel(
-    maps: solara.Reactive[IndicatorMaps | None],
+    maps: IndicatorMaps | None,
     map_: Any,
     gee_interface: Any,
 ) -> None:
@@ -91,7 +91,7 @@ def MapLayersPanel(
     interface the map itself was constructed with.
     """
     notifications = use_notifications()
-    current_maps = maps.value
+    current_maps = maps
 
     task = solara.lab.use_task(
         _add_layers, dependencies=None, raise_error=False, prefer_threaded=False
@@ -124,9 +124,9 @@ def MapLayersPanel(
     )
 
     def start() -> None:
-        # Snapshot `maps.value` here, at click time -- not inside `_add_layers`,
-        # which the guide's rule bans from reading live reactive inputs once it
-        # is running as a background task. Guarded again (`start` is only ever
+        # Snapshot `maps` here, at click time -- not inside `_add_layers`, which
+        # the guide's rule bans from reading live reactive inputs once it is
+        # running as a background task. Guarded again (`start` is only ever
         # wired to a button rendered when `current_maps` is not None below) so
         # the closure stays total rather than assuming its caller's care.
         if current_maps is not None:

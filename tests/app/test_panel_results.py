@@ -97,10 +97,8 @@ def test_the_panel_renders_before_a_run(monkeypatch):
     """Shown before Build has run."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
     box, rc = solara.render(
-        ResultsPanel(maps=maps, ctx=ctx, gee_interface=None), handle_error=False
+        ResultsPanel(maps=None, ctx=None, gee_interface=None), handle_error=False
     )
     assert rc is not None
     # Not `results.description` too: that copy lives once, in `page.py`'s
@@ -112,15 +110,15 @@ def test_the_panel_renders_before_a_run(monkeypatch):
 
 
 def test_the_panel_waits_for_both_maps_and_context(monkeypatch):
-    """``maps`` and ``ctx`` land via two separate assignments in
-    ``RunStep.on_build``, so a render can observe one set with the other
-    still ``None``. The panel must not show Compute until both have landed."""
+    """``maps`` and ``ctx`` land together, from one ``build_outcome`` call --
+    but they are still two separate fields on that ``BuildOutcome``, so
+    nothing stops a caller handing in one without the other. The panel must
+    not show Compute until both have landed."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
-    maps = solara.reactive(_FakeMaps(FakeResolved()))
-    ctx = solara.reactive(None)
     box, rc = solara.render(
-        ResultsPanel(maps=maps, ctx=ctx, gee_interface=None), handle_error=False
+        ResultsPanel(maps=_FakeMaps(FakeResolved()), ctx=None, gee_interface=None),
+        handle_error=False,
     )
     assert rc is not None
     assert markdown_texts(box) == [f"<p>{msg('results.build_first')}</p>"]
@@ -169,10 +167,8 @@ def test_clicking_compute_fetches_pivots_and_mounts_the_real_chart_option(monkey
     )
 
     async def main():
-        maps = solara.reactive(_FakeMaps(resolved))
-        ctx = solara.reactive(object())
         box, rc = solara.render(
-            ResultsPanel(maps=maps, ctx=ctx, gee_interface=None),
+            ResultsPanel(maps=_FakeMaps(resolved), ctx=object(), gee_interface=None),
             handle_error=False,
         )
         assert rc is not None
@@ -221,10 +217,8 @@ def test_a_fetch_that_fails_reports_the_error_and_never_mounts_a_chart(monkeypat
     monkeypatch.setattr(solara, "display", lambda obj: displayed.append(obj))
 
     async def main():
-        maps = solara.reactive(_FakeMaps(FakeResolved()))
-        ctx = solara.reactive(object())
         box, rc = solara.render(
-            ResultsPanel(maps=maps, ctx=ctx, gee_interface=None),
+            ResultsPanel(maps=_FakeMaps(FakeResolved()), ctx=object(), gee_interface=None),
             handle_error=False,
         )
         assert rc is not None
@@ -240,16 +234,23 @@ def test_a_fetch_that_fails_reports_the_error_and_never_mounts_a_chart(monkeypat
     assert displayed == []
 
 
-def test_the_task_uses_the_snapshot_taken_at_click_time_not_a_live_read(monkeypatch):
-    """A Build that lands WHILE Compute statistics is still running must not
-    change what that in-flight click fetches -- the guide's rule against
-    reading a live reactive input from inside a task after it has started."""
+def test_the_click_snapshot_is_what_the_fetch_receives_not_a_later_read(monkeypatch):
+    """``maps`` is a plain value now, not a reactive a later build could
+    mutate out from under a running task -- Task 20 removed the reactive
+    that made a live-read even possible (the staleness the panel used to be
+    vulnerable to lived one level up, in ``page.py``; see
+    ``tests/app/test_page.py``'s staleness regression test for where that
+    guarantee now lives). What is still worth pinning here is that
+    ``_compute`` receives the SAME object ``ResultsPanel`` was rendered
+    with, snapshotted into ``start()`` at click time -- not, say, a value it
+    re-reads from some other source at call time.
+    """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
     monkeypatch.setattr(solara, "display", lambda obj: None)
 
     calls: list[Any] = []
-    first_maps = _FakeMaps(FakeResolved(start_year=2001))
+    the_maps = _FakeMaps(FakeResolved(start_year=2001))
 
     async def recording_fetch(gee_interface, maps, ctx, *, layer):
         calls.append(maps)
@@ -259,21 +260,17 @@ def test_the_task_uses_the_snapshot_taken_at_click_time_not_a_live_read(monkeypa
     monkeypatch.setattr("app.panels.results.fetch_areas_by_land_cover", recording_fetch)
 
     async def main():
-        maps = solara.reactive(first_maps)
-        ctx = solara.reactive(object())
         box, rc = solara.render(
-            ResultsPanel(maps=maps, ctx=ctx, gee_interface=None),
+            ResultsPanel(maps=the_maps, ctx=object(), gee_interface=None),
             handle_error=False,
         )
         assert rc is not None
         button = find_widget(box, ipyvuetify.Btn)
         assert button is not None
-        button.click()  # fully synchronous snapshot, before any await happens
-        # Land a new build mid-flight -- must not change what this click reads.
-        maps.value = _FakeMaps(FakeResolved(start_year=2020))
+        button.click()
         assert await _wait_for(lambda: fake.successes or fake.errors)
 
     asyncio.run(main())
 
-    assert calls == [first_maps]
+    assert calls == [the_maps]
     assert fake.successes == [msg("results.computed")]

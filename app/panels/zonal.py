@@ -9,11 +9,10 @@ container-local disk is invisible to the user and collides between
 concurrent users.
 
 Follows ``docs/guides/solara-gee-patterns.md``'s Async Button Convention
-twice over, once per task: each snapshots its reactive inputs at click time
-rather than reading them live from inside the task, returns an outcome
-instead of mutating reactive state from inside itself, and a
-``solara.use_effect`` with the full dependency list mirrors that outcome
-into state and a toast.
+twice over, once per task: each snapshots its inputs at click time rather
+than reading them live from inside the task, returns an outcome instead of
+mutating reactive state from inside itself, and a ``solara.use_effect`` with
+the full dependency list mirrors that outcome into state and a toast.
 """
 
 from __future__ import annotations
@@ -62,8 +61,8 @@ async def _compute(gee_interface: Any, notifications: Any, request: _ZonalReques
     """Fetch one snapshot of zonal statistics.
 
     ``request`` is a snapshot taken at click time (``ZonalPanel.start_compute``),
-    never a live read of ``maps.value``/``ctx.value`` -- the guide's rule
-    against reading reactive inputs after a task has started.
+    never a live read of ``maps``/``ctx`` -- the guide's rule against
+    reading reactive inputs after a task has started.
     """
     with notifications.track(msg("zonal.compute"), total_steps=1) as task:
         task.step(msg("zonal.compute"))
@@ -106,14 +105,14 @@ async def _download(sepal_client: Any, frame: Any) -> _DownloadOutcome:
 
 @solara.component
 def ZonalPanel(
-    maps: solara.Reactive[IndicatorMaps | None],
-    ctx: solara.Reactive[ExecutionContext | None],
+    maps: IndicatorMaps | None,
+    ctx: ExecutionContext | None,
     gee_interface: Any,
     sepal_client: Any,
 ) -> None:
     notifications = use_notifications()
-    current_maps = maps.value
-    current_ctx = ctx.value
+    current_maps = maps
+    current_ctx = ctx
     frame: solara.Reactive[Any] = solara.use_reactive(None)
 
     compute_task = solara.lab.use_task(
@@ -152,12 +151,13 @@ def ZonalPanel(
     )
 
     def start_compute() -> None:
-        # Snapshot both reactives here, at click time -- not inside `_compute`,
-        # which the guide's rule bans from reading live reactive inputs once it
-        # is running as a background task. `maps` and `ctx` land via two
-        # separate assignments in `RunStep.on_build`, so a render can observe
-        # one set with the other still `None`; guarded again so this closure
-        # stays total rather than assuming its caller's care.
+        # Snapshot both here, at click time -- not inside `_compute`, which the
+        # guide's rule bans from reading live reactive inputs once it is running
+        # as a background task. `maps` and `ctx` come from the same `BuildOutcome`
+        # (`build_outcome` sets both together, never one without the other), so
+        # this can't observe one set with the other still `None` in practice;
+        # guarded again so this closure stays total rather than assuming its
+        # caller's care.
         if current_maps is not None and current_ctx is not None:
             compute_task(
                 gee_interface,

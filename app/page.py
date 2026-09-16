@@ -42,10 +42,8 @@ from app.panels.zonal import ZonalPanel
 from app.steps.aoi import AoiStep
 from app.steps.land_cover import LandCoverStep
 from app.steps.productivity import ProductivityStep
-from app.steps.run import RunStep
+from app.steps.run import BuildOutcome, RunStep, build_outcome
 from app.steps.soc import SocStep
-from sdg1531.engine.context import ExecutionContext
-from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import RunSpec
 
 __all__ = ("Page", "Sdg1531App", "build_workflow_sections")
@@ -56,8 +54,7 @@ setup_solara_server(extra_asset_locations=[])
 def build_workflow_sections(
     spec: solara.Reactive[RunSpec] | None = None,
     sepal_map: SepalMap | None = None,
-    maps: solara.Reactive[IndicatorMaps | None] | None = None,
-    ctx: solara.Reactive[ExecutionContext | None] | None = None,
+    outcome: BuildOutcome | None = None,
     gee_interface: Any = None,
 ) -> list[dict[str, object]]:
     """The five configuration steps, as ``right_panel_content`` sections, in DISPLAY order.
@@ -73,15 +70,16 @@ def build_workflow_sections(
     render pass builds an inert element descriptor, never executes the
     component body, so ``tests/app/test_page.py`` can call
     ``build_workflow_sections()`` bare to pin section order (title, icon)
-    without a real spec, map or reactive to hand it. Each step's own content
-    is built only once its required reactives are actually present, guarded
+    without a real spec, map or outcome to hand it. Each step's own content
+    is built only once its required arguments are actually present, guarded
     with plain ``is not None`` checks -- calling a step with ``None`` would
     not actually raise (an inert element descriptor is built either way, per
     the paragraph above), so this buys nothing at runtime. It exists solely
-    so ``mypy --strict`` narrows each ``Reactive[...] | None`` argument away
-    from ``None`` before it reaches a step that declares a bare
-    ``Reactive[...]`` parameter; measured by deleting the guards, which
-    leaves every test green and produces one ``mypy`` error per guard removed.
+    so ``mypy --strict`` narrows each ``X | None`` argument away from
+    ``None`` before it reaches a step that declares a bare ``X`` parameter
+    (``Reactive[RunSpec]`` for ``spec``, plain ``BuildOutcome`` for
+    ``outcome``); measured by deleting the guards, which leaves every test
+    green and produces one ``mypy`` error per guard removed.
 
     No ``description`` key: each step still renders its own
     ``msg("<step>.description")`` internally (unlike ``MapLayersPanel``, which
@@ -101,9 +99,7 @@ def build_workflow_sections(
     )
     soc_content: list[object] = [SocStep(spec=spec)] if spec is not None else []
     run_content: list[object] = (
-        [RunStep(spec=spec, maps=maps, ctx=ctx)]
-        if spec is not None and maps is not None and ctx is not None
-        else []
+        [RunStep(spec=spec, outcome=outcome)] if spec is not None and outcome is not None else []
     )
     return [
         {"title": msg("step.aoi"), "icon": "mdi-map-marker-check", "content": aoi_content},
@@ -135,8 +131,16 @@ def Sdg1531App() -> None:
     setup_theme_colors()
 
     spec = solara.use_reactive(RunSpec())
-    maps: solara.Reactive[IndicatorMaps | None] = solara.use_reactive(None)
-    ctx: solara.Reactive[ExecutionContext | None] = solara.use_reactive(None)
+    # `RunSpec` is a frozen, slots dataclass of plain data -- no `ee` objects --
+    # so it compares by field equality, not identity (`dataclasses.dataclass`'s
+    # generated `__eq__`). reacton's `use_memo` compares its dependency list the
+    # same way (`reacton.utils.equals`, which falls through to `==` for any type
+    # it has no special case for), so an unrelated re-render that leaves `spec`
+    # equal to what it already was does NOT recompute this -- only a real edit
+    # does. Measured, not assumed: a re-render with a structurally-equal-but-new
+    # `RunSpec` object reuses the cached outcome; changing one nested field
+    # (`periods.overall`, say) recomputes it.
+    outcome = solara.use_memo(lambda: build_outcome(spec.value), [spec.value])
 
     gee_interface = get_current_gee_interface()
     theme_state = get_current_theme_state()
@@ -177,24 +181,32 @@ def Sdg1531App() -> None:
         },
         right_panel_content=[
             *build_workflow_sections(
-                spec=spec, sepal_map=sepal_map, maps=maps, ctx=ctx, gee_interface=gee_interface
+                spec=spec, sepal_map=sepal_map, outcome=outcome, gee_interface=gee_interface
             ),
             {
                 "title": msg("layers.title"),
                 "icon": "mdi-layers",
-                "content": [MapLayersPanel(maps=maps, map_=sepal_map, gee_interface=gee_interface)],
+                "content": [
+                    MapLayersPanel(maps=outcome.maps, map_=sepal_map, gee_interface=gee_interface)
+                ],
                 "description": msg("layers.description"),
             },
             {
                 "title": msg("transitions.title"),
                 "icon": "mdi-transit-transfer",
-                "content": [TransitionsPanel(maps=maps, ctx=ctx, gee_interface=gee_interface)],
+                "content": [
+                    TransitionsPanel(
+                        maps=outcome.maps, ctx=outcome.ctx, gee_interface=gee_interface
+                    )
+                ],
                 "description": msg("transitions.description"),
             },
             {
                 "title": msg("results.title"),
                 "icon": "mdi-chart-bar",
-                "content": [ResultsPanel(maps=maps, ctx=ctx, gee_interface=gee_interface)],
+                "content": [
+                    ResultsPanel(maps=outcome.maps, ctx=outcome.ctx, gee_interface=gee_interface)
+                ],
                 "description": msg("results.description"),
             },
             {
@@ -202,8 +214,8 @@ def Sdg1531App() -> None:
                 "icon": "mdi-table",
                 "content": [
                     ZonalPanel(
-                        maps=maps,
-                        ctx=ctx,
+                        maps=outcome.maps,
+                        ctx=outcome.ctx,
                         gee_interface=gee_interface,
                         sepal_client=get_current_sepal_client(),
                     )
@@ -214,7 +226,12 @@ def Sdg1531App() -> None:
                 "title": msg("exports.title"),
                 "icon": "mdi-export-variant",
                 "content": [
-                    ExportsPanel(maps=maps, ctx=ctx, spec=spec, gee_interface=gee_interface)
+                    ExportsPanel(
+                        maps=outcome.maps,
+                        ctx=outcome.ctx,
+                        spec=spec.value,
+                        gee_interface=gee_interface,
+                    )
                 ],
                 "description": msg("exports.description"),
             },

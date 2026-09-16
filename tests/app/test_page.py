@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 import reacton.core
@@ -11,8 +12,29 @@ from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app.message import messages, msg
-from sdg1531.spec import RunSpec
+from app.steps.run import BuildOutcome
+from sdg1531.spec import Period, RunSpec
 from tests.app.render_helpers import find_widget
+from tests.spec_factory import DEFAULT_PERIODS, default_spec
+
+# `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
+# threshold for `build_indicator_maps()` to succeed (see
+# `tests/app/test_step_run.py`); every test below that needs a REAL build,
+# not just a runnable spec, uses this one.
+_BUILDABLE_SPEC = default_spec(threshold=0.0)
+
+
+@solara.component
+def _noop_exports_panel(**_kwargs: Any) -> None:
+    """A stand-in for ``ExportsPanel`` in tests that drive a REAL build but
+    care about a different panel. ``ExportLauncher`` (the real component
+    behind ``ExportsPanel``) mounts one of its own tasks with
+    ``dependencies=[]`` -- pysepal's own, unrelated to this task's
+    ``dependencies=None`` invariant -- which starts a real asyncio task the
+    moment it first mounts. That needs a running event loop this bare
+    ``solara.render()`` harness does not have, so tests that are not
+    exercising ``ExportsPanel`` itself substitute this instead of hitting it
+    by accident."""
 
 
 def test_page_is_a_solara_component():
@@ -232,12 +254,15 @@ def test_the_soc_step_shares_the_aoi_step_s_spec(monkeypatch):
     assert captured["soc_spec"] is captured["aoi_spec"]
 
 
-def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeypatch):
+def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_a_real_outcome(monkeypatch):
     """The Run step must read the SAME ``RunSpec`` reactive the AOI step
-    writes -- a private copy would let Run build against a stale spec -- and
-    ``maps``/``ctx`` must be real, writable reactives the Build trigger can
-    populate, not ``None`` placeholders that would make every panel after it
-    unable to receive a result."""
+    writes -- a private copy would let Run display against a stale spec --
+    and ``outcome`` must be the real ``BuildOutcome`` ``page.py`` derives from
+    that spec via ``build_outcome``, not a placeholder. The shell's initial
+    spec (``RunSpec()``) has no AOI, sensor or threshold, so the real
+    ``build_outcome`` reports that as an empty outcome -- not a stand-in
+    ``None`` that would make every panel after it unable to tell "not built"
+    from "wired wrong"."""
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -245,8 +270,8 @@ def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeyp
         captured["aoi_spec"] = spec
 
     @solara.component
-    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
-        captured.update(run_spec=spec, maps=maps, ctx=ctx)
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured.update(run_spec=spec, outcome=outcome)
 
     monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
     monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
@@ -255,27 +280,31 @@ def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_real_reactives(monkeyp
     assert rc is not None
 
     assert captured["run_spec"] is captured["aoi_spec"]
-    assert isinstance(captured["maps"], solara.Reactive)
-    assert captured["maps"].value is None
-    assert isinstance(captured["ctx"], solara.Reactive)
-    assert captured["ctx"].value is None
+    assert isinstance(captured["outcome"], BuildOutcome)
+    assert captured["outcome"] == BuildOutcome()
 
 
-def test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee_interface(
+def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_gee_interface(
     monkeypatch,
 ):
     """``right_panel_content[0]["content"]`` above is checked only by length:
     a placeholder widget, or a panel built with ``map_=None``, both pass it.
     Substituting a spy for ``MapLayersPanel`` and reading what ``Sdg1531App``
-    actually calls it with proves the identity instead -- the same ``maps``
-    reactive the Run step writes into (not a private copy that would never
-    see a Build), the real ``SepalMap`` the layers must be drawn onto, and
-    the real session-backed ``gee_interface``."""
+    actually calls it with proves the identity instead -- the SAME ``maps``
+    ``page.py``'s own ``outcome`` carries (not a private copy that would
+    never see a build), the real ``SepalMap`` the layers must be drawn onto,
+    and the real session-backed ``gee_interface``.
+
+    Driving a real build through the shared spec (rather than asserting on
+    the initial, unbuilt ``None``) is deliberate: ``None is None`` would pass
+    this identity check even if ``page.py`` wired a hardcoded ``None``
+    instead of the real outcome."""
     captured: dict[str, Any] = {}
 
     @solara.component
-    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
-        captured["run_maps"] = maps
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
 
     @solara.component
     def _spy_map_layers_panel(
@@ -285,14 +314,18 @@ def test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee
 
     monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(page_module, "MapLayersPanel", _spy_map_layers_panel)
+    monkeypatch.setattr(page_module, "ExportsPanel", _noop_exports_panel)
 
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
+    captured["spec"].value = _BUILDABLE_SPEC
+
     mapapp = find_widget(box, MapApp)
     assert mapapp is not None
 
-    assert captured["panel_maps"] is captured["run_maps"]
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
     # `is`, not `isinstance`: a second, unrelated SepalMap would still pass an
     # isinstance check while drawing the seven layers onto a map the user is
     # not looking at -- `mapapp.main_map[0]` is the one actually in the tree.
@@ -300,17 +333,17 @@ def test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee
     assert captured["gee_interface"] is not None
 
 
-def test_the_results_panel_is_wired_with_the_shared_maps_ctx_and_gee_interface(monkeypatch):
-    """Same identity concern as the layers panel above, for the two reactives
-    ``ResultsPanel`` needs: the ``maps`` AND the ``ctx`` a Build actually
-    writes into (not private copies that would never see one), and the real
+def test_the_results_panel_is_wired_with_the_shared_outcome_and_gee_interface(monkeypatch):
+    """Same identity concern as the layers panel above, for the two values
+    ``ResultsPanel`` needs: the ``maps`` AND the ``ctx`` a real build
+    produces (not private copies that would never see one), and the real
     session-backed ``gee_interface``."""
     captured: dict[str, Any] = {}
 
     @solara.component
-    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
-        captured["run_maps"] = maps
-        captured["run_ctx"] = ctx
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
 
     @solara.component
     def _spy_results_panel(*, maps: Any = None, ctx: Any = None, gee_interface: Any = None) -> None:
@@ -318,26 +351,30 @@ def test_the_results_panel_is_wired_with_the_shared_maps_ctx_and_gee_interface(m
 
     monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(page_module, "ResultsPanel", _spy_results_panel)
+    monkeypatch.setattr(page_module, "ExportsPanel", _noop_exports_panel)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    assert captured["panel_maps"] is captured["run_maps"]
-    assert captured["panel_ctx"] is captured["run_ctx"]
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
+    assert captured["panel_ctx"] is captured["outcome"].ctx
     assert captured["gee_interface"] is not None
 
 
-def test_the_transitions_panel_is_wired_with_the_shared_maps_ctx_and_gee_interface(monkeypatch):
-    """Same identity concern as the results panel above, for the two reactives
-    ``TransitionsPanel`` needs: the ``maps`` AND the ``ctx`` a Build actually
-    writes into (not private copies that would never see one), and the real
+def test_the_transitions_panel_is_wired_with_the_shared_outcome_and_gee_interface(monkeypatch):
+    """Same identity concern as the results panel above, for the two values
+    ``TransitionsPanel`` needs: the ``maps`` AND the ``ctx`` a real build
+    produces (not private copies that would never see one), and the real
     session-backed ``gee_interface``."""
     captured: dict[str, Any] = {}
 
     @solara.component
-    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
-        captured["run_maps"] = maps
-        captured["run_ctx"] = ctx
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
 
     @solara.component
     def _spy_transitions_panel(
@@ -347,26 +384,30 @@ def test_the_transitions_panel_is_wired_with_the_shared_maps_ctx_and_gee_interfa
 
     monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(page_module, "TransitionsPanel", _spy_transitions_panel)
+    monkeypatch.setattr(page_module, "ExportsPanel", _noop_exports_panel)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    assert captured["panel_maps"] is captured["run_maps"]
-    assert captured["panel_ctx"] is captured["run_ctx"]
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
+    assert captured["panel_ctx"] is captured["outcome"].ctx
     assert captured["gee_interface"] is not None
 
 
-def test_the_zonal_panel_is_wired_with_the_shared_maps_ctx_and_a_sepal_client(monkeypatch):
+def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(monkeypatch):
     """Same identity concern as the results panel above, for the two shared
-    reactives ``ZonalPanel`` needs plus its own extra dependency: a
+    values ``ZonalPanel`` needs plus its own extra dependency: a
     ``sepal_client``, without which the shapefile download has nothing to
     upload through."""
     captured: dict[str, Any] = {}
 
     @solara.component
-    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
-        captured["run_maps"] = maps
-        captured["run_ctx"] = ctx
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
 
     @solara.component
     def _spy_zonal_panel(
@@ -378,12 +419,16 @@ def test_the_zonal_panel_is_wired_with_the_shared_maps_ctx_and_a_sepal_client(mo
 
     monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(page_module, "ZonalPanel", _spy_zonal_panel)
+    monkeypatch.setattr(page_module, "ExportsPanel", _noop_exports_panel)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    assert captured["panel_maps"] is captured["run_maps"]
-    assert captured["panel_ctx"] is captured["run_ctx"]
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
+    assert captured["panel_ctx"] is captured["outcome"].ctx
     assert captured["gee_interface"] is not None
     # `get_current_sepal_client()`'s documented "no SEPAL identity" case
     # returns `None` outside a sandbox, which is exactly this test
@@ -392,12 +437,15 @@ def test_the_zonal_panel_is_wired_with_the_shared_maps_ctx_and_a_sepal_client(mo
     assert "sepal_client" in captured
 
 
-def test_the_exports_panel_is_wired_with_the_shared_maps_ctx_spec_and_gee_interface(monkeypatch):
-    """Same identity concern as the results and zonal panels above, plus one
-    of its own: ``gee_interface`` must be the real session interface, not
-    ``None`` -- a ``None`` here would leave ``ExportLauncher`` to resolve
-    ``get_current_gee_interface()`` itself, which raises outside a SEPAL
-    session (``app/panels/exports.py``'s ``ExportsPanel`` docstring)."""
+def test_the_exports_panel_is_wired_with_the_shared_outcome_spec_and_gee_interface(monkeypatch):
+    """Same identity concern as the results and zonal panels above, plus two
+    of its own: the ``RunSpec`` value ``page.py`` reads out of the SAME spec
+    reactive the AOI step writes (M4: ``ExportsPanel.spec`` is a plain
+    ``RunSpec`` now, not a reactive), and ``gee_interface`` must be the real
+    session interface, not ``None`` -- a ``None`` here would leave
+    ``ExportLauncher`` to resolve ``get_current_gee_interface()`` itself,
+    which raises outside a SEPAL session (``app/panels/exports.py``'s
+    ``ExportsPanel`` docstring)."""
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -405,9 +453,8 @@ def test_the_exports_panel_is_wired_with_the_shared_maps_ctx_spec_and_gee_interf
         captured["aoi_spec"] = spec
 
     @solara.component
-    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
-        captured["run_maps"] = maps
-        captured["run_ctx"] = ctx
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["outcome"] = outcome
 
     @solara.component
     def _spy_exports_panel(
@@ -427,10 +474,102 @@ def test_the_exports_panel_is_wired_with_the_shared_maps_ctx_spec_and_gee_interf
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    assert captured["exports_maps"] is captured["run_maps"]
-    assert captured["exports_ctx"] is captured["run_ctx"]
-    assert captured["exports_spec"] is captured["aoi_spec"]
+    captured["aoi_spec"].value = _BUILDABLE_SPEC
+
+    assert captured["outcome"].maps is not None
+    assert captured["exports_maps"] is captured["outcome"].maps
+    assert captured["exports_ctx"] is captured["outcome"].ctx
+    assert isinstance(captured["exports_spec"], RunSpec)
+    assert captured["exports_spec"] is captured["aoi_spec"].value
     assert captured["exports_gee_interface"] is not None
+
+
+def test_the_outcome_memo_recomputes_on_a_real_edit_not_on_an_unrelated_rerender(monkeypatch):
+    """``RunSpec`` is a frozen dataclass of plain data, so it compares by
+    field equality; reacton's own `use_memo` compares its dependency list the
+    same way (`reacton.utils.equals`, which falls through to plain `==` for
+    anything it has no special case for -- measured by reading the source,
+    not assumed). So an unrelated re-render that leaves `spec` structurally
+    equal to what it already was must NOT recompute `outcome` -- only a real
+    edit does. This is the trap the brief warns about turned into a real
+    assertion: proving the memo re-fires is not enough on its own (a
+    `RunStep`/panel test could still pass while page.py never threads the new
+    outcome anywhere useful), but this pins the OTHER half -- that page.py's
+    memo does not fire needlessly either, at the exact granularity that
+    matters for cost (an unrelated re-render must not re-run a real build).
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
+
+    monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(page_module, "ExportsPanel", _noop_exports_panel)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    first_outcome = captured["outcome"]
+    spec = captured["spec"]
+
+    # A structurally-equal-but-new `RunSpec` object -- not the exact same
+    # instance -- forces a re-render without changing what `spec.value`
+    # equals.
+    spec.value = RunSpec()
+    rc.force_update()
+    assert captured["outcome"] is first_outcome
+
+    # A real, nested edit -- this must recompute.
+    spec.value = _BUILDABLE_SPEC
+    assert captured["outcome"] is not first_outcome
+    assert captured["outcome"].maps is not None
+
+
+def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
+    """The final review's blocking defect, pinned where it actually broke: at
+    a PANEL, not at the memo. Build under one period, change it to a
+    DIFFERENT buildable period, and the exports panel -- the brief's own
+    example of where a stale value ships a wrong asset -- must reflect the
+    CURRENT spec.
+
+    Anchored against `resolved.spec.periods.overall`, a literal field the
+    domain's own `ResolvedSpec` carries (`sdg1531.resolve.ResolvedSpec.spec`)
+    -- not a value `build_outcome` computes itself, so a mutation that breaks
+    `build_outcome`'s own logic cannot also fake this anchor into agreeing
+    with itself.
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+
+    @solara.component
+    def _spy_exports_panel(
+        *, maps: Any = None, ctx: Any = None, spec: Any = None, gee_interface: Any = None
+    ) -> None:
+        captured["exports_maps"] = maps
+
+    monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(page_module, "ExportsPanel", _spy_exports_panel)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    spec = captured["spec"]
+
+    first = default_spec(
+        threshold=0.0, periods=replace(DEFAULT_PERIODS, overall=Period(2001, 2015))
+    )
+    spec.value = first
+    assert captured["exports_maps"] is not None
+    assert captured["exports_maps"].resolved.spec.periods.overall == Period(2001, 2015)
+
+    second = first.evolve(periods=replace(first.periods, overall=Period(2005, 2020)))
+    spec.value = second
+    assert captured["exports_maps"].resolved.spec.periods.overall == Period(2005, 2020)
 
 
 def test_the_steps_are_in_the_sub_indicator_order():

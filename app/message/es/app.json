@@ -61,11 +61,14 @@
     "end": "Año final"
   },
   "run": {
-    "description": "Construir el indicador a partir de la configuración anterior.",
+    "description": "Elija el período general sobre el que se ejecuta el indicador; su estado aparece a continuación.",
     "start_year": "Año de inicio",
     "end_year": "Año final",
-    "build": "Construir",
-    "built": "{count} capas construidas",
+    "ready": {
+      "one": "Listo: {count} capa",
+      "other": "Listo: {count} capas",
+      "many": "Listo: {count} de capas"
+    },
     "blocked": "Corrija los problemas anteriores antes de construir."
   },
   "layers": {

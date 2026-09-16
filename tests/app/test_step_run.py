@@ -1,14 +1,13 @@
-"""Build is pure graph construction: no network, no task, no spinner.
-
-The step is the LAST trigger before a run leaves pure Python: it shows only
-the whole-spec and overall-period problems it owns, disables Build while any
-fatal problem stands anywhere in the spec, and on a real click either fills
-``maps``/``ctx`` and reports success, or -- for a spec ``resolve()`` itself
-refuses -- notifies the error and leaves both reactives untouched.
+"""Build is pure graph construction: no network, no task, no spinner, and --
+since Task 20 -- no button. ``build_outcome`` derives it fresh from the spec
+on every render; ``RunStep`` only displays whatever outcome it is handed and
+never calls ``resolve()`` or ``build_indicator_maps()`` itself, so it cannot
+crash on a spec ``resolve()`` refuses.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 import ipyvuetify
@@ -16,12 +15,12 @@ import pytest
 import solara
 
 from app.message import msg
-from app.steps.run import RunStep, build
+from app.steps.run import BuildOutcome, RunStep, build, build_outcome
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import Period, PeriodOverride, RunSpec, SubPeriods
-from tests.app.render_helpers import find_widget, find_widgets, markdown_texts
-from tests.spec_factory import default_spec
+from tests.app.render_helpers import find_widgets, markdown_texts
+from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # Every non-overall sub-period pinned to a range that resolves on its own,
 # independent of `overall` -- so inverting `overall` below trips only
@@ -46,25 +45,18 @@ _SPEC_WITH_A_RUN_PROBLEM = default_spec(
 )
 
 # One fatal problem (field="aoi") that belongs to the AOI step, not Run -- the
-# case that actually distinguishes `problems_for("run", ...)` from `validate(...)`,
-# and `is_runnable` from `not problems_for("run", ...)`. Both mutations pass
-# every OTHER parametrization in this file, since those only ever use a spec
-# whose problems Run owns or a spec with none at all.
+# case that actually distinguishes `problems_for("run", ...)` from `validate(...)`.
 _SPEC_WITH_ANOTHER_STEPS_PROBLEM = default_spec(aoi=None)
 
 
-class _FakeNotifier:
-    """A spy standing in for ``use_notifications()``'s real bus-backed notifier."""
+class _StubMaps:
+    """Stands in for ``IndicatorMaps``: only ``.layers()`` is read by ``RunStep``."""
 
-    def __init__(self) -> None:
-        self.successes: list[str] = []
-        self.errors: list[str] = []
+    def __init__(self, count: int) -> None:
+        self._count = count
 
-    def success(self, message: str) -> None:
-        self.successes.append(message)
-
-    def error(self, message: str) -> None:
-        self.errors.append(message)
+    def layers(self) -> dict[int, object]:
+        return {i: object() for i in range(self._count)}
 
 
 def test_build_returns_the_maps_and_the_context():
@@ -93,38 +85,103 @@ def test_build_touches_no_network():
         socket.socket = original
 
 
+# ---------------------------------------------------------------- build_outcome
+
+
+def test_build_outcome_is_empty_for_a_spec_that_is_not_runnable():
+    """An ordinary half-filled form, not an exception -- `RunStep` already
+    renders `problems_for` and `msg("run.blocked")` for this state."""
+    assert build_outcome(RunSpec()) == BuildOutcome()
+
+
+def test_build_outcome_is_empty_not_a_crash_for_a_half_filled_overall_period():
+    """`resolve()` raises a bare `ValueError` (not `SpecError`) for an overall
+    period with a start and no end yet -- the state the Run step's two
+    independent year Selects reach naturally (see `app.state.is_runnable`'s
+    docstring). `build_outcome` must treat it exactly like any other
+    not-yet-runnable spec."""
+    spec = default_spec(periods=replace(DEFAULT_PERIODS, overall=Period(start=2000, end=None)))
+    assert build_outcome(spec) == BuildOutcome()
+
+
+def test_build_outcome_returns_the_real_maps_and_context_for_a_buildable_spec():
+    """Not a re-implementation of `build()` -- calls the real thing and checks
+    `build_outcome` hands back exactly what it returned."""
+    expected_maps, expected_ctx = build(_BUILDABLE_SPEC)
+    outcome = build_outcome(_BUILDABLE_SPEC)
+    assert outcome.error is None
+    assert isinstance(outcome.maps, IndicatorMaps)
+    assert list(outcome.maps.layers()) == list(expected_maps.layers())
+    assert outcome.ctx == expected_ctx
+
+
+def test_build_outcome_carries_the_refusal_is_runnable_cannot_see():
+    """`default_spec()`'s threshold is unset. `validate()` has no rule for it
+    (there is no `threshold` field problem), and `resolve()` itself succeeds --
+    only `build_indicator_maps()` refuses. `is_runnable` therefore says True,
+    so this is exactly the narrower case `build_outcome`'s own `except` exists
+    for, not the `is_runnable` branch above. Anchored against a real call to
+    `build()`, not a hardcoded guess at the domain's wording."""
+    spec = default_spec()  # threshold=None
+    with pytest.raises(Exception) as exc_info:
+        build(spec)
+
+    outcome = build_outcome(spec)
+
+    assert outcome.maps is None
+    assert outcome.ctx is None
+    assert outcome.error == str(exc_info.value)
+
+
+# -------------------------------------------------------------------- RunStep
+
+
 @pytest.mark.parametrize(
-    ("spec", "expected_extra"),
+    ("spec", "outcome", "expected_extra"),
     [
-        (default_spec(), []),
+        (
+            _BUILDABLE_SPEC,
+            BuildOutcome(maps=_StubMaps(7)),
+            [f"<p>{msg('run.ready', count=7)}</p>"],
+        ),
         (
             _SPEC_WITH_A_RUN_PROBLEM,
+            BuildOutcome(),
             [
                 "<p><strong>The assessment start year must be earlier than the "
                 "end year.</strong></p>",
-                "<p>Fix the problems above before building.</p>",
+                f"<p>{msg('run.blocked')}</p>",
             ],
         ),
         (
             _SPEC_WITH_ANOTHER_STEPS_PROBLEM,
-            ["<p>Fix the problems above before building.</p>"],
+            BuildOutcome(),
+            [f"<p>{msg('run.blocked')}</p>"],
+        ),
+        (
+            default_spec(),
+            BuildOutcome(error="spec.threshold must be resolved before the ee graph can be built"),
+            [
+                "<p><strong>spec.threshold must be resolved before the ee "
+                "graph can be built</strong></p>"
+            ],
         ),
     ],
 )
-def test_the_step_renders_only_its_own_text(spec, expected_extra):
-    """Pins what the step actually shows, in three states: a runnable spec
-    shows only the description; a spec with a fatal problem THIS step owns
-    shows that problem's text and the blocked notice; and a spec whose only
-    fatal problem belongs to ANOTHER step (missing AOI) shows the blocked
-    notice but NOT that other step's problem text -- the "only" half of this
-    test's name, which nothing else here exercises."""
+def test_the_step_renders_only_its_own_text(spec, outcome, expected_extra):
+    """Pins what the step actually shows, in four states: built (the status
+    line reports the real layer count), a fatal problem THIS step owns (that
+    problem's text plus the blocked notice), a fatal problem belonging to
+    ANOTHER step (the blocked notice but NOT that other step's text -- the
+    "only" half of this test's name), and a refusal `is_runnable` cannot see
+    (the error, bold). `RunStep` never calls `build_outcome` itself, so each
+    case hands it a `BuildOutcome` directly rather than relying on what the
+    real function would compute for that spec."""
     spec_r = solara.reactive(spec)
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec_r, maps=maps, ctx=ctx), handle_error=False)
+    box, rc = solara.render(RunStep(spec=spec_r, outcome=outcome), handle_error=False)
     assert rc is not None
     assert markdown_texts(box) == [
-        "<p>Build the indicator from the configuration above.</p>",
+        f"<p>{msg('run.description')}</p>",
         *expected_extra,
     ]
 
@@ -134,9 +191,7 @@ def test_the_year_selects_show_the_current_overall_period_and_the_legacy_range()
     `range(sensor_max_year, L4_start - 1, -1)` -- descending, no default. Both
     Selects share it; only their label and current value differ."""
     spec = solara.reactive(default_spec())
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    box, rc = solara.render(RunStep(spec=spec, outcome=BuildOutcome()), handle_error=False)
     assert rc is not None
 
     expected_years = list(range(date.today().year - 1, 1981, -1))
@@ -157,9 +212,7 @@ def test_selecting_a_start_year_updates_only_that_endpoint():
     `overall.end` and every other field untouched, and does not silently
     swap the two Selects' callbacks."""
     spec = solara.reactive(default_spec())
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    box, rc = solara.render(RunStep(spec=spec, outcome=BuildOutcome()), handle_error=False)
     assert rc is not None
 
     start_select, _end_select = find_widgets(box, ipyvuetify.Select)
@@ -174,37 +227,28 @@ def test_selecting_a_start_year_updates_only_that_endpoint():
 def test_the_step_survives_a_half_filled_overall_period_between_the_two_selects():
     """The two year Selects are independent widgets: a real user sets one
     before the other, leaving `overall` with a start and no end (or the
-    reverse) for at least one render. `resolve()` raises a bare `ValueError`
-    for that state, not `SpecError` (see `app.state.is_runnable`'s
-    docstring) -- this proves the step does not crash then, and correctly
-    keeps Build disabled until both endpoints are set.
+    reverse) for at least one render. `RunStep` itself calls neither
+    `resolve()` nor `build_outcome` -- only the total `problems_for` -- so
+    nothing here can make it crash; this proves the Selects keep updating
+    correctly through that half-filled state regardless. (The half-filled
+    period's effect on `build_outcome` itself is pinned separately above.)
     """
     spec = solara.reactive(default_spec(periods=SubPeriods()))
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    box, rc = solara.render(RunStep(spec=spec, outcome=BuildOutcome()), handle_error=False)
     assert rc is not None
 
     start_select, end_select = find_widgets(box, ipyvuetify.Select)
-    button = find_widget(box, ipyvuetify.Btn)
-    assert button.disabled is True  # neither endpoint set yet
 
-    start_select.v_model = 2000  # start only -- the state that used to crash
-
+    start_select.v_model = 2000  # start only -- the state that used to crash resolve()
     assert spec.value.periods.overall == Period(start=2000, end=None)
-    assert button.disabled is True  # still not runnable, and no crash
 
     end_select.v_model = 2020
-
     assert spec.value.periods.overall == Period(start=2000, end=2020)
-    assert button.disabled is False
 
 
 def test_selecting_an_end_year_updates_only_that_endpoint():
     spec = solara.reactive(default_spec())
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
+    box, rc = solara.render(RunStep(spec=spec, outcome=BuildOutcome()), handle_error=False)
     assert rc is not None
 
     _start_select, end_select = find_widgets(box, ipyvuetify.Select)
@@ -214,88 +258,3 @@ def test_selecting_an_end_year_updates_only_that_endpoint():
 
     assert spec.value.periods.overall == Period(start=2000, end=2010)
     assert spec.value.evolve(periods=before.periods) == before
-
-
-@pytest.mark.parametrize(
-    ("spec", "expected_disabled"),
-    [
-        (default_spec(), False),
-        (_SPEC_WITH_A_RUN_PROBLEM, True),
-        (_SPEC_WITH_ANOTHER_STEPS_PROBLEM, True),
-    ],
-)
-def test_the_build_button_is_disabled_exactly_when_not_runnable(spec, expected_disabled):
-    """``is_runnable`` -- not a length check on ``problems_for("run", ...)``
-    -- gates the button, so a problem some OTHER step owns still disables it
-    here (the third case: missing AOI, a problem Run's own loop never shows)."""
-    spec_r = solara.reactive(spec)
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec_r, maps=maps, ctx=ctx), handle_error=False)
-    assert rc is not None
-
-    button = find_widget(box, ipyvuetify.Btn)
-    assert button is not None
-    assert button.disabled is expected_disabled
-    assert button.color == "primary"
-    assert button.children == [msg("run.build")]
-
-
-def test_clicking_build_fills_the_reactives_and_reports_success(monkeypatch):
-    """A real click on the rendered widget -- not a captured spy -- proves
-    the button is wired to ``build()``, that BOTH reactives it hands back are
-    written, and that the toast and the context are the real ones.
-
-    The expected count (7) and scale (250, MODIS MOD13Q1's -- see
-    ``sdg1531.catalog.SENSORS``) are literals computed independently of
-    ``maps``/``ctx``, not read back off the very objects the click just
-    wrote: a build that quietly handed back the wrong context (a mismatched
-    scale for the zonal stats and export region -- see ``build()``'s
-    docstring) would still pass an ``isinstance``-only check.
-    """
-    fake = _FakeNotifier()
-    monkeypatch.setattr("app.steps.run.use_notifications", lambda: fake)
-
-    spec = solara.reactive(_BUILDABLE_SPEC)
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
-    assert rc is not None
-
-    button = find_widget(box, ipyvuetify.Btn)
-    assert button is not None
-    assert button.disabled is False
-
-    button.click()
-
-    assert isinstance(maps.value, IndicatorMaps)
-    assert isinstance(ctx.value, ExecutionContext)
-    assert ctx.value.analysis_scale == 250
-    assert fake.successes == [msg("run.built", count=7)]
-    assert fake.errors == []
-
-
-def test_clicking_build_on_a_spec_resolve_refuses_notifies_the_error_and_writes_nothing(
-    monkeypatch,
-):
-    """``build()`` can still raise ``SpecError`` for a spec ``validate()`` never
-    flagged (e.g. no vi_source at all) -- the tuple assignment must not run
-    half-way, and the error the user sees must be the domain's own message."""
-    fake = _FakeNotifier()
-    monkeypatch.setattr("app.steps.run.use_notifications", lambda: fake)
-
-    spec = solara.reactive(RunSpec())
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    box, rc = solara.render(RunStep(spec=spec, maps=maps, ctx=ctx), handle_error=False)
-    assert rc is not None
-
-    button = find_widget(box, ipyvuetify.Btn)
-    assert button is not None
-
-    button.click()  # a programmatic click bypasses the `disabled` UI hint
-
-    assert maps.value is None
-    assert ctx.value is None
-    assert fake.errors == ["vi_source is not set"]
-    assert fake.successes == []

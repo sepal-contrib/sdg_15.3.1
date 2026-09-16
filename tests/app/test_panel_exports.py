@@ -21,15 +21,13 @@ import solara
 
 from app.message import msg
 from app.panels.exports import ExportsPanel, export_sources
+from sdg1531.spec import RunSpec
 from tests.app.render_helpers import find_widget, markdown_texts
 
 
 def test_the_panel_renders_before_a_run():
-    maps = solara.reactive(None)
-    ctx = solara.reactive(None)
-    spec = solara.reactive(None)
     box, rc = solara.render(
-        ExportsPanel(maps=maps, ctx=ctx, spec=spec, gee_interface=None), handle_error=False
+        ExportsPanel(maps=None, ctx=None, spec=RunSpec(), gee_interface=None), handle_error=False
     )
     assert rc is not None
     # Not `exports.description` too: that copy lives once, in `page.py`'s
@@ -40,19 +38,17 @@ def test_the_panel_renders_before_a_run():
 
 
 def test_the_panel_waits_for_both_maps_and_context():
-    """``maps`` and ``ctx`` land via two separate assignments in
-    ``RunStep.on_build``, so a render can observe one set with the other
-    still ``None``. The panel must not offer the launcher until both have
-    landed."""
+    """``maps`` and ``ctx`` land together, from one ``build_outcome`` call --
+    but they are still two separate fields on that ``BuildOutcome``, so
+    nothing stops a caller handing in one without the other. The panel must
+    not offer the launcher until both have landed."""
     from app.steps.run import build
     from tests.spec_factory import default_spec
 
     maps_obj, _ctx_obj = build(default_spec(threshold=0.0))
-    maps = solara.reactive(maps_obj)
-    ctx = solara.reactive(None)
-    spec = solara.reactive(None)
     box, rc = solara.render(
-        ExportsPanel(maps=maps, ctx=ctx, spec=spec, gee_interface=None), handle_error=False
+        ExportsPanel(maps=maps_obj, ctx=None, spec=RunSpec(), gee_interface=None),
+        handle_error=False,
     )
     assert rc is not None
     assert markdown_texts(box) == [f"<p>{msg('exports.build_first')}</p>"]
@@ -135,13 +131,12 @@ def test_the_launcher_is_wired_with_the_localized_label_and_the_threaded_gee_int
     monkeypatch.setattr("app.panels.exports.ExportLauncher", _spy_export_launcher)
 
     maps_obj, ctx_obj = build(default_spec(threshold=0.0))
-    maps = solara.reactive(maps_obj)
-    ctx = solara.reactive(ctx_obj)
-    spec = solara.reactive(None)
     sentinel_gee_interface = object()
 
     box, rc = solara.render(
-        ExportsPanel(maps=maps, ctx=ctx, spec=spec, gee_interface=sentinel_gee_interface),
+        ExportsPanel(
+            maps=maps_obj, ctx=ctx_obj, spec=RunSpec(), gee_interface=sentinel_gee_interface
+        ),
         handle_error=False,
     )
     assert rc is not None
