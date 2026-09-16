@@ -37,14 +37,20 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     the rendered box at all under that mistake -- and, unlike a grep, it also
     catches a dropped or misspelled kwarg for every field this task gives a
     genuinely non-empty expected value (an empty map, a wrong title, a wrong
-    panel config, no language selector). ``right_panel_content`` and
-    ``steps_data`` are checked only by shape here (title/icon/description,
-    ``len(content) == 1``) -- this check alone cannot tell a placeholder
-    widget from the real ``MapLayersPanel`` or AOI step, since both would
-    pass it -- ``test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee_interface``,
+    panel config, no language selector). ``right_panel_content`` is checked
+    only by shape here (title/icon, ``len(content) == 1``) -- this check
+    alone cannot tell a placeholder widget from the real ``MapLayersPanel`` or
+    AOI step, since both would pass it --
+    ``test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee_interface``,
     ``test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map`` and
     ``test_the_productivity_step_shares_the_aoi_step_s_spec`` below prove
     identity instead.
+
+    The five workflow steps live in ``right_panel_content`` now, not
+    ``steps_data`` (Task 18 moved them to match the ``sbae-design`` /
+    ``sepal-gee-bundle`` layout) -- ``steps_data`` is asserted empty here for
+    the same reason ``test_the_layers_panel_is_wired...`` below matters: a
+    leftover copy of a step in the old home would render it twice.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -62,47 +68,58 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
         "width": 450,
         "description": msg("panel.description"),
     }
-    assert len(mapapp.right_panel_content) == 1
-    layers_section = mapapp.right_panel_content[0]
+    assert mapapp.steps_data == []
+    assert len(mapapp.right_panel_content) == 6
+    aoi_section = mapapp.right_panel_content[0]
+    assert aoi_section["title"] == msg("step.aoi")
+    assert aoi_section["icon"] == "mdi-map-marker-check"
+    assert len(aoi_section["content"]) == 1
+    productivity_section = mapapp.right_panel_content[1]
+    assert productivity_section["title"] == msg("step.productivity")
+    assert productivity_section["icon"] == "mdi-sprout-outline"
+    assert len(productivity_section["content"]) == 1
+    land_cover_section = mapapp.right_panel_content[2]
+    assert land_cover_section["title"] == msg("step.land_cover")
+    assert land_cover_section["icon"] == "mdi-terrain"
+    assert len(land_cover_section["content"]) == 1
+    soc_section = mapapp.right_panel_content[3]
+    assert soc_section["title"] == msg("step.soc")
+    assert soc_section["icon"] == "mdi-layers-outline"
+    assert len(soc_section["content"]) == 1
+    run_section = mapapp.right_panel_content[4]
+    assert run_section["title"] == msg("step.run")
+    assert run_section["icon"] == "mdi-play-circle-outline"
+    assert len(run_section["content"]) == 1
+    layers_section = mapapp.right_panel_content[5]
     assert layers_section["title"] == msg("layers.title")
     assert layers_section["icon"] == "mdi-layers"
     assert layers_section["description"] == msg("layers.description")
     assert len(layers_section["content"]) == 1
     assert mapapp.right_panel_open is True
-    assert len(mapapp.steps_data) == 5
-    aoi_step = mapapp.steps_data[0]
-    assert aoi_step["id"] == 1
-    assert aoi_step["name"] == msg("step.aoi")
-    assert aoi_step["icon"] == "mdi-map-marker-check"
-    assert aoi_step["display"] == "step"
-    assert len(aoi_step["content"]) == 1
-    productivity_step = mapapp.steps_data[1]
-    assert productivity_step["id"] == 2
-    assert productivity_step["name"] == msg("step.productivity")
-    assert productivity_step["icon"] == "mdi-sprout-outline"
-    assert productivity_step["display"] == "step"
-    assert len(productivity_step["content"]) == 1
-    land_cover_step = mapapp.steps_data[2]
-    assert land_cover_step["id"] == 3
-    assert land_cover_step["name"] == msg("step.land_cover")
-    assert land_cover_step["icon"] == "mdi-terrain"
-    assert land_cover_step["display"] == "step"
-    assert len(land_cover_step["content"]) == 1
-    soc_step = mapapp.steps_data[3]
-    assert soc_step["id"] == 4
-    assert soc_step["name"] == msg("step.soc")
-    assert soc_step["icon"] == "mdi-layers-outline"
-    assert soc_step["display"] == "step"
-    assert len(soc_step["content"]) == 1
-    run_step = mapapp.steps_data[4]
-    assert run_step["id"] == 5
-    assert run_step["name"] == msg("step.run")
-    assert run_step["icon"] == "mdi-play-circle-outline"
-    assert run_step["display"] == "step"
-    assert len(run_step["content"]) == 1
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
     assert offered == set(messages.available_locales())
+
+
+def test_the_map_is_memoized_across_rerenders():
+    """``Sdg1531App`` used to build a brand-new ``SepalMap`` on every render,
+    discarding the previous one's basemap, zoom and layers each time.
+    ``solara.use_memo``, keyed on ``id(gee_interface)``, is supposed to
+    prevent that -- proven here by forcing a second render and checking the
+    SAME ``SepalMap`` instance comes back, not merely another one that would
+    also pass an ``isinstance`` check.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    mapapp = find_widget(box, MapApp)
+    assert mapapp is not None
+    first_map = mapapp.main_map[0]
+
+    rc.force_update()
+
+    mapapp_again = find_widget(box, MapApp)
+    assert mapapp_again is not None
+    assert mapapp_again.main_map[0] is first_map
 
 
 def test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map(monkeypatch):
@@ -264,18 +281,18 @@ def test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee
 
 
 def test_the_steps_are_in_the_sub_indicator_order():
-    """AOI -> Productivity -> Land cover -> SOC -> Run (design decision A6).
-    Position is what orders them: MapApp renders `steps_data` as given, so a
-    step appended in the wrong place displays in the wrong place however its
-    `id` reads.
+    """AOI -> Productivity -> Land cover -> SOC -> Run (design decision A6;
+    unchanged by Task 18's move from `steps_data` into `right_panel_content`).
+    Position is what orders them: MapApp renders `right_panel_content` as
+    given, so a section appended in the wrong place displays in the wrong
+    place -- and a section has no `id` at all for a stray sort to key on.
 
     Compared against `msg(...)` rather than English literals so the assertion
     pins ORDER without also pinning the copy, and so it does not break when
     Task 14 adds locales.
     """
-    steps = page_module.build_steps_data()
-    assert [step["id"] for step in steps] == [1, 2, 3, 4, 5]
-    assert [step["name"] for step in steps] == [
+    sections = page_module.build_workflow_sections()
+    assert [section["title"] for section in sections] == [
         msg("step.aoi"),
         msg("step.productivity"),
         msg("step.land_cover"),

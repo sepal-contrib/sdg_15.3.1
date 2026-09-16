@@ -3,9 +3,15 @@
 ``Sdg1531App`` holds the layout so the same code can serve both runtimes;
 ``Page`` wraps it with SEPAL session authentication for the Solara server.
 
-``steps_data`` is unsorted -- its DISPLAY order is list order, not ``id``. AOI
-is first and Run is last; Productivity, Land cover and SOC sit between them,
-in that order (see ``build_steps_data``).
+The five configuration steps live in ``right_panel_content``, not
+``steps_data`` -- the repo owner asked for the ``sbae-design`` /
+``sepal-gee-bundle`` layout, where the whole workflow sits in the right panel
+as titled sections and the drawer holds none of it (this supersedes decision
+A6's PLACEMENT; the ORDER it chose is unchanged). List position, not any key,
+is still what orders them: AOI is first and Run is last; Productivity, Land
+cover and SOC sit between them, in that order (see ``build_workflow_sections``).
+``steps_data`` is left empty -- this app has no non-workflow entry (an About
+dialog, say) to put there.
 """
 
 from __future__ import annotations
@@ -36,29 +42,30 @@ from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import RunSpec
 
-__all__ = ("Page", "Sdg1531App", "build_steps_data")
+__all__ = ("Page", "Sdg1531App", "build_workflow_sections")
 
 setup_solara_server(extra_asset_locations=[])
 
 
-def build_steps_data(
+def build_workflow_sections(
     spec: solara.Reactive[RunSpec] | None = None,
     sepal_map: SepalMap | None = None,
     maps: solara.Reactive[IndicatorMaps | None] | None = None,
     ctx: solara.Reactive[ExecutionContext | None] | None = None,
 ) -> list[dict[str, object]]:
-    """The five configuration steps, in DISPLAY order.
+    """The five configuration steps, as ``right_panel_content`` sections, in DISPLAY order.
 
-    List position, not ``id``, is what orders them -- ``MapApp.vue`` returns
-    ``steps_data`` as given. AOI -> Productivity -> Land cover -> SOC -> Run
-    (design decision A6); Run's own ``id`` reads 5 even though SOC (id 4) was
-    the task added after it.
+    List position is still what orders them -- ``MapApp.vue`` renders
+    ``right_panel_content`` as given -- but a section has no ``id`` for a
+    stray sort to key on (unlike a ``steps_data`` entry), so order lives in
+    list position alone. AOI -> Productivity -> Land cover -> SOC -> Run
+    (design decision A6, unchanged by the move out of ``steps_data``).
 
     Every argument defaults to ``None`` so this is reachable with no render
     context at all -- calling a ``@solara.component`` function outside a
     render pass builds an inert element descriptor, never executes the
     component body, so ``tests/app/test_page.py`` can call
-    ``build_steps_data()`` bare to pin step order (id, name, icon, display)
+    ``build_workflow_sections()`` bare to pin section order (title, icon)
     without a real spec, map or reactive to hand it. Each step's own content
     is built only once its required reactives are actually present, guarded
     with plain ``is not None`` checks -- calling a step with ``None`` would
@@ -68,6 +75,12 @@ def build_steps_data(
     from ``None`` before it reaches a step that declares a bare
     ``Reactive[...]`` parameter; measured by deleting the guards, which
     leaves every test green and produces one ``mypy`` error per guard removed.
+
+    No ``description`` key: each step still renders its own
+    ``msg("<step>.description")`` internally (unlike ``MapLayersPanel``, which
+    dropped that call in favour of the section's ``description`` field --
+    see ``map_layers.py``). Adding one here without touching the step bodies
+    would print the sentence twice.
     """
     aoi_content: list[object] = (
         [AoiStep(spec=spec, map_=sepal_map)] if spec is not None and sepal_map is not None else []
@@ -81,39 +94,17 @@ def build_steps_data(
         else []
     )
     return [
+        {"title": msg("step.aoi"), "icon": "mdi-map-marker-check", "content": aoi_content},
         {
-            "id": 1,
-            "name": msg("step.aoi"),
-            "icon": "mdi-map-marker-check",
-            "display": "step",
-            "content": aoi_content,
-        },
-        {
-            "id": 2,
-            "name": msg("step.productivity"),
+            "title": msg("step.productivity"),
             "icon": "mdi-sprout-outline",
-            "display": "step",
             "content": productivity_content,
         },
+        {"title": msg("step.land_cover"), "icon": "mdi-terrain", "content": land_cover_content},
+        {"title": msg("step.soc"), "icon": "mdi-layers-outline", "content": soc_content},
         {
-            "id": 3,
-            "name": msg("step.land_cover"),
-            "icon": "mdi-terrain",
-            "display": "step",
-            "content": land_cover_content,
-        },
-        {
-            "id": 4,
-            "name": msg("step.soc"),
-            "icon": "mdi-layers-outline",
-            "display": "step",
-            "content": soc_content,
-        },
-        {
-            "id": 5,
-            "name": msg("step.run"),
+            "title": msg("step.run"),
             "icon": "mdi-play-circle-outline",
-            "display": "step",
             "content": run_content,
         },
     ]
@@ -128,7 +119,7 @@ def _on_kernel_start() -> Callable[[], None]:
 
 @solara.component
 def Sdg1531App() -> None:
-    """The MapApp shell: five configuration steps, results in the right panel."""
+    """The MapApp shell: the five configuration steps and results live in the right panel."""
     setup_theme_colors()
 
     spec = solara.use_reactive(RunSpec())
@@ -141,7 +132,17 @@ def Sdg1531App() -> None:
     # gee_interface, not gee_session: the session param is deprecated in favour of it
     # (sepal_map.py's __init__ docstring), and passing the interface is what makes the
     # map share this kernel's authenticated session instead of building its own.
-    sepal_map = SepalMap(gee=True, theme_state=theme_state, gee_interface=gee_interface)
+    #
+    # Wrapped in use_memo, keyed on id(gee_interface): without it a new SepalMap
+    # widget was built on every render, discarding the previous one's basemap,
+    # zoom and layers each time. sepal-gee-bundle's tmf_sepal/page.py, the
+    # layout reference for this task, memoizes the same way.
+    sepal_map = solara.use_memo(
+        lambda: SepalMap(
+            gee=True, fullscreen=True, theme_state=theme_state, gee_interface=gee_interface
+        ),
+        [id(gee_interface)],
+    )
 
     # Mounted before anything that calls use_notifications(): the bus is
     # created during render, via solara.use_memo (not an effect), specifically
@@ -155,7 +156,7 @@ def Sdg1531App() -> None:
         app_title=msg("app.title"),
         app_icon="mdi-earth",
         main_map=[sepal_map],
-        steps_data=build_steps_data(spec=spec, sepal_map=sepal_map, maps=maps, ctx=ctx),
+        steps_data=[],
         right_panel_config={
             "title": msg("panel.title"),
             "icon": "mdi-chart-box-outline",
@@ -163,6 +164,7 @@ def Sdg1531App() -> None:
             "description": msg("panel.description"),
         },
         right_panel_content=[
+            *build_workflow_sections(spec=spec, sepal_map=sepal_map, maps=maps, ctx=ctx),
             {
                 "title": msg("layers.title"),
                 "icon": "mdi-layers",
