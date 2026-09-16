@@ -3,21 +3,23 @@
 ``Sdg1531App`` holds the layout so the same code can serve both runtimes;
 ``Page`` wraps it with SEPAL session authentication for the Solara server.
 
-The five configuration steps live in ``right_panel_content``, not
-``steps_data`` -- the repo owner asked for the ``sbae-design`` /
-``sepal-gee-bundle`` layout, where the whole workflow sits in the right panel
-as titled sections and the drawer holds none of it (this supersedes decision
-A6's PLACEMENT; the ORDER it chose is unchanged). List position, not any key,
-is still what orders them: AOI is first and Run is last; Productivity, Land
-cover and SOC sit between them, in that order (see ``build_workflow_sections``).
-``steps_data`` is left empty -- this app has no non-workflow entry (an About
-dialog, say) to put there.
+The whole workflow lives in ``right_panel_content``, not ``steps_data`` --
+the repo owner asked for the ``sbae-design`` / ``sepal-gee-bundle`` layout,
+then separately for the ten steps to be tabs. ``app/tabs.py``'s
+``WorkflowTabs`` does both at once, the way ``spatial-risk-module`` /
+``spatial-risk-main-branch``'s own ``WorkflowTabs`` does: ONE titleless
+section whose whole content is that single component (this supersedes
+decision A6's PLACEMENT a second time; the ORDER it chose is unchanged). List
+position, not any key, is still what orders the ten tabs inside it: AOI is
+first and Export is last; Productivity, Land cover, SOC and Run sit between
+them, then Layers, Transitions, Results and Zonal after Run, in that order
+(see ``app.tabs.workflow_tabs``). ``steps_data`` is left empty -- this app
+has no non-workflow entry (an About dialog, say) to put there.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
 import solara
 from pysepal.mapping.sepal_map import SepalMap
@@ -34,88 +36,13 @@ from pysepal.solara import (
 from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
-from app.panels.exports import ExportsPanel
-from app.panels.map_layers import MapLayersPanel
-from app.panels.results import ResultsPanel
-from app.panels.transitions import TransitionsPanel
-from app.panels.zonal import ZonalPanel
-from app.steps.aoi import AoiStep
-from app.steps.land_cover import LandCoverStep
-from app.steps.productivity import ProductivityStep
-from app.steps.run import BuildOutcome, RunStep, build_outcome
-from app.steps.soc import SocStep
+from app.steps.run import build_outcome
+from app.tabs import WorkflowTabs
 from sdg1531.spec import RunSpec
 
-__all__ = ("Page", "Sdg1531App", "build_workflow_sections")
+__all__ = ("Page", "Sdg1531App")
 
 setup_solara_server(extra_asset_locations=[])
-
-
-def build_workflow_sections(
-    spec: solara.Reactive[RunSpec] | None = None,
-    sepal_map: SepalMap | None = None,
-    outcome: BuildOutcome | None = None,
-    gee_interface: Any = None,
-) -> list[dict[str, object]]:
-    """The five configuration steps, as ``right_panel_content`` sections, in DISPLAY order.
-
-    List position is still what orders them -- ``MapApp.vue`` renders
-    ``right_panel_content`` as given -- but a section has no ``id`` for a
-    stray sort to key on (unlike a ``steps_data`` entry), so order lives in
-    list position alone. AOI -> Productivity -> Land cover -> SOC -> Run
-    (design decision A6, unchanged by the move out of ``steps_data``).
-
-    Every argument defaults to ``None`` so this is reachable with no render
-    context at all -- calling a ``@solara.component`` function outside a
-    render pass builds an inert element descriptor, never executes the
-    component body, so ``tests/app/test_page.py`` can call
-    ``build_workflow_sections()`` bare to pin section order (title, icon)
-    without a real spec, map or outcome to hand it. Each step's own content
-    is built only once its required arguments are actually present, guarded
-    with plain ``is not None`` checks -- calling a step with ``None`` would
-    not actually raise (an inert element descriptor is built either way, per
-    the paragraph above), so this buys nothing at runtime. It exists solely
-    so ``mypy --strict`` narrows each ``X | None`` argument away from
-    ``None`` before it reaches a step that declares a bare ``X`` parameter
-    (``Reactive[RunSpec]`` for ``spec``, plain ``BuildOutcome`` for
-    ``outcome``); measured by deleting the guards, which leaves every test
-    green and produces one ``mypy`` error per guard removed.
-
-    No ``description`` key: each step still renders its own
-    ``msg("<step>.description")`` internally (unlike ``MapLayersPanel``, which
-    dropped that call in favour of the section's ``description`` field --
-    see ``map_layers.py``). Adding one here without touching the step bodies
-    would print the sentence twice.
-    """
-    aoi_content: list[object] = (
-        [AoiStep(spec=spec, map_=sepal_map)] if spec is not None and sepal_map is not None else []
-    )
-    productivity_content: list[object] = [ProductivityStep(spec=spec)] if spec is not None else []
-    # No `gee_interface is not None` guard: `LandCoverStep`'s own parameter already
-    # defaults to `None` (`AssetSelectComponent` falls back to the session
-    # interface), so there is no bare `Reactive[...]` for mypy to narrow here.
-    land_cover_content: list[object] = (
-        [LandCoverStep(spec=spec, gee_interface=gee_interface)] if spec is not None else []
-    )
-    soc_content: list[object] = [SocStep(spec=spec)] if spec is not None else []
-    run_content: list[object] = (
-        [RunStep(spec=spec, outcome=outcome)] if spec is not None and outcome is not None else []
-    )
-    return [
-        {"title": msg("step.aoi"), "icon": "mdi-map-marker-check", "content": aoi_content},
-        {
-            "title": msg("step.productivity"),
-            "icon": "mdi-sprout-outline",
-            "content": productivity_content,
-        },
-        {"title": msg("step.land_cover"), "icon": "mdi-terrain", "content": land_cover_content},
-        {"title": msg("step.soc"), "icon": "mdi-layers-outline", "content": soc_content},
-        {
-            "title": msg("step.run"),
-            "icon": "mdi-play-circle-outline",
-            "content": run_content,
-        },
-    ]
 
 
 @solara.lab.on_kernel_start
@@ -127,7 +54,7 @@ def _on_kernel_start() -> Callable[[], None]:
 
 @solara.component
 def Sdg1531App() -> None:
-    """The MapApp shell: the five configuration steps and results live in the right panel."""
+    """The MapApp shell: the whole workflow lives in the right panel, as tabs."""
     setup_theme_colors()
 
     spec = solara.use_reactive(RunSpec())
@@ -179,61 +106,23 @@ def Sdg1531App() -> None:
             "width": 450,
             "description": msg("panel.description"),
         },
+        # ONE titleless section: pysepal's RightPanel.vue renders a section with
+        # no `title`, `icon` or `description` as bare content, so the tab
+        # component gets the full panel width instead of a stacked heading per
+        # step. See `app/tabs.py`'s module docstring for why -- the owner asked
+        # for the workflow in the right panel AND for the steps to be tabs; this
+        # is the reference app's structure for doing both at once.
         right_panel_content=[
-            *build_workflow_sections(
-                spec=spec, sepal_map=sepal_map, outcome=outcome, gee_interface=gee_interface
-            ),
             {
-                "title": msg("layers.title"),
-                "icon": "mdi-layers",
                 "content": [
-                    MapLayersPanel(maps=outcome.maps, map_=sepal_map, gee_interface=gee_interface)
-                ],
-                "description": msg("layers.description"),
-            },
-            {
-                "title": msg("transitions.title"),
-                "icon": "mdi-transit-transfer",
-                "content": [
-                    TransitionsPanel(
-                        maps=outcome.maps, ctx=outcome.ctx, gee_interface=gee_interface
-                    )
-                ],
-                "description": msg("transitions.description"),
-            },
-            {
-                "title": msg("results.title"),
-                "icon": "mdi-chart-bar",
-                "content": [
-                    ResultsPanel(maps=outcome.maps, ctx=outcome.ctx, gee_interface=gee_interface)
-                ],
-                "description": msg("results.description"),
-            },
-            {
-                "title": msg("zonal.title"),
-                "icon": "mdi-table",
-                "content": [
-                    ZonalPanel(
-                        maps=outcome.maps,
-                        ctx=outcome.ctx,
+                    WorkflowTabs(
+                        spec=spec,
+                        sepal_map=sepal_map,
+                        outcome=outcome,
                         gee_interface=gee_interface,
                         sepal_client=get_current_sepal_client(),
                     )
                 ],
-                "description": msg("zonal.description"),
-            },
-            {
-                "title": msg("exports.title"),
-                "icon": "mdi-export-variant",
-                "content": [
-                    ExportsPanel(
-                        maps=outcome.maps,
-                        ctx=outcome.ctx,
-                        spec=spec.value,
-                        gee_interface=gee_interface,
-                    )
-                ],
-                "description": msg("exports.description"),
             },
         ],
         right_panel_open=True,
