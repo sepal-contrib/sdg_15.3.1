@@ -9,6 +9,11 @@ as a dotted path that mirrors the spec's own structure, so a step can claim a
 subtree by prefix instead of every rule naming its owner. A test asserts the
 table covers every field the validator can emit and that no two steps claim the
 same one.
+
+``render_problems`` is the other half of that: every step used to copy-paste
+the same three-line loop over its own ``problems_for()`` result. One copy here
+means a change to how a problem is shown (the bold-if-fatal rule, say) reaches
+every step at once instead of needing five identical edits.
 """
 
 from __future__ import annotations
@@ -16,11 +21,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 
+import solara
+
 from sdg1531.resolve import resolve
 from sdg1531.spec import RunSpec
 from sdg1531.validate import Problem, validate
 
-__all__ = ("STEP_PREFIXES", "is_runnable", "problems_for")
+__all__ = ("STEP_PREFIXES", "is_runnable", "problems_for", "render_problems")
 
 STEP_PREFIXES: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
@@ -71,6 +78,17 @@ def problems_for(step: str, spec: RunSpec) -> tuple[Problem, ...]:
     """
     prefixes = STEP_PREFIXES[step]
     return tuple(p for p in validate(spec) if any(_owns(prefix, p.field) for prefix in prefixes))
+
+
+def render_problems(step: str, spec: RunSpec) -> None:
+    """Render every problem ``step`` owns: bold and blocking if fatal, plain
+    text otherwise. Not a ``@solara.component`` -- it renders no hook of its
+    own, so a plain function called from inside a step's render body is
+    enough, the same way each step called ``solara.Markdown`` in a loop
+    directly before this was extracted.
+    """
+    for problem in problems_for(step, spec):
+        solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)
 
 
 def is_runnable(spec: RunSpec) -> bool:

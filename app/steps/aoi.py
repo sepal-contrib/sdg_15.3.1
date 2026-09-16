@@ -14,7 +14,7 @@ from pysepal.solara.components.aoi.aoi_result import AoiResult
 
 from app.adapters import to_domain_aoi
 from app.message import msg
-from app.state import problems_for
+from app.state import render_problems
 from sdg1531.spec import RunSpec
 
 __all__ = ("AoiStep", "apply_selection")
@@ -51,5 +51,4 @@ def AoiStep(spec: solara.Reactive[RunSpec], map_: Any) -> None:
     if spec.value.aoi is not None:
         solara.Markdown(msg("aoi.selected", name=spec.value.aoi.name))
 
-    for problem in problems_for("aoi", spec.value):
-        solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)
+    render_problems("aoi", spec.value)

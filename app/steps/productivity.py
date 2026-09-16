@@ -19,7 +19,7 @@ from collections.abc import Iterable
 import solara
 
 from app.message import msg
-from app.state import problems_for
+from app.state import render_problems
 from sdg1531.catalog import DISABLED_TRAJECTORIES, SENSORS
 from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
 from sdg1531.spec import RunSpec, SensorSelection
@@ -142,5 +142,4 @@ def ProductivityStep(spec: solara.Reactive[RunSpec]) -> None:
         on_value=lambda v: spec.set(spec.value.evolve(threshold=v)),
     )
 
-    for problem in problems_for("productivity", spec.value):
-        solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)
+    render_problems("productivity", spec.value)

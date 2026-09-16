@@ -31,7 +31,7 @@ from datetime import date
 import solara
 
 from app.message import msg
-from app.state import is_runnable, problems_for
+from app.state import is_runnable, render_problems
 from sdg1531.catalog import L4_START
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps, build_indicator_maps
@@ -93,9 +93,6 @@ def build_outcome(spec: RunSpec) -> BuildOutcome:
 def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
     solara.Markdown(msg("run.description"))
 
-    for problem in problems_for("run", spec.value):
-        solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)
-
     # The overall period. Transcribed from the legacy's PickerLine
     # (component/widget/picker_line.py:13-27): two year Selects over
     # `range(sensor_max_year, L4_start - 1, -1)` -- descending, 1982 up to last
@@ -125,6 +122,8 @@ def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
             spec.value.evolve(periods=replace(spec.value.periods, overall=Period(overall.start, y)))
         ),
     )
+
+    render_problems("run", spec.value)
 
     if outcome.error is not None:
         solara.Markdown(f"**{outcome.error}**")

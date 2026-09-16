@@ -54,7 +54,7 @@ from pysepal.solara.components.inputs.asset_select import AssetSelectComponent
 from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
-from app.state import problems_for
+from app.state import render_problems
 from sdg1531.catalog import L4_START
 from sdg1531.scheme import LandCoverScheme
 from sdg1531.spec import (
@@ -268,5 +268,4 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
     elif current.water_mask is not None:
         solara.Markdown(msg("land_cover.water_mask_other_arm"))
 
-    for problem in problems_for("land_cover", spec.value):
-        solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)
+    render_problems("land_cover", spec.value)

@@ -137,10 +137,12 @@ implicit_reexport = true
 # into it. Every step under app/steps renders its description and its own
 # validation problems through it (see AoiStep), so this belongs on the package,
 # not one file at a time. app.panels.* joins it for the same reason -- every
-# panel renders a description through Markdown too (see MapLayersPanel);
-# app.page, app.adapters and app.state are logic rather than UI and stay off
-# this list.
-module = ["app.steps.*", "app.panels.*"]
+# panel renders a description through Markdown too (see MapLayersPanel).
+# app.state joins it too, narrowly: render_problems is the one shared spot
+# every step's Markdown-a-problem loop was extracted to, so state.py now
+# makes exactly that one call -- it is still logic rather than UI everywhere
+# else. app.page and app.adapters render nothing and stay off this list.
+module = ["app.steps.*", "app.panels.*", "app.state"]
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]

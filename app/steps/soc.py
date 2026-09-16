@@ -16,7 +16,7 @@ from datetime import date
 import solara
 
 from app.message import msg
-from app.state import problems_for
+from app.state import render_problems
 from sdg1531.catalog import L4_START
 from sdg1531.spec import PeriodOverride, RunSpec
 
@@ -67,5 +67,4 @@ def SocStep(spec: solara.Reactive[RunSpec]) -> None:
         on_value=lambda v: set_bounds(spec.value.periods.soc.start, v),
     )
 
-    for problem in problems_for("soc", spec.value):
-        solara.Markdown(f"**{problem.message}**" if problem.fatal else problem.message)
+    render_problems("soc", spec.value)
