@@ -1,0 +1,106 @@
+{
+  "app": {
+    "title": "Indicador ODS 15.3.1",
+    "subtitle": "Proporción de tierras degradadas en relación con la superficie territorial total"
+  },
+  "panel": {
+    "title": "Resultados",
+    "description": "Capas, estadísticas y exportaciones de la ejecución actual."
+  },
+  "step": {
+    "aoi": "Área de interés",
+    "productivity": "Productividad",
+    "land_cover": "Cobertura del suelo",
+    "soc": "Carbono orgánico del suelo",
+    "run": "Ejecutar"
+  },
+  "aoi": {
+    "description": "Elija el área sobre la que se calcula el indicador.",
+    "selected": "Seleccionado: {name}"
+  },
+  "productivity": {
+    "description": "Índice de vegetación, método de tendencia y unidades ecológicas.",
+    "sensors": "Sensores",
+    "index": "Índice de vegetación",
+    "trajectory": "Método de tendencia",
+    "lceu": "Unidades ecológicas",
+    "lookup": "Tabla de referencia",
+    "threshold": "Umbral IV",
+    "index_value": {
+      "ndvi": "Índice de vegetación de diferencia normalizada (NDVI)",
+      "evi": "Índice de vegetación mejorado - 2 (EVI2)",
+      "msvi": "Índice de vegetación ajustado al suelo modificado - 2 (MSVI2)"
+    },
+    "trajectory_value": {
+      "ndvi_trend": "Tendencia de productividad (IV)",
+      "p_res_trend": "Tendencia residual (IV observado - IV predicho)",
+      "s_res_trend": "Eficiencia en el uso del agua (WUE)",
+      "ue_trend": "Eficiencia en el uso de la lluvia (RUE)"
+    },
+    "lceu_value": {
+      "gaes": "Estratificación agroambiental mundial",
+      "aez": "Zonas agroecológicas mundiales",
+      "wte": "Ecosistemas del mundo",
+      "hru": "Unidades de respuesta homogéneas mundiales",
+      "calculate": "Calcular a partir de la cobertura del suelo y la textura del suelo"
+    }
+  },
+  "land_cover": {
+    "description": "Fuente de la cobertura del suelo y máscara de agua.",
+    "source": "Fuente de la cobertura del suelo",
+    "water_mask": "Máscara de agua",
+    "water_mask_other_arm": "Ya hay configurada una máscara de agua diferente; este control solo modifica el umbral de estacionalidad.",
+    "esa": "ESA CCI",
+    "custom": "Assets personalizados",
+    "start_asset": "Asset de cobertura del suelo inicial",
+    "end_asset": "Asset de cobertura del suelo final"
+  },
+  "soc": {
+    "description": "El período durante el cual se mide el cambio del carbono orgánico del suelo.",
+    "start": "Año de inicio",
+    "end": "Año final"
+  },
+  "run": {
+    "description": "Construir el indicador a partir de la configuración anterior.",
+    "start_year": "Año de inicio",
+    "end_year": "Año final",
+    "build": "Construir",
+    "built": "{count} capas construidas",
+    "blocked": "Corrija los problemas anteriores antes de construir."
+  },
+  "layers": {
+    "title": "Capas",
+    "description": "Añadir las capas calculadas al mapa.",
+    "show": "Mostrar en el mapa",
+    "shown": "{count} capas añadidas al mapa",
+    "build_first": "Construya primero el indicador."
+  },
+  "transitions": {
+    "title": "Transiciones",
+    "description": "Transiciones de la cobertura del suelo entre los años inicial y final.",
+    "compute": "Calcular transiciones",
+    "computed": "Transiciones listas",
+    "build_first": "Construya primero el indicador."
+  },
+  "results": {
+    "title": "Resultados",
+    "description": "Superficies de clases por tipo de cobertura del suelo.",
+    "compute": "Calcular estadísticas",
+    "computed": "Estadísticas listas",
+    "build_first": "Construya primero el indicador."
+  },
+  "zonal": {
+    "title": "Estadísticas zonales",
+    "description": "Superficies del indicador por zona administrativa.",
+    "compute": "Calcular estadísticas zonales",
+    "download": "Descargar shapefile",
+    "ready": "Estadísticas zonales listas",
+    "build_first": "Construya primero el indicador."
+  },
+  "exports": {
+    "title": "Exportación",
+    "description": "Exportar cualquier capa como asset de GEE.",
+    "button": "Exportar",
+    "build_first": "Construya primero el indicador."
+  }
+}

@@ -2,5 +2,105 @@
   "app": {
     "title": "Indicateur ODD 15.3.1",
     "subtitle": "Proportion de terres dégradées par rapport à la superficie totale des terres"
+  },
+  "panel": {
+    "title": "Résultats",
+    "description": "Couches, statistiques et exports pour l'exécution en cours."
+  },
+  "step": {
+    "aoi": "Zone d'intérêt",
+    "productivity": "Productivité",
+    "land_cover": "Couverture terrestre",
+    "soc": "Carbone organique du sol",
+    "run": "Exécuter"
+  },
+  "aoi": {
+    "description": "Choisissez la zone sur laquelle l'indicateur est calculé.",
+    "selected": "Sélectionné : {name}"
+  },
+  "productivity": {
+    "description": "Indice de végétation, méthode de tendance et unités écologiques.",
+    "sensors": "Capteurs",
+    "index": "Indice de végétation",
+    "trajectory": "Méthode de tendance",
+    "lceu": "Unités écologiques",
+    "lookup": "Table de correspondance",
+    "threshold": "Seuil IV",
+    "index_value": {
+      "ndvi": "Indice de végétation par différence normalisée (NDVI)",
+      "evi": "Indice de végétation amélioré - 2 (EVI2)",
+      "msvi": "Indice de végétation ajusté au sol modifié - 2 (MSVI2)"
+    },
+    "trajectory_value": {
+      "ndvi_trend": "Tendance de productivité (IV)",
+      "p_res_trend": "Tendance résiduelle (IV observé - IV prédit)",
+      "s_res_trend": "Efficacité d'utilisation de l'eau (WUE)",
+      "ue_trend": "Efficacité d'utilisation de la pluie (RUE)"
+    },
+    "lceu_value": {
+      "gaes": "Stratification agro-environnementale mondiale",
+      "aez": "Zones agro-écologiques mondiales",
+      "wte": "Écosystèmes du monde",
+      "hru": "Unités de réponse homogènes mondiales",
+      "calculate": "Calculer à partir de la couverture terrestre et de la texture du sol"
+    }
+  },
+  "land_cover": {
+    "description": "Source de la couverture terrestre et masque d'eau.",
+    "source": "Source de la couverture terrestre",
+    "water_mask": "Masque d'eau",
+    "water_mask_other_arm": "Un masque d'eau différent est déjà configuré ; ce contrôle ne modifie que le seuil de saisonnalité.",
+    "esa": "ESA CCI",
+    "custom": "Assets personnalisés",
+    "start_asset": "Asset de couverture terrestre de début",
+    "end_asset": "Asset de couverture terrestre de fin"
+  },
+  "soc": {
+    "description": "La période sur laquelle le changement de carbone organique du sol est mesuré.",
+    "start": "Année de début",
+    "end": "Année de fin"
+  },
+  "run": {
+    "description": "Construire l'indicateur à partir de la configuration ci-dessus.",
+    "start_year": "Année de début",
+    "end_year": "Année de fin",
+    "build": "Construire",
+    "built": "{count} couches construites",
+    "blocked": "Corrigez les problèmes ci-dessus avant de construire."
+  },
+  "layers": {
+    "title": "Couches",
+    "description": "Ajouter les couches calculées à la carte.",
+    "show": "Afficher sur la carte",
+    "shown": "{count} couches ajoutées à la carte",
+    "build_first": "Construisez d'abord l'indicateur."
+  },
+  "transitions": {
+    "title": "Transitions",
+    "description": "Transitions de la couverture terrestre entre les années de début et de fin.",
+    "compute": "Calculer les transitions",
+    "computed": "Transitions prêtes",
+    "build_first": "Construisez d'abord l'indicateur."
+  },
+  "results": {
+    "title": "Résultats",
+    "description": "Superficies des classes par type de couverture terrestre.",
+    "compute": "Calculer les statistiques",
+    "computed": "Statistiques prêtes",
+    "build_first": "Construisez d'abord l'indicateur."
+  },
+  "zonal": {
+    "title": "Statistiques zonales",
+    "description": "Superficies de l'indicateur par zone administrative.",
+    "compute": "Calculer les statistiques zonales",
+    "download": "Télécharger le shapefile",
+    "ready": "Statistiques zonales prêtes",
+    "build_first": "Construisez d'abord l'indicateur."
+  },
+  "exports": {
+    "title": "Export",
+    "description": "Exporter n'importe quelle couche en tant qu'asset GEE.",
+    "button": "Exporter",
+    "build_first": "Construisez d'abord l'indicateur."
   }
 }
