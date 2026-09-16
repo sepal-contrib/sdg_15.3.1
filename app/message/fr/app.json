@@ -1,7 +1,6 @@
 {
   "app": {
-    "title": "Indicateur ODD 15.3.1",
-    "subtitle": "Proportion de terres dégradées par rapport à la superficie totale des terres"
+    "title": "Indicateur ODD 15.3.1"
   },
   "panel": {
     "title": "Résultats",
@@ -34,7 +33,6 @@
     "trajectory_value": {
       "ndvi_trend": "Tendance de productivité (IV)",
       "p_res_trend": "Tendance résiduelle (IV observé - IV prédit)",
-      "s_res_trend": "Efficacité d'utilisation de l'eau (WUE)",
       "ue_trend": "Efficacité d'utilisation de la pluie (RUE)"
     },
     "lceu_value": {

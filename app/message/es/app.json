@@ -1,7 +1,6 @@
 {
   "app": {
-    "title": "Indicador ODS 15.3.1",
-    "subtitle": "Proporción de tierras degradadas en relación con la superficie territorial total"
+    "title": "Indicador ODS 15.3.1"
   },
   "panel": {
     "title": "Resultados",
@@ -34,7 +33,6 @@
     "trajectory_value": {
       "ndvi_trend": "Tendencia de productividad (IV)",
       "p_res_trend": "Tendencia residual (IV observado - IV predicho)",
-      "s_res_trend": "Eficiencia en el uso del agua (WUE)",
       "ue_trend": "Eficiencia en el uso de la lluvia (RUE)"
     },
     "lceu_value": {

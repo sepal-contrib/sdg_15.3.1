@@ -90,10 +90,15 @@ def test_the_widgets_show_the_current_spec_values():
     assert index.v_model == msg("productivity.index_value.ndvi")
 
     assert trajectory.label == msg("productivity.trajectory")
+    # Exact list equality, not a subset check -- proves the disabled
+    # trajectory is missing from the rendered Select's own items, the same
+    # way an extra, unexpected item would also fail this. The catalogue key
+    # for the disabled trajectory (`s_res_trend`) is gone entirely (Task 25,
+    # M6: unreachable through any code path), so there is nothing left to
+    # look up and assert absent.
     assert trajectory.items == [
         msg(f"productivity.trajectory_value.{t.value}") for t in _EXPECTED_SELECTABLE_TRAJECTORIES
     ]
-    assert msg("productivity.trajectory_value.s_res_trend") not in trajectory.items
     assert trajectory.v_model == msg("productivity.trajectory_value.ndvi_trend")
 
     assert lceu.label == msg("productivity.lceu")
