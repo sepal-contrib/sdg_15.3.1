@@ -53,7 +53,9 @@
     "esa": "ESA CCI",
     "custom": "Assets personalizados",
     "start_asset": "Asset de cobertura del suelo inicial",
-    "end_asset": "Asset de cobertura del suelo final"
+    "end_asset": "Asset de cobertura del suelo final",
+    "period_start": "Año de inicio",
+    "period_end": "Año final"
   },
   "soc": {
     "description": "El período durante el cual se mide el cambio del carbono orgánico del suelo.",

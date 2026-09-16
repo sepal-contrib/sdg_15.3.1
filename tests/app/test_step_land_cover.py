@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from datetime import date
 from typing import Any
 
 import ipyvuetify
@@ -13,6 +14,7 @@ import solara
 from app.message import msg
 from app.state import problems_for
 from app.steps.land_cover import LandCoverStep, _scheme_for_pixel_check
+from sdg1531.catalog import L4_START
 from sdg1531.resolve import resolve
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
@@ -25,6 +27,11 @@ from sdg1531.spec import (
 )
 from tests.app.render_helpers import find_widgets, markdown_texts
 from tests.spec_factory import default_spec
+
+# Same range `soc.py`'s own Selects offer (see test_step_soc.py's `_YEARS`) --
+# the legacy's deleted `PickerLineLC` and `PickerLineSOC` shared this exact
+# `YEAR_RANGE`, and this step's period Selects reuse it too.
+_PERIOD_YEARS = list(range(date.today().year - 1, L4_START - 1, -1))
 
 
 class StubGee:
@@ -67,9 +74,21 @@ async def _wait_for(predicate: Any, timeout: float = 2.0) -> bool:
 
 
 def _select(box: object) -> object:
+    """The land-cover source Select, told apart from the two period Selects
+    added below by item count rather than by label -- a label comparison
+    would break under ``test_every_label_and_the_description_route_through_msg``'s
+    ``msg`` monkeypatch, which renames every label but leaves ``values`` alone."""
     selects = find_widgets(box, ipyvuetify.Select)
-    assert len(selects) == 1
-    return selects[0]
+    (source,) = [s for s in selects if len(s.items) == 2]
+    return source
+
+
+def _period_selects(box: object) -> tuple[object, object]:
+    """The step's two land-cover-period Selects, in source order: start, end."""
+    selects = find_widgets(box, ipyvuetify.Select)
+    periods = [s for s in selects if len(s.items) != 2]
+    assert len(periods) == 2
+    return tuple(periods)  # type: ignore[return-value]
 
 
 def _slider(box: object) -> object:
@@ -130,6 +149,69 @@ def test_the_widgets_show_the_current_spec_values():
     assert slider.min == 1
     assert slider.max == 12
     assert slider.v_model == 6
+
+    period_start, period_end = _period_selects(box)
+    assert period_start.label == msg("land_cover.period_start")
+    assert period_start.items == _PERIOD_YEARS
+    assert period_end.label == msg("land_cover.period_end")
+    assert period_end.items == _PERIOD_YEARS
+
+
+def test_the_period_widgets_show_no_default_when_the_override_is_unset():
+    """``periods.land_cover`` is an OPTIONAL override -- ``default_spec()``
+    leaves it ``PeriodOverride(None, None)``, and ``resolve()`` derives the
+    land-cover window from ``periods.overall`` instead. Mirrors
+    ``test_step_soc.py``'s identical assertion for ``periods.soc``."""
+    spec = solara.reactive(default_spec())
+    assert spec.value.periods.land_cover == PeriodOverride(None, None)
+
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+
+    period_start, period_end = _period_selects(box)
+    assert period_start.v_model is None
+    assert period_end.v_model is None
+
+
+def test_the_period_widgets_show_the_current_override_when_set():
+    spec = solara.reactive(
+        default_spec(periods=replace(default_spec().periods, land_cover=PeriodOverride(1995, 2010)))
+    )
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+
+    period_start, period_end = _period_selects(box)
+    assert period_start.v_model == 1995
+    assert period_end.v_model == 2010
+
+
+def test_changing_the_period_start_updates_only_that_field():
+    spec = solara.reactive(default_spec())
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+    before = spec.value
+
+    period_start, _period_end = _period_selects(box)
+    period_start.v_model = 1995
+
+    assert spec.value.periods.land_cover.start == 1995
+    assert spec.value.periods.land_cover.end is None
+    assert spec.value.evolve(periods=before.periods) == before
+
+
+def test_changing_the_period_end_updates_only_that_field():
+    spec = solara.reactive(
+        default_spec(periods=replace(default_spec().periods, land_cover=PeriodOverride(1995, None)))
+    )
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+    before = spec.value
+
+    _period_start, period_end = _period_selects(box)
+    period_end.v_model = 2010
+
+    assert spec.value.periods.land_cover == PeriodOverride(1995, 2010)
+    assert spec.value.evolve(periods=before.periods) == before
 
 
 def test_the_slider_reads_the_spec_s_own_threshold_not_a_constant():
@@ -437,6 +519,10 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     source = _select(box)
     assert source.label == "<land_cover.source>"
     assert source.v_model == "<land_cover.custom>"
+
+    period_start, period_end = _period_selects(box)
+    assert period_start.label == "<land_cover.period_start>"
+    assert period_end.label == "<land_cover.period_end>"
 
     slider = _slider(box)
     assert slider.label == "<land_cover.water_mask>"

@@ -53,7 +53,9 @@
     "esa": "ESA CCI",
     "custom": "Custom assets",
     "start_asset": "Start land cover asset",
-    "end_asset": "End land cover asset"
+    "end_asset": "End land cover asset",
+    "period_start": "Start year",
+    "period_end": "End year"
   },
   "soc": {
     "description": "The period soil organic carbon change is measured over.",
