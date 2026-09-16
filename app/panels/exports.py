@@ -23,7 +23,7 @@ from pysepal.solara.components.export import (
 )
 
 from app.message import msg
-from app.panels.map_layers import layer_vis_params
+from app.panels.map_layers import layer_name, layer_vis_params
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import ClassifiedLayer, IndicatorMaps
 from sdg1531.enums import IndicatorLayer
@@ -74,7 +74,11 @@ def export_sources(maps: IndicatorMaps, ctx: ExecutionContext) -> tuple[ExportSo
         sources.append(
             ExportSource(
                 id=layer_id.value,
-                label=layer.label,
+                # Not `layer.label`: that is the domain's raw snake id
+                # (`ClassifiedLayer.label` docstring; frozen under decision
+                # D9), and this is the label the user picks the export by
+                # (final-review finding M1).
+                label=layer_name(layer_id),
                 kind="image",
                 resolve=make(),
             )

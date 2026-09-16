@@ -74,8 +74,19 @@
   "layers": {
     "title": "Capas",
     "description": "Añadir las capas calculadas al mapa.",
-    "show": "Mostrar en el mapa",
-    "shown": "{count} capas añadidas al mapa",
+    "columns": { "name": "Capa", "action": "Acción" },
+    "add": "Añadir",
+    "remove": "Quitar",
+    "added": "Añadido al mapa: {name}",
+    "names": {
+      "land_cover": "Cobertura del suelo",
+      "soc": "Carbono orgánico del suelo",
+      "productivity": "Productividad",
+      "productivity_trend": "Tendencia de productividad",
+      "productivity_state": "Estado de productividad",
+      "productivity_performance": "Rendimiento de productividad",
+      "indicator_15_3_1": "Indicador ODS 15.3.1"
+    },
     "build_first": "Construya primero el indicador."
   },
   "transitions": {

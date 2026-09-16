@@ -14,10 +14,10 @@ from collections.abc import Callable
 import ipyvuetify
 import solara
 
-from app.message import msg
-from app.panels.map_layers import MapLayersPanel, layer_vis_params
+from app.message import messages, msg
+from app.panels.map_layers import MapLayersPanel, layer_name, layer_vis_params
 from sdg1531.enums import IndicatorLayer
-from tests.app.render_helpers import find_widget, markdown_texts
+from tests.app.render_helpers import cell_texts, find_widget, find_widgets, markdown_texts
 
 
 class _FakeImage:
@@ -31,7 +31,8 @@ class _FakeImage:
 
 
 class _FakeLayer:
-    """Stands in for ``ClassifiedLayer``: image/band/label only."""
+    """Stands in for ``ClassifiedLayer``: image/band only -- ``label`` is the
+    domain's raw id and no production code path reads it any more (M1)."""
 
     def __init__(self, name: str) -> None:
         self.image = _FakeImage(name)
@@ -66,46 +67,27 @@ _THREE_LAYERS = {
 
 
 class _RecordingMap:
-    """Records every ``add_ee_layer_async`` call.
+    """Records every ``add_ee_layer_async``/``remove_layer`` call.
 
-    ``on_first_call`` runs synchronously before the first call's own
-    ``await`` -- the hook a test uses to mutate ``maps.value`` mid-flight and
-    check the running task does not notice. ``fail_on`` raises for one named
-    layer, standing in for a GEE call that refuses.
+    ``fail_on`` raises for one named layer, standing in for a GEE call that
+    refuses.
     """
 
-    def __init__(
-        self,
-        on_first_call: Callable[[], None] | None = None,
-        fail_on: str | None = None,
-    ) -> None:
+    def __init__(self, fail_on: str | None = None) -> None:
         self.calls: list[dict[str, object]] = []
-        self._on_first_call = on_first_call
+        self.removed: list[tuple[str, bool]] = []
         self._fail_on = fail_on
 
     async def add_ee_layer_async(
         self, image: object, vis_params: dict, name: str, key: str = ""
     ) -> None:
-        if self._on_first_call is not None and not self.calls:
-            self._on_first_call()
         await asyncio.sleep(0)
         if name == self._fail_on:
             raise RuntimeError(f"GEE refused {name}")
         self.calls.append({"image": image, "vis_params": vis_params, "name": name, "key": key})
 
-
-class _FakeTracker:
-    def __init__(self) -> None:
-        self.steps: list[str] = []
-
-    def step(self, message: str) -> None:
-        self.steps.append(message)
-
-    def __enter__(self) -> _FakeTracker:
-        return self
-
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
-        return False  # never suppress -- a real TaskTracker doesn't either
+    def remove_layer(self, key: str, base: bool = False, none_ok: bool = False) -> None:
+        self.removed.append((key, none_ok))
 
 
 class _FakeNotifier:
@@ -114,14 +96,6 @@ class _FakeNotifier:
     def __init__(self) -> None:
         self.successes: list[str] = []
         self.errors: list[str] = []
-        self.tracked: list[tuple[str, int | None]] = []
-        self.trackers: list[_FakeTracker] = []
-
-    def track(self, title: str, total_steps: int | None = None) -> _FakeTracker:
-        self.tracked.append((title, total_steps))
-        tracker = _FakeTracker()
-        self.trackers.append(tracker)
-        return tracker
 
     def success(self, message: str) -> None:
         self.successes.append(message)
@@ -140,6 +114,13 @@ async def _wait_for(predicate: Callable[[], bool], timeout: float = 2.0) -> bool
     return True
 
 
+def _add_button_labels(box: object) -> list[list[object]]:
+    """Every button's ``.children``, in row order -- an "Add" row renders
+    ``TaskButtonComponent``'s button, a "shown" row the plain remove button;
+    both are ``ipyvuetify.Btn`` instances."""
+    return [btn.children for btn in find_widgets(box, ipyvuetify.Btn)]
+
+
 def test_the_panel_renders_with_no_maps(monkeypatch):
     """Shown before Build has run."""
     fake = _FakeNotifier()
@@ -152,8 +133,8 @@ def test_the_panel_renders_with_no_maps(monkeypatch):
         f"<p>{msg('layers.description')}</p>",
         f"<p>{msg('layers.build_first')}</p>",
     ]
-    assert find_widget(box, ipyvuetify.Btn) is None  # no dead button before Build
-    assert fake.tracked == []  # nothing to show yet, so nothing was started
+    assert find_widget(box, ipyvuetify.Btn) is None  # no dead action before Build
+    assert fake.successes == fake.errors == []
 
 
 def test_vis_params_come_from_the_domain_palette():
@@ -181,16 +162,49 @@ def test_the_performance_layer_gets_its_own_two_class_vis():
     assert vis["palette"] == list(DEGRADATION_COLORS.values())[1:3]
 
 
-def test_clicking_show_draws_every_layer_and_reports_the_real_count(monkeypatch):
-    """A real click on the rendered button -- not a captured spy -- proves the
-    task is wired to the domain's layers and that the toast carries the real
-    count once every layer has been drawn.
+def test_every_indicator_layer_resolves_to_a_translated_name_in_every_locale(monkeypatch):
+    """Final-review finding M1: ``ClassifiedLayer.label`` is the raw snake
+    id, and the app never supplied a translated one. Walks the real
+    ``IndicatorLayer`` enum -- not a hand-typed roster of its seven members,
+    which would just restate the enum with nothing independent to check it
+    against -- across every shipped locale, not only English.
 
-    Three layers, not two: ``layer_vis_params`` only tells
-    ``PRODUCTIVITY_PERFORMANCE`` apart from everything else, so a fixture of
-    just LAND_COVER + SOC cannot distinguish a correct per-layer mapping from
-    one constant vis dict reused for all seven layers.
+    Monkeypatches ``current_locale`` where ``BoundCatalog.msg`` looks it up,
+    rather than calling the real, global ``pysepal.i18n.set_locale``: that
+    writes a ``solara.reactive`` every earlier test's still-mounted (and
+    never explicitly torn down) render tree may be subscribed to, and would
+    re-render them -- with THEIR OWN test's ``use_notifications`` monkeypatch
+    already undone -- as a side effect of this one.
     """
+    import pysepal.i18n.binding as i18n_binding
+
+    for code in messages.available_locales():
+        monkeypatch.setattr(i18n_binding, "current_locale", lambda code=code: code)
+        for layer_id in IndicatorLayer:
+            name = layer_name(layer_id)
+            assert name
+            assert name != layer_id.value
+
+
+def test_the_table_lists_every_layer_translated_and_every_row_starts_addable(monkeypatch):
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: _FakeNotifier())
+    box, rc = solara.render(
+        MapLayersPanel(maps=_FakeMaps(_THREE_LAYERS), map_=_RecordingMap(), gee_interface=None),
+        handle_error=False,
+    )
+    assert rc is not None
+    assert cell_texts(box, "th") == [msg("layers.columns.name"), msg("layers.columns.action")]
+    assert cell_texts(box, "td") == [layer_name(layer_id) for layer_id in _THREE_LAYERS]
+
+    buttons = find_widgets(box, ipyvuetify.Btn)
+    assert len(buttons) == len(_THREE_LAYERS)
+    assert all(btn.children == [msg("layers.add")] for btn in buttons)
+
+
+def test_clicking_add_draws_only_that_rows_layer_and_reports_its_name(monkeypatch):
+    """A real click on the THIRD row's rendered button, not a captured spy or
+    the first row -- a naive "the add action ignores its row and always adds
+    the first layer" bug would draw LAND_COVER here instead."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
     fake_map = _RecordingMap()
@@ -201,38 +215,101 @@ def test_clicking_show_draws_every_layer_and_reports_the_real_count(monkeypatch)
             handle_error=False,
         )
         assert rc is not None
-        button = find_widget(box, ipyvuetify.Btn)
-        assert button is not None
-        assert button.children == [msg("layers.show")]
-        button.click()
+        buttons = find_widgets(box, ipyvuetify.Btn)
+        assert len(buttons) == 3
+        buttons[2].click()  # PRODUCTIVITY_PERFORMANCE, the third layer -- not the first
         assert await _wait_for(lambda: fake.successes or fake.errors)
 
     asyncio.run(main())
 
-    recorded = {call["name"]: call for call in fake_map.calls}
-    assert recorded.keys() == {layer.label for layer in _THREE_LAYERS.values()}
-    # `.select(layer.band)`, not `.image` alone: `ClassifiedLayer.image` may
-    # carry more bands than the one this panel is meant to draw (trend and
-    # state both do), and the fake's `select` bakes the band into the result,
-    # so a dropped `.select(...)` shows up as the bare `_FakeImage` instead.
-    for name, call in recorded.items():
-        assert call["image"] == f"{name}:{name}_band"
-    # Per layer, not one dict shared by all three -- the mapping this panel
-    # exists to own, not re-derive.
-    assert {name: call["vis_params"] for name, call in recorded.items()} == {
-        layer.label: layer_vis_params(layer_id) for layer_id, layer in _THREE_LAYERS.items()
-    }
-    assert fake.tracked == [(msg("layers.show"), 3)]
-    assert fake.trackers[0].steps == [layer.label for layer in _THREE_LAYERS.values()]
-    assert fake.successes == [msg("layers.shown", count=3)]
+    target = IndicatorLayer.PRODUCTIVITY_PERFORMANCE
+    assert len(fake_map.calls) == 1
+    call = fake_map.calls[0]
+    assert call["name"] == layer_name(target)
+    assert call["key"] == target.value
+    assert call["vis_params"] == layer_vis_params(target)
+    # `.select(layer.band)`, not `.image` alone -- `ClassifiedLayer.image` may
+    # carry more bands than the one this panel draws, and the fake's
+    # `select` bakes the band into its result, so a dropped `.select(...)`
+    # would show up as the bare `_FakeImage` instead.
+    assert call["image"] == "productivity_performance:productivity_performance_band"
+    assert fake.successes == [msg("layers.added", name=layer_name(target))]
     assert fake.errors == []
+    assert fake_map.removed == []  # adding never touches a layer that wasn't shown
 
 
-def test_every_layer_gets_a_stable_key_so_a_second_click_replaces_not_accumulates(monkeypatch):
-    """``add_ee_layer_async`` accepts a ``key`` and replaces an existing layer
-    that carries the same one; a call with no key at all -- or one that
-    changes between clicks -- is what would let two clicks pile up two
-    copies of the same layer instead of one."""
+def test_a_shown_layer_switches_to_remove_and_re_adds_with_the_same_key(monkeypatch):
+    """Covers both remaining single-row rules at once: the remove action must
+    really call ``remove_layer`` (not be a no-op), and taking a layer off and
+    back on must reuse the same stable ``key`` both times -- what makes a
+    second add replace rather than accumulate.
+    """
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
+    fake_map = _RecordingMap()
+    target = IndicatorLayer.SOC  # the second row of `_TWO_LAYERS`
+
+    # Everything below runs inside ONE `asyncio.run` -- `use_task`'s scheduler
+    # binds a task to whichever loop is running when it is started, so a
+    # second, later add started from a DIFFERENT loop (e.g. a fresh
+    # `asyncio.run` after this one has returned) is not something this
+    # panel's plumbing is exercised against elsewhere in the suite either.
+    async def main() -> None:
+        box, rc = solara.render(
+            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
+            handle_error=False,
+        )
+        assert rc is not None
+
+        find_widgets(box, ipyvuetify.Btn)[1].click()
+        assert await _wait_for(lambda: len(fake.successes) == 1)
+        assert _add_button_labels(box)[1] == [msg("layers.remove")]
+        first_key = fake_map.calls[0]["key"]
+
+        find_widgets(box, ipyvuetify.Btn)[1].click()  # remove -- fully synchronous
+        assert fake_map.removed == [(target.value, True)]
+        assert _add_button_labels(box)[1] == [msg("layers.add")]  # back to addable
+
+        find_widgets(box, ipyvuetify.Btn)[1].click()  # add again
+        assert await _wait_for(lambda: len(fake.successes) == 2)
+        assert fake_map.calls[1]["key"] == first_key == target.value
+        assert _add_button_labels(box)[1] == [msg("layers.remove")]
+
+    asyncio.run(main())
+    assert len(fake_map.calls) == 2
+
+
+def test_a_layer_that_fails_to_add_reports_the_error_and_stays_addable(monkeypatch):
+    """``raise_error=False`` keeps the render alive; the effect is what must
+    still surface the failure, and the row must not flip to "shown" over a
+    layer that was never actually drawn."""
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
+    target = IndicatorLayer.SOC
+    fake_map = _RecordingMap(fail_on=layer_name(target))
+
+    async def main():
+        box, rc = solara.render(
+            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
+            handle_error=False,
+        )
+        assert rc is not None
+        find_widgets(box, ipyvuetify.Btn)[1].click()
+        assert await _wait_for(lambda: fake.successes or fake.errors)
+        return box
+
+    box = asyncio.run(main())
+
+    assert fake.successes == []
+    assert fake.errors == ["GEE refused " + layer_name(target)]
+    assert _add_button_labels(box)[1] == [msg("layers.add")]  # never marked shown
+    assert fake_map.removed == []
+
+
+def test_clicking_cancel_while_pending_stops_the_add_without_marking_it_shown(monkeypatch):
+    """The Async Button Convention's single toggle button: clicking it again
+    while the add is running must cancel the task, and cancelling must not
+    quietly leave the row looking as if the layer landed."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
     fake_map = _RecordingMap()
@@ -243,100 +320,90 @@ def test_every_layer_gets_a_stable_key_so_a_second_click_replaces_not_accumulate
             handle_error=False,
         )
         assert rc is not None
-        button = find_widget(box, ipyvuetify.Btn)
-        assert button is not None
+        button = find_widgets(box, ipyvuetify.Btn)[0]
+        button.click()  # start the add
+        await asyncio.sleep(0)  # let the task begin, before its own `sleep(0)` resolves
+        button.click()  # the SAME button, now in cancel state
+        await asyncio.sleep(0.05)
+        return box
 
-        button.click()
-        assert await _wait_for(lambda: fake.successes)
-        first_keys = {call["name"]: call["key"] for call in fake_map.calls}
+    box = asyncio.run(main())
 
-        fake_map.calls = []
-        fake.successes = []
-        button.click()  # the SAME button, on the SAME task -- a real second click
-        assert await _wait_for(lambda: fake.successes)
-        second_keys = {call["name"]: call["key"] for call in fake_map.calls}
-
-        return first_keys, second_keys
-
-    first_keys, second_keys = asyncio.run(main())
-
-    assert first_keys == {"land_cover": "land_cover", "soc": "soc"}
-    assert all(first_keys.values()), "a falsy key falls back to add_layer's own name-derived one"
-    assert second_keys == first_keys
+    assert fake_map.calls == []
+    assert fake.successes == fake.errors == []
+    assert _add_button_labels(box)[0] == [msg("layers.add")]
 
 
-def test_the_layers_snapshot_is_taken_synchronously_inside_the_click_handler(monkeypatch):
-    """``maps`` is a plain value now, not a reactive a build can mutate out
-    from under a running task -- Task 20 removed the reactive that made a
-    live-read even possible, so the click-time-snapshot concern this used to
-    share a module with (a Build landing mid-flight) cannot recur at this
-    panel any more; see ``tests/app/test_page.py``'s staleness regression
-    test for where that guarantee now lives (the shared spec, one level up).
+@solara.component
+def _Harness(maps_reactive: solara.Reactive[_FakeMaps | None], map_: object) -> None:
+    """Lets a test swap the ``maps`` PROP on an already-mounted
+    ``MapLayersPanel`` -- Task 20 made ``maps`` a plain value, not a
+    reactive the panel itself owns, so a real "the run changed" render can
+    only be produced from a level above it, exactly as ``page.py`` does with
+    its own memoised ``outcome``.
+    """
+    MapLayersPanel(maps=maps_reactive.value, map_=map_, gee_interface=None)
 
-    What is still worth pinning here: a task scheduled with
-    ``solara.lab.use_task`` never runs any of its body until the event loop
-    is given a turn, so if ``.layers()`` is read where the guide requires --
-    inside the synchronous click handler, before ``task(...)`` schedules
-    anything -- it has already been called exactly once by the time
-    ``button.click()`` returns, with no ``await`` in between. A version that
-    instead handed the whole ``IndicatorMaps`` into the task and called
-    ``.layers()`` from inside it would still show zero calls here, because
-    that task has not had a turn to run yet.
+
+def test_a_new_maps_identity_clears_every_layer_the_previous_run_added(monkeypatch):
+    """Task 20: a new ``maps`` object is a different run, and the tiles this
+    panel already drew are from the run BEFORE it. Two ``_FakeMaps`` built
+    from equal-looking layer dicts stand in for "the spec changed and
+    produced a new ``IndicatorMaps``" -- ``_FakeMaps`` compares by identity
+    (no ``__eq__`` override), the same as the real, frozen ``IndicatorMaps``
+    the domain hands back (its ``ee.Image`` fields compare by identity too).
     """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
+    fake_map = _RecordingMap()
+    maps_reactive = solara.reactive(_FakeMaps(_TWO_LAYERS))
 
-    class _CountingMaps(_FakeMaps):
-        def __init__(self, layers: dict[IndicatorLayer, _FakeLayer]) -> None:
-            super().__init__(layers)
-            self.layers_call_count = 0
-
-        def layers(self) -> dict[IndicatorLayer, _FakeLayer]:
-            self.layers_call_count += 1
-            return super().layers()
-
-    async def main() -> int:
-        counting_maps = _CountingMaps(_TWO_LAYERS)
-        fake_map = _RecordingMap()
+    async def add_both():
         box, rc = solara.render(
-            MapLayersPanel(maps=counting_maps, map_=fake_map, gee_interface=None),
-            handle_error=False,
+            _Harness(maps_reactive=maps_reactive, map_=fake_map), handle_error=False
         )
         assert rc is not None
-        button = find_widget(box, ipyvuetify.Btn)
-        assert button is not None
+        for index in range(2):
+            find_widgets(box, ipyvuetify.Btn)[index].click()
+            assert await _wait_for(lambda n=index: len(fake.successes) == n + 1)
+        return box
 
-        button.click()  # fully synchronous: no `await` has happened yet
-        count_right_after_click = counting_maps.layers_call_count
+    box = asyncio.run(add_both())
 
-        assert await _wait_for(lambda: fake.successes or fake.errors)
-        return count_right_after_click
+    assert len(fake_map.calls) == 2
+    assert fake_map.removed == []  # nothing to clear yet: still the same run
 
-    count_right_after_click = asyncio.run(main())
+    maps_reactive.value = _FakeMaps(_TWO_LAYERS)  # a NEW object: a different run
 
-    assert count_right_after_click == 1
+    assert sorted(fake_map.removed) == sorted((layer_id.value, True) for layer_id in _TWO_LAYERS)
+    # The shown SET was cleared too, not just the map's own layers -- every
+    # row is addable again under the new run.
+    assert all(labels == [msg("layers.add")] for labels in _add_button_labels(box))
 
 
-def test_a_layer_that_fails_reports_the_error_and_no_success(monkeypatch):
-    """``raise_error=False`` keeps the render alive; the effect is what must
-    still surface the failure -- silently swallowing it would look like
-    success to the user."""
+def test_maps_becoming_none_also_clears_the_map(monkeypatch):
+    """The spec can stop being runnable entirely -- ``maps`` going from a
+    real run to ``None`` must clear the old run's tiles the same way a
+    change to a different run does, not leave them shown with nothing left
+    to manage them."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
-    fake_map = _RecordingMap(fail_on="soc")
+    fake_map = _RecordingMap()
+    maps_reactive: solara.Reactive[_FakeMaps | None] = solara.reactive(_FakeMaps(_TWO_LAYERS))
 
-    async def main():
+    async def add_one():
         box, rc = solara.render(
-            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
-            handle_error=False,
+            _Harness(maps_reactive=maps_reactive, map_=fake_map), handle_error=False
         )
         assert rc is not None
-        button = find_widget(box, ipyvuetify.Btn)
-        assert button is not None
-        button.click()
-        assert await _wait_for(lambda: fake.successes or fake.errors)
+        find_widgets(box, ipyvuetify.Btn)[0].click()
+        assert await _wait_for(lambda: fake.successes)
+        return box
 
-    asyncio.run(main())
+    box = asyncio.run(add_one())
+    assert fake_map.removed == []
 
-    assert fake.successes == []
-    assert fake.errors == ["GEE refused soc"]
+    maps_reactive.value = None
+
+    assert fake_map.removed == [(IndicatorLayer.LAND_COVER.value, True)]
+    assert markdown_texts(box)[-1] == f"<p>{msg('layers.build_first')}</p>"

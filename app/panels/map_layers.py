@@ -1,31 +1,52 @@
-"""Adding the computed layers to the map.
+"""Adding the computed layers to the map, one row per layer.
 
 The seven layers come from ``IndicatorMaps.layers()``; this panel never decides
-which layers exist, what they are called, or how they are coloured. Colours come
-from the domain palette so the map and the exported assets agree.
+which layers exist, what they are called, or how they are coloured. Colours
+come from the domain palette so the map and the exported assets agree. Names
+come from :func:`layer_name` -- ``ClassifiedLayer.label`` is the layer's raw
+snake id (frozen under decision D9; the domain's own docstring says the
+translated display label is the app layer's job).
 
-Follows ``docs/guides/solara-gee-patterns.md``'s Async Button Convention: the
-task snapshots ``maps`` at click time instead of reading it live, returns an
-outcome instead of notifying from inside itself, and a ``solara.use_effect``
-with the full dependency list mirrors that outcome into a toast.
+A table replaces the earlier single "show everything" button: each row adds or
+removes its own layer. The shown set is this panel's OWN state
+(``solara.use_state``), never read back from ``map_.find_layer`` -- the map's
+live widget state changes without telling Solara, so a row driven from it
+would not re-render when it did.
+
+Adding a layer is GEE work (it fetches a map id), so it follows
+``docs/guides/solara-gee-patterns.md``'s Async Button Convention: one
+``use_task`` for the whole component, parameterised by which layer it is
+currently drawing, with a row's spinner driven by comparing its id against the
+in-flight one. NOT one task per row -- that would call ``use_task`` a number
+of times that depends on ``maps.layers()``, a hook inside a loop. Removing is
+synchronous and local, so it needs no task.
+
+Task 20 made ``maps`` a derivation of the run spec: change the spec, and
+``maps`` is a new object describing a different run. Every tile this panel
+already drew is then from the run BEFORE it -- the same silently-wrong-data
+failure Task 20 exists to kill, reappearing on the map instead of in a panel.
+The effect keyed on ``maps`` below clears them.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import contextlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, cast
 
+import reacton.ipyvuetify as rv
 import solara
-from pysepal.solara.components.task_button import TaskButtonComponent, use_task_button
+from pysepal.solara.components.task_button import TaskButtonComponent
 from pysepal.solara.notifications import use_notifications
+from reacton.ipyvue import use_event
 
 from app.message import msg
 from sdg1531.engine.indicator import ClassifiedLayer, IndicatorMaps
 from sdg1531.enums import IndicatorLayer
 from sdg1531.tables import DEGRADATION_COLORS
 
-__all__ = ("MapLayersPanel", "layer_vis_params")
+__all__ = ("MapLayersPanel", "layer_name", "layer_vis_params")
 
 
 def layer_vis_params(layer_id: IndicatorLayer) -> dict[str, Any]:
@@ -40,43 +61,122 @@ def layer_vis_params(layer_id: IndicatorLayer) -> dict[str, Any]:
     return {"min": 1, "max": 3, "palette": colours[1:]}
 
 
-@dataclass(frozen=True, slots=True)
-class _LayersOutcome:
-    """What ``_add_layers`` hands back -- the task never notifies itself."""
+def layer_name(layer_id: IndicatorLayer) -> str:
+    """Translated display name for one layer.
 
-    count: int
-
-
-async def _add_layers(
-    map_: Any,
-    notifications: Any,
-    layers: Mapping[IndicatorLayer, ClassifiedLayer],
-) -> _LayersOutcome:
-    """Draw one snapshot of layers onto the map.
-
-    ``layers`` is a snapshot taken at click time (``MapLayersPanel.start``),
-    never a live read of ``maps`` -- the guide's rule against reading reactive
-    inputs after a task has started. ``key=layer_id.value`` is what
-    makes a second click replace each layer instead of accumulating another
-    copy of it: a stable, locale-invariant identity, independent of
-    ``layer.label`` (used below only as the display name and the progress-step
-    text), which idempotency should not hinge on.
+    ``ClassifiedLayer.label`` is ``id.value`` -- a stable snake id, not a
+    display string. The catalogue key is named after that same value, so
+    every ``IndicatorLayer`` member resolves through it with no separate,
+    hand-typed id-to-name mapping to keep in sync with the enum.
     """
-    with notifications.track(msg("layers.show"), total_steps=len(layers)) as task:
-        for layer_id, layer in layers.items():
-            task.step(layer.label)
-            # add_ee_layer_async, NOT asyncio.to_thread(add_ee_layer, ...).
-            # Drawing an EE layer fetches a map id, so it is GEE work, and the
-            # rule for GEE work is to await the library's own *_async method.
-            # A to_thread worker runs outside the kernel context, which is how
-            # it loses the session-backed interface this map was built with.
-            await map_.add_ee_layer_async(
-                layer.image.select(layer.band),
-                layer_vis_params(layer_id),
-                layer.label,
-                key=layer_id.value,
-            )
-    return _LayersOutcome(count=len(layers))
+    return str(msg(f"layers.names.{layer_id.value}"))
+
+
+@dataclass(frozen=True, slots=True)
+class _AddOutcome:
+    """What ``_add_layer`` hands back -- the task never notifies itself."""
+
+    layer_id: IndicatorLayer
+
+
+async def _add_layer(map_: Any, layer_id: IndicatorLayer, layer: ClassifiedLayer) -> _AddOutcome:
+    """Draw one layer onto the map.
+
+    ``layer_id``/``layer`` are a snapshot taken at click time
+    (``MapLayersPanel.start``), never a live read of ``maps`` -- the guide's
+    rule against reading reactive inputs after a task has started.
+    ``key=layer_id.value`` is what makes a second add of the same layer
+    replace it instead of accumulating another copy.
+    """
+    # add_ee_layer_async, NOT asyncio.to_thread(add_ee_layer, ...). Drawing an
+    # EE layer fetches a map id, so it is GEE work, and the rule for GEE work
+    # is to await the library's own *_async method. A to_thread worker runs
+    # outside the kernel context, which is how it loses the session-backed
+    # interface this map was built with.
+    await map_.add_ee_layer_async(
+        layer.image.select(layer.band),
+        layer_vis_params(layer_id),
+        layer_name(layer_id),
+        key=layer_id.value,
+    )
+    return _AddOutcome(layer_id=layer_id)
+
+
+def _bind_add(
+    start: Callable[[IndicatorLayer, ClassifiedLayer], None],
+    layer_id: IndicatorLayer,
+    layer: ClassifiedLayer,
+) -> Callable[[], None]:
+    """A stably-typed zero-arg closure over one row's layer -- see
+    ``app/tabs.py``'s ``_bind`` for why this is a named function rather than a
+    default-argument lambda."""
+
+    def _start() -> None:
+        start(layer_id, layer)
+
+    return _start
+
+
+def _bind_remove(
+    remove: Callable[[IndicatorLayer], None], layer_id: IndicatorLayer
+) -> Callable[[], None]:
+    def _remove() -> None:
+        remove(layer_id)
+
+    return _remove
+
+
+@solara.component
+def _RemoveButton(on_remove: Callable[[], None]) -> None:
+    """Its own component so ``use_event`` attaches unconditionally at ITS OWN
+    top level -- called only from the ``is_shown`` branch of ``_LayerRow``,
+    which is fine (mounting a whole child component conditionally is normal
+    reconciliation); calling ``use_event`` itself directly inside that branch
+    is not (rules of hooks: the caller's OWN hook count would then flip
+    between 0 and 1 across a re-render of the SAME row instance, each time
+    ``is_shown`` changes)."""
+    remove_btn = rv.Btn(children=[msg("layers.remove")], small=True, block=True, outlined=True)
+
+    def _handle_click(*_: object) -> None:
+        on_remove()
+
+    use_event(remove_btn, "click", _handle_click)
+
+
+@solara.component
+def _LayerRow(
+    name: str,
+    is_shown: bool,
+    is_pending: bool,
+    on_add: Callable[[], None],
+    on_remove: Callable[[], None],
+    on_cancel: Callable[[], None],
+) -> None:
+    """One table row: the layer's name, and its own add/remove action.
+
+    Its own component, called once per layer inside ``MapLayersPanel``'s loop
+    over ``maps.layers()`` -- a python list whose length is data-dependent,
+    so no hook may be called directly at that outer loop's level (rules of
+    hooks). ``_LayerRow`` itself calls none directly either: which of
+    ``_RemoveButton``/``TaskButtonComponent`` it mounts is decided by
+    ``is_shown``, but both are whole child components, each with its own
+    stable hook count, so branching on which one to mount does not touch
+    ``_LayerRow``'s.
+    """
+    with rv.Html(tag="tr"):
+        rv.Html(tag="td", children=[name])
+        with rv.Html(tag="td"):
+            if is_shown:
+                _RemoveButton(on_remove=on_remove)
+            else:
+                TaskButtonComponent(
+                    label=msg("layers.add"),
+                    running=is_pending,
+                    on_start=on_add,
+                    on_cancel=on_cancel,
+                    small=True,
+                    block=True,
+                )
 
 
 @solara.component
@@ -93,10 +193,12 @@ def MapLayersPanel(
     solara.Markdown(msg("layers.description"))
 
     notifications = use_notifications()
-    current_maps = maps
+
+    shown, set_shown = solara.use_state(frozenset[IndicatorLayer]())
+    pending_id, set_pending_id = solara.use_state(cast("IndicatorLayer | None", None))
 
     task = solara.lab.use_task(
-        _add_layers, dependencies=None, raise_error=False, prefer_threaded=False
+        _add_layer, dependencies=None, raise_error=False, prefer_threaded=False
     )
 
     def handle_task_state() -> None:
@@ -112,35 +214,71 @@ def MapLayersPanel(
             # `Coroutine` itself rather than what it resolves to -- a stub gap, not
             # a real ambiguity: at runtime `use_task` awaits the coroutine and
             # stores its result, never the coroutine object.
-            outcome = cast("_LayersOutcome", task.value)
-            notifications.success(msg("layers.shown", count=outcome.count))
+            outcome = cast("_AddOutcome", task.value)
+            set_shown(lambda current: current | {outcome.layer_id})
+            notifications.success(msg("layers.added", name=layer_name(outcome.layer_id)))
 
-    # Unconditional, ahead of the `current_maps is None` return below: the
-    # number of hooks a component calls must stay the same on every render of
-    # it, and that guard is exactly the kind of thing that would otherwise
-    # make it differ between the "not built yet" and "built" renders of the
-    # same panel instance.
+    # Unconditional, ahead of the `maps is None` return below: the number of
+    # hooks a component calls must stay the same on every render of it, and
+    # that guard is exactly the kind of thing that would otherwise make it
+    # differ between the "not built yet" and "built" renders of the same
+    # panel instance.
     solara.use_effect(
         handle_task_state,
         [task.pending, task.finished, task.error, task.cancelled],
     )
 
-    def start() -> None:
-        # Snapshot `maps` here, at click time -- not inside `_add_layers`, which
+    def cancel() -> None:
+        if task.pending:
+            with contextlib.suppress(RuntimeError):
+                task.cancel()
+
+    def clear_stale_layers() -> None:
+        # `maps` just became a different run (or stopped being runnable at
+        # all): cancel whatever this panel is still drawing from the
+        # PREVIOUS one, and take every layer this panel put on the map back
+        # off, rather than leaving old-run tiles shown next to -- or instead
+        # of -- the new run's.
+        cancel()
+        for layer_id in shown:
+            map_.remove_layer(layer_id.value, none_ok=True)
+        set_shown(frozenset())
+
+    # Keyed on `maps` alone -- identity/equality of the whole `IndicatorMaps`,
+    # never one of its fields, is what "a different run" means here (see
+    # `page.py`'s `outcome` comment on why `==` is the right comparison for a
+    # frozen dataclass built fresh per run). Fires on the first render too
+    # (nothing to remove: `shown` is still empty) and again when `maps`
+    # becomes `None` (the spec is no longer runnable) -- both are required by
+    # the task, not only the "changed to a different runnable spec" case.
+    solara.use_effect(clear_stale_layers, [maps])
+
+    def start(layer_id: IndicatorLayer, layer: ClassifiedLayer) -> None:
+        # Snapshot both here, at click time -- not inside `_add_layer`, which
         # the guide's rule bans from reading live reactive inputs once it is
-        # running as a background task. Guarded again (`start` is only ever
-        # wired to a button rendered when `current_maps` is not None below) so
-        # the closure stays total rather than assuming its caller's care.
-        if current_maps is not None:
-            task(map_, notifications, current_maps.layers())
+        # running as a background task.
+        set_pending_id(layer_id)
+        task(map_, layer_id, layer)
 
-    # `use_task_button` is a hook by convention (its name), not just by what it
-    # does -- solara's rules-of-hooks check flags it the same as `use_task`
-    # above if it moves below the conditional return, so it stays up here too.
-    btn_props = use_task_button(task, on_start=start)
+    def remove(layer_id: IndicatorLayer) -> None:
+        map_.remove_layer(layer_id.value, none_ok=True)
+        set_shown(lambda current: current - {layer_id})
 
-    if current_maps is None:
+    if maps is None:
         solara.Markdown(msg("layers.build_first"))
         return
 
-    TaskButtonComponent(label=msg("layers.show"), **btn_props)
+    with rv.SimpleTable(dense=True):
+        with rv.Html(tag="thead"), rv.Html(tag="tr"):
+            rv.Html(tag="th", children=[msg("layers.columns.name")])
+            rv.Html(tag="th", children=[msg("layers.columns.action")])
+        with rv.Html(tag="tbody"):
+            for layer_id, layer in maps.layers().items():
+                _LayerRow(
+                    name=layer_name(layer_id),
+                    is_shown=layer_id in shown,
+                    is_pending=task.pending and pending_id == layer_id,
+                    on_add=_bind_add(start, layer_id, layer),
+                    on_remove=_bind_remove(remove, layer_id),
+                    on_cancel=cancel,
+                )

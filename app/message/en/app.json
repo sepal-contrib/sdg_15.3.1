@@ -70,8 +70,19 @@
   "layers": {
     "title": "Layers",
     "description": "Add the computed layers to the map.",
-    "show": "Show on map",
-    "shown": "Added {count} layers to the map",
+    "columns": { "name": "Layer", "action": "Action" },
+    "add": "Add",
+    "remove": "Remove",
+    "added": "Added to the map: {name}",
+    "names": {
+      "land_cover": "Land cover",
+      "soc": "Soil organic carbon",
+      "productivity": "Productivity",
+      "productivity_trend": "Productivity trend",
+      "productivity_state": "Productivity state",
+      "productivity_performance": "Productivity performance",
+      "indicator_15_3_1": "SDG Indicator 15.3.1"
+    },
     "build_first": "Build the indicator first."
   },
   "transitions": {

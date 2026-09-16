@@ -74,8 +74,19 @@
   "layers": {
     "title": "Couches",
     "description": "Ajouter les couches calculées à la carte.",
-    "show": "Afficher sur la carte",
-    "shown": "{count} couches ajoutées à la carte",
+    "columns": { "name": "Couche", "action": "Action" },
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "added": "Ajouté à la carte : {name}",
+    "names": {
+      "land_cover": "Couverture terrestre",
+      "soc": "Carbone organique du sol",
+      "productivity": "Productivité",
+      "productivity_trend": "Tendance de productivité",
+      "productivity_state": "État de productivité",
+      "productivity_performance": "Performance de productivité",
+      "indicator_15_3_1": "Indicateur ODD 15.3.1"
+    },
     "build_first": "Construisez d'abord l'indicateur."
   },
   "transitions": {

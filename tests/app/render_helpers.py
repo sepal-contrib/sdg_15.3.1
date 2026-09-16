@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ("find_widget", "find_widgets", "markdown_texts")
+__all__ = ("cell_texts", "find_widget", "find_widgets", "markdown_texts")
 
 _MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
 
@@ -54,3 +54,20 @@ def find_widgets(root: object, cls: type) -> list[object]:
     for child in getattr(root, "children", None) or []:
         found.extend(find_widgets(child, cls))
     return found
+
+
+def cell_texts(node: object, tag: str) -> list[str]:
+    """Every ``rv.Html(tag=tag, children=[a_string])`` cell's text, in tree
+    order -- for a hand-built ``rv.SimpleTable`` row, which has no other
+    identifying trait to select "the name column" by. A cell that instead
+    holds a widget (an action button, say) contributes nothing here, so this
+    also doubles as "every plain-text cell", never the ones carrying controls.
+    """
+    children = getattr(node, "children", None) or ()
+    texts = []
+    if getattr(node, "tag", None) == tag:
+        texts.extend(child for child in children if isinstance(child, str))
+    for child in children:
+        if not isinstance(child, str):
+            texts.extend(cell_texts(child, tag))
+    return texts

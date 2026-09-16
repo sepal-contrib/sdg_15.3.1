@@ -58,9 +58,17 @@ def test_the_panel_waits_for_both_maps_and_context():
     assert find_widget(box, ipyvuetify.Btn) is None
 
 
-def test_there_is_one_source_per_layer_named_from_the_domain():
+def test_there_is_one_source_per_layer_and_its_id_matches_a_domain_basename():
     """Asset basenames come from sdg1531.naming, not from the UI: a repeat run
-    must produce the same names, and naming.py owns the collision suffix."""
+    must produce the same names, and naming.py owns the collision suffix.
+
+    Renamed from ``..._named_from_the_domain``: this only ever checked
+    ``source.id``, never the displayed ``source.label`` -- the old name
+    overstated what it proved. See
+    ``test_each_source_label_is_the_translated_layer_name_not_the_raw_id``
+    for the label itself, which (after M1) is no longer "from the domain"
+    at all.
+    """
     from app.steps.run import build
     from sdg1531.naming import LAYER_BASENAMES
     from tests.spec_factory import default_spec
@@ -71,6 +79,30 @@ def test_there_is_one_source_per_layer_named_from_the_domain():
     assert {s.kind for s in sources} == {"image"}
     for source in sources:
         assert source.id in LAYER_BASENAMES
+
+
+def test_each_source_label_is_the_translated_layer_name_not_the_raw_id():
+    """Final-review finding M1: the domain's ``ClassifiedLayer.label`` is the
+    raw snake id, and this panel used to pass it straight through as the
+    label the user picks the export by.
+
+    Checked against the raw id directly (``!= layer_id.value``), not only
+    against ``layer_name(...)`` -- a label that regressed to the raw id
+    together with a same-shaped regression in ``layer_name`` itself would
+    still agree with a check that only compared the two against each other.
+    """
+    from app.panels.map_layers import layer_name
+    from app.steps.run import build
+    from sdg1531.enums import IndicatorLayer
+    from tests.spec_factory import default_spec
+
+    maps, ctx = build(default_spec(threshold=0.0))
+    sources = {s.id: s for s in export_sources(maps, ctx)}
+
+    for layer_id in IndicatorLayer:
+        source = sources[layer_id.value]
+        assert source.label != layer_id.value
+        assert source.label == layer_name(layer_id)
 
 
 def test_resolve_is_lazy():
