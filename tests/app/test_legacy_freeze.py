@@ -12,7 +12,15 @@ import pathlib
 import subprocess
 
 FROZEN = ("component/model", "component/scripts", "component/parameter", "component/message")
-FREEZE_COMMIT = "bb72d2510ee897764cff3293603dea5f4273e360"
+# The last domain-layer commit on this branch, one before app-layer work starts
+# (`1697207`, "feat(app): scaffold the application package and its catalogue")
+# -- the actual point the D9 freeze took effect, not merely a commit late enough
+# to have seen no changes since. Re-anchored from `bb72d251`, which only proved
+# the freeze held for the branch's last 33 commits; verified before moving it
+# that neither anchor changes what the guard already proves: `git diff
+# --name-only 1121498 -- component/{model,scripts,parameter,message}` and
+# `git log 1121498..HEAD -- <those>` are both empty.
+FREEZE_COMMIT = "1121498bfcd2b30f33d630f7a1982117fb34b086"
 
 
 def test_the_frozen_legacy_is_unmodified():
