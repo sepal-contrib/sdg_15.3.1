@@ -115,6 +115,17 @@ def test_the_tabs_are_in_the_sub_indicator_order():
     # own -- `tests/test_rosters.py` holds every hand-maintained roster of
     # string constants to an account, and a roster here would just restate the
     # one in `app/tabs.py` with nothing to check it against.
+    #
+    # A PIN, not a derivation: unlike the `msg(...)` titles above (checked
+    # against the message catalogue, so a typo in either side shows up), an
+    # mdi icon name has no second, independent source of truth in this repo
+    # to import and compare against -- these ten strings are hand-typed here
+    # against ten hand-typed strings in `app/tabs.py`, so both sides could be
+    # wrong together and this would still pass. Kept anyway (matching the
+    # pattern the original, reviewed `test_page.py` used) because a literal
+    # match is still the only way to catch an icon that actually changed --
+    # just don't mistake it for proof the icon is CORRECT, only that it is
+    # UNCHANGED.
     assert tabs[0].icon == "mdi-map-marker-check"
     assert tabs[1].icon == "mdi-sprout-outline"
     assert tabs[2].icon == "mdi-terrain"
@@ -693,6 +704,27 @@ def test_a_locked_output_tab_does_not_navigate_on_click():
     tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
     assert tabs_items_widget is not None
     assert tabs_items_widget.v_model == _AOI_INDEX
+
+
+def test_a_locked_segment_cell_also_carries_pointer_events_none():
+    """The test above proves inertness through the HANDLER's ``if not
+    locked`` recheck alone -- ``fire_event`` calls the registered Python
+    callback directly and never dispatches a real browser pointer event, so
+    nothing else in this suite exercises ``_SegmentCell``'s CSS half. The
+    handler recheck is genuinely sufficient on its own (the hook must attach
+    on every render regardless of state, so the no-op has to live inside it
+    either way) -- but the reference this mirrors carries BOTH mechanisms for
+    a reason: the CSS is what stops a locked cell from looking clickable in
+    the first place, a job the handler alone does not do. Pinned here so a
+    future edit does not read the CSS line as redundant and drop it.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    rc.force_update()  # settle ProductivityStep's mount-time threshold-seeding effect first
+
+    cells = _wrapper_cells(_workflow_widget(box))
+    assert "pointer-events: none" in cells[_EXPORTS_INDEX].style_
+    assert "pointer-events: none" not in cells[_AOI_INDEX].style_
 
 
 def test_switching_tabs_does_not_rebuild_the_others_widgets():
