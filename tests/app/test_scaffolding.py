@@ -68,6 +68,11 @@ _UNTRANSLATED_FR_KEYS = frozenset(
         "layers.show",
         "layers.shown",
         "layers.build_first",
+        "results.title",
+        "results.description",
+        "results.compute",
+        "results.computed",
+        "results.build_first",
     }
 )
 

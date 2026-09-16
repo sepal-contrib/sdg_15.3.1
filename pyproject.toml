@@ -97,8 +97,10 @@ files = ["sdg1531", "app", "tools", "tests/parity"]
 # which only installs `dev`, never has it either -- `app/` needs the same
 # missing-imports pass ee and the geo stack already get. pygaul ships no
 # py.typed marker either; it is imported inside `from_aoi_spec` and
-# `_feature_collection`, both in this same missing-imports boat.
-module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*", "pysepal.*", "pygaul.*"]
+# `_feature_collection`, both in this same missing-imports boat. ipecharts (the
+# `app` extra pins it above) ships no py.typed marker either; `app/panels/results.py`
+# is its first import site.
+module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*", "pysepal.*", "pygaul.*", "ipecharts.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

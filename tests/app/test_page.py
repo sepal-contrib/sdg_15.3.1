@@ -69,7 +69,7 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
         "description": msg("panel.description"),
     }
     assert mapapp.steps_data == []
-    assert len(mapapp.right_panel_content) == 6
+    assert len(mapapp.right_panel_content) == 7
     aoi_section = mapapp.right_panel_content[0]
     assert aoi_section["title"] == msg("step.aoi")
     assert aoi_section["icon"] == "mdi-map-marker-check"
@@ -95,6 +95,11 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert layers_section["icon"] == "mdi-layers"
     assert layers_section["description"] == msg("layers.description")
     assert len(layers_section["content"]) == 1
+    results_section = mapapp.right_panel_content[6]
+    assert results_section["title"] == msg("results.title")
+    assert results_section["icon"] == "mdi-chart-bar"
+    assert results_section["description"] == msg("results.description")
+    assert len(results_section["content"]) == 1
     assert mapapp.right_panel_open is True
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
@@ -277,6 +282,33 @@ def test_the_layers_panel_is_wired_with_the_shared_maps_and_the_real_map_and_gee
     # isinstance check while drawing the seven layers onto a map the user is
     # not looking at -- `mapapp.main_map[0]` is the one actually in the tree.
     assert captured["map_"] is mapapp.main_map[0]
+    assert captured["gee_interface"] is not None
+
+
+def test_the_results_panel_is_wired_with_the_shared_maps_ctx_and_gee_interface(monkeypatch):
+    """Same identity concern as the layers panel above, for the two reactives
+    ``ResultsPanel`` needs: the ``maps`` AND the ``ctx`` a Build actually
+    writes into (not private copies that would never see one), and the real
+    session-backed ``gee_interface``."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
+        captured["run_maps"] = maps
+        captured["run_ctx"] = ctx
+
+    @solara.component
+    def _spy_results_panel(*, maps: Any = None, ctx: Any = None, gee_interface: Any = None) -> None:
+        captured.update(panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface)
+
+    monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(page_module, "ResultsPanel", _spy_results_panel)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["panel_maps"] is captured["run_maps"]
+    assert captured["panel_ctx"] is captured["run_ctx"]
     assert captured["gee_interface"] is not None
 
 

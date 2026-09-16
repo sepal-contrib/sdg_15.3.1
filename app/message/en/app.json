@@ -74,5 +74,12 @@
     "show": "Show on map",
     "shown": "Added {count} layers to the map",
     "build_first": "Build the indicator first."
+  },
+  "results": {
+    "title": "Results",
+    "description": "Class areas per land cover type.",
+    "compute": "Compute statistics",
+    "computed": "Statistics ready",
+    "build_first": "Build the indicator first."
   }
 }
