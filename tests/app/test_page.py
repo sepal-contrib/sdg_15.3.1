@@ -69,7 +69,7 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
         "description": msg("panel.description"),
     }
     assert mapapp.steps_data == []
-    assert len(mapapp.right_panel_content) == 8
+    assert len(mapapp.right_panel_content) == 9
     aoi_section = mapapp.right_panel_content[0]
     assert aoi_section["title"] == msg("step.aoi")
     assert aoi_section["icon"] == "mdi-map-marker-check"
@@ -105,6 +105,11 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert zonal_section["icon"] == "mdi-table"
     assert zonal_section["description"] == msg("zonal.description")
     assert len(zonal_section["content"]) == 1
+    exports_section = mapapp.right_panel_content[8]
+    assert exports_section["title"] == msg("exports.title")
+    assert exports_section["icon"] == "mdi-export-variant"
+    assert exports_section["description"] == msg("exports.description")
+    assert len(exports_section["content"]) == 1
     assert mapapp.right_panel_open is True
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
@@ -351,6 +356,47 @@ def test_the_zonal_panel_is_wired_with_the_shared_maps_ctx_and_a_sepal_client(mo
     # environment -- the identity that matters here is that `page.py` calls
     # it at all and passes the result through, not a particular truthiness.
     assert "sepal_client" in captured
+
+
+def test_the_exports_panel_is_wired_with_the_shared_maps_ctx_spec_and_gee_interface(monkeypatch):
+    """Same identity concern as the results and zonal panels above, plus one
+    of its own: ``gee_interface`` must be the real session interface, not
+    ``None`` -- a ``None`` here would leave ``ExportLauncher`` to resolve
+    ``get_current_gee_interface()`` itself, which raises outside a SEPAL
+    session (``app/panels/exports.py``'s ``ExportsPanel`` docstring)."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["aoi_spec"] = spec
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, maps: Any = None, ctx: Any = None) -> None:
+        captured["run_maps"] = maps
+        captured["run_ctx"] = ctx
+
+    @solara.component
+    def _spy_exports_panel(
+        *, maps: Any = None, ctx: Any = None, spec: Any = None, gee_interface: Any = None
+    ) -> None:
+        captured.update(
+            exports_maps=maps,
+            exports_ctx=ctx,
+            exports_spec=spec,
+            exports_gee_interface=gee_interface,
+        )
+
+    monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(page_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(page_module, "ExportsPanel", _spy_exports_panel)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert captured["exports_maps"] is captured["run_maps"]
+    assert captured["exports_ctx"] is captured["run_ctx"]
+    assert captured["exports_spec"] is captured["aoi_spec"]
+    assert captured["exports_gee_interface"] is not None
 
 
 def test_the_steps_are_in_the_sub_indicator_order():

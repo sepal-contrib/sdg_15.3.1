@@ -33,6 +33,7 @@ from pysepal.solara import (
 from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
+from app.panels.exports import ExportsPanel
 from app.panels.map_layers import MapLayersPanel
 from app.panels.results import ResultsPanel
 from app.panels.zonal import ZonalPanel
@@ -192,6 +193,14 @@ def Sdg1531App() -> None:
                     )
                 ],
                 "description": msg("zonal.description"),
+            },
+            {
+                "title": msg("exports.title"),
+                "icon": "mdi-export-variant",
+                "content": [
+                    ExportsPanel(maps=maps, ctx=ctx, spec=spec, gee_interface=gee_interface)
+                ],
+                "description": msg("exports.description"),
             },
         ],
         right_panel_open=True,

@@ -89,5 +89,11 @@
     "download": "Download shapefile",
     "ready": "Zonal statistics ready",
     "build_first": "Build the indicator first."
+  },
+  "exports": {
+    "title": "Export",
+    "description": "Export any layer as a GEE asset.",
+    "button": "Export",
+    "build_first": "Build the indicator first."
   }
 }

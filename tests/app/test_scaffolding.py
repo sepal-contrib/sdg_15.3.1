@@ -79,6 +79,10 @@ _UNTRANSLATED_FR_KEYS = frozenset(
         "zonal.download",
         "zonal.ready",
         "zonal.build_first",
+        "exports.title",
+        "exports.description",
+        "exports.button",
+        "exports.build_first",
     }
 )
 
