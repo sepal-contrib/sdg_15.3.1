@@ -3,8 +3,8 @@
     "title": "SDG Indicator 15.3.1"
   },
   "panel": {
-    "title": "Results",
-    "description": "Layers, statistics and exports for the current run."
+    "title": "Workflow",
+    "description": "Set up the run's inputs, then review its layers, statistics and exports."
   },
   "step": {
     "aoi": "Area of interest",

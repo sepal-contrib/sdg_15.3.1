@@ -3,8 +3,8 @@
     "title": "Indicador ODS 15.3.1"
   },
   "panel": {
-    "title": "Resultados",
-    "description": "Capas, estadísticas y exportaciones de la ejecución actual."
+    "title": "Flujo de trabajo",
+    "description": "Configure los datos de la ejecución y luego revise sus capas, estadísticas y exportaciones."
   },
   "step": {
     "aoi": "Área de interés",

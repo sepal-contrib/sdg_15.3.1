@@ -9,6 +9,7 @@ from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app.message import messages, msg
+from app.tabs import workflow_tabs
 from tests.app.render_helpers import find_widget
 
 
@@ -60,7 +61,7 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert isinstance(mapapp.main_map[0], SepalMap)
     assert mapapp.right_panel_config == {
         "title": msg("panel.title"),
-        "icon": "mdi-chart-box-outline",
+        "icon": "mdi-format-list-checks",
         "width": 450,
         "description": msg("panel.description"),
     }
@@ -73,6 +74,23 @@ def test_the_shell_builds_a_correctly_configured_mapapp():
     assert len(mapapp.language_selector) == 1
     offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
     assert offered == set(messages.available_locales())
+
+
+def test_the_panel_title_names_no_single_tab_it_contains():
+    """A title is a judgement about meaning, not a property a unit test can
+    verify is TRUE -- but "Results" (Task 18-21's regression: the panel held
+    only five output panels when it was named that, then grew the other five
+    configuration steps around it) is a judgement a test CAN show is FALSE:
+    the panel's own title equalling one of the ten tabs' own titles is
+    exactly the shape of the error that happened here, a panel named after
+    one of the things it contains rather than the whole of it.
+
+    Tab titles come from ``workflow_tabs()`` itself, callable with no render
+    context per its own docstring -- not a second, hand-typed list of ten
+    strings that could silently drift from the real tab order.
+    """
+    tab_titles = {tab.title for tab in workflow_tabs()}
+    assert msg("panel.title") not in tab_titles
 
 
 def test_the_map_is_memoized_across_rerenders():

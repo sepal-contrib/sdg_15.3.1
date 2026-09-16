@@ -3,8 +3,8 @@
     "title": "Indicateur ODD 15.3.1"
   },
   "panel": {
-    "title": "Résultats",
-    "description": "Couches, statistiques et exports pour l'exécution en cours."
+    "title": "Flux de travail",
+    "description": "Configurez les données de l'exécution, puis consultez ses couches, statistiques et exports."
   },
   "step": {
     "aoi": "Zone d'intérêt",

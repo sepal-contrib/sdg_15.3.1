@@ -116,9 +116,14 @@ def Sdg1531App() -> None:
         app_icon="mdi-earth",
         main_map=[sepal_map],
         steps_data=[],
+        # A chart icon and the title "Results" were accurate while this panel
+        # held only the five output panels. Task 18 moved the whole workflow
+        # here and Task 21 tabbed it, so the panel now opens on AOI selection
+        # and holds the five configuration steps too -- "mdi-format-list-checks"
+        # and "Workflow" describe the whole titleless section, not one tab in it.
         right_panel_config={
             "title": msg("panel.title"),
-            "icon": "mdi-chart-box-outline",
+            "icon": "mdi-format-list-checks",
             "width": 450,
             "description": msg("panel.description"),
         },
