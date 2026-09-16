@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+import pytest
 import reacton.core
 import solara
 from pysepal.mapping.sepal_map import SepalMap
@@ -12,9 +13,9 @@ from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app.message import messages, msg
-from app.steps.run import BuildOutcome
+from app.steps.run import BuildOutcome, build
 from sdg1531.spec import Period, RunSpec
-from tests.app.render_helpers import find_widget
+from tests.app.render_helpers import find_widget, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
@@ -570,6 +571,58 @@ def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
     second = first.evolve(periods=replace(first.periods, overall=Period(2005, 2020)))
     spec.value = second
     assert captured["exports_maps"].resolved.spec.periods.overall == Period(2005, 2020)
+
+
+def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
+    """The compositional gap fix round 1 flagged: ``build_outcome``'s error path
+    (``test_step_run.py::test_build_outcome_carries_the_refusal_is_runnable_cannot_see``)
+    and ``RunStep``'s rendering of ``outcome.error`` (``test_step_run.py``'s
+    ``test_the_step_renders_only_its_own_text``, fed a hand-built ``BuildOutcome``)
+    are each covered alone, but never joined -- the actual path a user hits runs
+    a real spec through ``page.py``'s real ``use_memo`` into the real ``RunStep``.
+    This drives that whole path and reads what actually landed on screen, with
+    the real ``RunStep`` in the tree and no hand-built outcome anywhere.
+
+    Only ``AoiStep`` is substituted, and only to reach the shared spec reactive
+    without rendering its own ``AssetSelectComponent`` (the same concern the
+    staleness regression test above has -- see its comment). ``RunStep`` is
+    the real component; its rendered ``Sheet`` is read back off ``MapApp``'s own
+    ``right_panel_content`` (a widget PROPERTY, not a reacton child of ``box`` --
+    ``markdown_texts(box)`` finds nothing there, which is why every other test
+    in this file reads identity off a spy instead of rendered text; this is the
+    one test that needs the real text, so it reads it from where it actually
+    lives instead).
+
+    Anchored against a direct call to ``build()``, not a hardcoded guess at the
+    domain's wording, so a change to that message updates both sides together.
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["spec"] = spec
+
+    monkeypatch.setattr(page_module, "AoiStep", _spy_aoi_step)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    mapapp = find_widget(box, MapApp)
+    assert mapapp is not None
+
+    refusing_spec = default_spec()  # threshold=None: is_runnable() True, build() refuses
+    with pytest.raises(Exception) as exc_info:
+        build(refusing_spec)
+
+    captured["spec"].value = refusing_spec
+
+    # Index 4: the Run section (design decision A6; also pinned by
+    # `test_the_steps_are_in_the_sub_indicator_order` and
+    # `test_the_shell_builds_a_correctly_configured_mapapp`). `mapapp` is the
+    # same widget instance across the re-render `.value =` above triggered
+    # (`test_the_map_is_memoized_across_rerenders` proves that identity), so
+    # its `right_panel_content` trait, read now, already reflects that render.
+    run_sheet = mapapp.right_panel_content[4]["content"][0]
+    assert markdown_texts(run_sheet)[-1] == f"<p><strong>{exc_info.value}</strong></p>"
 
 
 def test_the_steps_are_in_the_sub_indicator_order():
