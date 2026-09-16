@@ -166,6 +166,31 @@ def _is_engine_source(rel_path: str) -> bool:
     return rel_path == ENGINE_MODULE or rel_path.startswith(ENGINE_PREFIX)
 
 
+def _use_task_aliases(tree: ast.Module) -> frozenset[str]:
+    """Local names this module's imports bind to ``use_task``.
+
+    Covers ``from solara.lab import use_task`` and
+    ``from solara.lab import use_task as <alias>`` (any module, not just
+    ``solara.lab``, so a re-export would still be caught) -- the same
+    alias-defeats-a-literal-spelling hole
+    ``tests/app/test_task_dependencies.py`` closed for its own scan, and the
+    ``use-task-prefer-threaded`` rule below had too: a bare
+    ``name == "use_task"`` check let ``from solara.lab import use_task as ut``
+    call through with no ``prefer_threaded`` enforced at all. Module-level
+    aliasing (``import solara.lab as sl``) needs no separate handling: an
+    attribute access can't rename its own final attribute, so
+    ``sl.use_task(...)`` still ends in ``.use_task`` and the attr check
+    already covers it.
+    """
+    return frozenset(
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+        if alias.name == "use_task"
+    )
+
+
 def _binding_targets(node: ast.Assign | ast.AnnAssign) -> list[tuple[str, ast.expr]]:
     """Pairs of ``(bound name, value expression)`` for a module- or class-level assignment.
 
@@ -198,6 +223,7 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
     """Return every hygiene violation in ``source``. ``rel_path`` is POSIX, repo-relative."""
     tree = ast.parse(source, filename=rel_path)
     out: list[Violation] = []
+    use_task_aliases = _use_task_aliases(tree)
 
     def add(node: ast.AST, rule: str, detail: str) -> None:
         out.append(Violation(rel_path, getattr(node, "lineno", 0), rule, detail))
@@ -282,7 +308,7 @@ def check_source(rel_path: str, source: str) -> list[Violation]:
             if not exempt and (name in FS_CALL_NAMES or attr in FS_CALL_ATTRS):
                 add(node, "filesystem", f"{name or attr}() touches the filesystem")
 
-            if name == "use_task" or attr == "use_task":
+            if name == "use_task" or attr == "use_task" or name in use_task_aliases:
                 prefer_threaded_kw = next(
                     (kw for kw in node.keywords if kw.arg == "prefer_threaded"), None
                 )
