@@ -95,6 +95,20 @@ def _asset_id(value: dict[str, Any] | None) -> str:
     return (value or {}).get("asset_id") or ""
 
 
+def _scheme_for_pixel_check(custom_source: CustomLandCoverSource, spec: RunSpec) -> LandCoverScheme:
+    """The classification a custom asset's pixel values are checked against.
+
+    Mirrors ``sdg1531.resolve._scheme()``'s own fallback exactly -- that
+    function is private, and ``resolve()`` itself needs a fully populated
+    spec, which a half-filled form is not required to be -- so this re-derives
+    the two-line fallback locally instead of importing it.
+    ``tests/app/test_step_land_cover.py``'s
+    ``test_the_pixel_check_scheme_fallback_matches_resolve`` pins the two
+    together so they cannot silently diverge.
+    """
+    return custom_source.scheme or LandCoverScheme.default(matrix=spec.transition_matrix)
+
+
 async def _check_pixel_values(
     gee_interface: Any,
     notifications: Any,
@@ -176,9 +190,7 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
         def _maybe_check_pixel_values(start_asset: str, end_asset: str) -> None:
             if not (start_asset and end_asset):
                 return
-            scheme = custom_source.scheme or LandCoverScheme.default(
-                matrix=current.transition_matrix
-            )
+            scheme = _scheme_for_pixel_check(custom_source, current)
             task(gee_interface, notifications, scheme, start_asset, end_asset)
 
         def _on_start_value(value: dict[str, Any] | None) -> None:

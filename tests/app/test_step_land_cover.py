@@ -12,8 +12,9 @@ import solara
 
 from app.message import msg
 from app.state import problems_for
-from app.steps.land_cover import LandCoverStep
-from sdg1531.scheme import LandCoverScheme
+from app.steps.land_cover import LandCoverStep, _scheme_for_pixel_check
+from sdg1531.resolve import resolve
+from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     AssetBandMask,
     CustomLandCoverSource,
@@ -324,6 +325,26 @@ def test_choosing_either_asset_preserves_an_existing_scheme():
     assert spec.value.land_cover == CustomLandCoverSource(
         start_asset="users/x/new-start", end_asset="users/x/new-end", scheme=scheme
     )
+
+
+def test_the_pixel_check_scheme_fallback_matches_resolve():
+    """``_scheme_for_pixel_check`` re-derives ``sdg1531.resolve._scheme()``'s
+    own fallback locally (that function is private, and ``resolve()`` needs a
+    fully populated spec) -- so nothing enforces the two staying in sync
+    except this test. A half-custom source (both assets set, ``scheme=None``)
+    is exactly the case where the two could disagree: this step falls back to
+    the default vocabulary, carrying the run's own (possibly edited)
+    transition matrix, the same way the domain's own resolution does. The
+    matrix is deliberately NOT ``TransitionMatrix.default()`` -- a fallback
+    that silently ignored ``spec.transition_matrix`` and always returned the
+    stock default would satisfy the assertion anyway if the two happened to
+    already match."""
+    edited_matrix = TransitionMatrix.default().with_cell(0, 0, 5)
+    spec = default_spec(
+        land_cover=CustomLandCoverSource(start_asset="a", end_asset="b", scheme=None),
+        transition_matrix=edited_matrix,
+    )
+    assert _scheme_for_pixel_check(spec.land_cover, spec) == resolve(spec).scheme
 
 
 def test_choosing_both_assets_reports_a_pixel_mismatch_as_a_notification(monkeypatch):
