@@ -490,6 +490,27 @@ def test_a_locked_output_tab_does_not_navigate_on_click():
     assert tabs_items_widget.v_model == _AOI_INDEX
 
 
+def test_both_nav_arrows_carry_a_hover_and_screen_reader_label():
+    """An icon-only button has no text, so its `title`/`aria-label` is the
+    only affordance it has -- a user hovering sees nothing and a screen
+    reader announces nothing without them. The segment cells already solve
+    this the same way; the arrows were added later and did not.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    rc.force_update()
+
+    arrows = [
+        b
+        for b in find_widgets(_workflow_widget(box), v.Btn)
+        if b.attributes.get("title") in (msg("tabs.previous"), msg("tabs.next"))
+    ]
+    assert len(arrows) == 2, "expected exactly one previous and one next arrow"
+    for arrow in arrows:
+        assert arrow.attributes.get("title"), "arrow has no hover label"
+        assert arrow.attributes.get("aria-label") == arrow.attributes["title"]
+
+
 def test_a_locked_segment_cell_also_carries_pointer_events_none():
     """The test above proves inertness through the HANDLER's ``if not
     locked`` recheck alone -- ``fire_event`` calls the registered Python

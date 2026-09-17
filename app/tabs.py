@@ -279,7 +279,11 @@ def _SegmentCell(tip: str, seg_style: str, locked: bool, on_activate: Callable[[
 
 @solara.component
 def _NavArrow(
-    icon_name: str, disabled: bool, on_activate: Callable[[], None], color: str | None = None
+    icon_name: str,
+    label: str,
+    disabled: bool,
+    on_activate: Callable[[], None],
+    color: str | None = None,
 ) -> None:
     """One prev/next arrow. Its own component so the ``use_event`` click hook
     attaches at a stable top level -- same convention as ``_SegmentCell``
@@ -288,11 +292,16 @@ def _NavArrow(
     return-type annotation in solara's own stubs, so ``mypy --strict``
     refuses to call it; a plain ``rv.Btn`` is fully typed.
     """
+    # `label` is the only affordance this control has: an icon-only button
+    # carries no text, so without it the arrow is unreadable to a screen
+    # reader and unexplained on hover. `_SegmentCell` above solves the same
+    # problem the same way.
     btn = rv.Btn(
         icon=True,
         small=True,
         disabled=disabled,
         color=color,
+        attributes={"title": label, "aria-label": label},
         children=[rv.Icon(children=[icon_name])],
     )
 
@@ -430,9 +439,15 @@ def WorkflowTabs(
         # same double-guard `_SegmentCell.on_activate` uses for a locked
         # segment, for the same reason (the click handler is what a test
         # drives directly).
-        _NavArrow(icon_name="mdi-chevron-left", disabled=prev_t is None, on_activate=_activate_prev)
+        _NavArrow(
+            icon_name="mdi-chevron-left",
+            label=msg("tabs.previous"),
+            disabled=prev_t is None,
+            on_activate=_activate_prev,
+        )
         _NavArrow(
             icon_name="mdi-chevron-right",
+            label=msg("tabs.next"),
             disabled=next_t is None,
             on_activate=_activate_next,
             color="primary",

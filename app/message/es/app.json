@@ -160,5 +160,9 @@
   },
   "outputs": {
     "title": "Resultados"
+  },
+  "tabs": {
+    "previous": "Paso anterior",
+    "next": "Paso siguiente"
   }
 }
