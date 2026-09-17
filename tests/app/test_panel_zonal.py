@@ -239,6 +239,25 @@ def test_clicking_compute_fetches_with_the_zonal_scale_not_the_analysis_scale(mo
     # No download button until a table exists is covered separately; here,
     # once compute succeeds, it must appear.
     assert (msg("zonal.download"),) in _buttons(box)
+    # pysepal's right-panel button convention (docs/guides/solara-app-builder.md).
+    assert _buttons(box)[(msg("zonal.download"),)].small is True
+
+
+def test_the_compute_button_is_small(monkeypatch):
+    """pysepal's right-panel button convention -- see
+    ``docs/guides/solara-app-builder.md``'s button-sizing table."""
+    monkeypatch.setattr("app.panels.zonal.use_notifications", lambda: _FakeNotifier())
+    box, rc = solara.render(
+        ZonalPanel(
+            maps=_FakeMaps(_FakeResolvedScales(analysis_scale=300, zonal_scale=300)),
+            ctx=_FakeCtx(object()),
+            gee_interface=None,
+            sepal_client=None,
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+    assert _buttons(box)[(msg("zonal.compute"),)].small is True
 
 
 def test_a_failed_compute_reports_the_error_and_shows_no_table(monkeypatch):

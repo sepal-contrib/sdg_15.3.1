@@ -228,10 +228,10 @@ def ZonalPanel(
         solara.Markdown(msg("zonal.build_first"))
         return
 
-    TaskButtonComponent(label=msg("zonal.compute"), **compute_btn_props)
+    TaskButtonComponent(label=msg("zonal.compute"), **compute_btn_props, small=True)
 
     if current_frame is not None:
         # `is not None`, not bare truthiness: an empty DataFrame is falsey,
         # which would hide a real (if empty) result.
         solara.DataFrame(_display_frame(current_frame))
-        TaskButtonComponent(label=msg("zonal.download"), **download_btn_props)
+        TaskButtonComponent(label=msg("zonal.download"), **download_btn_props, small=True)

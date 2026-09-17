@@ -147,7 +147,7 @@ def TransitionsPanel(
         solara.Markdown(msg("transitions.build_first"))
         return
 
-    TaskButtonComponent(label=msg("transitions.compute"), **btn_props)
+    TaskButtonComponent(label=msg("transitions.compute"), **btn_props, small=True)
 
     # `solara.display`, called directly in the render body, not deferred into a
     # `use_effect` -- see `ResultsPanel`'s comment on this exact call for why:

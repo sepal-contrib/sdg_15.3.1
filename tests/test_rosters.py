@@ -104,6 +104,7 @@ NOT_DOMAIN_PACKAGES = ("tests", "tools")
 ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/_subprocess.py:__all__": "derived: test_every_export_list_matches_its_module",
     "tests/app/render_helpers.py:__all__": "derived: test_every_export_list_matches_its_module",
+    "tests/app/test_button_sizing.py:_TARGET_NAMES": "vocabulary: the two button-shaped call names (pysepal's TaskButtonComponent, reacton's Btn) this app's own button-sizing convention scan resolves calls against",
     "tests/app/test_legacy_freeze.py:FROZEN": "vocabulary: the component/ subtrees tools/dump_legacy_graphs.py and tools/to_legacy_model.py import (component/scripts, component/model) plus those two modules' own upstream imports (component/parameter, component/message) -- a second scanner reading the same import graph would only restate this one",
     "tests/engine/test_context.py:GEOJSON": "fixture: the AOI polygon the context tests build from",
     "tests/engine/test_indicator.py:_BAND_PRESERVING": "vocabulary: ee's encoder -- the nodes that hand a band list through",

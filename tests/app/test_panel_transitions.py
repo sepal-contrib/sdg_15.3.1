@@ -165,6 +165,7 @@ def test_clicking_compute_fetches_and_mounts_the_real_chart_option(monkeypatch):
         button = find_widget(box, ipyvuetify.Btn)
         assert button is not None
         assert button.children == [msg("transitions.compute")]
+        assert button.small is True  # pysepal's right-panel button convention
         button.click()
         assert await _wait_for(lambda: fake.successes or fake.errors)
         return box

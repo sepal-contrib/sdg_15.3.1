@@ -171,7 +171,7 @@ def ResultsPanel(
         solara.Markdown(msg("results.build_first"))
         return
 
-    TaskButtonComponent(label=msg("results.compute"), **btn_props)
+    TaskButtonComponent(label=msg("results.compute"), **btn_props, small=True)
 
     # `solara.display`, not a declarative `EChartsRawWidget.element(...)`: ipecharts
     # 1.4.0 gives neither chart class an `.element()` factory. Called directly in
