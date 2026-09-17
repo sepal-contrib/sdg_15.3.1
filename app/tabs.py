@@ -86,6 +86,7 @@ def workflow_tabs(
     gee_interface: Any = None,
     sepal_client: Any = None,
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]] | None = None,
+    active_tab: int | None = None,
 ) -> list[TabDescriptor]:
     """The six workflow tabs, in DISPLAY order: AOI -> Productivity -> Land
     cover -> SOC -> Run -> the merged outputs tab (design decision A6's order,
@@ -109,6 +110,14 @@ def workflow_tabs(
     ``ExportsPanel.spec`` deep inside ``OutputsPanel``); measured by deleting
     a guard, which leaves every test green and produces one ``mypy`` error per
     guard removed.
+
+    ``active_tab`` is ``WorkflowTabs``'s own active-index state, threaded down
+    only so ``OutputsPanel`` can tell whether ITS tab is the active one --
+    see that module's docstring for the chart-mount trap this feeds. ``None``
+    (the bare-callable default) means "no tab is active", which is also the
+    right answer for the merged outputs tab specifically: with no render
+    context there is no real active tab to speak of, and its two chart
+    sections must not eagerly build against a container that may not exist.
     """
     maps = outcome.maps if outcome is not None else None
     ctx = outcome.ctx if outcome is not None else None
@@ -127,6 +136,21 @@ def workflow_tabs(
     run_content: list[object] = (
         [RunStep(spec=spec, outcome=outcome)] if spec is not None and outcome is not None else []
     )
+
+    configuration_tabs = [
+        TabDescriptor("aoi", msg("step.aoi"), "mdi-map-marker-check", aoi_content),
+        TabDescriptor(
+            "productivity", msg("step.productivity"), "mdi-sprout-outline", productivity_content
+        ),
+        TabDescriptor("land_cover", msg("step.land_cover"), "mdi-terrain", land_cover_content),
+        TabDescriptor("soc", msg("step.soc"), "mdi-layers-outline", soc_content),
+        TabDescriptor("run", msg("step.run"), "mdi-play-circle-outline", run_content),
+    ]
+    # The outputs tab always comes straight after the five configuration
+    # tabs -- its index is this list's own length, not a second, hand-typed
+    # literal that could silently drift from the return list below.
+    outputs_index = len(configuration_tabs)
+
     # `OutputsPanel.spec` is a bare `RunSpec` (its own `ExportsPanel` section
     # needs it), unlike every other argument here -- the one tab that still
     # needs this guard, for the same mypy-narrowing reason it always did.
@@ -147,19 +171,14 @@ def workflow_tabs(
                 shown_layers=shown_layers
                 if shown_layers is not None
                 else frozenset[IndicatorLayer](),
+                is_active=active_tab == outputs_index,
             )
         ]
         if spec is not None
         else []
     )
     return [
-        TabDescriptor("aoi", msg("step.aoi"), "mdi-map-marker-check", aoi_content),
-        TabDescriptor(
-            "productivity", msg("step.productivity"), "mdi-sprout-outline", productivity_content
-        ),
-        TabDescriptor("land_cover", msg("step.land_cover"), "mdi-terrain", land_cover_content),
-        TabDescriptor("soc", msg("step.soc"), "mdi-layers-outline", soc_content),
-        TabDescriptor("run", msg("step.run"), "mdi-play-circle-outline", run_content),
+        *configuration_tabs,
         # `outputs.title`, not `results.title`: the merged tab holds five
         # sections and one of them IS the ResultsPanel, so reusing that key
         # named the tab after its own child. The section keeps `results.title`
@@ -395,6 +414,7 @@ def WorkflowTabs(
         gee_interface=gee_interface,
         sepal_client=sepal_client,
         shown_layers=shown_layers,
+        active_tab=active_tab,
     )
     has_maps = outcome.maps is not None
     aoi_index = next(i for i, tab in enumerate(tabs) if tab.step == "aoi")

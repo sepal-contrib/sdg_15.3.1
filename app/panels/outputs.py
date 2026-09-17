@@ -1,51 +1,74 @@
-"""The five output panels, as one tab's collapsible sections.
+"""The five output panels, as one tab's flat, headed sections.
 
 The repo owner asked for this after using the app: *"all the computation
 buttons ... should be in the same tab, like with multiple sections, similarly
-as se.plan does ... like all the computations in one single place."* This
-module is that tab's content -- ``se.plan``'s own
-``component/widget/dashboard_layer_panels.py`` builds the same shape with
-``sw.ExpansionPanels``/``ExpansionPanel``/``ExpansionPanelHeader``/
-``ExpansionPanelContent``; this uses the reacton equivalents (``rv.*``, never
-``v.*`` inside an ``rv.*`` container).
+as se.plan does ... like all the computations in one single place."* Task 27
+first built this as an ``rv.ExpansionPanels`` accordion; the repo owner then
+asked for that to go -- *"I didn't like the expansion panels you added, what
+about using like subtitles?"* -- so this module now renders the same five
+panels as flat, always-visible sections, each introduced by
+``app/panels/section_header.py``'s ``SectionHeader`` (title, icon and the
+panel's own description as one styled unit) instead of an
+``ExpansionPanelHeader``/``ExpansionPanelContent`` pair.
 
 **Section order is the old tab order and must not change**: Layers ->
 Transitions -> Results -> Zonal -> Export (``app/tabs.py``'s own docstring
-already names this as the tabs' DISPLAY order; task 27 folds five tabs into
-five sections without reordering them). Each section keeps its panel's own
-``msg("<panel>.description")`` (rendered inside the panel component itself,
-same as before) and its header carries that panel's existing
-``msg("<panel>.title")`` and icon -- no new copy invented for any of the five.
+already names this as the tabs' DISPLAY order; task 27 folded five tabs into
+five sections without reordering them, and this task's move to flat sections
+does not reorder them either). Each section's header carries that panel's
+existing ``msg("<panel>.title")``, icon and ``msg("<panel>.description")`` --
+no new copy invented for any of the five. The description used to be rendered
+a second time, inside the panel component itself, as a plain
+``solara.Markdown`` line below its own title-less content; it has been
+removed from all five panel components (``map_layers.py``, ``transitions.py``,
+``results.py``, ``zonal.py``, ``exports.py``) now that the header shows it,
+so title and description read as one unit rather than a heading followed by a
+stray sentence.
 
-Layers opens by default (``_DEFAULT_OPEN = 0``): it needs no button click to
-be useful (it is a read-only table of what layers a run produced), unlike the
-other four, which show nothing until the user presses Compute -- opening one
-of those by default would still look empty. All five collapsed was rejected
-outright: the brief that asked for this is explicit that the tab must not
-open looking empty.
+Layers opens by default; SO DO the other four now, since flat sections are
+always visible -- there is no "default open index" left to choose. What
+survives from that concept is only which section's OWN chart, if any, needs
+special mount timing; see the chart-mount trap below.
 
-**The chart-mount trap.** Two sections mount an ``EChartsRawWidget`` via
-``solara.display()`` (``ResultsPanel``, ``TransitionsPanel``) called directly
-in the render body. ``rv.TabsItems`` (this app's OTHER container, in
-``app/tabs.py``) hides an inactive tab without unmounting it, and a chart
-mounted there was verified in a real browser to survive a tab switch with its
-canvas intact. ``rv.ExpansionPanel`` is a different container, and that
-verification does not transfer: probed the same way (a throwaway app mounting
-an ``EChartsRawWidget`` inside ``rv.ExpansionPanel``, driven by
-``pysepal/scripts/browser_probe.mjs``), collapsing a section does NOT unmount
-its content (the canvas keeps its pixel dimensions, just hidden via
-``display: none``) -- so a chart already built while open survives a
-collapse/reopen cycle same as in a tab. But a chart built for the FIRST time
-while its section is collapsed -- which happens whenever the async fetch
-behind it resolves after the user has already opened a DIFFERENT section --
-measured a fixed, wrong canvas size (ECharts' own fallback, not the
-container's real width) that reopening the section never corrected. Both
-``ResultsPanel`` and ``TransitionsPanel`` now take an ``is_open`` flag for
-exactly this: their own chart-widget memo is gated on it, not just on the
-fetched data being ready, so the widget is always first constructed during a
-render where its section is already the open one. Threaded here from this
-component's own ``open_index`` state -- the only place that knows which
-section that is.
+**The chart-mount trap. This is now the THIRD container these charts have
+lived in**, and behaviour has changed with every one so far:
+
+* ``rv.TabItem`` (``app/tabs.py``, this app's OWN OTHER container) -- verified
+  fine for a chart that STAYS mounted after being built while visible, then
+  survives a tab switch away and back with its canvas intact.
+* ``rv.ExpansionPanel`` (task 27) -- broke: a chart built for the FIRST time
+  while its section was collapsed measured a fixed 100x500 canvas (ECharts'
+  own fallback, not the container's real width) that reopening never
+  corrected. Task 27's fix: an ``is_open`` flag gating each chart's
+  ``use_memo`` on "is MY section the one currently expanded", so the widget
+  is always first built during a render where its section is already open.
+* Flat sections (this task) -- the accordion (and its per-section open/closed
+  state) is gone, so naively deleting ``is_open`` and always building the
+  chart looked right: every section renders unconditionally now, all the
+  time. **Measured instead of assumed, with a throwaway probe mirroring task
+  27's own technique** (an ``EChartsRawWidget`` behind an ``rv.TabsItems``
+  pair, driven by ``pysepal/scripts/browser_probe.mjs --resize 1400x900``):
+  the accordion is gone, but the outer container is NOT -- this whole panel
+  still lives inside ``rv.TabItem`` (the merged outputs TAB, one of
+  ``app/tabs.py``'s six), which ``WorkflowTabs``'s own docstring already
+  documents as mounting a tab's content once, on first visit, and never
+  unmounting it afterwards. That is exactly ``rv.ExpansionPanel``'s own
+  eager-DOM, CSS-toggled behaviour, not a lazier one: switching to a
+  DIFFERENT workflow tab while a chart's async fetch is still in flight, then
+  letting it resolve while the outputs tab is hidden, reproduced the
+  IDENTICAL 100x500 fallback canvas task 27 found -- confirmed with the exact
+  same probe technique, gate removed, chart built while ``display: none``.
+  So the trap survives the move to flat sections unchanged; only its
+  ADDRESS moves, from "which accordion section is open" (a concept flat
+  sections no longer have) to "is the merged outputs TAB itself the one
+  currently active" (a concept ``app/tabs.py``'s ``WorkflowTabs`` owns, since
+  it is the only place that knows). ``is_open`` therefore becomes
+  ``is_active`` here: threaded from ``WorkflowTabs``'s own ``active_tab``
+  state, through ``workflow_tabs()``, into ``OutputsPanel``, and down into
+  ``ResultsPanel``/``TransitionsPanel`` exactly as before -- re-probed with
+  the gate restored (now keyed on the OUTER tab instead of an accordion
+  section): the widget builds ``None`` while the outputs tab is inactive, and
+  on switching to it, builds fresh at the real container width.
 """
 
 from __future__ import annotations
@@ -60,6 +83,7 @@ from app.message import msg
 from app.panels.exports import ExportsPanel
 from app.panels.map_layers import MapLayersPanel
 from app.panels.results import ResultsPanel
+from app.panels.section_header import SectionHeader
 from app.panels.transitions import TransitionsPanel
 from app.panels.zonal import ZonalPanel
 from sdg1531.engine.context import ExecutionContext
@@ -68,11 +92,6 @@ from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
 __all__ = ("OutputsPanel", "SectionDescriptor", "output_sections")
-
-#: Layers -- see the module docstring for why.
-_DEFAULT_OPEN = 0
-_TRANSITIONS_INDEX = 1
-_RESULTS_INDEX = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +102,7 @@ class SectionDescriptor:
 
     title: str
     icon: str
+    description: str
     content: list[object]
 
 
@@ -96,15 +116,15 @@ def output_sections(
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]]
     | frozenset[IndicatorLayer]
     | None = None,
-    open_index: int = _DEFAULT_OPEN,
+    is_active: bool = True,
 ) -> list[SectionDescriptor]:
     """The five sections, in DISPLAY order. Bare-callable with every argument
-    defaulting to ``None`` (or ``_DEFAULT_OPEN`` for ``open_index``), same
-    reason ``app.tabs.workflow_tabs`` is bare-callable -- see that function's
-    docstring; the reasoning carries over unchanged. ``export_content`` is the
-    one guarded build (``ExportsPanel.spec`` is a bare ``RunSpec``, unlike
-    every other panel's already-``X | None`` ``maps``/``ctx``), for the exact
-    same mypy-narrowing reason ``workflow_tabs`` guards it.
+    defaulting to ``None`` (or ``True`` for ``is_active``) -- same reason
+    ``app.tabs.workflow_tabs`` is bare-callable; see that function's
+    docstring. ``export_content`` is the one guarded build (``ExportsPanel.spec``
+    is a bare ``RunSpec``, unlike every other panel's already-``X | None``
+    ``maps``/``ctx``), for the exact same mypy-narrowing reason
+    ``workflow_tabs`` guards it.
     """
     export_content: list[object] = (
         [ExportsPanel(maps=maps, ctx=ctx, spec=spec, gee_interface=gee_interface)]
@@ -115,6 +135,7 @@ def output_sections(
         SectionDescriptor(
             msg("layers.title"),
             "mdi-layers",
+            msg("layers.description"),
             [
                 MapLayersPanel(
                     maps=maps,
@@ -127,37 +148,42 @@ def output_sections(
         SectionDescriptor(
             msg("transitions.title"),
             "mdi-transit-transfer",
+            msg("transitions.description"),
             [
                 TransitionsPanel(
                     maps=maps,
                     ctx=ctx,
                     gee_interface=gee_interface,
-                    is_open=open_index == _TRANSITIONS_INDEX,
+                    is_open=is_active,
                 )
             ],
         ),
         SectionDescriptor(
             msg("results.title"),
             "mdi-chart-bar",
+            msg("results.description"),
             [
                 ResultsPanel(
                     maps=maps,
                     ctx=ctx,
                     gee_interface=gee_interface,
-                    is_open=open_index == _RESULTS_INDEX,
+                    is_open=is_active,
                 )
             ],
         ),
         SectionDescriptor(
             msg("zonal.title"),
             "mdi-table",
+            msg("zonal.description"),
             [
                 ZonalPanel(
                     maps=maps, ctx=ctx, gee_interface=gee_interface, sepal_client=sepal_client
                 )
             ],
         ),
-        SectionDescriptor(msg("exports.title"), "mdi-export-variant", export_content),
+        SectionDescriptor(
+            msg("exports.title"), "mdi-export-variant", msg("exports.description"), export_content
+        ),
     ]
 
 
@@ -171,14 +197,18 @@ def OutputsPanel(
     sepal_client: Any,
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]]
     | frozenset[IndicatorLayer] = frozenset[IndicatorLayer](),
+    is_active: bool = True,
 ) -> None:
-    """The merged outputs tab's whole content: an accordion over
-    ``output_sections()``, single-select (opening one closes whichever else
-    was open) so ``open_index`` is unambiguous for the ``is_open`` wiring
-    above.
-    """
-    open_index, set_open_index = solara.use_state(_DEFAULT_OPEN)
+    """The merged outputs tab's whole content: five flat, headed sections
+    over ``output_sections()``, stacked and always visible.
 
+    ``is_active`` says whether the merged outputs TAB (``app/tabs.py``'s
+    ``WorkflowTabs``, one of six ``rv.TabItem``s) is the one currently
+    active -- see the module docstring's chart-mount trap for why this
+    replaced the old per-accordion-section ``open_index``. Defaults to
+    ``True`` so a bare, standalone render of this panel (as most of
+    ``tests/app/test_panel_outputs.py`` does) behaves as it always has.
+    """
     sections = output_sections(
         maps=maps,
         ctx=ctx,
@@ -187,19 +217,16 @@ def OutputsPanel(
         gee_interface=gee_interface,
         sepal_client=sepal_client,
         shown_layers=shown_layers,
-        open_index=open_index,
+        is_active=is_active,
     )
 
-    with rv.ExpansionPanels(v_model=open_index, on_v_model=set_open_index):
-        for section in sections:
-            rv.ExpansionPanel(
-                children=[
-                    rv.ExpansionPanelHeader(
-                        children=[
-                            rv.Icon(children=[section.icon], style_="margin-right: 8px;"),
-                            section.title,
-                        ]
-                    ),
-                    rv.ExpansionPanelContent(children=section.content),
-                ]
-            )
+    for section in sections:
+        SectionHeader(title=section.title, icon=section.icon, description=section.description)
+        # A plain, unstyled `rv.Html` div: its only job is to be a live widget
+        # for `section.content`'s already-built (inert, since `output_sections`
+        # is a plain function, not a `@solara.component`) elements to attach to
+        # -- see `app/tabs.py`'s `workflow_tabs` docstring for the same
+        # "inert element descriptor" mechanism. It introduces no CSS visibility
+        # toggle of its own, so it cannot reintroduce the accordion's own
+        # collapsed/hidden state.
+        rv.Html(tag="div", style_="margin-bottom: 16px;", children=section.content)

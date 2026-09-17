@@ -80,12 +80,14 @@ def ResultsPanel(
     gee_interface: Any,
     is_open: bool = True,
 ) -> None:
-    """``is_open`` says whether THIS panel's own container (an
-    ``rv.ExpansionPanel`` section since task 27) is the one currently
-    expanded -- see the ``chart`` memo below for why that gates more than
-    visibility."""
-    solara.Markdown(msg("results.description"))
-
+    """``is_open`` used to say whether THIS panel's own accordion section (an
+    ``rv.ExpansionPanel`` since task 27) was the one currently expanded; task
+    28's move to flat sections removed the accordion, so it now says whether
+    the merged outputs TAB itself (``app/tabs.py``'s ``WorkflowTabs``) is the
+    one currently active -- see ``app/panels/outputs.py``'s module docstring
+    for why that still gates more than visibility. The description this
+    panel used to render itself (``solara.Markdown(msg("results.description"))``)
+    now lives in its section's own header there too."""
     notifications = use_notifications()
     option: solara.Reactive[dict[str, Any] | None] = solara.use_reactive(None)
     current_maps = maps

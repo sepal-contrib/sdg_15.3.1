@@ -222,9 +222,10 @@ def MapLayersPanel(
     panel own its state exactly as it always has; a ``Reactive`` -- ``page.py``
     passes one, shared with ``MapLegend`` -- makes the set visible to that
     sibling component instead of staying this panel's private copy.
-    """
-    solara.Markdown(msg("layers.description"))
 
+    The description this panel used to render itself now lives in its
+    section's own header (``app/panels/outputs.py``).
+    """
     notifications = use_notifications()
 
     # `shown_reactive.set` -- unlike `use_state`'s own setter, which this

@@ -1,12 +1,15 @@
-"""The merged outputs tab: five panels as ``rv.ExpansionPanel`` sections.
+"""The merged outputs tab: five flat, headed sections.
 
 Task 27 folded the five output tabs (Layers, Transitions, Results, Zonal,
-Export) into one, ``app.panels.outputs.OutputsPanel``. The identity-wiring
-tests for those five panels moved here from ``tests/app/test_tabs.py`` along
-with their monkeypatch target -- Task 21's own reasoning for moving them
-INTO ``test_tabs.py`` in the first place applies again: a monkeypatch targets
-the module that actually calls the thing, and that is no longer ``app.tabs``
-for these five.
+Export) into one, ``app.panels.outputs.OutputsPanel``, as an
+``rv.ExpansionPanels`` accordion. Task 28 replaced that accordion with flat
+sections, each introduced by ``app/panels/section_header.py``'s
+``SectionHeader`` -- see ``app/panels/outputs.py``'s module docstring for the
+chart-mount trap this move carried over (in a new shape) from the accordion.
+The identity-wiring tests for the five panels moved here from
+``tests/app/test_tabs.py`` back in task 21 -- a monkeypatch targets the
+module that actually calls the thing, and that is no longer ``app.tabs`` for
+these five.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from app.message import msg
 from app.panels import outputs as outputs_module
 from app.panels.outputs import output_sections
 from sdg1531.spec import Period, RunSpec
-from tests.app.render_helpers import find_widget, find_widgets
+from tests.app.render_helpers import cell_texts, find_widget, find_widgets
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
@@ -40,12 +43,24 @@ _RESULTS_INDEX = 2
 _ZONAL_INDEX = 3
 _EXPORTS_INDEX = 4
 
+# `app/tabs.py`'s own six-tab order: the merged outputs tab always follows
+# the five configuration tabs, at this fixed index.
+_OUTPUTS_TAB_INDEX = 5
+
 _SECTION_TITLES_IN_ORDER = (
     msg("layers.title"),
     msg("transitions.title"),
     msg("results.title"),
     msg("zonal.title"),
     msg("exports.title"),
+)
+
+_SECTION_DESCRIPTIONS_IN_ORDER = (
+    msg("layers.description"),
+    msg("transitions.description"),
+    msg("results.description"),
+    msg("zonal.description"),
+    msg("exports.description"),
 )
 
 
@@ -72,6 +87,15 @@ def _workflow_widget(box: object) -> Any:
     assert mapapp is not None
     workflow_widget: Any = mapapp.right_panel_content[0]["content"][0]
     return workflow_widget
+
+
+def _wrapper_cells(root: object) -> list[Any]:
+    """The six segment-strip cells, in tab order -- duplicated from
+    ``tests/app/test_tabs.py``'s identical helper (a `title` attribute is
+    what picks a `_SegmentCell` wrapper out; see that module's own docstring)
+    rather than imported, matching this suite's existing per-file convention.
+    """
+    return [w for w in find_widgets(root, v.Html) if w.attributes.get("title")]
 
 
 # ---------------------------------------------------------------------------
@@ -105,35 +129,56 @@ def test_there_are_exactly_five_sections():
     assert len(output_sections()) == 5
 
 
+def test_each_sections_own_description_travels_with_it():
+    """Task 28: each section's own ``msg("<panel>.description")`` now rides
+    along on the ``SectionDescriptor`` itself, for ``OutputsPanel`` to hand to
+    ``SectionHeader`` -- the panel components themselves no longer render it.
+    A description test naming its section, per the brief -- these five
+    strings have already vanished once (task 21 dropped all five silently
+    when it collapsed ten right-panel sections into one).
+    """
+    sections = output_sections()
+    assert [s.description for s in sections] == list(_SECTION_DESCRIPTIONS_IN_ORDER)
+
+
 # ---------------------------------------------------------------------------
-# `OutputsPanel` rendered -- which section opens by default, and the
-# chart-mount `is_open` wiring for Results/Transitions.
+# `OutputsPanel` rendered -- flat sections (no accordion), and the
+# chart-mount `is_open`/`is_active` wiring for Results/Transitions.
 # ---------------------------------------------------------------------------
 
 
-def test_the_layers_section_is_open_by_default(monkeypatch):
-    """Layers needs no button click to be useful (a read-only table of what a
-    run produced); the other four show nothing until Compute is pressed, so
-    opening one of those instead would still look empty. All five collapsed
-    was rejected outright -- the brief this task follows is explicit that the
-    tab must not open looking empty.
+def test_the_expansion_panel_accordion_is_gone(monkeypatch):
+    """Task 28's own ask: the repo owner disliked the accordion Task 27
+    added ("I didn't like the expansion panels you added"). Regression guard
+    against reintroducing it."""
+    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    workflow_widget = _workflow_widget(box)
+    assert find_widget(workflow_widget, v.ExpansionPanels) is None
+    assert find_widgets(workflow_widget, v.ExpansionPanel) == []
+
+
+def test_every_sections_title_and_description_render_on_screen(monkeypatch):
+    """The render-level half of ``test_each_sections_own_description_travels_
+    with_it`` above: proves the five descriptions are not just carried on the
+    dataclass but actually reach the screen, in order, alongside their
+    titles -- the exact thing that silently broke once already (task 21).
+
+    ``cell_texts`` walks any ``rv.Html(tag=..., children=[a_string])`` node,
+    not only a ``SimpleTable`` cell (see ``tests/app/render_helpers.py``);
+    ``SectionHeader`` is the ONLY place in this app's whole render tree that
+    builds a bare ``tag="span"``/``tag="p"`` element (grepped), so this
+    cannot coincidentally match some other panel's text.
     """
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    expansion_panels = find_widget(_workflow_widget(box), v.ExpansionPanels)
-    assert expansion_panels is not None
-    assert expansion_panels.v_model == _LAYERS_INDEX
-
-
-def test_there_are_exactly_five_expansion_panels(monkeypatch):
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    panels = find_widgets(_workflow_widget(box), v.ExpansionPanel)
-    assert len(panels) == 5
+    workflow_widget = _workflow_widget(box)
+    assert cell_texts(workflow_widget, "span") == list(_SECTION_TITLES_IN_ORDER)
+    assert cell_texts(workflow_widget, "p") == list(_SECTION_DESCRIPTIONS_IN_ORDER)
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +246,13 @@ def test_the_layers_panel_and_the_legend_share_the_same_shown_reactive(monkeypat
 
 
 def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is_open(monkeypatch):
+    """``is_open`` now reflects whether the merged outputs TAB itself is the
+    active one (task 28's flat sections removed the accordion this used to
+    key on) -- driven here by clicking the outputs tab's own segment cell,
+    the same real control a user would use, rather than an accordion
+    ``v_model``. See ``app/panels/outputs.py``'s module docstring for the
+    chart-mount trap this still guards against.
+    """
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -229,13 +281,11 @@ def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is
     assert captured["panel_maps"] is captured["outcome"].maps
     assert captured["panel_ctx"] is captured["outcome"].ctx
     assert captured["gee_interface"] is not None
-    # Layers is the section open by default, not Results -- see the chart-mount
-    # trap `app/panels/outputs.py`'s module docstring explains.
+    # The workflow starts on the AOI tab, not the merged outputs tab.
     assert captured["panel_is_open"] is False
 
-    expansion_panels = find_widget(_workflow_widget(box), v.ExpansionPanels)
-    assert expansion_panels is not None
-    expansion_panels.v_model = _RESULTS_INDEX
+    cells = _wrapper_cells(_workflow_widget(box))
+    cells[_OUTPUTS_TAB_INDEX].fire_event("click", None)
     rc.force_update()
     assert captured["panel_is_open"] is True
 
@@ -243,6 +293,7 @@ def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is
 def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_and_is_open(
     monkeypatch,
 ):
+    """See ``test_the_results_panel_...``'s identical docstring above."""
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -273,11 +324,48 @@ def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_an
     assert captured["gee_interface"] is not None
     assert captured["panel_is_open"] is False
 
-    expansion_panels = find_widget(_workflow_widget(box), v.ExpansionPanels)
-    assert expansion_panels is not None
-    expansion_panels.v_model = _TRANSITIONS_INDEX
+    cells = _wrapper_cells(_workflow_widget(box))
+    cells[_OUTPUTS_TAB_INDEX].fire_event("click", None)
     rc.force_update()
     assert captured["panel_is_open"] is True
+
+
+def test_both_chart_panels_stay_closed_while_a_different_workflow_tab_is_active(monkeypatch):
+    """The exact regression a naive "sections are always open now, delete
+    ``is_open``" edit would reintroduce: measured with a real browser probe
+    (see ``app/panels/outputs.py``'s module docstring) that a chart built for
+    the first time while the merged outputs TAB is inactive bakes in a wrong,
+    fixed canvas size. Pinned here without a browser: with the outputs tab
+    never visited, both chart panels' ``is_open`` must read ``False``, not
+    ``True`` merely because their OWN accordion section no longer exists.
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+
+    @solara.component
+    def _spy_results_panel(*, is_open: Any = None, **_kwargs: Any) -> None:
+        captured["results_is_open"] = is_open
+
+    @solara.component
+    def _spy_transitions_panel(*, is_open: Any = None, **_kwargs: Any) -> None:
+        captured["transitions_is_open"] = is_open
+
+    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
+    monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
+    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+
+    assert captured["results_is_open"] is False
+    assert captured["transitions_is_open"] is False
 
 
 def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(monkeypatch):

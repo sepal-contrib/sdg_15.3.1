@@ -128,8 +128,8 @@ def ZonalPanel(
     gee_interface: Any,
     sepal_client: Any,
 ) -> None:
-    solara.Markdown(msg("zonal.description"))
-
+    """The description this panel used to render itself now lives in its
+    section's own header (``app/panels/outputs.py``)."""
     notifications = use_notifications()
     current_maps = maps
     current_ctx = ctx

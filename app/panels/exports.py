@@ -111,9 +111,10 @@ def ExportsPanel(
     ``@with_sepal_sessions`` page that establishes the session, so a nested
     panel calling ``get_current_gee_interface()`` itself can raise
     ``SepalSessionError`` even though the page-level lookup succeeds.
-    """
-    solara.Markdown(msg("exports.description"))
 
+    The description this panel used to render itself now lives in its
+    section's own header (``app/panels/outputs.py``).
+    """
     if maps is None or ctx is None:
         solara.Markdown(msg("exports.build_first"))
         return

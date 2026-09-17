@@ -96,10 +96,7 @@ def test_the_panel_renders_before_a_run(monkeypatch):
         TransitionsPanel(maps=None, ctx=None, gee_interface=None), handle_error=False
     )
     assert rc is not None
-    assert markdown_texts(box) == [
-        f"<p>{msg('transitions.description')}</p>",
-        f"<p>{msg('transitions.build_first')}</p>",
-    ]
+    assert markdown_texts(box) == [f"<p>{msg('transitions.build_first')}</p>"]
     assert find_widget(box, ipyvuetify.Btn) is None  # no dead button before Build
     assert fake.tracked == []  # nothing to show yet, so nothing was started
 
@@ -116,10 +113,7 @@ def test_the_panel_waits_for_both_maps_and_context(monkeypatch):
         handle_error=False,
     )
     assert rc is not None
-    assert markdown_texts(box) == [
-        f"<p>{msg('transitions.description')}</p>",
-        f"<p>{msg('transitions.build_first')}</p>",
-    ]
+    assert markdown_texts(box) == [f"<p>{msg('transitions.build_first')}</p>"]
     assert find_widget(box, ipyvuetify.Btn) is None
 
 
@@ -182,9 +176,10 @@ def test_clicking_compute_fetches_and_mounts_the_real_chart_option(monkeypatch):
     chart = displayed[-1]
     assert isinstance(chart, EChartsRawWidget)
     assert chart.option == expected_option
-    # The description still shows (it's not conditional on a build); no
-    # stray "build first" text now that one exists.
-    assert markdown_texts(box) == [f"<p>{msg('transitions.description')}</p>"]
+    # No stray "build first" text now that a build exists -- the description
+    # itself no longer renders here at all; it moved to the section header
+    # (`app/panels/outputs.py`).
+    assert markdown_texts(box) == []
     assert fake.tracked == [(msg("transitions.compute"), 2)]
     assert fake.trackers[0].steps == [msg("transitions.compute"), msg("transitions.computed")]
     assert fake.successes == [msg("transitions.computed")]

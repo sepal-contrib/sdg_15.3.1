@@ -70,9 +70,10 @@ def TransitionsPanel(
     is_open: bool = True,
 ) -> None:
     """``is_open``: see ``ResultsPanel``'s identical parameter -- same
-    ``rv.ExpansionPanel`` mount-timing trap, same fix."""
-    solara.Markdown(msg("transitions.description"))
-
+    chart-mount trap, same fix, now keyed on the merged outputs tab's own
+    active state rather than an accordion section. The description this
+    panel used to render itself now lives in its section's own header
+    (``app/panels/outputs.py``)."""
     notifications = use_notifications()
     option: solara.Reactive[dict[str, Any] | None] = solara.use_reactive(None)
     current_maps = maps
