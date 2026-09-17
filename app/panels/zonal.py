@@ -21,6 +21,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, cast
 
+import geopandas as gpd
+import pandas as pd
 import solara
 from pysepal.solara.components.task_button import TaskButtonComponent, use_task_button
 from pysepal.solara.notifications import use_notifications
@@ -49,12 +51,12 @@ class _ZonalRequest:
 class _ZonalOutcome:
     """What ``_compute`` hands back -- the task never mutates reactive state.
 
-    ``frame`` is ``Any`` (a ``gpd.GeoDataFrame`` at runtime): the app layer
-    reaches it through a duck-typed object rather than importing geopandas,
-    matching ``sdg1531.export.zonal_shapefile_zip``'s own ``gdf: Any``.
+    ``frame`` keeps its geometry column: the download path
+    (``zonal_shapefile_zip``) needs it. The render site is what derives a
+    geometry-free view for ``solara.DataFrame`` -- see ``_display_frame``.
     """
 
-    frame: Any
+    frame: gpd.GeoDataFrame
 
 
 async def _compute(gee_interface: Any, notifications: Any, request: _ZonalRequest) -> _ZonalOutcome:
@@ -80,7 +82,7 @@ async def _compute(gee_interface: Any, notifications: Any, request: _ZonalReques
     return _ZonalOutcome(frame=frame)
 
 
-def _write_zip(sepal_client: Any, gdf: Any) -> None:
+def _write_zip(sepal_client: Any, gdf: gpd.GeoDataFrame) -> None:
     """Blocking HTTP, plus a ``module_dir()`` round trip of its own. Never
     call ``msg()`` in here: a pool thread has no kernel context and would
     silently fall back to English."""
@@ -93,7 +95,7 @@ class _DownloadOutcome:
     """Sentinel outcome -- the upload has nothing to report but success."""
 
 
-async def _download(sepal_client: Any, frame: Any) -> _DownloadOutcome:
+async def _download(sepal_client: Any, frame: gpd.GeoDataFrame) -> _DownloadOutcome:
     # to_thread, not a GEE await: this is plain blocking IO against SEPAL's
     # file API, not Earth Engine -- the opposite of the GEE rule, which keeps
     # GEE coroutines on Solara's own event loop instead of a worker thread.
@@ -101,6 +103,22 @@ async def _download(sepal_client: Any, frame: Any) -> _DownloadOutcome:
     # whole upload.
     await asyncio.to_thread(_write_zip, sepal_client, frame)
     return _DownloadOutcome()
+
+
+def _display_frame(gdf: gpd.GeoDataFrame) -> pd.DataFrame:
+    """The zonal table with its geometry column dropped, for display only.
+
+    ``solara.DataFrame`` supports pandas, polars and vaex -- not geopandas
+    (``solara/lab/utils/dataframe.py:28`` raises ``TypeError`` on anything
+    else) -- and the geometry is not useful in a table of areas per zone
+    anyway. ``gdf.geometry.name`` rather than the literal ``"geometry"``:
+    that is what ``decode_zonal_areas``'s ``GeoDataFrame.from_features`` call
+    always names it, but reading it through the accessor keeps this correct
+    if that ever changes. This returns a new frame and never mutates ``gdf``
+    itself -- the download path (``_write_zip``) needs the geometry column
+    still on it.
+    """
+    return pd.DataFrame(gdf.drop(columns=gdf.geometry.name))
 
 
 @solara.component
@@ -115,7 +133,7 @@ def ZonalPanel(
     notifications = use_notifications()
     current_maps = maps
     current_ctx = ctx
-    frame: solara.Reactive[Any] = solara.use_reactive(None)
+    frame: solara.Reactive[gpd.GeoDataFrame | None] = solara.use_reactive(None)
 
     compute_task = solara.lab.use_task(
         _compute, dependencies=None, raise_error=False, prefer_threaded=False
@@ -215,5 +233,5 @@ def ZonalPanel(
     if current_frame is not None:
         # `is not None`, not bare truthiness: an empty DataFrame is falsey,
         # which would hide a real (if empty) result.
-        solara.DataFrame(current_frame)
+        solara.DataFrame(_display_frame(current_frame))
         TaskButtonComponent(label=msg("zonal.download"), **download_btn_props)
