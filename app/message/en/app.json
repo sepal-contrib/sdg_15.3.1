@@ -64,13 +64,19 @@
     "description": "Choose the overall period the indicator runs over; its status appears below.",
     "start_year": "Start year",
     "end_year": "End year",
-    "ready": { "one": "Ready: {count} layer", "other": "Ready: {count} layers" },
+    "ready": {
+      "one": "Ready: {count} layer",
+      "other": "Ready: {count} layers"
+    },
     "blocked": "Fix the problems above before building."
   },
   "layers": {
     "title": "Layers",
     "description": "Add the computed layers to the map.",
-    "columns": { "name": "Layer", "action": "Action" },
+    "columns": {
+      "name": "Layer",
+      "action": "Action"
+    },
     "add": "Add",
     "remove": "Remove",
     "added": "Added to the map: {name}",
@@ -87,13 +93,40 @@
   },
   "legend": {
     "classes": {
-      "land_cover": { "1": "Degraded", "2": "Stable", "3": "Improved" },
-      "soc": { "1": "Degraded", "2": "Stable", "3": "Improved" },
-      "productivity": { "1": "Degraded", "2": "Stable", "3": "Improved" },
-      "productivity_trend": { "1": "Degraded", "2": "Stable", "3": "Improved" },
-      "productivity_state": { "1": "Degraded", "2": "Stable", "3": "Improved" },
-      "productivity_performance": { "1": "Degraded", "2": "Not degraded" },
-      "indicator_15_3_1": { "1": "Degraded", "2": "Stable", "3": "Improved" }
+      "land_cover": {
+        "1": "Degraded",
+        "2": "Stable",
+        "3": "Improved"
+      },
+      "soc": {
+        "1": "Degraded",
+        "2": "Stable",
+        "3": "Improved"
+      },
+      "productivity": {
+        "1": "Degraded",
+        "2": "Stable",
+        "3": "Improved"
+      },
+      "productivity_trend": {
+        "1": "Degraded",
+        "2": "Stable",
+        "3": "Improved"
+      },
+      "productivity_state": {
+        "1": "Degraded",
+        "2": "Stable",
+        "3": "Improved"
+      },
+      "productivity_performance": {
+        "1": "Degraded",
+        "2": "Not degraded"
+      },
+      "indicator_15_3_1": {
+        "1": "Degraded",
+        "2": "Stable",
+        "3": "Improved"
+      }
     }
   },
   "transitions": {
@@ -104,7 +137,7 @@
     "build_first": "Build the indicator first."
   },
   "results": {
-    "title": "Results",
+    "title": "Distribution",
     "description": "Class areas per land cover type.",
     "compute": "Compute statistics",
     "computed": "Statistics ready",
@@ -123,5 +156,8 @@
     "description": "Export any layer as a GEE asset.",
     "button": "Export",
     "build_first": "Build the indicator first."
+  },
+  "outputs": {
+    "title": "Results"
   }
 }

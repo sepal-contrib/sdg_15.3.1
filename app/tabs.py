@@ -160,15 +160,12 @@ def workflow_tabs(
         TabDescriptor("land_cover", msg("step.land_cover"), "mdi-terrain", land_cover_content),
         TabDescriptor("soc", msg("step.soc"), "mdi-layers-outline", soc_content),
         TabDescriptor("run", msg("step.run"), "mdi-play-circle-outline", run_content),
-        # Title and icon reused from the old Results tab (`msg("results.title")`,
-        # "mdi-chart-bar") rather than new copy -- this is the brief's own name
-        # for the merged tab, and it needs none invented. The ResultsPanel
-        # SECTION inside it (see `output_sections`) keeps that same title on
-        # its own header too, per the brief's explicit "section header carries
-        # the panel's existing title" instruction; the two labels sitting one
-        # inside the other is accepted rather than papered over with a second,
-        # unrequested tab name.
-        TabDescriptor(None, msg("results.title"), "mdi-chart-bar", outputs_content),
+        # `outputs.title`, not `results.title`: the merged tab holds five
+        # sections and one of them IS the ResultsPanel, so reusing that key
+        # named the tab after its own child. The section keeps `results.title`
+        # (now "Distribution", what it actually charts -- class areas per land
+        # cover type); the tab carries its own key.
+        TabDescriptor(None, msg("outputs.title"), "mdi-chart-bar", outputs_content),
     ]
 
 

@@ -74,7 +74,10 @@
   "layers": {
     "title": "Capas",
     "description": "Añadir las capas calculadas al mapa.",
-    "columns": { "name": "Capa", "action": "Acción" },
+    "columns": {
+      "name": "Capa",
+      "action": "Acción"
+    },
     "add": "Añadir",
     "remove": "Quitar",
     "added": "Añadido al mapa: {name}",
@@ -91,13 +94,40 @@
   },
   "legend": {
     "classes": {
-      "land_cover": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
-      "soc": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
-      "productivity": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
-      "productivity_trend": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
-      "productivity_state": { "1": "Degradado", "2": "Estable", "3": "Mejorado" },
-      "productivity_performance": { "1": "Degradado", "2": "No degradado" },
-      "indicator_15_3_1": { "1": "Degradado", "2": "Estable", "3": "Mejorado" }
+      "land_cover": {
+        "1": "Degradado",
+        "2": "Estable",
+        "3": "Mejorado"
+      },
+      "soc": {
+        "1": "Degradado",
+        "2": "Estable",
+        "3": "Mejorado"
+      },
+      "productivity": {
+        "1": "Degradado",
+        "2": "Estable",
+        "3": "Mejorado"
+      },
+      "productivity_trend": {
+        "1": "Degradado",
+        "2": "Estable",
+        "3": "Mejorado"
+      },
+      "productivity_state": {
+        "1": "Degradado",
+        "2": "Estable",
+        "3": "Mejorado"
+      },
+      "productivity_performance": {
+        "1": "Degradado",
+        "2": "No degradado"
+      },
+      "indicator_15_3_1": {
+        "1": "Degradado",
+        "2": "Estable",
+        "3": "Mejorado"
+      }
     }
   },
   "transitions": {
@@ -108,7 +138,7 @@
     "build_first": "Construya primero el indicador."
   },
   "results": {
-    "title": "Resultados",
+    "title": "Distribución",
     "description": "Superficies de clases por tipo de cobertura del suelo.",
     "compute": "Calcular estadísticas",
     "computed": "Estadísticas listas",
@@ -127,5 +157,8 @@
     "description": "Exportar cualquier capa como asset de GEE.",
     "button": "Exportar",
     "build_first": "Construya primero el indicador."
+  },
+  "outputs": {
+    "title": "Resultados"
   }
 }

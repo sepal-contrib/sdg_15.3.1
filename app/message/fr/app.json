@@ -74,7 +74,10 @@
   "layers": {
     "title": "Couches",
     "description": "Ajouter les couches calculées à la carte.",
-    "columns": { "name": "Couche", "action": "Action" },
+    "columns": {
+      "name": "Couche",
+      "action": "Action"
+    },
     "add": "Ajouter",
     "remove": "Retirer",
     "added": "Ajouté à la carte : {name}",
@@ -91,13 +94,40 @@
   },
   "legend": {
     "classes": {
-      "land_cover": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
-      "soc": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
-      "productivity": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
-      "productivity_trend": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
-      "productivity_state": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" },
-      "productivity_performance": { "1": "Dégradé", "2": "Non dégradé" },
-      "indicator_15_3_1": { "1": "Dégradé", "2": "Stable", "3": "Amélioré" }
+      "land_cover": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "soc": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity_trend": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity_state": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity_performance": {
+        "1": "Dégradé",
+        "2": "Non dégradé"
+      },
+      "indicator_15_3_1": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      }
     }
   },
   "transitions": {
@@ -108,7 +138,7 @@
     "build_first": "Construisez d'abord l'indicateur."
   },
   "results": {
-    "title": "Résultats",
+    "title": "Distribution",
     "description": "Superficies des classes par type de couverture terrestre.",
     "compute": "Calculer les statistiques",
     "computed": "Statistiques prêtes",
@@ -127,5 +157,8 @@
     "description": "Exporter n'importe quelle couche en tant qu'asset GEE.",
     "button": "Exporter",
     "build_first": "Construisez d'abord l'indicateur."
+  },
+  "outputs": {
+    "title": "Résultats"
   }
 }

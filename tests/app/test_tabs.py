@@ -59,7 +59,7 @@ _TAB_TITLES_IN_ORDER = (
     msg("step.land_cover"),
     msg("step.soc"),
     msg("step.run"),
-    msg("results.title"),  # the merged outputs tab -- see app/tabs.py's comment on reusing this
+    msg("outputs.title"),  # the merged outputs tab: its own key, NOT the ResultsPanel section's
 )
 _AOI_INDEX = 0
 _PRODUCTIVITY_INDEX = 1
