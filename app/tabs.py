@@ -85,6 +85,7 @@ from typing import Any
 import reacton.ipyvuetify as rv
 import solara
 from pysepal.mapping.sepal_map import SepalMap
+from pysepal.solara import use_theme_dark
 from reacton.ipyvue import use_event
 
 from app.message import msg
@@ -297,13 +298,64 @@ def nav_targets(
     return prev_t, next_t
 
 
-#: Incomplete / locked tones stay theme-neutral grey; the SATISFIED fill and
-#: the active-tab ring derive from the live Vuetify "primary" colour at
-#: render time (see ``_WorkflowSegments``) so the strip matches the app
-#: accent in both light and dark mode.
-_SEG_INCOMPLETE = "rgba(128, 128, 128, 0.28)"
-_SEG_LOCKED = (
-    "repeating-linear-gradient(90deg, rgba(128,128,128,0.30) 0 3px, rgba(128,128,128,0.10) 3px 6px)"
+#: Incomplete / locked tones now follow light/dark mode the same way the
+#: SATISFIED fill and the active-tab ring already do (see
+#: ``_WorkflowSegments``): picked in Python, per render, off the live,
+#: per-session ``pysepal.solara.use_theme_dark()`` flag -- never a single
+#: fixed literal.
+#:
+#: Task 30: these two used to be plain `rgba(128, 128, 128, ...)` literals --
+#: the one part of this strip that did NOT follow the theme, next to a
+#: SATISFIED fill that already did (the repo owner's own words: "they should
+#: use the vuetify colors, so they can easily change with the theme"). Two
+#: dead ends preceded the fix below, both caught only by actually rendering
+#: in a browser, exactly as the brief warned:
+#:
+#: 1. CSS variables (`var(--v-divider-base, <literal fallback>)`), the
+#:    identical technique `app/panels/section_header.py`'s `SectionHeader`
+#:    already uses for its own border. Measured in a real browser, in both
+#:    themes: does nothing. `getComputedStyle(...).getPropertyValue(
+#:    "--v-divider-base")` on `.v-application` returns an empty string
+#:    either way -- ipyvuetify's theming here sets Python-side traits on a
+#:    `ThemeColors` model (`primary`/`secondary`/`accent`/`error`/`info`/
+#:    `success`/`warning`/`anchor` -- the fixed set `solara.lab.theme.themes.
+#:    light/dark` expose; no `divider` trait exists) without ever injecting
+#:    matching global CSS custom properties, unlike a plain Vuetify SPA. So
+#:    `var(--v-divider-base, X)` permanently resolves to its own fallback
+#:    `X`, in both themes -- looks fixed, is not.
+#: 2. Reading `solara.lab.use_dark_effective()` -- the mechanism
+#:    `_WorkflowSegments` already used for `primary`, and the brief's own
+#:    suggested route. Measured in a real browser: clicking THIS APP'S own
+#:    theme toggle (`MapApp`'s built-in control, wired to `page.py`'s
+#:    `theme_state = get_current_theme_state()`) flips `.v-application`'s own
+#:    `theme--light`/`theme--dark` class but never changes what
+#:    `use_dark_effective()` reports -- that reads solara's own PROCESS-WIDE
+#:    theme flag (auto-detected from the browser's `prefers-color-scheme`),
+#:    a completely different, unscoped signal this app's own toggle never
+#:    touches. So `primary`'s existing selection was ALREADY disconnected
+#:    from this app's real, per-session theme before this task -- reusing it
+#:    for these two would have reproduced the identical disconnect, not
+#:    fixed it.
+#:
+#: Fixed by reading the SAME per-kernel state the app's own toggle actually
+#: drives: `pysepal.solara.use_theme_dark()` (a thin `ThemeState.dark`
+#: subscription over `get_current_theme_state()`, the object `page.py`
+#: already threads into `MapApp`) -- `_WorkflowSegments` now uses it for
+#: `primary` too, fixing that pre-existing disconnect as a side effect of
+#: fixing these two. Confirmed in the browser: clicking the app's real theme
+#: toggle now visibly changes the rendered `background-color` of an
+#: INCOMPLETE/LOCKED chip (`rgba(0, 0, 0, 0.28)` light, `rgba(255, 255, 255,
+#: 0.28)` dark -- Vuetify's own canonical divider colours, black-based for
+#: light and white-based for dark, at a higher alpha than Vuetify's own
+#: hairline default since this is a filled chip background, not a 1px
+#: border) -- see this task's report.
+_SEG_INCOMPLETE_LIGHT = "rgba(0, 0, 0, 0.28)"
+_SEG_INCOMPLETE_DARK = "rgba(255, 255, 255, 0.28)"
+_SEG_LOCKED_LIGHT = (
+    "repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.30) 0 3px, transparent 3px 6px)"
+)
+_SEG_LOCKED_DARK = (
+    "repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.30) 0 3px, transparent 3px 6px)"
 )
 
 #: The repo owner asked for the segments to be "a little bigger" and to carry
@@ -319,23 +371,27 @@ def _rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({r}, {g}, {b}, {alpha})"
 
 
-def _seg_style(state: _TabState, primary: str, active: bool) -> str:
+def _seg_style(
+    state: _TabState, primary: str, incomplete_fill: str, locked_fill: str, active: bool
+) -> str:
     """The chip's style: fill by state, ring when active, same as before --
     plus the sizing and typography its new abbreviation label needs.
 
     Text colour is never a fixed value: SATISFIED fills with the theme's own
     ``primary`` colour, dark enough in both light and dark mode that white
     text reads on it (the same assumption Vuetify's own ``v-chip
-    color="primary"`` makes); INCOMPLETE/LOCKED fill with a translucent grey
-    over the page background, so ``color: inherit`` -- the theme's own
+    color="primary"`` makes); INCOMPLETE/LOCKED fill with whichever of
+    ``incomplete_fill``/``locked_fill`` the caller already picked for the
+    live theme (see ``_SEG_INCOMPLETE_LIGHT``/``_DARK`` and
+    ``_WorkflowSegments``), so ``color: inherit`` -- the theme's own
     foreground colour -- already has the contrast it needs without a second
     hardcoded value to keep in sync with the theme.
     """
     if state is _TabState.LOCKED:
-        bg = f"background: {_SEG_LOCKED};"
+        bg = f"background: {locked_fill};"
         color = "inherit"
     else:
-        fill = primary if state is _TabState.SATISFIED else _SEG_INCOMPLETE
+        fill = primary if state is _TabState.SATISFIED else incomplete_fill
         bg = f"background: {fill};"
         color = "#fff" if state is _TabState.SATISFIED else "inherit"
     ring = f" box-shadow: 0 0 0 2px {_rgba(primary, 0.55)};" if active else ""
@@ -472,8 +528,18 @@ def _WorkflowSegments(
     """The segment strip: one cell per tab, coloured by ``_tab_state``."""
     # Filled segments and the active-tab ring use the app's theme "primary"
     # accent, so the strip matches every other `color="primary"` control.
+    # INCOMPLETE/LOCKED pick their own fill the identical way, off the same
+    # `is_dark` flag -- see `_SEG_INCOMPLETE_LIGHT`/`_DARK`'s own comment for
+    # why this reads `use_theme_dark()` (this app's own, per-session theme
+    # state -- the one `page.py` threads into `MapApp` and its built-in
+    # toggle actually drives) rather than `solara.lab.use_dark_effective()`
+    # (a disconnected, process-wide flag task 30 found this line was using
+    # before, measured inert against the app's REAL toggle in a browser).
     themes = solara.lab.theme.themes
-    primary = themes.dark.primary if solara.lab.use_dark_effective() else themes.light.primary
+    is_dark = use_theme_dark()
+    primary = themes.dark.primary if is_dark else themes.light.primary
+    incomplete_fill = _SEG_INCOMPLETE_DARK if is_dark else _SEG_INCOMPLETE_LIGHT
+    locked_fill = _SEG_LOCKED_DARK if is_dark else _SEG_LOCKED_LIGHT
 
     # A flex `rv.Html` div, not `solara.Row`: the latter is untyped in solara's
     # own stubs (no return annotation), which `mypy --strict` refuses to call.
@@ -486,7 +552,9 @@ def _WorkflowSegments(
             _SegmentCell(
                 tip=tab.title,
                 label=_tab_abbrev(tab),
-                seg_style=_seg_style(state, primary, active=i == active_tab),
+                seg_style=_seg_style(
+                    state, primary, incomplete_fill, locked_fill, active=i == active_tab
+                ),
                 locked=locked,
                 on_activate=_bind(on_navigate, i),
             )

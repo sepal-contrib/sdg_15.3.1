@@ -32,6 +32,7 @@ import ipyvuetify as v
 import pytest
 import solara
 from pysepal.sepalwidgets.vue_app import MapApp
+from pysepal.solara import get_current_theme_state
 
 from app import page as page_module
 from app import tabs as tabs_module
@@ -41,6 +42,7 @@ from app.state import STEP_PREFIXES, problems_for
 from app.steps.run import build
 from app.tabs import (
     TabDescriptor,
+    _seg_style,
     _sync_draw_control,
     _tab_abbrev,
     _tab_state,
@@ -331,6 +333,104 @@ def test_a_combined_tab_is_satisfied_only_once_every_named_step_is():
     step being fatal-free reads as SATISFIED."""
     params_tab = next(tab for tab in workflow_tabs() if isinstance(tab.step, tuple))
     assert _tab_state(params_tab, _BUILDABLE_SPEC, has_maps=False) is _TabState.SATISFIED
+
+
+# ---------------------------------------------------------------------------
+# Theme-driven chip colours (task 30). A first attempt used
+# `var(--v-divider-base, <literal fallback>)` -- `app/panels/section_header.py`'s
+# own technique -- but a real browser check (this task's report) measured
+# that CSS variable as never defined in this app's actual Vuetify/ipyvuetify
+# setup: `getComputedStyle(...).getPropertyValue("--v-divider-base")` on
+# `.v-application` returned `""` in BOTH themes, so the chip's rendered
+# background was IDENTICAL in light and dark mode despite the source
+# embedding a `var(...)` wrapper -- looks theme-aware, is not. Replaced with
+# the route already proven to work in this exact file: picking between two
+# literals in PYTHON, off the live `solara.lab.use_dark_effective()` flag,
+# the same mechanism `_WorkflowSegments` already uses for `primary`. The
+# tests below are the render-level proof that replaced the (wrong) static
+# source scan: a literal that never changes with the theme cannot be caught
+# by reading the source text alone, only by rendering both themes and
+# comparing what actually comes out -- exactly what a static scan cannot see,
+# and exactly why the brief asked for a browser check here specifically.
+# ---------------------------------------------------------------------------
+
+
+def test_seg_style_uses_whichever_incomplete_and_locked_fill_it_is_given():
+    """``_seg_style`` itself is theme-agnostic -- it renders exactly the
+    ``incomplete_fill``/``locked_fill`` its caller hands it, never a value of
+    its own. The theme-AWARE half is ``_WorkflowSegments``'s own choice of
+    which pair to pass, proven separately below; this pins that
+    ``_seg_style`` cannot silently ignore that choice and fall back to a
+    fixed value regardless of the argument.
+    """
+    incomplete_light = _seg_style(
+        _TabState.INCOMPLETE, "#000000", "LIGHT-FILL", "LOCKED-FILL", active=False
+    )
+    incomplete_dark = _seg_style(
+        _TabState.INCOMPLETE, "#000000", "DARK-FILL", "LOCKED-FILL", active=False
+    )
+    assert "LIGHT-FILL" in incomplete_light
+    assert "DARK-FILL" in incomplete_dark
+    assert incomplete_light != incomplete_dark
+
+    locked_a = _seg_style(_TabState.LOCKED, "#000000", "INCOMPLETE-FILL", "LOCKED-A", active=False)
+    locked_b = _seg_style(_TabState.LOCKED, "#000000", "INCOMPLETE-FILL", "LOCKED-B", active=False)
+    assert "LOCKED-A" in locked_a
+    assert "LOCKED-B" in locked_b
+    assert locked_a != locked_b
+
+
+def test_the_incomplete_fill_is_two_distinct_literals_for_light_and_dark():
+    """A floor beneath the render-level test below: the two constants
+    ``_WorkflowSegments`` picks between must actually differ, or that test
+    would pass by coincidence (both branches choosing the identical value).
+    Directly catches the brief's own named mutation in the exact shape it
+    was actually found here: a single shared literal used for both themes.
+    """
+    assert tabs_module._SEG_INCOMPLETE_LIGHT != tabs_module._SEG_INCOMPLETE_DARK
+    assert tabs_module._SEG_LOCKED_LIGHT != tabs_module._SEG_LOCKED_DARK
+
+
+def test_the_incomplete_fill_actually_differs_between_light_and_dark_mode_on_screen():
+    """The render-level proof the source-only tests above cannot give: a
+    genuinely rendered INCOMPLETE chip's computed style must differ between
+    themes, driven through the real component the same way a live theme
+    toggle would. This is the exact check that would have caught BOTH dead
+    ends this module's own comment describes: a CSS-variable attempt with
+    two different-LOOKING source strings that rendered identically in both
+    themes, and then a ``solara.lab.use_dark_effective()`` attempt that
+    changed nothing when THIS APP'S real theme toggle was clicked in a
+    browser, because that flag is a disconnected, process-wide default
+    rather than this app's own per-session state. Only reading the ACTUAL
+    rendered style after flipping the SAME state the app's real toggle
+    drives catches either failure; a plain source read cannot.
+
+    ``get_current_theme_state().dark`` is set directly, not through a real
+    frontend click -- ``use_theme_dark()`` is a subscription over exactly
+    that trait, and toggling it is what a real click on the app's own theme
+    control also does (that control is wired to this same
+    ``ThemeState``, threaded into ``MapApp`` by ``page.py``). Restored in a
+    ``finally`` block: ``get_current_theme_state()`` is scoped per kernel,
+    not per test, so leaving it flipped could leak into a later test's
+    render in the same process.
+    """
+    theme_state = get_current_theme_state()
+    original = theme_state.dark
+    try:
+        theme_state.dark = False
+        box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+        assert rc is not None
+        light_style = _wrapper_cells(_workflow_widget(box))[_AOI_INDEX].children[0].style_
+
+        theme_state.dark = True
+        rc.force_update()
+        dark_style = _wrapper_cells(_workflow_widget(box))[_AOI_INDEX].children[0].style_
+
+        assert light_style != dark_style
+        assert tabs_module._SEG_INCOMPLETE_LIGHT in light_style
+        assert tabs_module._SEG_INCOMPLETE_DARK in dark_style
+    finally:
+        theme_state.dark = original
 
 
 # ---------------------------------------------------------------------------
