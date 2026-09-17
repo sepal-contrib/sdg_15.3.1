@@ -12,13 +12,14 @@ this by drawing no ``rv.Tabs`` strip at all (``grep -n "rv.Tabs\\b"`` returns
 nothing in either checkout). Navigation is a separate custom widget instead:
 a segment strip of thin bars, one per tab, coloured by state, with a ring on
 the active one (``gui/widget/pipeline_header.py``). This module adapts that
-shape rather than transcribing it -- no prev/next buttons or jump dropdown,
-since the strip alone already fits and already covers every required state
-transition; those two extra controls are additional surface the brief did
-not ask this app to carry.
+shape rather than transcribing it -- no jump dropdown, since a strip this
+short does not need one to be usable. It DOES now carry the reference's
+prev/next arrows (below), which task 21 originally left out; the repo owner
+asked for them directly after using the app ("can we add arrows to the tabs
+component? so I can easily navigate back-and-forth?").
 
-Task 27 folded the five output tabs (Layers, Transitions, Results, Zonal,
-Export) into ONE tab, ``app/panels/outputs.py``'s ``OutputsPanel``, an
+Task 27 also folded the five output tabs (Layers, Transitions, Results,
+Zonal, Export) into ONE tab, ``app/panels/outputs.py``'s ``OutputsPanel``, an
 accordion over the same five panels in the same order -- the repo owner's own
 words: "all the computation buttons ... should be in the same tab, like with
 multiple sections, similarly as se.plan does". The panel now has SIX tabs,
@@ -27,7 +28,11 @@ it just applies to one merged output tab instead of five separate ones.
 
 Segment state is derived from what ``app/state.py`` already knows
 (``problems_for``) and from ``outcome.maps``, never from a second,
-hand-typed notion of "done" per step -- see ``_tab_state``.
+hand-typed notion of "done" per step -- see ``_tab_state``. ``nav_targets``
+(ported from the reference's own ``pipeline_header.nav_targets``) walks that
+same derived state to find the nearest non-locked tab on each side of the
+active one, so "next" from Run skips straight past a still-locked outputs
+tab instead of landing on it.
 """
 
 from __future__ import annotations
@@ -53,7 +58,7 @@ from app.steps.soc import SocStep
 from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
-__all__ = ("TabDescriptor", "WorkflowTabs", "workflow_tabs")
+__all__ = ("TabDescriptor", "WorkflowTabs", "nav_targets", "workflow_tabs")
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +200,25 @@ def _tab_state(tab: TabDescriptor, spec: RunSpec, has_maps: bool) -> _TabState:
     return _TabState.INCOMPLETE if fatal else _TabState.SATISFIED
 
 
+def nav_targets(
+    tabs: list[TabDescriptor], active: int, spec: RunSpec, has_maps: bool
+) -> tuple[int | None, int | None]:
+    """The nearest non-``LOCKED`` tab on each side of ``active`` -- ported
+    from spatial-risk's own ``pipeline_header.nav_targets``, same "skip a
+    whole locked run" reasoning: since task 27, the outputs tab is one LOCKED
+    block until a build exists, so ``active_tab`` sitting on Run must not let
+    "next" land there, it must find nothing (``None``) past it instead. Reads
+    ``_tab_state`` -- the same derivation the segment strip itself is coloured
+    by -- rather than a second, hand-typed notion of which tabs are reachable.
+    """
+    states = [_tab_state(tab, spec, has_maps) for tab in tabs]
+    prev_t = next((i for i in range(active - 1, -1, -1) if states[i] is not _TabState.LOCKED), None)
+    next_t = next(
+        (i for i in range(active + 1, len(states)) if states[i] is not _TabState.LOCKED), None
+    )
+    return prev_t, next_t
+
+
 #: Incomplete / locked tones stay theme-neutral grey; the SATISFIED fill and
 #: the active-tab ring derive from the live Vuetify "primary" colour at
 #: render time (see ``_WorkflowSegments``) so the strip matches the app
@@ -256,6 +280,31 @@ def _SegmentCell(tip: str, seg_style: str, locked: bool, on_activate: Callable[[
     use_event(cell, "click", _handle_click)
 
 
+@solara.component
+def _NavArrow(
+    icon_name: str, disabled: bool, on_activate: Callable[[], None], color: str | None = None
+) -> None:
+    """One prev/next arrow. Its own component so the ``use_event`` click hook
+    attaches at a stable top level -- same convention as ``_SegmentCell``
+    above and ``map_layers.py``'s ``_RemoveButton``. ``solara.Button`` would
+    build this in one call, but (like ``solara.Row``/``Column``) it has no
+    return-type annotation in solara's own stubs, so ``mypy --strict``
+    refuses to call it; a plain ``rv.Btn`` is fully typed.
+    """
+    btn = rv.Btn(
+        icon=True,
+        small=True,
+        disabled=disabled,
+        color=color,
+        children=[rv.Icon(children=[icon_name])],
+    )
+
+    def _handle_click(*_: object) -> None:
+        on_activate()
+
+    use_event(btn, "click", _handle_click)
+
+
 def _bind(on_navigate: Callable[[int], None], index: int) -> Callable[[], None]:
     """A zero-arg closure over ``index`` -- a plain default-argument lambda
     (``lambda i=i: ...``) is how the reference does this, but its type is
@@ -309,7 +358,8 @@ def WorkflowTabs(
     gee_interface: Any = None,
     sepal_client: Any = None,
 ) -> None:
-    """The whole right-panel workflow: the segment strip over the six tabs.
+    """The whole right-panel workflow: the segment strip, the prev/next
+    arrows, and the six tabs they navigate.
 
     ``rv.TabsItems`` hides inactive tabs client-side WITHOUT unmounting them.
     That is a problem for ``app/steps/aoi.py``'s ``AoiStep``, which mounts
@@ -359,6 +409,37 @@ def WorkflowTabs(
         has_maps=has_maps,
         on_navigate=set_active_tab,
     )
+
+    prev_t, next_t = nav_targets(tabs, active_tab, spec.value, has_maps)
+
+    def _activate_prev() -> None:
+        if prev_t is not None:
+            set_active_tab(prev_t)
+
+    def _activate_next() -> None:
+        if next_t is not None:
+            set_active_tab(next_t)
+
+    # A flex `rv.Html` div, not `solara.Row`: see `_WorkflowSegments`'s identical
+    # comment -- `solara.Row` has no return annotation in solara's own stubs,
+    # which `mypy --strict` refuses to call.
+    nav_style = "display: flex; justify-content: space-between; padding: 0 4px 4px;"
+    with rv.Html(tag="div", style_=nav_style):
+        # Disabled, never hidden, with no target: a disabled control tells the
+        # user where they are (first/last reachable tab); a vanishing one would
+        # make the strip jump. `disabled=` alone would already stop a real
+        # browser click, but `_activate_prev`/`_activate_next`'s own `is not
+        # None` recheck is what actually stops a raw `fire_event` too -- the
+        # same double-guard `_SegmentCell.on_activate` uses for a locked
+        # segment, for the same reason (the click handler is what a test
+        # drives directly).
+        _NavArrow(icon_name="mdi-chevron-left", disabled=prev_t is None, on_activate=_activate_prev)
+        _NavArrow(
+            icon_name="mdi-chevron-right",
+            disabled=next_t is None,
+            on_activate=_activate_next,
+            color="primary",
+        )
 
     with rv.TabsItems(v_model=active_tab):
         for tab in tabs:

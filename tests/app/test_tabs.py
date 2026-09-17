@@ -1,4 +1,5 @@
-"""The right-panel workflow: six tabs, a segment strip to move between them.
+"""The right-panel workflow: six tabs, a segment strip and prev/next arrows
+to move between them.
 
 Every ``page.py`` identity-wiring concern that used to be checked by
 monkeypatching ``app.page``'s step/panel imports now targets ``app.tabs``
@@ -14,8 +15,9 @@ Results, Zonal, Export) moved to ``tests/app/test_panel_outputs.py`` along
 with their monkeypatch target, for the same reason Task 21 moved them here in
 the first place -- the thing they monkeypatch lives where it is actually
 called from. What stays here is everything about the TAB LEVEL: order/shape,
-lock state, navigation (segments), and the five configuration steps' own
-identity wiring (still called directly from this module).
+lock state, navigation (segments and the new arrows), and the five
+configuration steps' own identity wiring (still called directly from this
+module).
 """
 
 from __future__ import annotations
@@ -30,9 +32,17 @@ from pysepal.sepalwidgets.vue_app import MapApp
 from app import page as page_module
 from app import tabs as tabs_module
 from app.message import msg
+from app.panels import outputs as outputs_module
 from app.state import STEP_PREFIXES, problems_for
 from app.steps.run import BuildOutcome, build
-from app.tabs import TabDescriptor, _sync_draw_control, _tab_state, _TabState, workflow_tabs
+from app.tabs import (
+    TabDescriptor,
+    _sync_draw_control,
+    _tab_state,
+    _TabState,
+    nav_targets,
+    workflow_tabs,
+)
 from sdg1531.spec import RunSpec
 from tests.app.render_helpers import find_widget, find_widgets, markdown_texts
 from tests.spec_factory import default_spec
@@ -95,6 +105,20 @@ def _wrapper_cells(root: object) -> list[Any]:
     app's render tree.
     """
     return [w for w in find_widgets(root, v.Html) if w.attributes.get("title")]
+
+
+def _nav_arrows(root: object) -> list[Any]:
+    """The prev/next arrow ``v.Btn`` widgets, in that order.
+
+    ``_NavArrow`` is the only place in this app's whole render tree that
+    passes ``icon=True`` to a ``v.Btn`` -- ``TaskButtonComponent`` (used by
+    every compute/download button) never does (see
+    ``pysepal/solara/components/task_button.py``), and ``map_layers.py``'s
+    own ``_RemoveButton`` passes ``outlined=True``, not ``icon=True`` -- so
+    that trait alone picks the two arrows out from every other button in the
+    tree, real or not-yet-visited.
+    """
+    return [w for w in find_widgets(root, v.Btn) if w.icon]
 
 
 # ---------------------------------------------------------------------------
@@ -542,3 +566,196 @@ def test_switching_away_from_aoi_clears_the_draw_control_and_restores_it_on_retu
     rc.force_update()
 
     assert sepal_map.dc in sepal_map.controls
+
+
+# ---------------------------------------------------------------------------
+# `nav_targets` -- pure, ported from spatial-risk's own
+# `pipeline_header.nav_targets`. No render context needed: it only reads
+# `_tab_state` over a plain `TabDescriptor` list.
+# ---------------------------------------------------------------------------
+
+_UNLOCKED_SPEC = RunSpec()  # configuration tabs are never LOCKED, whatever their state
+
+
+def test_nav_targets_returns_the_adjacent_indices_with_nothing_locked():
+    tabs = [
+        TabDescriptor("aoi", "AOI", "i", []),
+        TabDescriptor("productivity", "Productivity", "i", []),
+        TabDescriptor("land_cover", "Land cover", "i", []),
+    ]
+    assert nav_targets(tabs, 1, _UNLOCKED_SPEC, has_maps=False) == (0, 2)
+
+
+def test_nav_targets_prev_is_none_at_the_first_tab():
+    tabs = [TabDescriptor("aoi", "AOI", "i", []), TabDescriptor("productivity", "P", "i", [])]
+    prev_t, _next_t = nav_targets(tabs, 0, _UNLOCKED_SPEC, has_maps=False)
+    assert prev_t is None
+
+
+def test_nav_targets_next_is_none_at_the_last_tab():
+    tabs = [TabDescriptor("aoi", "AOI", "i", []), TabDescriptor("productivity", "P", "i", [])]
+    _prev_t, next_t = nav_targets(tabs, 1, _UNLOCKED_SPEC, has_maps=False)
+    assert next_t is None
+
+
+def test_nav_targets_next_skips_a_locked_tab_and_finds_nothing_past_it():
+    """The shape of this app's own six tabs: Run, then one LOCKED output
+    tab, nothing after it. "Next" from Run must not land on the locked tab --
+    it must find nothing. Directly catches the mutation the brief names:
+    "'next' no longer skips a locked tab" would instead return the locked
+    tab's own index here.
+    """
+    tabs = [TabDescriptor("run", "Run", "i", []), TabDescriptor(None, "Outputs", "i", [])]
+    _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=False)
+    assert next_t is None
+
+
+def test_nav_targets_next_reaches_the_output_tab_once_it_unlocks():
+    """The positive case: once ``has_maps`` is true the same tab is no
+    longer LOCKED, so "next" from Run finds it."""
+    tabs = [TabDescriptor("run", "Run", "i", []), TabDescriptor(None, "Outputs", "i", [])]
+    _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=True)
+    assert next_t == 1
+
+
+def test_nav_targets_skips_a_run_of_more_than_one_locked_tab():
+    """``nav_targets`` itself has no notion of "exactly one" locked tab --
+    proven generically here with two, even though this app's own six tabs
+    never produce more than one (``_tab_state`` locks every ``step=None``
+    tab identically, off the same ``has_maps``)."""
+    tabs = [
+        TabDescriptor("run", "Run", "i", []),
+        TabDescriptor(None, "Locked 1", "i", []),
+        TabDescriptor(None, "Locked 2", "i", []),
+    ]
+    _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=False)
+    assert next_t is None
+
+
+# ---------------------------------------------------------------------------
+# The prev/next arrows, rendered -- the repo owner asked for these directly
+# ("can we add arrows to the tabs component? so I can easily navigate
+# back-and-forth?"); task 21 had deliberately left them out.
+# ---------------------------------------------------------------------------
+
+
+def test_the_arrows_render_exactly_two_icon_buttons():
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    arrows = _nav_arrows(_workflow_widget(box))
+    assert len(arrows) == 2
+
+
+def test_the_prev_arrow_is_disabled_and_the_next_arrow_enabled_on_the_first_tab():
+    """Disabled, not hidden or absent -- a disabled control tells the user
+    where they are; a vanishing one would make the strip jump. Directly
+    catches "arrows stay enabled at the first/last tab": under that mutation
+    the prev arrow's ``disabled`` would read ``False`` here.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
+    assert prev_arrow.disabled is True
+    assert next_arrow.disabled is False
+
+
+def test_the_next_arrow_is_disabled_on_run_while_the_outputs_tab_is_still_locked():
+    """The default, empty spec has no build, so the merged outputs tab --
+    the only tab after Run -- is LOCKED. The next arrow must show that,
+    not just silently refuse to navigate.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    cells = _wrapper_cells(_workflow_widget(box))
+    cells[_RUN_INDEX].fire_event("click", None)
+    rc.force_update()
+
+    _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
+    assert next_arrow.disabled is True
+
+
+def test_clicking_the_next_arrow_moves_forward_and_the_prev_arrow_moves_back():
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    workflow_widget = _workflow_widget(box)
+
+    tabs_items_widget = find_widget(workflow_widget, v.TabsItems)
+    assert tabs_items_widget is not None
+    assert tabs_items_widget.v_model == _AOI_INDEX
+
+    _prev_arrow, next_arrow = _nav_arrows(workflow_widget)
+    next_arrow.fire_event("click", None)
+    rc.force_update()
+
+    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
+    assert tabs_items_widget is not None
+    assert tabs_items_widget.v_model == _PRODUCTIVITY_INDEX
+
+    prev_arrow, _next_arrow = _nav_arrows(_workflow_widget(box))
+    prev_arrow.fire_event("click", None)
+    rc.force_update()
+
+    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
+    assert tabs_items_widget is not None
+    assert tabs_items_widget.v_model == _AOI_INDEX
+
+
+def test_clicking_the_next_arrow_on_run_does_not_navigate_into_a_locked_outputs_tab():
+    """The direct counter-proof for "'next' no longer skips a locked tab":
+    under that mutation this click WOULD move ``v_model`` to the outputs tab
+    even though it is still LOCKED. Uses ``fire_event``, which bypasses the
+    widget's own ``disabled`` prop (a raw Python-level call, not a real
+    browser click) -- so this also proves ``_activate_next``'s own
+    ``is not None`` recheck, not merely the CSS-level ``disabled`` state the
+    test above already covers.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    cells = _wrapper_cells(_workflow_widget(box))
+    cells[_RUN_INDEX].fire_event("click", None)
+    rc.force_update()
+
+    _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
+    next_arrow.fire_event("click", None)
+    rc.force_update()
+
+    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
+    assert tabs_items_widget is not None
+    assert tabs_items_widget.v_model == _RUN_INDEX
+
+
+def test_clicking_the_next_arrow_on_run_reaches_the_outputs_tab_once_unlocked(monkeypatch):
+    """The positive case, through the real render tree: once a build exists
+    the outputs tab is reachable, and "next" from Run lands on it directly
+    (there is nothing else after it to skip)."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["spec"] = spec
+
+    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
+    # `ExportsPanel`'s real `ExportLauncher` starts a task the moment it
+    # mounts (see `_noop_exports_panel`'s own docstring) -- a buildable spec
+    # makes `OutputsPanel` actually reach it, so it needs the same stand-in
+    # every panel-identity test in `test_panel_outputs.py` uses.
+    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    cells = _wrapper_cells(_workflow_widget(box))
+    cells[_RUN_INDEX].fire_event("click", None)
+    rc.force_update()
+
+    _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
+    assert next_arrow.disabled is False
+    next_arrow.fire_event("click", None)
+    rc.force_update()
+
+    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
+    assert tabs_items_widget is not None
+    assert tabs_items_widget.v_model == _OUTPUTS_INDEX
