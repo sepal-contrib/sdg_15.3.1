@@ -62,11 +62,31 @@ _TAB_TITLES_IN_ORDER = (
     msg("step.soc"),
     msg("outputs.title"),  # the merged outputs tab: its own key, NOT the ResultsPanel section's
 )
-_AOI_INDEX = 0
-_PERIOD_INDEX = 1  # the renamed "Run" step -- `tab.step == "run"` internally, unchanged
-_PRODUCTIVITY_INDEX = 2
-_SOC_INDEX = 4
-_OUTPUTS_INDEX = 5
+
+
+def _index_of(step: str | None) -> int:
+    """Where the tab identified by ``step`` sits, derived from ``workflow_tabs()``.
+
+    NOT hand-typed literals, which is what these were until task 28's reorder
+    showed why that is unsafe: moving the period step from position 4 to
+    position 1 is a ROTATION, so every index from 1 to 4 kept its number while
+    changing identity. Stale constants stayed numerically valid and silently
+    pointed at the wrong tab -- the review reproduced the naive bump and found
+    all four affected tests still passed, proving nothing their names claimed.
+
+    ``_TAB_TITLES_IN_ORDER`` above deliberately does NOT use this: that roster
+    is what pins the ORDER, so deriving it from the same source it checks would
+    make it agree with itself. Everything below asks "the SOC tab", not "index
+    4", so identity is the right key for those and order is not their subject.
+    """
+    return next(i for i, tab in enumerate(workflow_tabs()) if tab.step == step)
+
+
+_AOI_INDEX = _index_of("aoi")
+_PERIOD_INDEX = _index_of("run")  # the renamed "Run" step -- `tab.step` is still "run"
+_PRODUCTIVITY_INDEX = _index_of("productivity")
+_SOC_INDEX = _index_of("soc")
+_OUTPUTS_INDEX = _index_of(None)  # the merged outputs tab carries no step id
 
 
 @solara.component
