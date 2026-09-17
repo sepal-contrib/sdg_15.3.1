@@ -55,6 +55,7 @@ from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
 from app.state import render_problems
+from app.steps.period_override import PeriodOverrideControl
 from sdg1531.catalog import L4_START
 from sdg1531.scheme import LandCoverScheme
 from sdg1531.spec import (
@@ -187,34 +188,24 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
         ),
     )
 
-    current_period = current.periods.land_cover
-
-    def _set_period(start: int | None, end: int | None) -> None:
-        spec.set(
-            spec.value.evolve(
-                periods=replace(spec.value.periods, land_cover=PeriodOverride(start, end))
-            )
-        )
+    def _set_period(new: PeriodOverride) -> None:
+        spec.set(spec.value.evolve(periods=replace(spec.value.periods, land_cover=new)))
 
     # Same range and the same "no invented default" rule as `soc.py`'s own
-    # Selects -- `periods.land_cover` is an OPTIONAL override too, and
+    # control -- `periods.land_cover` is an OPTIONAL override too, and
     # `resolve()` derives the window from `periods.overall` when it is unset.
     # The legacy's deleted `PickerLineLC` used this exact
     # `range(sensor_max_year, L4_start - 1, -1)`, the same one
     # `PickerLineSOC` did.
     period_years = list(range(date.today().year - 1, L4_START - 1, -1))
 
-    solara.Select(
-        label=msg("land_cover.period_start"),
-        value=current_period.start,
-        values=period_years,
-        on_value=lambda v: _set_period(v, spec.value.periods.land_cover.end),
-    )
-    solara.Select(
-        label=msg("land_cover.period_end"),
-        value=current_period.end,
-        values=period_years,
-        on_value=lambda v: _set_period(spec.value.periods.land_cover.start, v),
+    PeriodOverrideControl(
+        override=current.periods.land_cover,
+        overall=current.periods.overall,
+        years=period_years,
+        start_label=msg("land_cover.period_start"),
+        end_label=msg("land_cover.period_end"),
+        on_change=_set_period,
     )
 
     if isinstance(current.land_cover, CustomLandCoverSource):

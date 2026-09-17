@@ -160,6 +160,10 @@
   "outputs": {
     "title": "Results"
   },
+  "period_override": {
+    "toggle": "Use a different period for this sub-indicator",
+    "inherited": "Uses the run's period: {start}–{end}."
+  },
   "tabs": {
     "previous": "Previous step",
     "next": "Next step",

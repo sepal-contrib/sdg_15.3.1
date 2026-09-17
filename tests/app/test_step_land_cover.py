@@ -26,12 +26,22 @@ from sdg1531.spec import (
     PixelValueMask,
 )
 from tests.app.render_helpers import find_widgets, markdown_texts
-from tests.spec_factory import default_spec
+from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
-# Same range `soc.py`'s own Selects offer (see test_step_soc.py's `_YEARS`) --
+# Same range `soc.py`'s own control offers (see test_step_soc.py's `_YEARS`) --
 # the legacy's deleted `PickerLineLC` and `PickerLineSOC` shared this exact
-# `YEAR_RANGE`, and this step's period Selects reuse it too.
+# `YEAR_RANGE`, and this step's period control reuses it too.
 _PERIOD_YEARS = list(range(date.today().year - 1, L4_START - 1, -1))
+
+# `DEFAULT_PERIODS.overall` (`tests/spec_factory.py`) is what an unset
+# land-cover override inherits from -- see `test_step_soc.py`'s identical
+# constant for `periods.soc`.
+_INHERITED_MSG = msg(
+    "period_override.inherited",
+    start=DEFAULT_PERIODS.overall.start,
+    end=DEFAULT_PERIODS.overall.end,
+)
+_INHERITED_TEXT = f"<p>{_INHERITED_MSG}</p>"
 
 
 class StubGee:
@@ -84,11 +94,20 @@ def _select(box: object) -> object:
 
 
 def _period_selects(box: object) -> tuple[object, object]:
-    """The step's two land-cover-period Selects, in source order: start, end."""
+    """The step's two land-cover-period Selects, in source order: start, end
+    -- present only once the override checkbox (``_checkbox`` below) is
+    enabled."""
     selects = find_widgets(box, ipyvuetify.Select)
     periods = [s for s in selects if len(s.items) != 2]
     assert len(periods) == 2
     return tuple(periods)  # type: ignore[return-value]
+
+
+def _checkbox(box: object) -> object:
+    """The step's one land-cover-period override-toggle checkbox."""
+    boxes = find_widgets(box, ipyvuetify.Checkbox)
+    assert len(boxes) == 1
+    return boxes[0]
 
 
 def _slider(box: object) -> object:
@@ -150,43 +169,88 @@ def test_the_widgets_show_the_current_spec_values():
     assert slider.max == 12
     assert slider.v_model == 6
 
-    period_start, period_end = _period_selects(box)
-    assert period_start.label == msg("land_cover.period_start")
-    assert period_start.items == _PERIOD_YEARS
-    assert period_end.label == msg("land_cover.period_end")
-    assert period_end.items == _PERIOD_YEARS
+    # `periods.land_cover` is unset here (`default_spec()`'s own default), so
+    # the override checkbox starts unchecked and shows the inherited window
+    # in plain text instead of two empty Selects -- see
+    # `test_the_period_override_checkbox_starts_unchecked_...` below for the
+    # dedicated version of this assertion, and
+    # `test_the_period_selects_show_labels_and_items_once_revealed` for the
+    # revealed-Select case this test used to check directly.
+    assert _checkbox(box).v_model is False
+    assert find_widgets(box, ipyvuetify.Select) == [source]
 
 
-def test_the_period_widgets_show_no_default_when_the_override_is_unset():
+def test_the_period_override_checkbox_starts_unchecked_and_shows_the_inherited_window():
     """``periods.land_cover`` is an OPTIONAL override -- ``default_spec()``
-    leaves it ``PeriodOverride(None, None)``, and ``resolve()`` derives the
-    land-cover window from ``periods.overall`` instead. Mirrors
-    ``test_step_soc.py``'s identical assertion for ``periods.soc``."""
+    leaves it ``PeriodOverride(None, None)``. Mirrors
+    ``test_step_soc.py``'s identical assertion for ``periods.soc``: the
+    three period controls are one requirement and two optional narrowings,
+    not three equal date ranges."""
     spec = solara.reactive(default_spec())
     assert spec.value.periods.land_cover == PeriodOverride(None, None)
 
     box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
     assert rc is not None
 
-    period_start, period_end = _period_selects(box)
-    assert period_start.v_model is None
-    assert period_end.v_model is None
+    assert _checkbox(box).v_model is False
+    assert _INHERITED_TEXT in markdown_texts(box)
 
 
-def test_the_period_widgets_show_the_current_override_when_set():
+def test_the_inherited_text_matches_resolves_own_derived_period():
+    """Directly catches "the inherited window shown in the UI stops matching
+    resolve()'s derived period" -- see ``test_step_soc.py``'s identical test."""
+    spec = default_spec()
+    box, rc = solara.render(LandCoverStep(spec=solara.reactive(spec)), handle_error=False)
+    assert rc is not None
+
+    derived = resolve(spec).land_cover_period
+    assert msg("period_override.inherited", start=derived.start, end=derived.end) == _INHERITED_MSG
+    assert _INHERITED_TEXT in markdown_texts(box)
+
+
+def test_the_period_selects_show_labels_and_items_once_revealed():
+    """The checkbox starts CHECKED when an override already holds a value --
+    a spec loaded with a real override must not hide that fact behind an
+    unchecked box the user has no reason to tick."""
     spec = solara.reactive(
         default_spec(periods=replace(default_spec().periods, land_cover=PeriodOverride(1995, 2010)))
     )
     box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
     assert rc is not None
 
+    assert _checkbox(box).v_model is True
+
     period_start, period_end = _period_selects(box)
+    assert period_start.label == msg("land_cover.period_start")
+    assert period_start.items == _PERIOD_YEARS
     assert period_start.v_model == 1995
+    assert period_end.label == msg("land_cover.period_end")
+    assert period_end.items == _PERIOD_YEARS
     assert period_end.v_model == 2010
 
 
+def test_turning_the_period_override_off_clears_it_rather_than_leaving_stale_years():
+    """The brief's own named trap, directly -- see
+    ``test_step_soc.py``'s identical test. Directly catches "toggling an
+    override off leaves the old years in the spec"."""
+    spec = solara.reactive(
+        default_spec(periods=replace(default_spec().periods, land_cover=PeriodOverride(1995, 2010)))
+    )
+    box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
+    assert rc is not None
+    assert _checkbox(box).v_model is True
+
+    _checkbox(box).v_model = False
+
+    assert spec.value.periods.land_cover == PeriodOverride(None, None)
+    assert find_widgets(box, ipyvuetify.Select) == [_select(box)]
+    assert _INHERITED_TEXT in markdown_texts(box)
+
+
 def test_changing_the_period_start_updates_only_that_field():
-    spec = solara.reactive(default_spec())
+    spec = solara.reactive(
+        default_spec(periods=replace(default_spec().periods, land_cover=PeriodOverride(None, 2010)))
+    )
     box, rc = solara.render(LandCoverStep(spec=spec), handle_error=False)
     assert rc is not None
     before = spec.value
@@ -195,7 +259,7 @@ def test_changing_the_period_start_updates_only_that_field():
     period_start.v_model = 1995
 
     assert spec.value.periods.land_cover.start == 1995
-    assert spec.value.periods.land_cover.end is None
+    assert spec.value.periods.land_cover.end == 2010
     assert spec.value.evolve(periods=before.periods) == before
 
 
@@ -502,9 +566,13 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
         return f"<{key}>"
 
     monkeypatch.setattr("app.steps.land_cover.msg", _fake_msg)
+    monkeypatch.setattr("app.steps.period_override.msg", _fake_msg)
 
     spec = solara.reactive(
-        default_spec(land_cover=CustomLandCoverSource(start_asset="a", end_asset="b"))
+        default_spec(
+            land_cover=CustomLandCoverSource(start_asset="a", end_asset="b"),
+            periods=replace(default_spec().periods, land_cover=PeriodOverride(1995, 2010)),
+        )
     )
     box, rc = _render(spec, gee_interface=StubGee())
     assert rc is not None
@@ -519,6 +587,8 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     source = _select(box)
     assert source.label == "<land_cover.source>"
     assert source.v_model == "<land_cover.custom>"
+
+    assert _checkbox(box).label == "<period_override.toggle>"
 
     period_start, period_end = _period_selects(box)
     assert period_start.label == "<land_cover.period_start>"
@@ -543,10 +613,14 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
 @pytest.mark.parametrize(
     ("spec", "expected_extra"),
     [
-        (default_spec(), []),
+        # `periods.land_cover` is unset in every case below except the
+        # explicit override one, so the inherited-window text leads
+        # `expected_extra` in all of them.
+        (default_spec(), [_INHERITED_TEXT]),
         (
             default_spec(land_cover=CustomLandCoverSource(start_asset="", end_asset="")),
             [
+                _INHERITED_TEXT,
                 "<p>Start land cover asset</p>",
                 "<p>End land cover asset</p>",
                 "<p><strong>Select the start land cover asset.</strong></p>",
@@ -560,6 +634,7 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
             # `else` arm of the problems loop.
             default_spec(land_cover=CustomLandCoverSource(start_asset="a", end_asset="b")),
             [
+                _INHERITED_TEXT,
                 "<p>Start land cover asset</p>",
                 "<p>End land cover asset</p>",
                 "<p>Custom land cover assets are set without a transition matrix "
@@ -568,6 +643,8 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
             ],
         ),
         (
+            # The override IS set here -- the checkbox starts checked, so no
+            # inherited text shows.
             default_spec(
                 periods=replace(
                     default_spec().periods, land_cover=PeriodOverride(start=1980, end=1985)
@@ -586,9 +663,9 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
         (
             # A fatal problem belonging to ANOTHER step (missing AOI) --
             # the case that actually distinguishes `problems_for("land_cover",
-            # ...)` from `validate(...)`.
+            # ...)` from `validate(...)`. The override is still unset here.
             default_spec(aoi=None),
-            [],
+            [_INHERITED_TEXT],
         ),
     ],
 )

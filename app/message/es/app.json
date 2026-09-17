@@ -161,6 +161,10 @@
   "outputs": {
     "title": "Resultados"
   },
+  "period_override": {
+    "toggle": "Usar un período diferente para este subindicador",
+    "inherited": "Usa el período de la ejecución: {start}–{end}."
+  },
   "tabs": {
     "previous": "Paso anterior",
     "next": "Paso siguiente",
