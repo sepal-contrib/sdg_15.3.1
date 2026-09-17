@@ -298,7 +298,17 @@ def test_a_layer_that_fails_to_add_reports_the_error_and_stays_addable(monkeypat
     box = asyncio.run(main())
 
     assert fake.successes == []
-    assert fake.errors == ["GEE refused " + layer_name(target)]
+    # The toast NAMES the layer: one task serves all seven rows, so Earth
+    # Engine's own message ("Image.remap: Parameter 'image' ...") would
+    # otherwise leave the user with no idea which row failed.
+    assert fake.errors == [
+        msg(
+            "layers.add_failed",
+            name=layer_name(target),
+            reason="GEE refused " + layer_name(target),
+        )
+    ]
+    assert layer_name(target) in fake.errors[0]
     assert _add_button_labels(box)[1] == [msg("layers.add")]  # never marked shown
     assert fake_map.removed == []
 

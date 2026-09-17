@@ -90,7 +90,8 @@
       "productivity_performance": "Performance de productivité",
       "indicator_15_3_1": "Indicateur ODD 15.3.1"
     },
-    "build_first": "Construisez d'abord l'indicateur."
+    "build_first": "Construisez d'abord l'indicateur.",
+    "add_failed": "Impossible d'ajouter {name} à la carte : {reason}"
   },
   "legend": {
     "classes": {

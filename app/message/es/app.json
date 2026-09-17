@@ -90,7 +90,8 @@
       "productivity_performance": "Rendimiento de productividad",
       "indicator_15_3_1": "Indicador ODS 15.3.1"
     },
-    "build_first": "Construya primero el indicador."
+    "build_first": "Construya primero el indicador.",
+    "add_failed": "No se pudo añadir {name} al mapa: {reason}"
   },
   "legend": {
     "classes": {

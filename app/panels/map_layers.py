@@ -247,7 +247,22 @@ def MapLayersPanel(
         if task.pending or task.cancelled:
             return
         if task.error:
-            notifications.error(str(task.exception))
+            # Name the layer. Earth Engine reports a failed graph in its own
+            # terms ("Image.remap: Parameter 'image' ... may not be null"),
+            # which says nothing about which of the seven the user clicked --
+            # and with one task serving every row, the raw message is the only
+            # thing that would otherwise reach them.
+            failed = pending_id
+            if failed is None:
+                notifications.error(str(task.exception))
+            else:
+                notifications.error(
+                    msg(
+                        "layers.add_failed",
+                        name=layer_name(failed),
+                        reason=str(task.exception),
+                    )
+                )
             return
         if task.finished and task.value is not None:
             # solara's own `use_task` overloads (tasks.py) bind `R` straight to the

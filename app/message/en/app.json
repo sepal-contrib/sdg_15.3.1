@@ -89,7 +89,8 @@
       "productivity_performance": "Productivity performance",
       "indicator_15_3_1": "SDG Indicator 15.3.1"
     },
-    "build_first": "Build the indicator first."
+    "build_first": "Build the indicator first.",
+    "add_failed": "Could not add {name} to the map: {reason}"
   },
   "legend": {
     "classes": {
