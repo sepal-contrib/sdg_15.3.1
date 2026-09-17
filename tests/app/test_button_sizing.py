@@ -1,6 +1,8 @@
 """Every button-ish call in ``app/`` carries pysepal's right-panel
-``small=True`` convention (``docs/guides/solara-app-builder.md``'s
-button-sizing table, in the pysepal repo).
+``small=True`` convention, and (task 30) every one that is not an icon
+button also carries ``block=True`` (``docs/guides/solara-app-builder.md``'s
+button-sizing table, in the pysepal repo: right-panel content buttons take
+``small=True``, adding ``block=True`` for full width).
 
 Two call shapes matter here: ``TaskButtonComponent(...)`` (every compute /
 download / add button) and a bare ``rv.Btn(...)`` / ``v.Btn(...)``
@@ -8,7 +10,16 @@ download / add button) and a bare ``rv.Btn(...)`` / ``v.Btn(...)``
 ``app/tabs.py``). Both need ``small=True`` in a ~450px right panel -- this
 app has no navigation-drawer button to exempt (``page.py``'s
 ``steps_data=[]`` is empty, so the table's one "never ``small=True``" row
-never applies here).
+never applies here). ``block=True`` is narrower: the guide's own last row
+keeps navigation-drawer icons at their default size, and this app's own
+equivalent -- the two prev/next arrows, ``icon=True`` calls -- stay icon
+buttons the same way (the repo owner's own brief for this task: "the
+prev/next arrows are icon buttons and must stay icon buttons"). That
+exemption is read off ``icon=True`` at the call site itself
+(``_is_icon_call``), not a hand-typed file/line exemption list, so a NEW
+icon button needs no entry added anywhere to be exempted correctly, and a
+content button cannot be exempted by mistake just by living in the same
+file as one.
 
 Checked the Selects and chips the brief also asked about, and found nothing
 to pin: no ``rv.Chip``/``solara.Chip`` call exists anywhere in ``app/``, and
@@ -22,7 +33,10 @@ for ``use_task``, applied here: resolve import bindings (``from ... import
 Btn as X``) rather than matching one literal spelling, and hold the
 alias-aware scan to a floor set by a simpler, independently-authored
 name/attr-only pass, so a regression in the scan itself shows up as a
-specific list of missing sites rather than a silent pass.
+specific list of missing sites rather than a silent pass. The ``block=True``
+check reuses that same alias-aware call list rather than re-scanning, so an
+aliased import defeats it exactly as little as it defeats the ``small=True``
+check.
 """
 
 from __future__ import annotations
@@ -110,6 +124,20 @@ def _app_sources() -> list[tuple[str, str]]:
     return [(rel, source) for rel, source in iter_domain_sources() if rel.startswith("app/")]
 
 
+def _literal_true_kwarg(call: ast.Call, name: str) -> bool:
+    """Whether ``call`` passes ``name=True`` as a literal, not merely present
+    (``name=some_variable`` would not count)."""
+    value = next((kw.value for kw in call.keywords if kw.arg == name), None)
+    return isinstance(value, ast.Constant) and value.value is True
+
+
+def _is_icon_call(call: ast.Call) -> bool:
+    """An icon-only button (``icon=True``) -- the one call shape task 30's
+    ``block=True`` convention deliberately does not apply to (see this
+    module's docstring): ``app/tabs.py``'s prev/next arrows."""
+    return _literal_true_kwarg(call, "icon")
+
+
 def test_every_button_call_carries_small_true():
     sources = _app_sources()
     assert sources, "iter_domain_sources() found nothing under app/ -- the scan itself is broken"
@@ -134,17 +162,75 @@ def test_every_button_call_carries_small_true():
     # still clear a bare non-empty check.
     assert len(calls) >= 7, f"expected at least 7 button call sites, found {len(calls)}: {calls}"
 
-    violations = []
-    for rel, lineno, target, call in calls:
-        small = next((kw.value for kw in call.keywords if kw.arg == "small"), None)
-        passes_literal_true = isinstance(small, ast.Constant) and small.value is True
-        if not passes_literal_true:
-            violations.append(f"{rel}:{lineno} ({target})")
-
+    violations = [
+        f"{rel}:{lineno} ({target})"
+        for rel, lineno, target, call in calls
+        if not _literal_true_kwarg(call, "small")
+    ]
     assert violations == [], (
         "these button calls do not pass small=True explicitly, breaking pysepal's "
         f"right-panel button-sizing convention: {violations}"
     )
+
+
+def test_every_non_icon_button_call_carries_block_true():
+    """Task 30's own ask, pysepal's convention table's other half: right-panel
+    content buttons take ``block=True`` for full width, alongside the
+    ``small=True`` checked above. Icon buttons (``app/tabs.py``'s prev/next
+    arrows) are exempted by ``_is_icon_call`` reading ``icon=True`` off the
+    call itself, not a hand-typed file/line list -- see this module's
+    docstring for why.
+
+    Directly catches both mutations the brief names for this rule: dropping
+    ``block=True`` from one outputs button (a violation, naming that exact
+    call site), and aliasing the button import in one panel (inherited for
+    free from ``_button_calls_in_source``'s own alias resolution -- the same
+    reason ``test_every_button_call_carries_small_true`` needs no separate
+    alias-import test of its own here either; ``test_the_scan_resolves_an_
+    aliased_task_button_component_import``/``..._btn_import`` above already
+    prove the shared scan sees through an alias).
+    """
+    sources = _app_sources()
+    calls = [call for rel, source in sources for call in _button_calls_in_source(rel, source)]
+
+    icon_calls = [c for c in calls if _is_icon_call(c[3])]
+    content_calls = [c for c in calls if not _is_icon_call(c[3])]
+
+    # A floor on each half of the split, for the same reason the bare `>= 7`
+    # above is a floor: today's app/ has exactly one icon call site
+    # (`_NavArrow`) and six non-icon ones. A regression that misclassified a
+    # real content button as an icon button (exempting it by mistake) or the
+    # reverse would still pass a bare non-empty check on either side.
+    assert len(icon_calls) == 1, f"expected exactly one icon button call site: {icon_calls}"
+    assert len(content_calls) == 6, (
+        f"expected exactly six non-icon button call sites: {content_calls}"
+    )
+
+    violations = [
+        f"{rel}:{lineno} ({target})"
+        for rel, lineno, target, call in content_calls
+        if not _literal_true_kwarg(call, "block")
+    ]
+    assert violations == [], (
+        "these button calls do not pass block=True explicitly, breaking pysepal's "
+        f"right-panel button-sizing convention: {violations}"
+    )
+
+
+def test_the_icon_exemption_does_not_require_block_true():
+    """The direct counter-proof for the test above: a synthetic icon button
+    with no ``block`` at all must NOT be flagged -- proves the exemption is a
+    real branch in the check, not an accident of every icon call in this
+    app's own source already happening to pass ``block=True`` anyway.
+    """
+    source = (
+        "from reacton.ipyvuetify import Btn\n\ndef f():\n    return Btn(icon=True, small=True)\n"
+    )
+    calls = _button_calls_in_source("app/probe.py", source)
+    assert len(calls) == 1
+    _, _, _, call = calls[0]
+    assert _is_icon_call(call)
+    assert not _literal_true_kwarg(call, "block")
 
 
 def test_the_scan_resolves_an_aliased_task_button_component_import():
