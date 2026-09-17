@@ -69,7 +69,7 @@
       "other": "Listo: {count} capas",
       "many": "Listo: {count} de capas"
     },
-    "blocked": "Corrija los problemas anteriores antes de construir."
+    "blocked": "Corrija los problemas anteriores para poder calcular el indicador."
   },
   "layers": {
     "title": "Capas",

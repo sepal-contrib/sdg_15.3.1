@@ -68,7 +68,7 @@
       "one": "Ready: {count} layer",
       "other": "Ready: {count} layers"
     },
-    "blocked": "Fix the problems above before building."
+    "blocked": "Fix the problems above before the indicator can be computed."
   },
   "layers": {
     "title": "Layers",

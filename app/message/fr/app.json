@@ -69,7 +69,7 @@
       "other": "Prêt : {count} couches",
       "many": "Prêt : {count} de couches"
     },
-    "blocked": "Corrigez les problèmes ci-dessus avant de construire."
+    "blocked": "Corrigez les problèmes ci-dessus pour que l'indicateur puisse être calculé."
   },
   "layers": {
     "title": "Couches",
