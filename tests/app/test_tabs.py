@@ -420,15 +420,29 @@ def test_the_incomplete_fill_actually_differs_between_light_and_dark_mode_on_scr
         theme_state.dark = False
         box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
         assert rc is not None
-        light_style = _wrapper_cells(_workflow_widget(box))[_AOI_INDEX].children[0].style_
+
+        # `_PARAMS_INDEX`, NOT `_AOI_INDEX`: AOI is the ACTIVE tab, and an
+        # active cell carries the ring, whose colour is the already-theme-aware
+        # `primary`. Reading it made `light_style != dark_style` true whichever
+        # fills were in play, so this test passed unchanged when the two
+        # INCOMPLETE literals were mutated to one identical string -- the exact
+        # bug its own name claims to catch. An INACTIVE, INCOMPLETE cell has no
+        # ring, so its background IS the fill under test and nothing else.
+        def cell() -> str:
+            return _wrapper_cells(_workflow_widget(box))[_PARAMS_INDEX].children[0].style_
+
+        light_style = cell()
 
         theme_state.dark = True
         rc.force_update()
-        dark_style = _wrapper_cells(_workflow_widget(box))[_AOI_INDEX].children[0].style_
+        dark_style = cell()
 
         assert light_style != dark_style
         assert tabs_module._SEG_INCOMPLETE_LIGHT in light_style
         assert tabs_module._SEG_INCOMPLETE_DARK in dark_style
+        # Both `in` assertions above still pass when the two constants are the
+        # SAME string, so neither of them closes the hole on its own.
+        assert tabs_module._SEG_INCOMPLETE_LIGHT not in dark_style
     finally:
         theme_state.dark = original
 

@@ -114,6 +114,38 @@ def _wrapper_cells(root: object) -> list[Any]:
 # ---------------------------------------------------------------------------
 
 
+def test_the_section_header_divider_follows_the_theme():
+    """`var(--v-divider-base, ...)` never resolved in this stack -- Vuetify 2
+    compiles its theme from SASS and `--v-*` custom properties are a Vuetify 3
+    feature, so the fallback always won and the divider was a light-theme
+    colour in dark mode. It looked fine in a browser because a fallback that
+    always applies is indistinguishable from a working default.
+    """
+    from pysepal.solara import get_current_theme_state
+
+    from app.panels.section_header import _DIVIDER_DARK, _DIVIDER_LIGHT, SectionHeader
+
+    assert _DIVIDER_LIGHT != _DIVIDER_DARK
+
+    theme_state = get_current_theme_state()
+    original = theme_state.dark
+    try:
+        theme_state.dark = False
+        box, rc = solara.render(SectionHeader(title="t", icon="mdi-cog"), handle_error=False)
+        assert rc is not None
+        light = find_widget(box, v.Html).style_
+
+        theme_state.dark = True
+        rc.force_update()
+        dark = find_widget(box, v.Html).style_
+
+        assert _DIVIDER_LIGHT in light
+        assert _DIVIDER_DARK in dark
+        assert _DIVIDER_LIGHT not in dark
+    finally:
+        theme_state.dark = original
+
+
 def test_the_sections_are_in_the_old_tab_order():
     """Layers -> Transitions -> Results -> Zonal -> Export -- the brief's own
     words: "Section order is the old tab order and must not change". This is
