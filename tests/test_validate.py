@@ -8,6 +8,7 @@ from _subprocess import run_python
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from sdg1531.catalog import SENSORS
 from sdg1531.enums import Trajectory
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
@@ -96,6 +97,88 @@ def test_missing_aoi_is_fatal_and_anchored():
     problem = only(BASE.evolve(aoi=None), "missing_aoi")
     assert problem.field == "aoi"
     assert problem.fatal is True
+
+
+# --------------------------------------------------- sensor_period_no_overlap
+
+
+def test_sensor_period_no_overlap_is_fatal_and_anchored():
+    """The exact case the repo owner hit twice: Sentinel 2 (real coverage starts
+    2015) selected over 2001-2014. Before this rule, `is_runnable` said True and
+    Earth Engine refused the graph deep inside, naming neither the sensor nor the
+    period (`Image.select: ... no bands`, over an empty ImageCollection)."""
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Sentinel 2",)), periods=overall(start=2001, end=2014)
+    )
+    problem = only(spec, "sensor_period_no_overlap")
+    assert problem.field == "vi_source.names"
+    assert problem.fatal is True
+    assert "Sentinel 2" in problem.message
+    assert "2001" in problem.message and "2014" in problem.message
+
+
+def test_a_sensor_period_that_does_overlap_is_accepted():
+    """A period wholly inside the sensor's real coverage: must stay runnable."""
+    landsat8 = SENSORS["Landsat 8"]
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Landsat 8",)),
+        periods=overall(start=landsat8.first_year, end=landsat8.first_year + 5),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_a_partially_overlapping_sensor_period_is_accepted():
+    """Judgement call: partial overlap is fine, not a warning and not fatal.
+
+    Landsat 5's real archive ends in 2012 (see tests/test_sensor_bounds.py); a
+    period running past that still shares years with it, so the sub-indicators
+    integrate over real (if partial) data rather than nothing -- refusing this
+    would block a legitimate run for a reason the user cannot fix by picking a
+    different sensor.
+    """
+    landsat5 = SENSORS["Landsat 5"]
+    assert landsat5.last_year is not None  # retired archive; a fixed ceiling
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Landsat 5",)),
+        periods=overall(start=landsat5.last_year - 5, end=landsat5.last_year + 10),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_sensor_period_no_overlap_is_silent_when_any_selected_sensor_overlaps():
+    """Sensors are legitimately combined for continuous multi-mission coverage
+    (`_process_landsat_sensors` merges every selected Landsat collection into
+    one) -- so a selection where only ONE sensor reaches the period must stay
+    runnable, not be refused because another rides along uselessly."""
+    landsat4 = SENSORS["Landsat 4"]
+    sentinel2 = SENSORS["Sentinel 2"]
+    assert landsat4.last_year is not None and landsat4.last_year < sentinel2.first_year
+
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Landsat 4", "Sentinel 2")),
+        periods=overall(start=landsat4.first_year, end=landsat4.last_year),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_sensor_period_no_overlap_is_silent_for_a_half_filled_period():
+    """No endpoint pinned down yet on any period: nothing to compare against,
+    so this rule must stay silent rather than guess or raise."""
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Sentinel 2",)),
+        periods=SubPeriods(overall=Period(start=1995, end=None)),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_sensor_period_no_overlap_ignores_an_unrecognised_sensor_name():
+    """An unknown name is `_vi_dispatch`'s problem (a `SpecError`, caught by
+    `is_runnable`), not this rule's -- there is no recorded coverage to compare
+    it against."""
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Not A Real Sensor",)), periods=overall(start=2001, end=2014)
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
 
 
 def soc(**override) -> SubPeriods:

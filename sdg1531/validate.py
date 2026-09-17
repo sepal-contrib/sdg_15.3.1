@@ -6,8 +6,8 @@ spec: it returns field-anchored :class:`Problem` records instead. This replaces
 the scattered ``alert.check_input`` chain at ``input_tile.py:245-330`` and the
 ``raise Exception`` at ``run_15_3_1.py:165-166``.
 
-EXPECTED_DIVERGENCES note -- four divergences from the legacy. The parity harness
-must carry all four.
+EXPECTED_DIVERGENCES note -- five divergences from the legacy. The parity harness
+must carry all five.
 
 The legacy had no total validator, so in one sense every :class:`Problem` here is
 new. What is recorded below is the narrower set that changes WHICH RUNS ARE
@@ -51,6 +51,22 @@ deliberately left non-fatal, for the reason note 1 quotes.
    matrix of the wrong rectangle -- the 7x7 default crammed into one 49-value row, a
    transposed custom scheme -- kept the legacy's flatten reading in order and
    misaligned the transition table silently.
+5. **Behaviour-changing.** ``sensor_period_no_overlap`` (fatal,
+   :func:`_sensor_period_problems`) rejects a sensor selection whose combined
+   coverage does not intersect the assessment period at all. Nothing in the legacy
+   ever checks a sensor's temporal coverage against the requested period --
+   ``parameter/sensor.py``'s sensor table carries no year bounds, and
+   ``integration.py``'s collection builders trust the selection unconditionally --
+   so a mismatched pick reaches Earth Engine as an empty ``ImageCollection`` and
+   fails deep inside the graph with a message naming neither the sensor nor the
+   period (``Image.select`` on a band that was never there, ``Image.divide`` on
+   mismatched band counts, ``Image.remap`` on a null image -- whichever operation
+   the empty collection reaches first). Partial overlap is deliberately NOT
+   refused: sensors are legitimately combined for continuous multi-mission
+   coverage (``_process_landsat_sensors`` merges every selected Landsat collection
+   into one), so the rule fires only when NONE of the selected sensors has any
+   data anywhere in the period -- the one case that is guaranteed to build a
+   wholly empty collection regardless of which other sensors ride along.
 """
 
 from __future__ import annotations
@@ -63,6 +79,8 @@ from sdg1531.catalog import (
     DISABLED_TRAJECTORIES,
     LAND_COVER_FIRST_YEAR,
     LAND_COVER_MAX_YEAR,
+    SENSORS,
+    SensorInfo,
 )
 from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
@@ -289,6 +307,69 @@ def _vi_source_problems(spec: RunSpec) -> tuple[Problem, ...]:
             ),
         )
     return ()
+
+
+def _integration_period_envelope(spec: RunSpec) -> tuple[int, int] | None:
+    """The date range integration.py:11-19 actually asks each sensor's collection
+    for -- resolve.py's ``_integration_period``, duplicated here rather than
+    imported for the same reason ``_clamp_cci`` above is: ``_integration_period``
+    raises ``ValueError`` when every start (or every end) is unset, and this
+    module must not depend on anything that can fail. Returns ``None`` in that
+    case instead, meaning "no period is pinned down yet, nothing to check".
+    """
+    p = spec.periods
+    raw_starts = (p.overall.start, p.trend.start, p.state.start, p.performance.start)
+    raw_ends = (p.overall.end, p.trend.end, p.state.end, p.performance.end)
+    starts = [y for y in (_year(v) for v in raw_starts) if y is not None]
+    ends = [y for y in (_year(v) for v in raw_ends) if y is not None]
+    if not starts or not ends:
+        return None
+    return min(starts), max(ends)
+
+
+def _sensor_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
+    """A selected sensor whose archive does not cover the assessment period at
+    all yields an empty ``ImageCollection``, and Earth Engine refuses the graph
+    deep inside -- see note 5 in this module's docstring for the reproduced
+    failure and why partial overlap is accepted rather than refused.
+    """
+    source = spec.vi_source
+    if not isinstance(source, SensorSelection) or not source.names:
+        return ()  # `missing_sensors` above already covers this half-filled state
+
+    envelope = _integration_period_envelope(spec)
+    if envelope is None:
+        return ()
+    period_start, period_end = envelope
+
+    # An unrecognised name is `_vi_dispatch`'s problem (`SpecError`, caught by
+    # `is_runnable`), not this rule's -- there is nothing to compare it against.
+    known = [(name, SENSORS[name]) for name in source.names if name in SENSORS]
+    if not known:
+        return ()
+
+    def overlaps(info: SensorInfo) -> bool:
+        if period_end < info.first_year:
+            return False
+        return info.last_year is None or period_start <= info.last_year
+
+    if any(overlaps(info) for _, info in known):
+        return ()
+
+    coverage = ", ".join(
+        f"{name} ({info.first_year}-{info.last_year if info.last_year is not None else 'present'})"
+        for name, info in known
+    )
+    return (
+        Problem(
+            field="vi_source.names",
+            code="sensor_period_no_overlap",
+            message=(
+                f"None of the selected sensors has data in {period_start}-{period_end}: {coverage}."
+            ),
+            fatal=True,
+        ),
+    )
 
 
 def _trajectory_problems(spec: RunSpec) -> tuple[Problem, ...]:
@@ -530,6 +611,7 @@ _CHECKS = (
     _land_cover_period_problems,
     _state_period_problems,
     _vi_source_problems,
+    _sensor_period_problems,
     _trajectory_problems,
     _climate_problems,
     _land_cover_problems,

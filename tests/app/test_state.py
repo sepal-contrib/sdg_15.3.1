@@ -24,7 +24,14 @@ import sdg1531.validate
 from app.state import STEP_PREFIXES, _owns, is_runnable, problems_for
 from sdg1531.catalog import DISABLED_TRAJECTORIES
 from sdg1531.scheme import TransitionMatrix
-from sdg1531.spec import FixedClimate, Period, PeriodOverride, RunSpec, SubPeriods
+from sdg1531.spec import (
+    FixedClimate,
+    Period,
+    PeriodOverride,
+    RunSpec,
+    SensorSelection,
+    SubPeriods,
+)
 from sdg1531.validate import validate
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
@@ -334,6 +341,24 @@ def test_an_unfilled_spec_is_not_runnable():
 
 def test_a_complete_spec_is_runnable():
     assert is_runnable(default_spec()) is True
+
+
+def test_a_sensor_period_mismatch_is_not_runnable_before_any_graph_is_touched():
+    """The repo owner's real crash, reproduced against GEE (task 29's brief):
+    Sentinel 2 (real coverage starts 2015) selected over 2001-2014 used to say
+    `is_runnable() is True`, and Earth Engine refused the graph deep inside --
+    `Image.select`, `Image.divide` or `Image.remap`, naming neither the sensor
+    nor the period. `sensor_period_no_overlap` (`sdg1531.validate`) now catches
+    it in `validate()` alone, which this test proves by construction: nothing
+    here calls `resolve()` or touches `ee`.
+    """
+    spec = default_spec(
+        vi_source=SensorSelection(("Sentinel 2",)),
+        periods=replace(DEFAULT_PERIODS, overall=Period(2001, 2014)),
+    )
+    problems = validate(spec)
+    assert any(p.code == "sensor_period_no_overlap" and p.fatal for p in problems)
+    assert is_runnable(spec) is False
 
 
 def test_a_spec_with_only_a_warning_is_runnable():

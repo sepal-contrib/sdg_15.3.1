@@ -776,6 +776,27 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
             "test_transposed_custom_scheme_matrix_is_fatal",
         ),
     },
+    "sensor_period_no_overlap": {
+        "note": "sdg1531/validate.py:5",
+        "reason": (
+            "sensor_period_no_overlap (fatal) rejects a sensor selection whose "
+            "combined coverage does not intersect the assessment period at all. "
+            "parameter/sensor.py's sensor table carries no year bounds and "
+            "integration.py trusts the selection unconditionally, so the legacy "
+            "reaches the same mismatch as a bare ee failure deep inside the graph "
+            "(an empty ImageCollection, Image.select/.divide/.remap refusing it) "
+            "rather than a named refusal. Partial overlap is accepted: sensors are "
+            "legitimately combined for continuous multi-mission coverage, so the "
+            "rule only fires when NONE of the selected sensors has any data "
+            "anywhere in the period."
+        ),
+        "tests": (
+            "test_sensor_period_no_overlap_is_fatal_and_anchored",
+            "test_a_sensor_period_that_does_overlap_is_accepted",
+            "test_a_partially_overlapping_sensor_period_is_accepted",
+            "test_sensor_period_no_overlap_is_silent_when_any_selected_sensor_overlaps",
+        ),
+    },
     # --- naming.py --------------------------------------------------------------
     "run_label_is_total": {
         "note": "sdg1531/naming.py:1",
