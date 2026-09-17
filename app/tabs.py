@@ -17,6 +17,14 @@ since the strip alone already fits and already covers every required state
 transition; those two extra controls are additional surface the brief did
 not ask this app to carry.
 
+Task 27 folded the five output tabs (Layers, Transitions, Results, Zonal,
+Export) into ONE tab, ``app/panels/outputs.py``'s ``OutputsPanel``, an
+accordion over the same five panels in the same order -- the repo owner's own
+words: "all the computation buttons ... should be in the same tab, like with
+multiple sections, similarly as se.plan does". The panel now has SIX tabs,
+not ten; ``_tab_state``'s LOCKED/INCOMPLETE/SATISFIED derivation is unchanged,
+it just applies to one merged output tab instead of five separate ones.
+
 Segment state is derived from what ``app/state.py`` already knows
 (``problems_for``) and from ``outcome.maps``, never from a second,
 hand-typed notion of "done" per step -- see ``_tab_state``.
@@ -35,11 +43,7 @@ from pysepal.mapping.sepal_map import SepalMap
 from reacton.ipyvue import use_event
 
 from app.message import msg
-from app.panels.exports import ExportsPanel
-from app.panels.map_layers import MapLayersPanel
-from app.panels.results import ResultsPanel
-from app.panels.transitions import TransitionsPanel
-from app.panels.zonal import ZonalPanel
+from app.panels.outputs import OutputsPanel
 from app.state import problems_for
 from app.steps.aoi import AoiStep
 from app.steps.land_cover import LandCoverStep
@@ -58,7 +62,7 @@ class TabDescriptor:
 
     ``step`` is the ``app.state.STEP_PREFIXES`` key a configuration tab owns,
     so its segment can read its state off ``problems_for`` -- ``None`` for
-    the five output tabs, which are gated by ``outcome.maps`` instead (see
+    the merged outputs tab, which is gated by ``outcome.maps`` instead (see
     ``_tab_state``). Order lives in list position alone, same reason
     ``build_workflow_sections`` gave: nothing here has an ``id`` for a stray
     sort to key on.
@@ -78,11 +82,11 @@ def workflow_tabs(
     sepal_client: Any = None,
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]] | None = None,
 ) -> list[TabDescriptor]:
-    """The ten workflow tabs, in DISPLAY order: AOI -> Productivity -> Land
-    cover -> SOC -> Run -> Layers -> Transitions -> Results -> Zonal ->
-    Export (design decision A6, unchanged by this module's move out of
-    ``steps_data`` and then out of ten separate ``right_panel_content``
-    sections).
+    """The six workflow tabs, in DISPLAY order: AOI -> Productivity -> Land
+    cover -> SOC -> Run -> the merged outputs tab (design decision A6's order,
+    unchanged by this module's move out of ``steps_data``, then out of ten
+    separate ``right_panel_content`` sections, then -- task 27 -- by folding
+    the last five of those ten into one tab; see ``app/panels/outputs.py``).
 
     Every argument defaults to ``None`` so this is reachable with no render
     context at all -- calling a ``@solara.component`` function outside a
@@ -97,8 +101,9 @@ def workflow_tabs(
     ``mypy --strict`` narrows each ``X | None`` argument away from ``None``
     before it reaches a component that declares a bare ``X`` parameter
     (``Reactive[RunSpec]`` for ``spec``, plain ``RunSpec`` for
-    ``ExportsPanel.spec``); measured by deleting a guard, which leaves every
-    test green and produces one ``mypy`` error per guard removed.
+    ``ExportsPanel.spec`` deep inside ``OutputsPanel``); measured by deleting
+    a guard, which leaves every test green and produces one ``mypy`` error per
+    guard removed.
     """
     maps = outcome.maps if outcome is not None else None
     ctx = outcome.ctx if outcome is not None else None
@@ -117,10 +122,28 @@ def workflow_tabs(
     run_content: list[object] = (
         [RunStep(spec=spec, outcome=outcome)] if spec is not None and outcome is not None else []
     )
-    # `ExportsPanel.spec` is a bare `RunSpec`, unlike every other panel's `maps`/
-    # `ctx` (both already `X | None`) -- the one output tab that needs a guard.
-    exports_content: list[object] = (
-        [ExportsPanel(maps=maps, ctx=ctx, spec=spec.value, gee_interface=gee_interface)]
+    # `OutputsPanel.spec` is a bare `RunSpec` (its own `ExportsPanel` section
+    # needs it), unlike every other argument here -- the one tab that still
+    # needs this guard, for the same mypy-narrowing reason it always did.
+    outputs_content: list[object] = (
+        [
+            OutputsPanel(
+                maps=maps,
+                ctx=ctx,
+                spec=spec.value,
+                map_=sepal_map,
+                gee_interface=gee_interface,
+                sepal_client=sepal_client,
+                # `OutputsPanel.shown_layers` already defaults to an
+                # internally-owned frozenset when no `Reactive` is given (the
+                # bare `workflow_tabs()` call this docstring describes), so
+                # `None` here means exactly that -- not a narrowing guard like
+                # the one above.
+                shown_layers=shown_layers
+                if shown_layers is not None
+                else frozenset[IndicatorLayer](),
+            )
+        ]
         if spec is not None
         else []
     )
@@ -132,47 +155,15 @@ def workflow_tabs(
         TabDescriptor("land_cover", msg("step.land_cover"), "mdi-terrain", land_cover_content),
         TabDescriptor("soc", msg("step.soc"), "mdi-layers-outline", soc_content),
         TabDescriptor("run", msg("step.run"), "mdi-play-circle-outline", run_content),
-        TabDescriptor(
-            None,
-            msg("layers.title"),
-            "mdi-layers",
-            [
-                MapLayersPanel(
-                    maps=maps,
-                    map_=sepal_map,
-                    gee_interface=gee_interface,
-                    # `MapLayersPanel.shown` already defaults to an
-                    # internally-owned frozenset when no `Reactive` is given
-                    # (the bare `workflow_tabs()` call this docstring
-                    # describes), so `None` here means exactly that -- not a
-                    # narrowing guard like the ones above.
-                    shown=shown_layers if shown_layers is not None else frozenset[IndicatorLayer](),
-                )
-            ],
-        ),
-        TabDescriptor(
-            None,
-            msg("transitions.title"),
-            "mdi-transit-transfer",
-            [TransitionsPanel(maps=maps, ctx=ctx, gee_interface=gee_interface)],
-        ),
-        TabDescriptor(
-            None,
-            msg("results.title"),
-            "mdi-chart-bar",
-            [ResultsPanel(maps=maps, ctx=ctx, gee_interface=gee_interface)],
-        ),
-        TabDescriptor(
-            None,
-            msg("zonal.title"),
-            "mdi-table",
-            [
-                ZonalPanel(
-                    maps=maps, ctx=ctx, gee_interface=gee_interface, sepal_client=sepal_client
-                )
-            ],
-        ),
-        TabDescriptor(None, msg("exports.title"), "mdi-export-variant", exports_content),
+        # Title and icon reused from the old Results tab (`msg("results.title")`,
+        # "mdi-chart-bar") rather than new copy -- this is the brief's own name
+        # for the merged tab, and it needs none invented. The ResultsPanel
+        # SECTION inside it (see `output_sections`) keeps that same title on
+        # its own header too, per the brief's explicit "section header carries
+        # the panel's existing title" instruction; the two labels sitting one
+        # inside the other is accepted rather than papered over with a second,
+        # unrequested tab name.
+        TabDescriptor(None, msg("results.title"), "mdi-chart-bar", outputs_content),
     ]
 
 
@@ -188,15 +179,15 @@ class _TabState(Enum):
 def _tab_state(tab: TabDescriptor, spec: RunSpec, has_maps: bool) -> _TabState:
     """A configuration tab (``tab.step`` set) is INCOMPLETE while it owns a
     fatal problem and SATISFIED once it does not -- it is never LOCKED, since
-    every configuration field is always editable. An output tab
+    every configuration field is always editable. The merged outputs tab
     (``tab.step is None``) is LOCKED until ``outcome.maps`` exists and
     SATISFIED after -- the same gate ``is_runnable``/``build_outcome``
-    already apply before Layers, Transitions, Results, Zonal or Export can
-    show anything.
+    already apply before any of its five sections (Layers, Transitions,
+    Results, Zonal, Export) can show anything.
 
     Reads ``problems_for`` and ``has_maps`` -- the same predicates the steps
     and panels themselves already render against -- rather than a second,
-    hand-typed roster of ten step states.
+    hand-typed roster of step states.
     """
     if tab.step is None:
         return _TabState.SATISFIED if has_maps else _TabState.LOCKED
@@ -318,7 +309,7 @@ def WorkflowTabs(
     gee_interface: Any = None,
     sepal_client: Any = None,
 ) -> None:
-    """The whole right-panel workflow: the segment strip over the ten tabs.
+    """The whole right-panel workflow: the segment strip over the six tabs.
 
     ``rv.TabsItems`` hides inactive tabs client-side WITHOUT unmounting them.
     That is a problem for ``app/steps/aoi.py``'s ``AoiStep``, which mounts
@@ -331,12 +322,13 @@ def WorkflowTabs(
     ``_sync_draw_control`` for why it needs no dependency beyond
     ``active_tab`` in THIS app.
 
-    The same non-unmounting behaviour is a help for the two chart tabs
-    (Results, Transitions): both call ``solara.display()`` directly in their
-    render body (see ``app/panels/results.py``'s load-bearing comment on
-    why), and a tab that stays mounted does not re-run that path on every
-    switch -- verified in the browser, not merely assumed: mounting a chart,
-    switching away and back leaves the same live ``<canvas>`` in place.
+    The same non-unmounting behaviour is a help for the merged outputs tab's
+    two chart sections (Results, Transitions): both call ``solara.display()``
+    directly in their render body (see ``app/panels/results.py``'s
+    load-bearing comment on why), and a tab that stays mounted does not
+    re-run that path on every switch -- verified in the browser, not merely
+    assumed: mounting a chart, switching away and back leaves the same live
+    ``<canvas>`` in place.
     """
     active_tab, set_active_tab = solara.use_state(0)
 

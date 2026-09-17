@@ -78,7 +78,12 @@ def ResultsPanel(
     maps: IndicatorMaps | None,
     ctx: ExecutionContext | None,
     gee_interface: Any,
+    is_open: bool = True,
 ) -> None:
+    """``is_open`` says whether THIS panel's own container (an
+    ``rv.ExpansionPanel`` section since task 27) is the one currently
+    expanded -- see the ``chart`` memo below for why that gates more than
+    visibility."""
     solara.Markdown(msg("results.description"))
 
     notifications = use_notifications()
@@ -140,11 +145,27 @@ def ResultsPanel(
     # solara's hooks-order check flags a `use_*` hook called inside an `if` block
     # regardless of whether it precedes a return, so whether the widget exists at
     # all has to be decided INSIDE the memoised factory. Keyed on `option.value`
-    # so a re-render with an unchanged option does not rebuild the widget.
-    chart = solara.use_memo(
-        lambda: None if option.value is None else EChartsRawWidget(option=option.value),
-        [option.value],
-    )
+    # AND `is_open`, and gated on both: an `EChartsRawWidget` sizes its canvas
+    # from its container's live dimensions at construction time and never
+    # revisits that later, so building it while this section is collapsed (a
+    # real case -- the async fetch above can finish after the user has already
+    # expanded a DIFFERENT section) bakes in a zero-width canvas that reopening
+    # this one does not fix. Verified in a real browser with a throwaway probe
+    # (an `EChartsRawWidget` mounted via `solara.display()` inside an
+    # `rv.ExpansionPanel`, driven by `pysepal/scripts/browser_probe.mjs`): built
+    # while open, the canvas measured its real pixel size and kept it across a
+    # collapse/reopen cycle; built while collapsed, it measured 100x500 (an
+    # ECharts fallback, not the container's real width) and STAYED that size
+    # after reopening. Gating on `is_open` too means the widget is always first
+    # built during a render where its section is already the open one -- the
+    # reopen itself is what re-runs this memo once `option.value` is already
+    # sitting there waiting.
+    def _build_chart() -> EChartsRawWidget | None:
+        if option.value is None or not is_open:
+            return None
+        return EChartsRawWidget(option=option.value)
+
+    chart = solara.use_memo(_build_chart, [option.value, is_open])
 
     if current_maps is None or current_ctx is None:
         solara.Markdown(msg("results.build_first"))

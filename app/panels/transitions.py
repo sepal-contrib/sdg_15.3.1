@@ -67,7 +67,10 @@ def TransitionsPanel(
     maps: IndicatorMaps | None,
     ctx: ExecutionContext | None,
     gee_interface: Any,
+    is_open: bool = True,
 ) -> None:
+    """``is_open``: see ``ResultsPanel``'s identical parameter -- same
+    ``rv.ExpansionPanel`` mount-timing trap, same fix."""
     solara.Markdown(msg("transitions.description"))
 
     notifications = use_notifications()
@@ -129,11 +132,16 @@ def TransitionsPanel(
     # solara's hooks-order check flags a `use_*` hook called inside an `if` block
     # regardless of whether it precedes a return, so whether the widget exists at
     # all has to be decided INSIDE the memoised factory. Keyed on `option.value`
-    # so a re-render with an unchanged option does not rebuild the widget.
-    chart = solara.use_memo(
-        lambda: None if option.value is None else EChartsRawWidget(option=option.value),
-        [option.value],
-    )
+    # AND `is_open` -- see ``ResultsPanel``'s identical comment for why: an
+    # `EChartsRawWidget` built while its `rv.ExpansionPanel` is collapsed bakes
+    # in a wrong canvas size that reopening the section does not fix, verified
+    # with the same browser probe.
+    def _build_chart() -> EChartsRawWidget | None:
+        if option.value is None or not is_open:
+            return None
+        return EChartsRawWidget(option=option.value)
+
+    chart = solara.use_memo(_build_chart, [option.value, is_open])
 
     if current_maps is None or current_ctx is None:
         solara.Markdown(msg("transitions.build_first"))

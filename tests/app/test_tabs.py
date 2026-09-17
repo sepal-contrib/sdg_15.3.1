@@ -1,4 +1,4 @@
-"""The right-panel workflow: ten tabs, a segment strip to move between them.
+"""The right-panel workflow: six tabs, a segment strip to move between them.
 
 Every ``page.py`` identity-wiring concern that used to be checked by
 monkeypatching ``app.page``'s step/panel imports now targets ``app.tabs``
@@ -7,11 +7,19 @@ renamed ``workflow_tabs``) out of ``page.py`` and into this module, since
 ``WorkflowTabs`` is what actually calls them now. ``page.py`` itself is
 still exercised end to end here (``solara.render(page_module.Sdg1531App(),
 ...)``): only the monkeypatch TARGET moved, not the render entry point.
+
+Task 27 folded the five output tabs into one (``app.panels.outputs``); the
+identity-wiring tests for the five panels it now calls (Layers, Transitions,
+Results, Zonal, Export) moved to ``tests/app/test_panel_outputs.py`` along
+with their monkeypatch target, for the same reason Task 21 moved them here in
+the first place -- the thing they monkeypatch lives where it is actually
+called from. What stays here is everything about the TAB LEVEL: order/shape,
+lock state, navigation (segments), and the five configuration steps' own
+identity wiring (still called directly from this module).
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any, ClassVar
 
 import ipyvuetify as v
@@ -25,9 +33,9 @@ from app.message import msg
 from app.state import STEP_PREFIXES, problems_for
 from app.steps.run import BuildOutcome, build
 from app.tabs import TabDescriptor, _sync_draw_control, _tab_state, _TabState, workflow_tabs
-from sdg1531.spec import Period, RunSpec
+from sdg1531.spec import RunSpec
 from tests.app.render_helpers import find_widget, find_widgets, markdown_texts
-from tests.spec_factory import DEFAULT_PERIODS, default_spec
+from tests.spec_factory import default_spec
 
 # `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
 # threshold for `build_indicator_maps()` to succeed (see
@@ -41,16 +49,12 @@ _TAB_TITLES_IN_ORDER = (
     msg("step.land_cover"),
     msg("step.soc"),
     msg("step.run"),
-    msg("layers.title"),
-    msg("transitions.title"),
-    msg("results.title"),
-    msg("zonal.title"),
-    msg("exports.title"),
+    msg("results.title"),  # the merged outputs tab -- see app/tabs.py's comment on reusing this
 )
 _AOI_INDEX = 0
 _PRODUCTIVITY_INDEX = 1
 _RUN_INDEX = 4
-_EXPORTS_INDEX = 9
+_OUTPUTS_INDEX = 5
 
 
 @solara.component
@@ -82,7 +86,7 @@ def _workflow_widget(box: object) -> Any:
 
 
 def _wrapper_cells(root: object) -> list[Any]:
-    """The ten segment-strip cells, in tab order.
+    """The six segment-strip cells, in tab order.
 
     ``_SegmentCell`` builds two ``rv.Html`` divs per tab -- a padded,
     titled wrapper that owns the click and tooltip, and a plain inner bar
@@ -99,12 +103,13 @@ def _wrapper_cells(root: object) -> list[Any]:
 
 
 def test_the_tabs_are_in_the_sub_indicator_order():
-    """AOI -> Productivity -> Land cover -> SOC -> Run -> Layers ->
-    Transitions -> Results -> Zonal -> Export (design decision A6; unchanged
-    by Task 18's move into ``right_panel_content`` and Task 21's move from
-    ten sections into one ``WorkflowTabs`` component). Position is what
-    orders them -- ``WorkflowTabs`` renders ``workflow_tabs()`` as given, and
-    a ``TabDescriptor`` has no ``id`` for a stray sort to key on.
+    """AOI -> Productivity -> Land cover -> SOC -> Run -> the merged outputs
+    tab (design decision A6's order; unchanged by Task 18's move into
+    ``right_panel_content``, Task 21's move from ten sections into one
+    ``WorkflowTabs`` component, and Task 27's fold of the last five of those
+    ten into one tab). Position is what orders them -- ``WorkflowTabs``
+    renders ``workflow_tabs()`` as given, and a ``TabDescriptor`` has no
+    ``id`` for a stray sort to key on.
 
     Compared against ``msg(...)`` rather than English literals so the
     assertion pins ORDER without also pinning the copy.
@@ -119,8 +124,8 @@ def test_the_tabs_are_in_the_sub_indicator_order():
     # A PIN, not a derivation: unlike the `msg(...)` titles above (checked
     # against the message catalogue, so a typo in either side shows up), an
     # mdi icon name has no second, independent source of truth in this repo
-    # to import and compare against -- these ten strings are hand-typed here
-    # against ten hand-typed strings in `app/tabs.py`, so both sides could be
+    # to import and compare against -- these six strings are hand-typed here
+    # against six hand-typed strings in `app/tabs.py`, so both sides could be
     # wrong together and this would still pass. Kept anyway (matching the
     # pattern the original, reviewed `test_page.py` used) because a literal
     # match is still the only way to catch an icon that actually changed --
@@ -131,18 +136,14 @@ def test_the_tabs_are_in_the_sub_indicator_order():
     assert tabs[2].icon == "mdi-terrain"
     assert tabs[3].icon == "mdi-layers-outline"
     assert tabs[4].icon == "mdi-play-circle-outline"
-    assert tabs[5].icon == "mdi-layers"
-    assert tabs[6].icon == "mdi-transit-transfer"
-    assert tabs[7].icon == "mdi-chart-bar"
-    assert tabs[8].icon == "mdi-table"
-    assert tabs[9].icon == "mdi-export-variant"
+    assert tabs[5].icon == "mdi-chart-bar"
 
 
-def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_tabs_carry_none():
+def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_tab_carries_none():
     """``tab.step`` is what ``_tab_state`` reads a configuration tab's
     problems by -- it must be a real ``STEP_PREFIXES`` key, not a
     hand-typed string that happens to look like one, or the two would drift
-    apart silently. The five output tabs carry ``None``: they are gated by
+    apart silently. The merged outputs tab carries ``None``: it is gated by
     ``outcome.maps`` instead (see ``_tab_state``), not by any step's
     problems.
     """
@@ -154,10 +155,6 @@ def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_ta
         "land_cover",
         "soc",
         "run",
-        None,
-        None,
-        None,
-        None,
         None,
     ]
     for step in steps:
@@ -368,267 +365,6 @@ def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_a_real_outcome(monkeyp
     assert captured["outcome"] == BuildOutcome()
 
 
-def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_gee_interface(
-    monkeypatch,
-):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["spec"] = spec
-        captured["outcome"] = outcome
-
-    @solara.component
-    def _spy_map_layers_panel(
-        *, maps: Any = None, map_: Any = None, gee_interface: Any = None, shown: Any = None
-    ) -> None:
-        captured.update(panel_maps=maps, map_=map_, gee_interface=gee_interface, panel_shown=shown)
-
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(tabs_module, "MapLayersPanel", _spy_map_layers_panel)
-    monkeypatch.setattr(tabs_module, "ExportsPanel", _noop_exports_panel)
-
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    captured["spec"].value = _BUILDABLE_SPEC
-
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-
-    assert captured["outcome"].maps is not None
-    assert captured["panel_maps"] is captured["outcome"].maps
-    assert captured["map_"] is mapapp.main_map[0]
-    assert captured["gee_interface"] is not None
-    assert isinstance(captured["panel_shown"], solara.Reactive)
-
-
-def test_the_layers_panel_and_the_legend_share_the_same_shown_reactive(monkeypatch):
-    """Task 24: a private copy of the shown set in either consumer would let
-    one add a layer the other never finds out about."""
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_map_layers_panel(*, shown: Any = None, **_kwargs: Any) -> None:
-        captured["panel_shown"] = shown
-
-    @solara.component
-    def _spy_map_legend(*, maps: Any = None, shown: Any = None) -> None:
-        captured["legend_shown"] = shown
-
-    monkeypatch.setattr(tabs_module, "MapLayersPanel", _spy_map_layers_panel)
-    monkeypatch.setattr(page_module, "MapLegend", _spy_map_legend)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    assert isinstance(captured["panel_shown"], solara.Reactive)
-    assert captured["panel_shown"] is captured["legend_shown"]
-
-
-def test_the_results_panel_is_wired_with_the_shared_outcome_and_gee_interface(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["spec"] = spec
-        captured["outcome"] = outcome
-
-    @solara.component
-    def _spy_results_panel(*, maps: Any = None, ctx: Any = None, gee_interface: Any = None) -> None:
-        captured.update(panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface)
-
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(tabs_module, "ResultsPanel", _spy_results_panel)
-    monkeypatch.setattr(tabs_module, "ExportsPanel", _noop_exports_panel)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    captured["spec"].value = _BUILDABLE_SPEC
-
-    assert captured["outcome"].maps is not None
-    assert captured["panel_maps"] is captured["outcome"].maps
-    assert captured["panel_ctx"] is captured["outcome"].ctx
-    assert captured["gee_interface"] is not None
-
-
-def test_the_transitions_panel_is_wired_with_the_shared_outcome_and_gee_interface(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["spec"] = spec
-        captured["outcome"] = outcome
-
-    @solara.component
-    def _spy_transitions_panel(
-        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None
-    ) -> None:
-        captured.update(panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface)
-
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(tabs_module, "TransitionsPanel", _spy_transitions_panel)
-    monkeypatch.setattr(tabs_module, "ExportsPanel", _noop_exports_panel)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    captured["spec"].value = _BUILDABLE_SPEC
-
-    assert captured["outcome"].maps is not None
-    assert captured["panel_maps"] is captured["outcome"].maps
-    assert captured["panel_ctx"] is captured["outcome"].ctx
-    assert captured["gee_interface"] is not None
-
-
-def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["spec"] = spec
-        captured["outcome"] = outcome
-
-    @solara.component
-    def _spy_zonal_panel(
-        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, sepal_client: Any = None
-    ) -> None:
-        captured.update(
-            panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, sepal_client=sepal_client
-        )
-
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(tabs_module, "ZonalPanel", _spy_zonal_panel)
-    monkeypatch.setattr(tabs_module, "ExportsPanel", _noop_exports_panel)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    captured["spec"].value = _BUILDABLE_SPEC
-
-    assert captured["outcome"].maps is not None
-    assert captured["panel_maps"] is captured["outcome"].maps
-    assert captured["panel_ctx"] is captured["outcome"].ctx
-    assert captured["gee_interface"] is not None
-    # `get_current_sepal_client()`'s documented "no SEPAL identity" case returns
-    # `None` outside a sandbox, which is exactly this test environment -- the
-    # identity that matters here is that it is called and threaded through at
-    # all, not a particular truthiness.
-    assert "sepal_client" in captured
-
-
-def test_the_exports_panel_is_wired_with_the_shared_outcome_spec_and_gee_interface(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
-        captured["aoi_spec"] = spec
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["outcome"] = outcome
-
-    @solara.component
-    def _spy_exports_panel(
-        *, maps: Any = None, ctx: Any = None, spec: Any = None, gee_interface: Any = None
-    ) -> None:
-        captured.update(
-            exports_maps=maps,
-            exports_ctx=ctx,
-            exports_spec=spec,
-            exports_gee_interface=gee_interface,
-        )
-
-    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(tabs_module, "ExportsPanel", _spy_exports_panel)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    captured["aoi_spec"].value = _BUILDABLE_SPEC
-
-    assert captured["outcome"].maps is not None
-    assert captured["exports_maps"] is captured["outcome"].maps
-    assert captured["exports_ctx"] is captured["outcome"].ctx
-    assert isinstance(captured["exports_spec"], RunSpec)
-    assert captured["exports_spec"] is captured["aoi_spec"].value
-    assert captured["exports_gee_interface"] is not None
-
-
-def test_the_outcome_memo_recomputes_on_a_real_edit_not_on_an_unrelated_rerender(monkeypatch):
-    """``RunSpec`` compares by field equality, and reacton's own ``use_memo``
-    compares its dependency list the same way, so an unrelated re-render that
-    leaves ``spec`` structurally equal to what it already was must NOT
-    recompute ``page.py``'s ``outcome`` -- only a real edit does.
-    """
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["spec"] = spec
-        captured["outcome"] = outcome
-
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(tabs_module, "ExportsPanel", _noop_exports_panel)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    first_outcome = captured["outcome"]
-    spec = captured["spec"]
-
-    spec.value = RunSpec()
-    rc.force_update()
-    assert captured["outcome"] is first_outcome
-
-    spec.value = _BUILDABLE_SPEC
-    assert captured["outcome"] is not first_outcome
-    assert captured["outcome"].maps is not None
-
-
-def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
-    """Build under one period, change it to a DIFFERENT buildable period, and
-    the exports panel must reflect the CURRENT spec, not a stale one.
-
-    Anchored against ``resolved.spec.periods.overall``, a literal field the
-    domain's own ``ResolvedSpec`` carries -- not a value ``build_outcome``
-    computes itself, so a mutation that breaks ``build_outcome``'s own logic
-    cannot also fake this anchor into agreeing with itself.
-    """
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["spec"] = spec
-
-    @solara.component
-    def _spy_exports_panel(
-        *, maps: Any = None, ctx: Any = None, spec: Any = None, gee_interface: Any = None
-    ) -> None:
-        captured["exports_maps"] = maps
-
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(tabs_module, "ExportsPanel", _spy_exports_panel)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    spec = captured["spec"]
-
-    first = default_spec(
-        threshold=0.0, periods=replace(DEFAULT_PERIODS, overall=Period(2001, 2015))
-    )
-    spec.value = first
-    assert captured["exports_maps"] is not None
-    assert captured["exports_maps"].resolved.spec.periods.overall == Period(2001, 2015)
-
-    second = first.evolve(periods=replace(first.periods, overall=Period(2005, 2020)))
-    spec.value = second
-    assert captured["exports_maps"].resolved.spec.periods.overall == Period(2005, 2020)
-
-
 def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
     """The real path a user hits runs a real spec through ``page.py``'s real
     ``use_memo`` into the real ``RunStep``, inside the real ``WorkflowTabs``.
@@ -665,27 +401,27 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
 
     workflow_widget = mapapp.right_panel_content[0]["content"][0]
     tab_items = find_widgets(workflow_widget, v.TabItem)
-    assert len(tab_items) == 10
+    assert len(tab_items) == 6
     run_sheet = tab_items[_RUN_INDEX]
     assert markdown_texts(run_sheet)[-1] == f"<p><strong>{exc_info.value}</strong></p>"
 
 
 # ---------------------------------------------------------------------------
-# `WorkflowTabs` itself: renders ten tabs, the active index selects which
+# `WorkflowTabs` itself: renders six tabs, the active index selects which
 # `TabItem`'s content is live, and switching tabs does not rebuild the rest.
 # ---------------------------------------------------------------------------
 
 
-def test_workflow_tabs_renders_ten_tab_items_and_ten_segments():
+def test_workflow_tabs_renders_six_tab_items_and_six_segments():
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
     workflow_widget = _workflow_widget(box)
 
     tab_items = find_widgets(workflow_widget, v.TabItem)
-    assert len(tab_items) == 10
+    assert len(tab_items) == 6
 
     cells = _wrapper_cells(workflow_widget)
-    assert len(cells) == 10
+    assert len(cells) == 6
 
 
 def test_clicking_a_segment_moves_the_active_tab():
@@ -712,17 +448,17 @@ def test_clicking_a_segment_moves_the_active_tab():
 
 
 def test_a_locked_output_tab_does_not_navigate_on_click():
-    """Layers/Transitions/Results/Zonal/Export are LOCKED while
-    ``outcome.maps`` is ``None`` (the default, empty spec) -- clicking their
-    segment must be a genuine no-op, not merely visually muted. Directly
-    catches "mark every step unlocked regardless of state": under that
-    mutation this click WOULD navigate.
+    """The merged outputs tab is LOCKED while ``outcome.maps`` is ``None``
+    (the default, empty spec) -- clicking its segment must be a genuine
+    no-op, not merely visually muted. Directly catches "mark every step
+    unlocked regardless of state": under that mutation this click WOULD
+    navigate.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_EXPORTS_INDEX].fire_event("click", None)
+    cells[_OUTPUTS_INDEX].fire_event("click", None)
     rc.force_update()
 
     tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
@@ -747,13 +483,13 @@ def test_a_locked_segment_cell_also_carries_pointer_events_none():
     rc.force_update()  # settle ProductivityStep's mount-time threshold-seeding effect first
 
     cells = _wrapper_cells(_workflow_widget(box))
-    assert "pointer-events: none" in cells[_EXPORTS_INDEX].style_
+    assert "pointer-events: none" in cells[_OUTPUTS_INDEX].style_
     assert "pointer-events: none" not in cells[_AOI_INDEX].style_
 
 
 def test_switching_tabs_does_not_rebuild_the_others_widgets():
     """``rv.TabsItems`` hides inactive tabs client-side WITHOUT unmounting
-    them; the ten ``TabItem`` calls happen in the same order on every render
+    them; the six ``TabItem`` calls happen in the same order on every render
     regardless of which is active, so reacton's positional reconciliation
     must keep every ``TabItem``'s underlying widget (and everything mounted
     inside it) stable across a switch, not tear it down and rebuild it.
@@ -764,15 +500,15 @@ def test_switching_tabs_does_not_rebuild_the_others_widgets():
     assert rc is not None
 
     before = find_widgets(_workflow_widget(box), v.TabItem)
-    assert len(before) == 10
+    assert len(before) == 6
 
     cells = _wrapper_cells(_workflow_widget(box))
     cells[_PRODUCTIVITY_INDEX].fire_event("click", None)
     rc.force_update()
 
     after = find_widgets(_workflow_widget(box), v.TabItem)
-    assert len(after) == 10
-    for i in (_AOI_INDEX, _RUN_INDEX, _EXPORTS_INDEX):
+    assert len(after) == 6
+    for i in (_AOI_INDEX, _RUN_INDEX, _OUTPUTS_INDEX):
         assert after[i] is before[i], f"tab {i} was rebuilt on an unrelated tab switch"
 
 

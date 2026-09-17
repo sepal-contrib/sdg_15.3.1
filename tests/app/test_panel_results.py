@@ -306,3 +306,44 @@ def test_the_click_snapshot_is_what_the_fetch_receives_not_a_later_read(monkeypa
 
     assert calls == [the_maps]
     assert fake.successes == [msg("results.computed")]
+
+
+def test_a_chart_ready_while_its_section_is_collapsed_does_not_mount_until_reopened(monkeypatch):
+    """``is_open`` gates the chart widget's CONSTRUCTION, not just whether it
+    shows: an ``EChartsRawWidget`` built while its ``rv.ExpansionPanel`` is
+    collapsed measures a fixed, wrong canvas size that reopening never fixes
+    (verified with a browser probe; see ``app/panels/outputs.py``'s module
+    docstring). Proven here without a browser: the fetch resolves while
+    ``is_open=False``, and ``solara.display`` must not be called until a
+    later render flips it to ``True``.
+    """
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
+
+    async def fake_fetch(gee_interface, maps, ctx, *, layer):
+        return _FRAME
+
+    monkeypatch.setattr("app.panels.results.fetch_areas_by_land_cover", fake_fetch)
+
+    displayed: list[Any] = []
+    monkeypatch.setattr(solara, "display", lambda obj: displayed.append(obj))
+
+    the_maps = _FakeMaps(FakeResolved())
+
+    async def main():
+        box, rc = solara.render(
+            ResultsPanel(maps=the_maps, ctx=object(), gee_interface=None, is_open=False),
+            handle_error=False,
+        )
+        assert rc is not None
+        button = find_widget(box, ipyvuetify.Btn)
+        assert button is not None
+        button.click()
+        assert await _wait_for(lambda: fake.successes or fake.errors)
+        assert displayed == []  # data arrived, but the section is collapsed
+
+        rc.render(ResultsPanel(maps=the_maps, ctx=object(), gee_interface=None, is_open=True))
+
+    asyncio.run(main())
+
+    assert displayed  # reopening builds the widget now that data is ready
