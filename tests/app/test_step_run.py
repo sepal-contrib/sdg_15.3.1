@@ -15,10 +15,10 @@ import pytest
 import solara
 
 from app.message import msg
-from app.steps.run import BuildOutcome, RunStep, build, build_outcome
+from app.steps.run import BuildOutcome, RunStep, _sensor_coverage_hint, build, build_outcome
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
-from sdg1531.spec import Period, PeriodOverride, RunSpec, SubPeriods
+from sdg1531.spec import Period, PeriodOverride, RunSpec, SensorSelection, SubPeriods
 from tests.app.render_helpers import find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
@@ -176,12 +176,16 @@ def test_the_step_renders_only_its_own_text(spec, outcome, expected_extra):
     "only" half of this test's name), and a refusal `is_runnable` cannot see
     (the error, bold). `RunStep` never calls `build_outcome` itself, so each
     case hands it a `BuildOutcome` directly rather than relying on what the
-    real function would compute for that spec."""
+    real function would compute for that spec. Every case here shares
+    `default_spec()`'s sensor (MODIS MOD13Q1, coverage 2000-onward), so the
+    coverage hint between the description and the rest is the same line in
+    all four."""
     spec_r = solara.reactive(spec)
     box, rc = solara.render(RunStep(spec=spec_r, outcome=outcome), handle_error=False)
     assert rc is not None
     assert markdown_texts(box) == [
         f"<p>{msg('run.description')}</p>",
+        f"<p>{msg('run.sensor_coverage_open', start=2000)}</p>",
         *expected_extra,
     ]
 
@@ -258,3 +262,34 @@ def test_selecting_an_end_year_updates_only_that_endpoint():
 
     assert spec.value.periods.overall == Period(start=2000, end=2010)
     assert spec.value.evolve(periods=before.periods) == before
+
+
+# --------------------------------------------------------- _sensor_coverage_hint
+
+
+def test_sensor_coverage_hint_is_open_ended_for_an_active_sensor():
+    """MODIS MOD13Q1 is still being ingested (`last_year=None`); the hint must
+    say so without naming a false ceiling."""
+    spec = default_spec(vi_source=SensorSelection(("MODIS MOD13Q1",)))
+    assert _sensor_coverage_hint(spec) == msg("run.sensor_coverage_open", start=2000)
+
+
+def test_sensor_coverage_hint_is_bounded_for_a_retired_sensor():
+    """Landsat 5's archive is closed (`last_year=2012`); the hint must show
+    both ends, not claim it is still active."""
+    spec = default_spec(vi_source=SensorSelection(("Landsat 5",)))
+    assert _sensor_coverage_hint(spec) == msg("run.sensor_coverage_bounded", start=1984, end=2012)
+
+
+def test_sensor_coverage_hint_spans_every_selected_sensor():
+    """Multiple sensors: the hint covers the UNION, matching the union
+    `sdg1531.validate.sensor_period_no_overlap` refuses against -- the widest
+    start, and open-ended if ANY selected sensor still is."""
+    spec = default_spec(vi_source=SensorSelection(("Landsat 4", "Landsat 8")))
+    assert _sensor_coverage_hint(spec) == msg("run.sensor_coverage_open", start=1982)
+
+
+def test_sensor_coverage_hint_is_none_without_a_recognised_sensor():
+    assert _sensor_coverage_hint(default_spec(vi_source=None)) is None
+    assert _sensor_coverage_hint(default_spec(vi_source=SensorSelection(()))) is None
+    assert _sensor_coverage_hint(default_spec(vi_source=SensorSelection(("Not Real",)))) is None

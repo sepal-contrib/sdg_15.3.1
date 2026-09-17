@@ -32,11 +32,11 @@ import solara
 
 from app.message import msg
 from app.state import is_runnable, render_problems
-from sdg1531.catalog import L4_START
+from sdg1531.catalog import L4_START, SENSORS
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps, build_indicator_maps
 from sdg1531.resolve import resolve
-from sdg1531.spec import Period, RunSpec
+from sdg1531.spec import Period, RunSpec, SensorSelection
 
 __all__ = ("BuildOutcome", "RunStep", "build", "build_outcome")
 
@@ -89,6 +89,31 @@ def build_outcome(spec: RunSpec) -> BuildOutcome:
     return BuildOutcome(maps=maps, ctx=ctx)
 
 
+def _sensor_coverage_hint(spec: RunSpec) -> str | None:
+    """What the currently selected sensors can actually deliver, or ``None``
+    when no recognised sensor is selected yet.
+
+    Informational only -- ``sdg1531.validate``'s ``sensor_period_no_overlap`` is
+    what actually blocks a run (see that module's docstring, note 5); this just
+    shows the constraint next to the two year Selects so a user sees it before
+    hitting that refusal. Deliberately does NOT truncate or rewrite either
+    Select's own range: a user who picks a period and then changes sensor must
+    not have that period silently rewritten out from under them.
+    """
+    source = spec.vi_source
+    if not isinstance(source, SensorSelection) or not source.names:
+        return None
+    known = [SENSORS[name] for name in source.names if name in SENSORS]
+    if not known:
+        return None
+
+    first = min(info.first_year for info in known)
+    last_years = [info.last_year for info in known if info.last_year is not None]
+    if len(last_years) < len(known):  # at least one selected sensor is still active
+        return str(msg("run.sensor_coverage_open", start=first))
+    return str(msg("run.sensor_coverage_bounded", start=first, end=max(last_years)))
+
+
 @solara.component
 def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
     solara.Markdown(msg("run.description"))
@@ -122,6 +147,10 @@ def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
             spec.value.evolve(periods=replace(spec.value.periods, overall=Period(overall.start, y)))
         ),
     )
+
+    coverage_hint = _sensor_coverage_hint(spec.value)
+    if coverage_hint is not None:
+        solara.Markdown(coverage_hint)
 
     render_problems("run", spec.value)
 

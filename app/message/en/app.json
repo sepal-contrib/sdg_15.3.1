@@ -64,6 +64,8 @@
     "description": "Choose the overall assessment period; its status appears below.",
     "start_year": "Start year",
     "end_year": "End year",
+    "sensor_coverage_bounded": "The selected sensors have data from {start} to {end}.",
+    "sensor_coverage_open": "The selected sensors have data from {start} onward.",
     "ready": {
       "one": "Ready: {count} layer",
       "other": "Ready: {count} layers"

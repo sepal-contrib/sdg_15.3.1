@@ -64,6 +64,8 @@
     "description": "Choisissez la période d'évaluation globale ; son état apparaît ci-dessous.",
     "start_year": "Année de début",
     "end_year": "Année de fin",
+    "sensor_coverage_bounded": "Les capteurs sélectionnés disposent de données de {start} à {end}.",
+    "sensor_coverage_open": "Les capteurs sélectionnés disposent de données depuis {start}.",
     "ready": {
       "one": "Prêt : {count} couche",
       "other": "Prêt : {count} couches",
