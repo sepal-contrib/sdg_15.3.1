@@ -163,6 +163,14 @@
   },
   "tabs": {
     "previous": "Étape précédente",
-    "next": "Étape suivante"
+    "next": "Étape suivante",
+    "abbrev": {
+      "aoi": "ZI",
+      "productivity": "PRD",
+      "land_cover": "CT",
+      "soc": "COS",
+      "run": "EXE",
+      "outputs": "RES"
+    }
   }
 }

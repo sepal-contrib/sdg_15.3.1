@@ -31,13 +31,14 @@ from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app import tabs as tabs_module
-from app.message import msg
+from app.message import messages, msg
 from app.panels import outputs as outputs_module
 from app.state import STEP_PREFIXES, problems_for
 from app.steps.run import BuildOutcome, build
 from app.tabs import (
     TabDescriptor,
     _sync_draw_control,
+    _tab_abbrev,
     _tab_state,
     _TabState,
     nav_targets,
@@ -184,6 +185,73 @@ def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_ta
     for step in steps:
         if step is not None:
             assert step in STEP_PREFIXES
+
+
+# ---------------------------------------------------------------------------
+# `_tab_abbrev` -- each segment chip's up-to-three-character label.
+# ---------------------------------------------------------------------------
+
+
+def test_every_tabs_abbreviation_is_unique_and_at_most_three_characters():
+    """The owner's own words: "show inside them a max-three-char reference".
+    Directly catches the brief's own named mutation: two chips sharing an
+    abbreviation."""
+    tabs = workflow_tabs()
+    abbrevs = [_tab_abbrev(tab) for tab in tabs]
+    assert len(abbrevs) == len(set(abbrevs)), abbrevs
+    for abbrev in abbrevs:
+        assert 1 <= len(abbrev) <= 3, abbrev
+
+
+def test_every_locales_abbreviations_are_unique_and_at_most_three_characters(monkeypatch):
+    """Walks every shipped locale, not only English -- an abbreviation MAY
+    legitimately repeat across locales (the brief's own words), but within
+    one locale the six must stay distinct and short.
+
+    Monkeypatches ``current_locale`` where ``BoundCatalog.msg`` looks it up,
+    rather than calling the real, global ``pysepal.i18n.set_locale`` -- see
+    ``tests/app/test_panel_map_layers.py``'s identical comment for why: that
+    would re-render every earlier test's still-mounted render tree with that
+    test's own monkeypatches already undone.
+    """
+    import pysepal.i18n.binding as i18n_binding
+
+    tabs = workflow_tabs()
+    for code in messages.available_locales():
+        monkeypatch.setattr(i18n_binding, "current_locale", lambda code=code: code)
+        abbrevs = [_tab_abbrev(tab) for tab in tabs]
+        assert len(abbrevs) == len(set(abbrevs)), (code, abbrevs)
+        for abbrev in abbrevs:
+            assert 1 <= len(abbrev) <= 3, (code, abbrev)
+
+
+def test_the_segment_chips_render_their_abbreviation_as_text():
+    """The render-level half of the abbreviation tests above: proves the
+    label actually reaches the rendered chip, not just ``_tab_abbrev``
+    itself. ``cell.children[0]`` is the inner, coloured chip div
+    ``_SegmentCell`` builds; its own ``children`` is the one-item
+    ``[label]`` list passed to it."""
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    tabs = workflow_tabs()
+    expected = [_tab_abbrev(tab) for tab in tabs]
+
+    cells = _wrapper_cells(_workflow_widget(box))
+    rendered = [cell.children[0].children[0] for cell in cells]
+    assert rendered == expected
+
+
+def test_the_full_title_tooltip_still_exists_alongside_the_abbreviation():
+    """The abbreviation is an ADDITION to the hover tooltip, never a
+    replacement for it -- the owner's own words: "show inside them a
+    max-three-char reference", not "replace the label with one"."""
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    tabs = workflow_tabs()
+    cells = _wrapper_cells(_workflow_widget(box))
+    assert [cell.attributes.get("title") for cell in cells] == [tab.title for tab in tabs]
 
 
 # ---------------------------------------------------------------------------

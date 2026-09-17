@@ -244,6 +244,11 @@ _SEG_LOCKED = (
     "repeating-linear-gradient(90deg, rgba(128,128,128,0.30) 0 3px, rgba(128,128,128,0.10) 3px 6px)"
 )
 
+#: The repo owner asked for the segments to be "a little bigger" and to carry
+#: a short label -- 28px is tall enough to hold the 3-character abbreviation
+#: readably; the old bars were 7px, purely decorative, and held no text.
+_CHIP_HEIGHT = 28
+
 
 def _rgba(hex_color: str, alpha: float) -> str:
     """``#rrggbb`` -> ``rgba(r, g, b, alpha)`` (for the translucent active ring)."""
@@ -253,18 +258,37 @@ def _rgba(hex_color: str, alpha: float) -> str:
 
 
 def _seg_style(state: _TabState, primary: str, active: bool) -> str:
-    """The 7px inner bar's style: fill by state, ring when active."""
+    """The chip's style: fill by state, ring when active, same as before --
+    plus the sizing and typography its new abbreviation label needs.
+
+    Text colour is never a fixed value: SATISFIED fills with the theme's own
+    ``primary`` colour, dark enough in both light and dark mode that white
+    text reads on it (the same assumption Vuetify's own ``v-chip
+    color="primary"`` makes); INCOMPLETE/LOCKED fill with a translucent grey
+    over the page background, so ``color: inherit`` -- the theme's own
+    foreground colour -- already has the contrast it needs without a second
+    hardcoded value to keep in sync with the theme.
+    """
     if state is _TabState.LOCKED:
         bg = f"background: {_SEG_LOCKED};"
+        color = "inherit"
     else:
         fill = primary if state is _TabState.SATISFIED else _SEG_INCOMPLETE
         bg = f"background: {fill};"
+        color = "#fff" if state is _TabState.SATISFIED else "inherit"
     ring = f" box-shadow: 0 0 0 2px {_rgba(primary, 0.55)};" if active else ""
-    return f"width: 100%; height: 7px; border-radius: 3.5px; {bg}{ring}"
+    return (
+        f"width: 100%; height: {_CHIP_HEIGHT}px; border-radius: 6px; {bg}"
+        f"display: flex; align-items: center; justify-content: center; "
+        f"color: {color}; font-size: 11px; font-weight: 600; letter-spacing: 0.02em;"
+        f"{ring}"
+    )
 
 
 @solara.component
-def _SegmentCell(tip: str, seg_style: str, locked: bool, on_activate: Callable[[], None]) -> None:
+def _SegmentCell(
+    tip: str, label: str, seg_style: str, locked: bool, on_activate: Callable[[], None]
+) -> None:
     """One cell of the segment strip.
 
     Its own component so the ``rv.use_event`` click hook is called exactly
@@ -277,9 +301,14 @@ def _SegmentCell(tip: str, seg_style: str, locked: bool, on_activate: Callable[[
     because the hook must be attached on every render regardless of state,
     the no-op has to live inside the handler rather than around it.
 
-    The wrapper is a padded, transparent div (~21px tall) that owns the
-    tooltip and the click; the 7px bar inside is purely visual, so the hit
-    area stays usable.
+    ``label`` is the tab's up-to-three-character abbreviation, rendered
+    inside the chip; ``tip`` (the tab's own full title) stays the hover
+    tooltip on the WRAPPER, same as before -- the abbreviation is an
+    addition to that, never a replacement for it.
+
+    The wrapper is a padded, transparent div that owns the tooltip and the
+    click; the coloured chip inside is what carries the label, sizing and
+    state -- the hit area is the whole wrapper, not just the chip.
     """
 
     def _handle_click(*_: object) -> None:
@@ -289,10 +318,10 @@ def _SegmentCell(tip: str, seg_style: str, locked: bool, on_activate: Callable[[
     lock_style = " pointer-events: none;" if locked else " cursor: pointer;"
     with rv.Html(
         tag="div",
-        style_=f"flex: 1; padding: 7px 0;{lock_style}",
+        style_=f"flex: 1; padding: 4px 2px;{lock_style}",
         attributes={"title": tip},
     ) as cell:
-        rv.Html(tag="div", style_=seg_style)
+        rv.Html(tag="div", style_=seg_style, children=[label])
     use_event(cell, "click", _handle_click)
 
 
@@ -328,6 +357,22 @@ def _NavArrow(
         on_activate()
 
     use_event(btn, "click", _handle_click)
+
+
+def _tab_abbrev(tab: TabDescriptor) -> str:
+    """The tab's up-to-three-character segment-chip label -- an ADDITION to
+    the full-title tooltip ``_SegmentCell`` already carries, never a
+    replacement for it (the owner's own words: "show inside them a
+    max-three-char reference").
+
+    Keyed off ``tab.step`` (``"outputs"`` standing in for the merged tab's
+    own ``None``) -- the same routing key ``_tab_state`` already reads, so
+    this cannot silently name a step ``STEP_PREFIXES`` does not know about. A
+    real ``msg()`` lookup, not a hand-typed dict: these are user-facing
+    strings, and a translator may legitimately need to change a three-letter
+    English contraction that reads wrong in Spanish or French.
+    """
+    return str(msg(f"tabs.abbrev.{tab.step or 'outputs'}"))
 
 
 def _bind(on_navigate: Callable[[int], None], index: int) -> Callable[[], None]:
@@ -368,6 +413,7 @@ def _WorkflowSegments(
             locked = state is _TabState.LOCKED
             _SegmentCell(
                 tip=tab.title,
+                label=_tab_abbrev(tab),
                 seg_style=_seg_style(state, primary, active=i == active_tab),
                 locked=locked,
                 on_activate=_bind(on_navigate, i),

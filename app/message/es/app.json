@@ -163,6 +163,14 @@
   },
   "tabs": {
     "previous": "Paso anterior",
-    "next": "Paso siguiente"
+    "next": "Paso siguiente",
+    "abbrev": {
+      "aoi": "AI",
+      "productivity": "PRD",
+      "land_cover": "CS",
+      "soc": "COS",
+      "run": "EJE",
+      "outputs": "RES"
+    }
   }
 }

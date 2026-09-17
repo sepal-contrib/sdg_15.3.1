@@ -162,6 +162,14 @@
   },
   "tabs": {
     "previous": "Previous step",
-    "next": "Next step"
+    "next": "Next step",
+    "abbrev": {
+      "aoi": "AOI",
+      "productivity": "PRD",
+      "land_cover": "LC",
+      "soc": "SOC",
+      "run": "RUN",
+      "outputs": "RES"
+    }
   }
 }
