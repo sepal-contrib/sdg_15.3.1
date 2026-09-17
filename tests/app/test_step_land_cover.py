@@ -560,7 +560,14 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     place of a ``msg()`` call would satisfy all of them by coincidence.
     Substituting a distinguishing stand-in for ``msg`` instead proves each
     rendered string is really that call's OUTPUT, not a literal that happens
-    to match it."""
+    to match it.
+
+    The description itself is no longer rendered by this step (task 30: it
+    rides on ``ParamsPanel``'s own ``SectionHeader`` now -- see
+    ``app/panels/params.py``); ``tests/app/test_panel_params.py``'s
+    ``test_each_sections_own_description_travels_with_it`` pins it to
+    ``msg("land_cover.description")`` instead.
+    """
 
     def _fake_msg(key: str, **_: object) -> str:
         return f"<{key}>"
@@ -578,7 +585,6 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     assert rc is not None
 
     texts = markdown_texts(box)
-    assert texts[0] == "<p><land_cover.description></p>"
     # AssetSelectComponent's own label is pysepal's, not this step's -- the
     # picker gets its label from the catalogue via a caption above it instead.
     assert "<p><land_cover.start_asset></p>" in texts
@@ -670,10 +676,10 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
     ],
 )
 def test_the_step_renders_only_its_own_text(spec, expected_extra):
+    """The description no longer leads this list (task 30: it rides on
+    ``ParamsPanel``'s own ``SectionHeader`` now -- see
+    ``app/panels/params.py``)."""
     spec_r = solara.reactive(spec)
     box, rc = _render(spec_r, gee_interface=StubGee())
     assert rc is not None
-    assert markdown_texts(box) == [
-        "<p>Land cover source and the water mask.</p>",
-        *expected_extra,
-    ]
+    assert markdown_texts(box) == expected_extra

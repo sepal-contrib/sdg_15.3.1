@@ -9,7 +9,11 @@ chart-mount trap this move carried over (in a new shape) from the accordion.
 The identity-wiring tests for the five panels moved here from
 ``tests/app/test_tabs.py`` back in task 21 -- a monkeypatch targets the
 module that actually calls the thing, and that is no longer ``app.tabs`` for
-these five.
+these five. Several tests below also spy on ``RunStep`` -- not one of the
+five, just the cheapest way to reach the shared spec reactive that flows into
+them -- and that spy's own monkeypatch target moved a second time, task 30:
+``RunStep`` is called from ``app.panels.params`` now, not ``app.tabs``, so it
+is patched as ``params_module.RunStep`` here.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from app import page as page_module
 from app import tabs as tabs_module
 from app.message import msg
 from app.panels import outputs as outputs_module
+from app.panels import params as params_module
 from app.panels.outputs import output_sections
 from sdg1531.spec import Period, RunSpec
 from tests.app.render_helpers import cell_texts, find_widget, find_widgets
@@ -43,9 +48,14 @@ _RESULTS_INDEX = 2
 _ZONAL_INDEX = 3
 _EXPORTS_INDEX = 4
 
-# `app/tabs.py`'s own six-tab order: the merged outputs tab always follows
-# the five configuration tabs, at this fixed index.
-_OUTPUTS_TAB_INDEX = 5
+# The merged outputs tab always follows the configuration tabs before it --
+# derived from `workflow_tabs()` itself (task 30 changed how many there are,
+# from five to one PARAMS tab; a hand-typed literal would have gone stale
+# again the same way `tests/app/test_tabs.py`'s own indices already learned
+# not to be).
+_OUTPUTS_TAB_INDEX = next(
+    i for i, tab in enumerate(tabs_module.workflow_tabs()) if tab.step is None
+)
 
 _SECTION_TITLES_IN_ORDER = (
     msg("layers.title"),
@@ -90,7 +100,7 @@ def _workflow_widget(box: object) -> Any:
 
 
 def _wrapper_cells(root: object) -> list[Any]:
-    """The six segment-strip cells, in tab order -- duplicated from
+    """The segment-strip cells, in tab order -- duplicated from
     ``tests/app/test_tabs.py``'s identical helper (a `title` attribute is
     what picks a `_SegmentCell` wrapper out; see that module's own docstring)
     rather than imported, matching this suite's existing per-file convention.
@@ -170,15 +180,24 @@ def test_every_sections_title_and_description_render_on_screen(monkeypatch):
     not only a ``SimpleTable`` cell (see ``tests/app/render_helpers.py``);
     ``SectionHeader`` is the ONLY place in this app's whole render tree that
     builds a bare ``tag="span"``/``tag="p"`` element (grepped), so this
-    cannot coincidentally match some other panel's text.
+    cannot coincidentally match some other panel's text -- but since task 30
+    ``app/panels/params.py``'s ``ParamsPanel`` uses the identical
+    ``SectionHeader`` for its own four sections, and ``rv.TabsItems`` never
+    unmounts an inactive tab (``app/tabs.py``'s own docstring), THAT tab's
+    spans/paragraphs are also live in the same tree. Scoped to the outputs
+    ``TabItem`` alone (``_OUTPUTS_TAB_INDEX``), not the whole workflow
+    widget, so this stays a proof about the five OUTPUT sections specifically
+    -- ``tests/app/test_panel_params.py``'s own identical test covers PARAMS'
+    four.
     """
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     workflow_widget = _workflow_widget(box)
-    assert cell_texts(workflow_widget, "span") == list(_SECTION_TITLES_IN_ORDER)
-    assert cell_texts(workflow_widget, "p") == list(_SECTION_DESCRIPTIONS_IN_ORDER)
+    outputs_sheet = find_widgets(workflow_widget, v.TabItem)[_OUTPUTS_TAB_INDEX]
+    assert cell_texts(outputs_sheet, "span") == list(_SECTION_TITLES_IN_ORDER)
+    assert cell_texts(outputs_sheet, "p") == list(_SECTION_DESCRIPTIONS_IN_ORDER)
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +222,7 @@ def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_
     ) -> None:
         captured.update(panel_maps=maps, map_=map_, gee_interface=gee_interface, panel_shown=shown)
 
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "MapLayersPanel", _spy_map_layers_panel)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
 
@@ -268,7 +287,7 @@ def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is
             panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, panel_is_open=is_open
         )
 
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
 
@@ -309,7 +328,7 @@ def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_an
             panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, panel_is_open=is_open
         )
 
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
 
@@ -353,7 +372,7 @@ def test_both_chart_panels_stay_closed_while_a_different_workflow_tab_is_active(
     def _spy_transitions_panel(*, is_open: Any = None, **_kwargs: Any) -> None:
         captured["transitions_is_open"] = is_open
 
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
     monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
@@ -384,7 +403,7 @@ def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(mon
             panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, sepal_client=sepal_client
         )
 
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ZonalPanel", _spy_zonal_panel)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
 
@@ -427,7 +446,7 @@ def test_the_exports_panel_is_wired_with_the_shared_outcome_spec_and_gee_interfa
         )
 
     monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _spy_exports_panel)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
@@ -456,7 +475,7 @@ def test_the_outcome_memo_recomputes_on_a_real_edit_not_on_an_unrelated_rerender
         captured["spec"] = spec
         captured["outcome"] = outcome
 
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
@@ -495,7 +514,7 @@ def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
     ) -> None:
         captured["exports_maps"] = maps
 
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ExportsPanel", _spy_exports_panel)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)

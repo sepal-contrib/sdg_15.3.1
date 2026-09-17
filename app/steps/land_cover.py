@@ -165,7 +165,10 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
 
     solara.use_effect(_report_pixel_check_failure, [task.finished, task.error])
 
-    solara.Markdown(msg("land_cover.description"))
+    # The description used to render here; it now lives in this step's own
+    # PARAMS section header (`app/panels/params.py`), the same move task 28
+    # made for the five output panels (`app/panels/outputs.py`'s module
+    # docstring).
 
     current = spec.value
 

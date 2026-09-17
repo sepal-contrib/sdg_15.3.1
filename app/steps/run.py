@@ -116,7 +116,10 @@ def _sensor_coverage_hint(spec: RunSpec) -> str | None:
 
 @solara.component
 def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
-    solara.Markdown(msg("run.description"))
+    # The description used to render here; it now lives in this step's own
+    # PARAMS section header (`app/panels/params.py`), the same move task 28
+    # made for the five output panels (`app/panels/outputs.py`'s module
+    # docstring).
 
     # The overall period. Transcribed from the legacy's PickerLine
     # (component/widget/picker_line.py:13-27): two year Selects over

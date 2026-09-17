@@ -124,7 +124,16 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     Substituting a distinguishing stand-in for ``msg`` instead proves each
     rendered string is really that call's OUTPUT, not a literal that happens
     to match it -- including the two catalogue-keyed value labels, which a
-    literal could not reproduce for more than one locale anyway."""
+    literal could not reproduce for more than one locale anyway.
+
+    The description itself is no longer rendered by this step (task 30: it
+    rides on ``ParamsPanel``'s own ``SectionHeader`` now -- see
+    ``app/panels/params.py``), so this test's name is now a slight
+    overstatement kept for continuity with its own history;
+    ``tests/app/test_panel_params.py``'s ``test_each_sections_own_
+    description_travels_with_it`` pins the description to
+    ``msg("productivity.description")`` instead.
+    """
 
     def _fake_msg(key: str, **_: object) -> str:
         return f"<{key}>"
@@ -134,8 +143,6 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     spec = solara.reactive(default_spec())
     box, rc = solara.render(ProductivityStep(spec=spec), handle_error=False)
     assert rc is not None
-
-    assert markdown_texts(box)[0] == "<p><productivity.description></p>"
 
     sensors, index, trajectory, lceu, lookup = _selects(box)
     assert sensors.label == "<productivity.sensors>"
@@ -292,17 +299,16 @@ def test_moving_the_threshold_slider_updates_only_threshold():
     ],
 )
 def test_the_step_renders_only_its_own_text(spec, expected_extra):
-    """Pins what the step actually shows: a fully-configured spec shows only
-    the description; a spec with a fatal problem THIS step owns (no sensors,
-    or the disabled trajectory) shows that problem's text, bolded; a spec
-    with a non-fatal problem THIS step owns shows that problem's text
-    unbolded; and a spec whose only fatal problem belongs to ANOTHER step
-    (missing AOI) shows neither -- the case that actually distinguishes
-    ``problems_for("productivity", ...)`` from ``validate(...)``."""
+    """Pins what the step actually shows: a fully-configured spec renders no
+    markdown at all now (task 30 moved the description into ``ParamsPanel``'s
+    own ``SectionHeader`` -- see ``app/panels/params.py``); a spec with a
+    fatal problem THIS step owns (no sensors, or the disabled trajectory)
+    shows that problem's text, bolded; a spec with a non-fatal problem THIS
+    step owns shows that problem's text unbolded; and a spec whose only fatal
+    problem belongs to ANOTHER step (missing AOI) shows nothing -- the case
+    that actually distinguishes ``problems_for("productivity", ...)`` from
+    ``validate(...)``."""
     spec_r = solara.reactive(spec)
     box, rc = solara.render(ProductivityStep(spec=spec_r), handle_error=False)
     assert rc is not None
-    assert markdown_texts(box) == [
-        "<p>Vegetation index, trend method and ecological units.</p>",
-        *expected_extra,
-    ]
+    assert markdown_texts(box) == expected_extra

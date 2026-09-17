@@ -1,4 +1,4 @@
-"""The right-panel workflow: six tabs, a segment strip and prev/next arrows
+"""The right-panel workflow: three tabs, a segment strip and prev/next arrows
 to move between them.
 
 Every ``page.py`` identity-wiring concern that used to be checked by
@@ -14,10 +14,14 @@ identity-wiring tests for the five panels it now calls (Layers, Transitions,
 Results, Zonal, Export) moved to ``tests/app/test_panel_outputs.py`` along
 with their monkeypatch target, for the same reason Task 21 moved them here in
 the first place -- the thing they monkeypatch lives where it is actually
-called from. What stays here is everything about the TAB LEVEL: order/shape,
-lock state, navigation (segments and the new arrows), and the five
-configuration steps' own identity wiring (still called directly from this
-module).
+called from. Task 30 did the identical move a second time, for the OTHER
+four configuration tabs (Assessment period, Productivity, Land cover, SOC):
+they are folded into one PARAMS tab (``app.panels.params``), so their own
+identity-wiring tests moved to ``tests/app/test_panel_params.py``, patching
+``params_module`` instead of ``tabs_module``. What stays here is everything
+about the TAB LEVEL: order/shape, lock state, the PARAMS chip's own combined
+state, theme-driven chip colours, navigation (segments and the arrows), and
+the AOI step's own identity wiring (still called directly from this module).
 """
 
 from __future__ import annotations
@@ -34,7 +38,7 @@ from app import tabs as tabs_module
 from app.message import messages, msg
 from app.panels import outputs as outputs_module
 from app.state import STEP_PREFIXES, problems_for
-from app.steps.run import BuildOutcome, build
+from app.steps.run import build
 from app.tabs import (
     TabDescriptor,
     _sync_draw_control,
@@ -56,15 +60,12 @@ _BUILDABLE_SPEC = default_spec(threshold=0.0)
 
 _TAB_TITLES_IN_ORDER = (
     msg("step.aoi"),
-    msg("step.run"),  # "Assessment period" -- task 28 renamed and moved it second
-    msg("step.productivity"),
-    msg("step.land_cover"),
-    msg("step.soc"),
+    msg("params.title"),  # task 30: Assessment period/Productivity/Land cover/SOC, merged
     msg("outputs.title"),  # the merged outputs tab: its own key, NOT the ResultsPanel section's
 )
 
 
-def _index_of(step: str | None) -> int:
+def _index_of(step: str | tuple[str, ...] | None) -> int:
     """Where the tab identified by ``step`` sits, derived from ``workflow_tabs()``.
 
     NOT hand-typed literals, which is what these were until task 28's reorder
@@ -76,16 +77,17 @@ def _index_of(step: str | None) -> int:
 
     ``_TAB_TITLES_IN_ORDER`` above deliberately does NOT use this: that roster
     is what pins the ORDER, so deriving it from the same source it checks would
-    make it agree with itself. Everything below asks "the SOC tab", not "index
-    4", so identity is the right key for those and order is not their subject.
+    make it agree with itself. Everything below asks "the PARAMS tab", not
+    "index 1", so identity is the right key for those and order is not their
+    subject.
     """
     return next(i for i, tab in enumerate(workflow_tabs()) if tab.step == step)
 
 
 _AOI_INDEX = _index_of("aoi")
-_PERIOD_INDEX = _index_of("run")  # the renamed "Run" step -- `tab.step` is still "run"
-_PRODUCTIVITY_INDEX = _index_of("productivity")
-_SOC_INDEX = _index_of("soc")
+# The merged PARAMS tab (task 30) is the one tab whose `step` is a tuple --
+# found by shape, not by retyping its four step names a second time here.
+_PARAMS_INDEX = next(i for i, tab in enumerate(workflow_tabs()) if isinstance(tab.step, tuple))
 _OUTPUTS_INDEX = _index_of(None)  # the merged outputs tab carries no step id
 
 
@@ -118,7 +120,7 @@ def _workflow_widget(box: object) -> Any:
 
 
 def _wrapper_cells(root: object) -> list[Any]:
-    """The six segment-strip cells, in tab order.
+    """The three segment-strip cells, in tab order.
 
     ``_SegmentCell`` builds two ``rv.Html`` divs per tab -- a padded,
     titled wrapper that owns the click and tooltip, and a plain inner bar
@@ -149,18 +151,16 @@ def _nav_arrows(root: object) -> list[Any]:
 
 
 def test_the_tabs_are_in_the_sub_indicator_order():
-    """AOI -> Assessment period -> Productivity -> Land cover -> SOC -> the
-    merged outputs tab. Design decision A6's own order was unchanged by Task
-    18's move into ``right_panel_content``, Task 21's move from ten sections
-    into one ``WorkflowTabs`` component, and Task 27's fold of the last five
-    of those ten into one tab -- but task 28 moved the step long called "Run"
-    (routing key ``"run"``, unchanged) to second place and renamed its
-    catalogue title, by the repo owner's direct request: SOC and Land
-    cover's own period controls show the window they INHERIT from this
-    step's ``periods.overall``, which has to already be chosen or that text
-    is empty or misleading. Position is what orders them -- ``WorkflowTabs``
-    renders ``workflow_tabs()`` as given, and a ``TabDescriptor`` has no
-    ``id`` for a stray sort to key on.
+    """AOI -> PARAMS -> the merged outputs tab. Design decision A6's own
+    order was unchanged by Task 18's move into ``right_panel_content``, Task
+    21's move from ten sections into one ``WorkflowTabs`` component, and Task
+    27's fold of the last five of those ten into one tab -- task 28 then
+    moved the step long called "Run" to run first among the configuration
+    steps, and task 30 folded it and the three remaining configuration tabs
+    (Productivity, Land cover, SOC) into one PARAMS tab, in that same
+    relative order (see ``app/panels/params.py``). Position is what orders
+    them -- ``WorkflowTabs`` renders ``workflow_tabs()`` as given, and a
+    ``TabDescriptor`` has no ``id`` for a stray sort to key on.
 
     Compared against ``msg(...)`` rather than English literals so the
     assertion pins ORDER without also pinning the copy.
@@ -175,45 +175,39 @@ def test_the_tabs_are_in_the_sub_indicator_order():
     # A PIN, not a derivation: unlike the `msg(...)` titles above (checked
     # against the message catalogue, so a typo in either side shows up), an
     # mdi icon name has no second, independent source of truth in this repo
-    # to import and compare against -- these six strings are hand-typed here
-    # against six hand-typed strings in `app/tabs.py`, so both sides could be
+    # to import and compare against -- these three strings are hand-typed here
+    # against three hand-typed strings in `app/tabs.py`, so both sides could be
     # wrong together and this would still pass. Kept anyway (matching the
     # pattern the original, reviewed `test_page.py` used) because a literal
     # match is still the only way to catch an icon that actually changed --
     # just don't mistake it for proof the icon is CORRECT, only that it is
     # UNCHANGED.
     assert tabs[0].icon == "mdi-map-marker-check"
-    # "mdi-calendar-range", not the old "mdi-play-circle-outline" -- the
-    # Build button this step used to hold is long gone (Task 20); a
-    # date-range icon describes what is actually left.
-    assert tabs[1].icon == "mdi-calendar-range"
-    assert tabs[2].icon == "mdi-sprout-outline"
-    assert tabs[3].icon == "mdi-terrain"
-    assert tabs[4].icon == "mdi-layers-outline"
-    assert tabs[5].icon == "mdi-chart-bar"
+    # "mdi-cogs", task 30: a settings-gear icon for the tab that is now
+    # itself a settings panel, not any one folded step's own icon.
+    assert tabs[1].icon == "mdi-cogs"
+    assert tabs[2].icon == "mdi-chart-bar"
 
 
 def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_tab_carries_none():
-    """``tab.step`` is what ``_tab_state`` reads a configuration tab's
-    problems by -- it must be a real ``STEP_PREFIXES`` key, not a
-    hand-typed string that happens to look like one, or the two would drift
-    apart silently. The merged outputs tab carries ``None``: it is gated by
-    ``outcome.maps`` instead (see ``_tab_state``), not by any step's
-    problems.
+    """``tab.step`` is what ``_tab_state`` reads a tab's problems by -- a
+    real ``STEP_PREFIXES`` key (or, for PARAMS since task 30, a tuple of
+    them) for a configuration tab, never a hand-typed string that happens to
+    look like one, or it would drift apart silently from ``app/state.py``.
+    The merged outputs tab carries ``None``: it is gated by ``outcome.maps``
+    instead (see ``_tab_state``), not by any step's problems.
     """
     tabs = workflow_tabs()
     steps = [tab.step for tab in tabs]
-    assert steps == [
-        "aoi",
-        "run",
-        "productivity",
-        "land_cover",
-        "soc",
-        None,
-    ]
+    assert steps[0] == "aoi"
+    assert steps[1] == ("run", "productivity", "land_cover", "soc")
+    assert steps[2] is None
     for step in steps:
-        if step is not None:
-            assert step in STEP_PREFIXES
+        if step is None:
+            continue
+        names = (step,) if isinstance(step, str) else step
+        for name in names:
+            assert name in STEP_PREFIXES
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +229,7 @@ def test_every_tabs_abbreviation_is_unique_and_at_most_three_characters():
 def test_every_locales_abbreviations_are_unique_and_at_most_three_characters(monkeypatch):
     """Walks every shipped locale, not only English -- an abbreviation MAY
     legitimately repeat across locales (the brief's own words), but within
-    one locale the six must stay distinct and short.
+    one locale the three must stay distinct and short.
 
     Monkeypatches ``current_locale`` where ``BoundCatalog.msg`` looks it up,
     rather than calling the real, global ``pysepal.i18n.set_locale`` -- see
@@ -306,6 +300,39 @@ def test_an_output_tab_is_locked_without_maps_and_satisfied_with_them():
     assert _tab_state(output_tab, RunSpec(), has_maps=True) is _TabState.SATISFIED
 
 
+def test_a_combined_tab_is_incomplete_when_only_one_of_its_named_steps_has_a_fatal_problem():
+    """PARAMS' own combining rule (task 30, defended in the task's report):
+    satisfied only when EVERY step behind the chip is -- a single chip is the
+    only signal a user watching the segment strip has for everything folded
+    behind it, so reading it as satisfied while one of the four still has a
+    fatal problem would be reporting a false all-clear.
+
+    ``_BUILDABLE_SPEC`` clears every fatal problem across all four steps;
+    breaking ONLY ``water_mask`` (owned by "land_cover" alone -- see
+    ``app/state.py``'s ``STEP_PREFIXES``) must still flip the WHOLE combined
+    chip to INCOMPLETE, not just a per-step state nothing outside this test
+    renders on its own. Directly catches the brief's own named mutation:
+    "make the PARAMS chip satisfied while one section still has a fatal
+    problem".
+    """
+    # The real tab, not a hand-typed copy of its four step names: found by
+    # shape, the same way `_PARAMS_INDEX` above is.
+    params_tab = next(tab for tab in workflow_tabs() if isinstance(tab.step, tuple))
+    spec = default_spec(threshold=0.0, water_mask=None)
+    assert any(p.fatal for p in problems_for("land_cover", spec))
+    assert not any(p.fatal for p in problems_for("run", spec))
+    assert not any(p.fatal for p in problems_for("productivity", spec))
+    assert not any(p.fatal for p in problems_for("soc", spec))
+    assert _tab_state(params_tab, spec, has_maps=False) is _TabState.INCOMPLETE
+
+
+def test_a_combined_tab_is_satisfied_only_once_every_named_step_is():
+    """The positive half of the combining rule: nothing short of every named
+    step being fatal-free reads as SATISFIED."""
+    params_tab = next(tab for tab in workflow_tabs() if isinstance(tab.step, tuple))
+    assert _tab_state(params_tab, _BUILDABLE_SPEC, has_maps=False) is _TabState.SATISFIED
+
+
 # ---------------------------------------------------------------------------
 # `_sync_draw_control` -- a fast, isolated proof of the pure state machine.
 # ---------------------------------------------------------------------------
@@ -374,9 +401,10 @@ def test_sync_draw_control_is_a_no_op_with_no_map_or_no_control():
 
 
 # ---------------------------------------------------------------------------
-# Identity wiring -- `page.py` -> `WorkflowTabs` -> each step/panel, end to
-# end through the real `Sdg1531App` render. Monkeypatches target `tabs_module`
-# now, since that is what actually imports and calls each step/panel.
+# Identity wiring -- `page.py` -> `WorkflowTabs` -> the AOI step, end to end
+# through the real `Sdg1531App` render. The other four steps' identity
+# wiring (task 30: they render inside `ParamsPanel` now, not directly here)
+# lives in `tests/app/test_panel_params.py`, patching `params_module`.
 # ---------------------------------------------------------------------------
 
 
@@ -400,102 +428,22 @@ def test_the_aoi_step_is_wired_with_the_shared_spec_and_a_real_map(monkeypatch):
     assert captured.get("map_") is not None
 
 
-def test_the_productivity_step_shares_the_aoi_step_s_spec(monkeypatch):
-    """A private copy of ``RunSpec`` here would let Productivity edit a spec
-    Run never sees."""
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
-        captured["aoi_spec"] = spec
-
-    @solara.component
-    def _spy_productivity_step(*, spec: Any = None) -> None:
-        captured["productivity_spec"] = spec
-
-    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    monkeypatch.setattr(tabs_module, "ProductivityStep", _spy_productivity_step)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    assert captured["productivity_spec"] is captured["aoi_spec"]
-
-
-def test_the_land_cover_step_shares_the_aoi_step_s_spec(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
-        captured["aoi_spec"] = spec
-
-    @solara.component
-    def _spy_land_cover_step(*, spec: Any = None, gee_interface: Any = None) -> None:
-        captured["land_cover_spec"] = spec
-
-    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    monkeypatch.setattr(tabs_module, "LandCoverStep", _spy_land_cover_step)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    assert captured["land_cover_spec"] is captured["aoi_spec"]
-
-
-def test_the_soc_step_shares_the_aoi_step_s_spec(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
-        captured["aoi_spec"] = spec
-
-    @solara.component
-    def _spy_soc_step(*, spec: Any = None) -> None:
-        captured["soc_spec"] = spec
-
-    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    monkeypatch.setattr(tabs_module, "SocStep", _spy_soc_step)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    assert captured["soc_spec"] is captured["aoi_spec"]
-
-
-def test_the_run_step_shares_the_aoi_step_s_spec_and_gets_a_real_outcome(monkeypatch):
-    """``outcome`` must be the real ``BuildOutcome`` ``page.py`` derives from
-    the shared spec via ``build_outcome``, not a placeholder."""
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
-        captured["aoi_spec"] = spec
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured.update(run_spec=spec, outcome=outcome)
-
-    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    monkeypatch.setattr(tabs_module, "RunStep", _spy_run_step)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    assert captured["run_spec"] is captured["aoi_spec"]
-    assert isinstance(captured["outcome"], BuildOutcome)
-    assert captured["outcome"] == BuildOutcome()
-
-
 def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
     """The real path a user hits runs a real spec through ``page.py``'s real
-    ``use_memo`` into the real ``RunStep``, inside the real ``WorkflowTabs``.
-    Only ``AoiStep`` is substituted, and only to reach the shared spec
-    reactive without rendering its own ``AssetSelectComponent``.
+    ``use_memo`` into the real ``RunStep``, inside the real ``WorkflowTabs``
+    (task 30: nested inside the real ``ParamsPanel``, alongside Productivity,
+    Land cover and SOC). Only ``AoiStep`` is substituted, and only to reach
+    the shared spec reactive without rendering its own ``AssetSelectComponent``.
 
-    ``RunStep``'s rendered content is read back off the Run ``TabItem`` --
+    ``RunStep``'s rendered content is read back off the PARAMS ``TabItem`` --
     a widget PROPERTY of ``MapApp.right_panel_content``'s sole section, not a
     reacton child of ``box`` -- the same reason every other test in this file
-    reads identity off a spy instead of rendered text.
+    reads identity off a spy instead of rendered text. Checked by MEMBERSHIP
+    in every markdown fragment the PARAMS tab renders, not by position: since
+    task 30, Run's own section is FIRST among four (see
+    ``app/panels/params.py``), not the tab's only content, so its refusal
+    text is no longer reliably the LAST markdown fragment the way it was
+    when Run held its own tab.
 
     Anchored against a direct call to ``build()``, not a hardcoded guess at
     the domain's wording, so a change to that message updates both sides
@@ -522,27 +470,27 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
 
     workflow_widget = mapapp.right_panel_content[0]["content"][0]
     tab_items = find_widgets(workflow_widget, v.TabItem)
-    assert len(tab_items) == 6
-    run_sheet = tab_items[_PERIOD_INDEX]
-    assert markdown_texts(run_sheet)[-1] == f"<p><strong>{exc_info.value}</strong></p>"
+    assert len(tab_items) == 3
+    params_sheet = tab_items[_PARAMS_INDEX]
+    assert f"<p><strong>{exc_info.value}</strong></p>" in markdown_texts(params_sheet)
 
 
 # ---------------------------------------------------------------------------
-# `WorkflowTabs` itself: renders six tabs, the active index selects which
+# `WorkflowTabs` itself: renders three tabs, the active index selects which
 # `TabItem`'s content is live, and switching tabs does not rebuild the rest.
 # ---------------------------------------------------------------------------
 
 
-def test_workflow_tabs_renders_six_tab_items_and_six_segments():
+def test_workflow_tabs_renders_three_tab_items_and_three_segments():
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
     workflow_widget = _workflow_widget(box)
 
     tab_items = find_widgets(workflow_widget, v.TabItem)
-    assert len(tab_items) == 6
+    assert len(tab_items) == 3
 
     cells = _wrapper_cells(workflow_widget)
-    assert len(cells) == 6
+    assert len(cells) == 3
 
 
 def test_clicking_a_segment_moves_the_active_tab():
@@ -560,12 +508,12 @@ def test_clicking_a_segment_moves_the_active_tab():
     assert tabs_items_widget.v_model == _AOI_INDEX
 
     cells = _wrapper_cells(workflow_widget)
-    cells[_PRODUCTIVITY_INDEX].fire_event("click", None)
+    cells[_PARAMS_INDEX].fire_event("click", None)
     rc.force_update()
 
     tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
     assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _PRODUCTIVITY_INDEX
+    assert tabs_items_widget.v_model == _PARAMS_INDEX
 
 
 def test_a_locked_output_tab_does_not_navigate_on_click():
@@ -631,26 +579,27 @@ def test_a_locked_segment_cell_also_carries_pointer_events_none():
 
 def test_switching_tabs_does_not_rebuild_the_others_widgets():
     """``rv.TabsItems`` hides inactive tabs client-side WITHOUT unmounting
-    them; the six ``TabItem`` calls happen in the same order on every render
-    regardless of which is active, so reacton's positional reconciliation
-    must keep every ``TabItem``'s underlying widget (and everything mounted
-    inside it) stable across a switch, not tear it down and rebuild it.
-    Checked the same way ``test_the_map_is_memoized_across_rerenders`` checks
-    the shared map: by widget IDENTITY, not merely a repeat ``isinstance``.
+    them; the three ``TabItem`` calls happen in the same order on every
+    render regardless of which is active, so reacton's positional
+    reconciliation must keep every ``TabItem``'s underlying widget (and
+    everything mounted inside it) stable across a switch, not tear it down
+    and rebuild it. Checked the same way ``test_the_map_is_memoized_across_
+    rerenders`` checks the shared map: by widget IDENTITY, not merely a
+    repeat ``isinstance``.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     before = find_widgets(_workflow_widget(box), v.TabItem)
-    assert len(before) == 6
+    assert len(before) == 3
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_PRODUCTIVITY_INDEX].fire_event("click", None)
+    cells[_PARAMS_INDEX].fire_event("click", None)
     rc.force_update()
 
     after = find_widgets(_workflow_widget(box), v.TabItem)
-    assert len(after) == 6
-    for i in (_AOI_INDEX, _PERIOD_INDEX, _OUTPUTS_INDEX):
+    assert len(after) == 3
+    for i in (_AOI_INDEX, _OUTPUTS_INDEX):
         assert after[i] is before[i], f"tab {i} was rebuilt on an unrelated tab switch"
 
 
@@ -674,7 +623,7 @@ def test_switching_away_from_aoi_clears_the_draw_control_and_restores_it_on_retu
     assert sepal_map.dc in sepal_map.controls
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_PRODUCTIVITY_INDEX].fire_event("click", None)
+    cells[_PARAMS_INDEX].fire_event("click", None)
     rc.force_update()
 
     assert sepal_map.dc not in sepal_map.controls
@@ -717,11 +666,16 @@ def test_nav_targets_next_is_none_at_the_last_tab():
 
 
 def test_nav_targets_next_skips_a_locked_tab_and_finds_nothing_past_it():
-    """The shape of this app's own six tabs since task 28's reorder: SOC,
-    then one LOCKED output tab, nothing after it. "Next" from SOC must not
-    land on the locked tab -- it must find nothing. Directly catches the
-    mutation the brief names: "'next' no longer skips a locked tab" would
-    instead return the locked tab's own index here.
+    """The shape of this app's own three tabs since task 30's second fold:
+    PARAMS, then one LOCKED output tab, nothing after it. "Next" from PARAMS
+    must not land on the locked tab -- it must find nothing. Directly catches
+    the mutation the brief names: "'next' no longer skips a locked tab" would
+    instead return the locked tab's own index here. Uses a generic
+    single-step tab (``"soc"``, still a real ``STEP_PREFIXES`` key) rather
+    than the real combined PARAMS tuple -- ``nav_targets`` and ``_tab_state``
+    treat a 1-tuple and several names identically (see ``_tab_state``'s own
+    docstring), so this pins the algorithm generically rather than re-typing
+    the real app's own shape.
     """
     tabs = [TabDescriptor("soc", "Soc", "i", []), TabDescriptor(None, "Outputs", "i", [])]
     _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=False)
@@ -738,7 +692,7 @@ def test_nav_targets_next_reaches_the_output_tab_once_it_unlocks():
 
 def test_nav_targets_skips_a_run_of_more_than_one_locked_tab():
     """``nav_targets`` itself has no notion of "exactly one" locked tab --
-    proven generically here with two, even though this app's own six tabs
+    proven generically here with two, even though this app's own three tabs
     never produce more than one (``_tab_state`` locks every ``step=None``
     tab identically, off the same ``has_maps``)."""
     tabs = [
@@ -777,17 +731,17 @@ def test_the_prev_arrow_is_disabled_and_the_next_arrow_enabled_on_the_first_tab(
     assert next_arrow.disabled is False
 
 
-def test_the_next_arrow_is_disabled_on_soc_while_the_outputs_tab_is_still_locked():
+def test_the_next_arrow_is_disabled_on_params_while_the_outputs_tab_is_still_locked():
     """The default, empty spec has no build, so the merged outputs tab --
-    the only tab after SOC, task 28's reorder put the renamed "Run"
-    (Assessment period) step second instead -- is LOCKED. The next arrow
-    must show that, not just silently refuse to navigate.
+    the only tab after PARAMS, task 30's second fold made it the last
+    configuration tab -- is LOCKED. The next arrow must show that, not just
+    silently refuse to navigate.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_SOC_INDEX].fire_event("click", None)
+    cells[_PARAMS_INDEX].fire_event("click", None)
     rc.force_update()
 
     _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
@@ -809,7 +763,7 @@ def test_clicking_the_next_arrow_moves_forward_and_the_prev_arrow_moves_back():
 
     tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
     assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _PERIOD_INDEX
+    assert tabs_items_widget.v_model == _PARAMS_INDEX
 
     prev_arrow, _next_arrow = _nav_arrows(_workflow_widget(box))
     prev_arrow.fire_event("click", None)
@@ -820,7 +774,7 @@ def test_clicking_the_next_arrow_moves_forward_and_the_prev_arrow_moves_back():
     assert tabs_items_widget.v_model == _AOI_INDEX
 
 
-def test_clicking_the_next_arrow_on_soc_does_not_navigate_into_a_locked_outputs_tab():
+def test_clicking_the_next_arrow_on_params_does_not_navigate_into_a_locked_outputs_tab():
     """The direct counter-proof for "'next' no longer skips a locked tab":
     under that mutation this click WOULD move ``v_model`` to the outputs tab
     even though it is still LOCKED. Uses ``fire_event``, which bypasses the
@@ -833,7 +787,7 @@ def test_clicking_the_next_arrow_on_soc_does_not_navigate_into_a_locked_outputs_
     assert rc is not None
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_SOC_INDEX].fire_event("click", None)
+    cells[_PARAMS_INDEX].fire_event("click", None)
     rc.force_update()
 
     _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
@@ -842,14 +796,14 @@ def test_clicking_the_next_arrow_on_soc_does_not_navigate_into_a_locked_outputs_
 
     tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
     assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _SOC_INDEX
+    assert tabs_items_widget.v_model == _PARAMS_INDEX
 
 
-def test_clicking_the_next_arrow_on_soc_reaches_the_outputs_tab_once_unlocked(monkeypatch):
+def test_clicking_the_next_arrow_on_params_reaches_the_outputs_tab_once_unlocked(monkeypatch):
     """The positive case, through the real render tree: once a build exists
-    the outputs tab is reachable, and "next" from SOC (the last configuration
-    tab since task 28's reorder) lands on it directly (there is nothing else
-    after it to skip)."""
+    the outputs tab is reachable, and "next" from PARAMS (the last
+    configuration tab since task 30's second fold) lands on it directly
+    (there is nothing else after it to skip)."""
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -868,7 +822,7 @@ def test_clicking_the_next_arrow_on_soc_reaches_the_outputs_tab_once_unlocked(mo
     captured["spec"].value = _BUILDABLE_SPEC
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_SOC_INDEX].fire_event("click", None)
+    cells[_PARAMS_INDEX].fire_event("click", None)
     rc.force_update()
 
     _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))

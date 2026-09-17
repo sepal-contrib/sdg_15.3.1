@@ -24,9 +24,21 @@ the repo owner's own words: "all the computation buttons ... should be in
 the same tab, like with multiple sections, similarly as se.plan does". Task
 28 replaced that tab's own ``rv.ExpansionPanels`` accordion with flat, headed
 sections (see that module's docstring); the panel is still ONE tab here,
-just one whose own content changed shape. The panel now has SIX tabs, not
-ten; ``_tab_state``'s LOCKED/INCOMPLETE/SATISFIED derivation is unchanged, it
-just applies to one merged output tab instead of five separate ones.
+just one whose own content changed shape.
+
+**Task 30 did the same fold a second time, to the other four configuration
+tabs.** The repo owner, after using the six-tab layout task 28 left behind:
+*"I now think we could have just three tabs, AOI, PARAMS, Result"* ...
+*"in params, we should have sections, as you just did in the results."*
+Assessment period, Productivity, Land cover and SOC collapse into one PARAMS
+tab, built the identical way task 28 built the outputs tab -- flat, headed
+sections, no accordion -- see ``app/panels/params.py``'s own docstring. The
+panel has THREE tabs now: AOI, PARAMS, and the merged outputs tab.
+``_tab_state``'s LOCKED/INCOMPLETE/SATISFIED derivation is unchanged in
+shape; it now reads across FOUR steps' worth of ``problems_for`` for the
+PARAMS tab's own chip, the same way it always read across one merged output
+tab's ``outcome.maps`` instead of five (see ``TabDescriptor.step`` and
+``_tab_state`` below for how a tab now names either one step or several).
 
 Segment state is derived from what ``app/state.py`` already knows
 (``problems_for``) and from ``outcome.maps``, never from a second,
@@ -37,24 +49,30 @@ active one, so "next" skips straight past a still-locked outputs tab instead
 of landing on it.
 
 **Tab order (design decision A6) changed again here, task 28, by the repo
-owner's direct request.** A6's own ORDER -- AOI, Productivity, Land cover,
-SOC, Run, then the merged outputs tab -- had already survived one
-supersession (its PLACEMENT moved into the right panel; the order itself did
-not change then). It changes now: the step long called "Run" owns no input
-but the overall assessment period (``periods.overall``) -- Task 20 deleted
-its Build button, and task 28 renamed it for what remains, "Assessment
-period" (``PER`` in the segment strip; the owner's own question started
-this: "the 'RUN' is only date? should we change that 'RUN' by 'DAT'???").
-That period is also what task 28's own ``app/steps/period_override.py``
-shows the SOC and Land cover steps inheriting FROM -- a user sitting on
-either step needs the period already chosen, or the "inherited window" text
-they show is empty or misleading. The step everything else derives from has
-to come before them. New order: AOI -> Assessment period -> Productivity ->
-Land cover -> SOC -> the merged outputs tab. Only the catalogue TITLE/
-DESCRIPTION and the tab's position moved -- its routing key
-(``tab.step == "run"``, ``STEP_PREFIXES["run"]`` in ``app/state.py``) is
-unchanged; renaming the key itself would ripple into ``app/state.py`` and
-the domain's own field names for no gain.
+owner's direct request, and task 30 preserves what task 28 chose.** A6's own
+ORDER -- AOI, Productivity, Land cover, SOC, Run, then the merged outputs
+tab -- had already survived one supersession (its PLACEMENT moved into the
+right panel; the order itself did not change then). Task 28 changed it: the
+step long called "Run" owns no input but the overall assessment period
+(``periods.overall``) -- Task 20 deleted its Build button, and task 28
+renamed it for what remains, "Assessment period" (``PER`` in the segment
+strip until task 30 merged it away; the owner's own question started this:
+"the 'RUN' is only date? should we change that 'RUN' by 'DAT'???") -- and
+moved it to run FIRST among the configuration steps. That period is also
+what task 28's own ``app/steps/period_override.py`` shows the SOC and Land
+cover steps inheriting FROM -- a user sitting on either step needs the
+period already chosen, or the "inherited window" text they show is empty or
+misleading. The step everything else derives from has to come before them.
+Task 30 folds Assessment period, Productivity, Land cover and SOC into one
+PARAMS tab's sections WITHOUT reordering them -- ``app/panels/params.py``'s
+own docstring repeats this reasoning at the section level, since it is the
+module that now actually orders them. New tab order: AOI -> PARAMS (itself
+ordered Assessment period -> Productivity -> Land cover -> SOC) -> the
+merged outputs tab. Only the catalogue TITLE/DESCRIPTION and the tab's
+position moved over these two tasks -- the Run step's own routing key
+(``STEP_PREFIXES["run"]`` in ``app/state.py``) is unchanged throughout;
+renaming the key itself would ripple into ``app/state.py`` and the domain's
+own field names for no gain.
 """
 
 from __future__ import annotations
@@ -71,12 +89,10 @@ from reacton.ipyvue import use_event
 
 from app.message import msg
 from app.panels.outputs import OutputsPanel
+from app.panels.params import ParamsPanel
 from app.state import problems_for
 from app.steps.aoi import AoiStep
-from app.steps.land_cover import LandCoverStep
-from app.steps.productivity import ProductivityStep
-from app.steps.run import BuildOutcome, RunStep
-from app.steps.soc import SocStep
+from app.steps.run import BuildOutcome
 from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
@@ -87,15 +103,21 @@ __all__ = ("TabDescriptor", "WorkflowTabs", "nav_targets", "workflow_tabs")
 class TabDescriptor:
     """One workflow tab, in DISPLAY order.
 
-    ``step`` is the ``app.state.STEP_PREFIXES`` key a configuration tab owns,
-    so its segment can read its state off ``problems_for`` -- ``None`` for
-    the merged outputs tab, which is gated by ``outcome.maps`` instead (see
-    ``_tab_state``). Order lives in list position alone, same reason
+    ``step`` is what ``_tab_state`` reads a tab's problems by, off
+    ``app.state.problems_for``: a single ``STEP_PREFIXES`` key for a tab that
+    owns one step (AOI), a tuple of them for a tab that folds several
+    (PARAMS, task 30 -- ``("run", "productivity", "land_cover", "soc")``), or
+    ``None`` for the merged outputs tab, which is gated by ``outcome.maps``
+    instead (see ``_tab_state``). A tuple is never registered in
+    ``STEP_PREFIXES`` itself -- that mapping's own coverage test
+    (``tests/app/test_state.py``) requires every field be owned by EXACTLY one
+    step, and a combined PARAMS entry would double-claim every field its four
+    real steps already own. Order lives in list position alone, same reason
     ``build_workflow_sections`` gave: nothing here has an ``id`` for a stray
     sort to key on.
     """
 
-    step: str | None
+    step: str | tuple[str, ...] | None
     title: str
     icon: str
     content: list[object]
@@ -110,14 +132,17 @@ def workflow_tabs(
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]] | None = None,
     active_tab: int | None = None,
 ) -> list[TabDescriptor]:
-    """The six workflow tabs, in DISPLAY order: AOI -> Assessment period ->
-    Productivity -> Land cover -> SOC -> the merged outputs tab. Design
-    decision A6's own order was unchanged by this module's move out of
-    ``steps_data``, then out of ten separate ``right_panel_content``
-    sections, then -- task 27 -- by folding the last five of those ten into
-    one tab (see ``app/panels/outputs.py``) -- but task 28 moved the step
-    long called "Run" (routing key ``"run"``, unchanged) to second place and
-    renamed its catalogue title; see this module's own docstring for why.
+    """The three workflow tabs, in DISPLAY order: AOI -> PARAMS -> the merged
+    outputs tab. Design decision A6's own order was unchanged by this
+    module's move out of ``steps_data``, then out of ten separate
+    ``right_panel_content`` sections, then -- task 27 -- by folding the last
+    five of those ten into one tab (see ``app/panels/outputs.py``), then --
+    task 28 -- by moving the step long called "Run" to run first among the
+    configuration steps and renaming its catalogue title, and now -- task 30
+    -- by folding the remaining four configuration tabs (Assessment period,
+    Productivity, Land cover, SOC) into one PARAMS tab (see
+    ``app/panels/params.py``), in that same relative order; see this
+    module's own docstring for why each move happened.
 
     Every argument defaults to ``None`` so this is reachable with no render
     context at all -- calling a ``@solara.component`` function outside a
@@ -150,35 +175,29 @@ def workflow_tabs(
     aoi_content: list[object] = (
         [AoiStep(spec=spec, map_=sepal_map)] if spec is not None and sepal_map is not None else []
     )
-    productivity_content: list[object] = [ProductivityStep(spec=spec)] if spec is not None else []
-    # No `gee_interface is not None` guard: `LandCoverStep`'s own parameter already
-    # defaults to `None` (`AssetSelectComponent` falls back to the session
-    # interface), so there is no bare `Reactive[...]` for mypy to narrow here.
-    land_cover_content: list[object] = (
-        [LandCoverStep(spec=spec, gee_interface=gee_interface)] if spec is not None else []
-    )
-    soc_content: list[object] = [SocStep(spec=spec)] if spec is not None else []
-    run_content: list[object] = (
-        [RunStep(spec=spec, outcome=outcome)] if spec is not None and outcome is not None else []
+    # `ParamsPanel.outcome` is a bare `BuildOutcome` (its own `RunStep`
+    # section needs it), unlike `spec` -- the same mypy-narrowing reason
+    # `OutputsPanel.spec` below needs its own guard.
+    params_content: list[object] = (
+        [ParamsPanel(spec=spec, outcome=outcome, gee_interface=gee_interface)]
+        if spec is not None and outcome is not None
+        else []
     )
 
     configuration_tabs = [
         TabDescriptor("aoi", msg("step.aoi"), "mdi-map-marker-check", aoi_content),
-        # Second, not fifth (task 28): SOC and Land cover's own period
-        # controls (`app/steps/period_override.py`) show the window they
-        # INHERIT from this step's `periods.overall` -- that has to already
-        # be chosen, or the inherited text they show is empty or misleading.
-        # "mdi-calendar-range", not the old "mdi-play-circle-outline": the
-        # Build button this step used to hold is long gone (Task 20); a
-        # date-range icon describes what is actually left.
-        TabDescriptor("run", msg("step.run"), "mdi-calendar-range", run_content),
+        # `step` names all four folded steps, in the order `param_sections()`
+        # renders them -- `_tab_state` reads every one of them for this tab's
+        # own chip (see that function). "mdi-cogs": a settings-gear icon for
+        # a tab that is now itself a settings panel, not any one step's own.
         TabDescriptor(
-            "productivity", msg("step.productivity"), "mdi-sprout-outline", productivity_content
+            ("run", "productivity", "land_cover", "soc"),
+            msg("params.title"),
+            "mdi-cogs",
+            params_content,
         ),
-        TabDescriptor("land_cover", msg("step.land_cover"), "mdi-terrain", land_cover_content),
-        TabDescriptor("soc", msg("step.soc"), "mdi-layers-outline", soc_content),
     ]
-    # The outputs tab always comes straight after the five configuration
+    # The outputs tab always comes straight after the two configuration
     # tabs -- its index is this list's own length, not a second, hand-typed
     # literal that could silently drift from the return list below.
     outputs_index = len(configuration_tabs)
@@ -230,21 +249,30 @@ class _TabState(Enum):
 
 
 def _tab_state(tab: TabDescriptor, spec: RunSpec, has_maps: bool) -> _TabState:
-    """A configuration tab (``tab.step`` set) is INCOMPLETE while it owns a
-    fatal problem and SATISFIED once it does not -- it is never LOCKED, since
-    every configuration field is always editable. The merged outputs tab
-    (``tab.step is None``) is LOCKED until ``outcome.maps`` exists and
-    SATISFIED after -- the same gate ``is_runnable``/``build_outcome``
-    already apply before any of its five sections (Layers, Transitions,
-    Results, Zonal, Export) can show anything.
+    """A configuration tab (``tab.step`` set) is INCOMPLETE while ANY step it
+    names owns a fatal problem, and SATISFIED only once NONE of them do -- it
+    is never LOCKED, since every configuration field is always editable. AOI
+    names one step; PARAMS (task 30) names four (``("run", "productivity",
+    "land_cover", "soc")``), and the combining rule is the same either way:
+    "satisfied" means every step behind the chip is, because a single chip is
+    the only signal a user watching the segment strip has for everything
+    folded behind it -- reading it as satisfied while one of the four still
+    has a fatal problem would be reporting a false all-clear. The merged
+    outputs tab (``tab.step is None``) is LOCKED until ``outcome.maps``
+    exists and SATISFIED after -- the same gate ``is_runnable``/
+    ``build_outcome`` already apply before any of its five sections (Layers,
+    Transitions, Results, Zonal, Export) can show anything.
 
     Reads ``problems_for`` and ``has_maps`` -- the same predicates the steps
     and panels themselves already render against -- rather than a second,
-    hand-typed roster of step states.
+    hand-typed roster of step states. A single step and several are the same
+    code path here (a 1-tuple would compute identically to the bare string
+    case), so AOI is not special-cased.
     """
     if tab.step is None:
         return _TabState.SATISFIED if has_maps else _TabState.LOCKED
-    fatal = any(problem.fatal for problem in problems_for(tab.step, spec))
+    steps = (tab.step,) if isinstance(tab.step, str) else tab.step
+    fatal = any(problem.fatal for step in steps for problem in problems_for(step, spec))
     return _TabState.INCOMPLETE if fatal else _TabState.SATISFIED
 
 
@@ -255,10 +283,11 @@ def nav_targets(
     from spatial-risk's own ``pipeline_header.nav_targets``, same "skip a
     whole locked run" reasoning: since task 27, the outputs tab is one LOCKED
     block until a build exists, so ``active_tab`` sitting on the last
-    configuration tab (SOC, since task 28's reorder) must not let "next" land
-    there, it must find nothing (``None``) past it instead. Reads
-    ``_tab_state`` -- the same derivation the segment strip itself is coloured
-    by -- rather than a second, hand-typed notion of which tabs are reachable.
+    configuration tab (PARAMS, since task 30 folded the other four
+    configuration tabs into it) must not let "next" land there, it must find
+    nothing (``None``) past it instead. Reads ``_tab_state`` -- the same
+    derivation the segment strip itself is coloured by -- rather than a
+    second, hand-typed notion of which tabs are reachable.
     """
     states = [_tab_state(tab, spec, has_maps) for tab in tabs]
     prev_t = next((i for i in range(active - 1, -1, -1) if states[i] is not _TabState.LOCKED), None)
@@ -398,14 +427,24 @@ def _tab_abbrev(tab: TabDescriptor) -> str:
     replacement for it (the owner's own words: "show inside them a
     max-three-char reference").
 
-    Keyed off ``tab.step`` (``"outputs"`` standing in for the merged tab's
-    own ``None``) -- the same routing key ``_tab_state`` already reads, so
-    this cannot silently name a step ``STEP_PREFIXES`` does not know about. A
-    real ``msg()`` lookup, not a hand-typed dict: these are user-facing
-    strings, and a translator may legitimately need to change a three-letter
-    English contraction that reads wrong in Spanish or French.
+    Keyed off ``tab.step``: a single ``STEP_PREFIXES`` name for a
+    single-step tab (AOI) is also its own catalogue key, ``"outputs"`` stands
+    in for the merged tab's own ``None``, and ``"params"`` stands in for a
+    tuple (task 30's combined PARAMS tab) -- a tuple has no ``STEP_PREFIXES``
+    name of its own to reuse (see ``TabDescriptor``'s own docstring for why
+    one is never registered), so this is the one case that does not fall
+    straight out of ``tab.step``. A real ``msg()`` lookup either way, not a
+    hand-typed dict: these are user-facing strings, and a translator may
+    legitimately need to change a three-letter English contraction that
+    reads wrong in Spanish or French.
     """
-    return str(msg(f"tabs.abbrev.{tab.step or 'outputs'}"))
+    if tab.step is None:
+        key = "outputs"
+    elif isinstance(tab.step, str):
+        key = tab.step
+    else:
+        key = "params"
+    return str(msg(f"tabs.abbrev.{key}"))
 
 
 def _bind(on_navigate: Callable[[int], None], index: int) -> Callable[[], None]:
@@ -463,7 +502,7 @@ def WorkflowTabs(
     sepal_client: Any = None,
 ) -> None:
     """The whole right-panel workflow: the segment strip, the prev/next
-    arrows, and the six tabs they navigate.
+    arrows, and the three tabs they navigate.
 
     ``rv.TabsItems`` hides inactive tabs client-side WITHOUT unmounting them.
     That is a problem for ``app/steps/aoi.py``'s ``AoiStep``, which mounts

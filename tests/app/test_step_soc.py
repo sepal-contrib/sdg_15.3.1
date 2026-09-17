@@ -255,10 +255,17 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     place of a ``msg()`` call would satisfy all of them by coincidence.
     Substituting a distinguishing stand-in for ``msg`` instead proves each
     rendered string is really that call's OUTPUT, not a literal that happens
-    to match it. Patches ``msg`` in BOTH ``app.steps.soc`` (the description
-    and the two Select labels) and ``app.steps.period_override`` (the shared
-    control's own checkbox label), since the two modules each import their
-    own bound ``msg``."""
+    to match it. Patches ``msg`` in BOTH ``app.steps.soc`` (the two Select
+    labels) and ``app.steps.period_override`` (the shared control's own
+    checkbox label), since the two modules each import their own bound
+    ``msg``.
+
+    The description itself is no longer rendered by this step (task 30: it
+    rides on ``ParamsPanel``'s own ``SectionHeader`` now -- see
+    ``app/panels/params.py``); ``tests/app/test_panel_params.py``'s
+    ``test_each_sections_own_description_travels_with_it`` pins it to
+    ``msg("soc.description")`` instead.
+    """
 
     def _fake_msg(key: str, **_: object) -> str:
         return f"<{key}>"
@@ -271,8 +278,6 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     )
     box, rc = solara.render(SocStep(spec=spec), handle_error=False)
     assert rc is not None
-
-    assert markdown_texts(box)[0] == "<p><soc.description></p>"
 
     assert _checkbox(box).label == "<period_override.toggle>"
 
@@ -321,10 +326,10 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
     ],
 )
 def test_the_step_renders_only_its_own_text(spec, expected_extra):
+    """The description no longer leads this list (task 30: it rides on
+    ``ParamsPanel``'s own ``SectionHeader`` now -- see
+    ``app/panels/params.py``)."""
     spec_r = solara.reactive(spec)
     box, rc = solara.render(SocStep(spec=spec_r), handle_error=False)
     assert rc is not None
-    assert markdown_texts(box) == [
-        "<p>The period soil organic carbon change is measured over.</p>",
-        *expected_extra,
-    ]
+    assert markdown_texts(box) == expected_extra

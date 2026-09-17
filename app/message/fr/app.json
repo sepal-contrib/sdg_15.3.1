@@ -164,6 +164,9 @@
   "outputs": {
     "title": "Résultats"
   },
+  "params": {
+    "title": "Paramètres"
+  },
   "period_override": {
     "toggle": "Utiliser une période différente pour ce sous-indicateur",
     "inherited": "Utilise la période d'évaluation : {start}–{end}."
@@ -173,10 +176,7 @@
     "next": "Étape suivante",
     "abbrev": {
       "aoi": "ZI",
-      "productivity": "PRD",
-      "land_cover": "CT",
-      "soc": "COS",
-      "run": "PER",
+      "params": "PAR",
       "outputs": "RES"
     }
   }

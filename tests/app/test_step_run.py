@@ -178,13 +178,14 @@ def test_the_step_renders_only_its_own_text(spec, outcome, expected_extra):
     case hands it a `BuildOutcome` directly rather than relying on what the
     real function would compute for that spec. Every case here shares
     `default_spec()`'s sensor (MODIS MOD13Q1, coverage 2000-onward), so the
-    coverage hint between the description and the rest is the same line in
-    all four."""
+    coverage hint leading the rest is the same line in all four. The
+    description itself is no longer rendered by this step (task 30: it rides
+    on `ParamsPanel`'s own `SectionHeader` now -- see `app/panels/params.py`).
+    """
     spec_r = solara.reactive(spec)
     box, rc = solara.render(RunStep(spec=spec_r, outcome=outcome), handle_error=False)
     assert rc is not None
     assert markdown_texts(box) == [
-        f"<p>{msg('run.description')}</p>",
         f"<p>{msg('run.sensor_coverage_open', start=2000)}</p>",
         *expected_extra,
     ]
