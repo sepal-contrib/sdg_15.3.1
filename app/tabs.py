@@ -19,20 +19,42 @@ asked for them directly after using the app ("can we add arrows to the tabs
 component? so I can easily navigate back-and-forth?").
 
 Task 27 also folded the five output tabs (Layers, Transitions, Results,
-Zonal, Export) into ONE tab, ``app/panels/outputs.py``'s ``OutputsPanel``, an
-accordion over the same five panels in the same order -- the repo owner's own
-words: "all the computation buttons ... should be in the same tab, like with
-multiple sections, similarly as se.plan does". The panel now has SIX tabs,
-not ten; ``_tab_state``'s LOCKED/INCOMPLETE/SATISFIED derivation is unchanged,
-it just applies to one merged output tab instead of five separate ones.
+Zonal, Export) into ONE tab, ``app/panels/outputs.py``'s ``OutputsPanel`` --
+the repo owner's own words: "all the computation buttons ... should be in
+the same tab, like with multiple sections, similarly as se.plan does". Task
+28 replaced that tab's own ``rv.ExpansionPanels`` accordion with flat, headed
+sections (see that module's docstring); the panel is still ONE tab here,
+just one whose own content changed shape. The panel now has SIX tabs, not
+ten; ``_tab_state``'s LOCKED/INCOMPLETE/SATISFIED derivation is unchanged, it
+just applies to one merged output tab instead of five separate ones.
 
 Segment state is derived from what ``app/state.py`` already knows
 (``problems_for``) and from ``outcome.maps``, never from a second,
 hand-typed notion of "done" per step -- see ``_tab_state``. ``nav_targets``
 (ported from the reference's own ``pipeline_header.nav_targets``) walks that
 same derived state to find the nearest non-locked tab on each side of the
-active one, so "next" from Run skips straight past a still-locked outputs
-tab instead of landing on it.
+active one, so "next" skips straight past a still-locked outputs tab instead
+of landing on it.
+
+**Tab order (design decision A6) changed again here, task 28, by the repo
+owner's direct request.** A6's own ORDER -- AOI, Productivity, Land cover,
+SOC, Run, then the merged outputs tab -- had already survived one
+supersession (its PLACEMENT moved into the right panel; the order itself did
+not change then). It changes now: the step long called "Run" owns no input
+but the overall assessment period (``periods.overall``) -- Task 20 deleted
+its Build button, and task 28 renamed it for what remains, "Assessment
+period" (``PER`` in the segment strip; the owner's own question started
+this: "the 'RUN' is only date? should we change that 'RUN' by 'DAT'???").
+That period is also what task 28's own ``app/steps/period_override.py``
+shows the SOC and Land cover steps inheriting FROM -- a user sitting on
+either step needs the period already chosen, or the "inherited window" text
+they show is empty or misleading. The step everything else derives from has
+to come before them. New order: AOI -> Assessment period -> Productivity ->
+Land cover -> SOC -> the merged outputs tab. Only the catalogue TITLE/
+DESCRIPTION and the tab's position moved -- its routing key
+(``tab.step == "run"``, ``STEP_PREFIXES["run"]`` in ``app/state.py``) is
+unchanged; renaming the key itself would ripple into ``app/state.py`` and
+the domain's own field names for no gain.
 """
 
 from __future__ import annotations
@@ -88,11 +110,14 @@ def workflow_tabs(
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]] | None = None,
     active_tab: int | None = None,
 ) -> list[TabDescriptor]:
-    """The six workflow tabs, in DISPLAY order: AOI -> Productivity -> Land
-    cover -> SOC -> Run -> the merged outputs tab (design decision A6's order,
-    unchanged by this module's move out of ``steps_data``, then out of ten
-    separate ``right_panel_content`` sections, then -- task 27 -- by folding
-    the last five of those ten into one tab; see ``app/panels/outputs.py``).
+    """The six workflow tabs, in DISPLAY order: AOI -> Assessment period ->
+    Productivity -> Land cover -> SOC -> the merged outputs tab. Design
+    decision A6's own order was unchanged by this module's move out of
+    ``steps_data``, then out of ten separate ``right_panel_content``
+    sections, then -- task 27 -- by folding the last five of those ten into
+    one tab (see ``app/panels/outputs.py``) -- but task 28 moved the step
+    long called "Run" (routing key ``"run"``, unchanged) to second place and
+    renamed its catalogue title; see this module's own docstring for why.
 
     Every argument defaults to ``None`` so this is reachable with no render
     context at all -- calling a ``@solara.component`` function outside a
@@ -139,12 +164,19 @@ def workflow_tabs(
 
     configuration_tabs = [
         TabDescriptor("aoi", msg("step.aoi"), "mdi-map-marker-check", aoi_content),
+        # Second, not fifth (task 28): SOC and Land cover's own period
+        # controls (`app/steps/period_override.py`) show the window they
+        # INHERIT from this step's `periods.overall` -- that has to already
+        # be chosen, or the inherited text they show is empty or misleading.
+        # "mdi-calendar-range", not the old "mdi-play-circle-outline": the
+        # Build button this step used to hold is long gone (Task 20); a
+        # date-range icon describes what is actually left.
+        TabDescriptor("run", msg("step.run"), "mdi-calendar-range", run_content),
         TabDescriptor(
             "productivity", msg("step.productivity"), "mdi-sprout-outline", productivity_content
         ),
         TabDescriptor("land_cover", msg("step.land_cover"), "mdi-terrain", land_cover_content),
         TabDescriptor("soc", msg("step.soc"), "mdi-layers-outline", soc_content),
-        TabDescriptor("run", msg("step.run"), "mdi-play-circle-outline", run_content),
     ]
     # The outputs tab always comes straight after the five configuration
     # tabs -- its index is this list's own length, not a second, hand-typed
@@ -222,8 +254,9 @@ def nav_targets(
     """The nearest non-``LOCKED`` tab on each side of ``active`` -- ported
     from spatial-risk's own ``pipeline_header.nav_targets``, same "skip a
     whole locked run" reasoning: since task 27, the outputs tab is one LOCKED
-    block until a build exists, so ``active_tab`` sitting on Run must not let
-    "next" land there, it must find nothing (``None``) past it instead. Reads
+    block until a build exists, so ``active_tab`` sitting on the last
+    configuration tab (SOC, since task 28's reorder) must not let "next" land
+    there, it must find nothing (``None``) past it instead. Reads
     ``_tab_state`` -- the same derivation the segment strip itself is coloured
     by -- rather than a second, hand-typed notion of which tabs are reachable.
     """

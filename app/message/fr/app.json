@@ -11,7 +11,7 @@
     "productivity": "Productivité",
     "land_cover": "Couverture terrestre",
     "soc": "Carbone organique du sol",
-    "run": "Exécuter"
+    "run": "Période d'évaluation"
   },
   "aoi": {
     "description": "Choisissez la zone sur laquelle l'indicateur est calculé.",
@@ -61,7 +61,7 @@
     "end": "Année de fin"
   },
   "run": {
-    "description": "Choisissez la période globale sur laquelle l'indicateur s'exécute ; son état apparaît ci-dessous.",
+    "description": "Choisissez la période d'évaluation globale ; son état apparaît ci-dessous.",
     "start_year": "Année de début",
     "end_year": "Année de fin",
     "ready": {
@@ -163,7 +163,7 @@
   },
   "period_override": {
     "toggle": "Utiliser une période différente pour ce sous-indicateur",
-    "inherited": "Utilise la période de l'exécution : {start}–{end}."
+    "inherited": "Utilise la période d'évaluation : {start}–{end}."
   },
   "tabs": {
     "previous": "Étape précédente",
@@ -173,7 +173,7 @@
       "productivity": "PRD",
       "land_cover": "CT",
       "soc": "COS",
-      "run": "EXE",
+      "run": "PER",
       "outputs": "RES"
     }
   }

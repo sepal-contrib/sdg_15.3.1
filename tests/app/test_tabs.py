@@ -56,15 +56,16 @@ _BUILDABLE_SPEC = default_spec(threshold=0.0)
 
 _TAB_TITLES_IN_ORDER = (
     msg("step.aoi"),
+    msg("step.run"),  # "Assessment period" -- task 28 renamed and moved it second
     msg("step.productivity"),
     msg("step.land_cover"),
     msg("step.soc"),
-    msg("step.run"),
     msg("outputs.title"),  # the merged outputs tab: its own key, NOT the ResultsPanel section's
 )
 _AOI_INDEX = 0
-_PRODUCTIVITY_INDEX = 1
-_RUN_INDEX = 4
+_PERIOD_INDEX = 1  # the renamed "Run" step -- `tab.step == "run"` internally, unchanged
+_PRODUCTIVITY_INDEX = 2
+_SOC_INDEX = 4
 _OUTPUTS_INDEX = 5
 
 
@@ -128,11 +129,16 @@ def _nav_arrows(root: object) -> list[Any]:
 
 
 def test_the_tabs_are_in_the_sub_indicator_order():
-    """AOI -> Productivity -> Land cover -> SOC -> Run -> the merged outputs
-    tab (design decision A6's order; unchanged by Task 18's move into
-    ``right_panel_content``, Task 21's move from ten sections into one
-    ``WorkflowTabs`` component, and Task 27's fold of the last five of those
-    ten into one tab). Position is what orders them -- ``WorkflowTabs``
+    """AOI -> Assessment period -> Productivity -> Land cover -> SOC -> the
+    merged outputs tab. Design decision A6's own order was unchanged by Task
+    18's move into ``right_panel_content``, Task 21's move from ten sections
+    into one ``WorkflowTabs`` component, and Task 27's fold of the last five
+    of those ten into one tab -- but task 28 moved the step long called "Run"
+    (routing key ``"run"``, unchanged) to second place and renamed its
+    catalogue title, by the repo owner's direct request: SOC and Land
+    cover's own period controls show the window they INHERIT from this
+    step's ``periods.overall``, which has to already be chosen or that text
+    is empty or misleading. Position is what orders them -- ``WorkflowTabs``
     renders ``workflow_tabs()`` as given, and a ``TabDescriptor`` has no
     ``id`` for a stray sort to key on.
 
@@ -157,10 +163,13 @@ def test_the_tabs_are_in_the_sub_indicator_order():
     # just don't mistake it for proof the icon is CORRECT, only that it is
     # UNCHANGED.
     assert tabs[0].icon == "mdi-map-marker-check"
-    assert tabs[1].icon == "mdi-sprout-outline"
-    assert tabs[2].icon == "mdi-terrain"
-    assert tabs[3].icon == "mdi-layers-outline"
-    assert tabs[4].icon == "mdi-play-circle-outline"
+    # "mdi-calendar-range", not the old "mdi-play-circle-outline" -- the
+    # Build button this step used to hold is long gone (Task 20); a
+    # date-range icon describes what is actually left.
+    assert tabs[1].icon == "mdi-calendar-range"
+    assert tabs[2].icon == "mdi-sprout-outline"
+    assert tabs[3].icon == "mdi-terrain"
+    assert tabs[4].icon == "mdi-layers-outline"
     assert tabs[5].icon == "mdi-chart-bar"
 
 
@@ -176,10 +185,10 @@ def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_ta
     steps = [tab.step for tab in tabs]
     assert steps == [
         "aoi",
+        "run",
         "productivity",
         "land_cover",
         "soc",
-        "run",
         None,
     ]
     for step in steps:
@@ -494,7 +503,7 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
     workflow_widget = mapapp.right_panel_content[0]["content"][0]
     tab_items = find_widgets(workflow_widget, v.TabItem)
     assert len(tab_items) == 6
-    run_sheet = tab_items[_RUN_INDEX]
+    run_sheet = tab_items[_PERIOD_INDEX]
     assert markdown_texts(run_sheet)[-1] == f"<p><strong>{exc_info.value}</strong></p>"
 
 
@@ -621,7 +630,7 @@ def test_switching_tabs_does_not_rebuild_the_others_widgets():
 
     after = find_widgets(_workflow_widget(box), v.TabItem)
     assert len(after) == 6
-    for i in (_AOI_INDEX, _RUN_INDEX, _OUTPUTS_INDEX):
+    for i in (_AOI_INDEX, _PERIOD_INDEX, _OUTPUTS_INDEX):
         assert after[i] is before[i], f"tab {i} was rebuilt on an unrelated tab switch"
 
 
@@ -688,21 +697,21 @@ def test_nav_targets_next_is_none_at_the_last_tab():
 
 
 def test_nav_targets_next_skips_a_locked_tab_and_finds_nothing_past_it():
-    """The shape of this app's own six tabs: Run, then one LOCKED output
-    tab, nothing after it. "Next" from Run must not land on the locked tab --
-    it must find nothing. Directly catches the mutation the brief names:
-    "'next' no longer skips a locked tab" would instead return the locked
-    tab's own index here.
+    """The shape of this app's own six tabs since task 28's reorder: SOC,
+    then one LOCKED output tab, nothing after it. "Next" from SOC must not
+    land on the locked tab -- it must find nothing. Directly catches the
+    mutation the brief names: "'next' no longer skips a locked tab" would
+    instead return the locked tab's own index here.
     """
-    tabs = [TabDescriptor("run", "Run", "i", []), TabDescriptor(None, "Outputs", "i", [])]
+    tabs = [TabDescriptor("soc", "Soc", "i", []), TabDescriptor(None, "Outputs", "i", [])]
     _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=False)
     assert next_t is None
 
 
 def test_nav_targets_next_reaches_the_output_tab_once_it_unlocks():
     """The positive case: once ``has_maps`` is true the same tab is no
-    longer LOCKED, so "next" from Run finds it."""
-    tabs = [TabDescriptor("run", "Run", "i", []), TabDescriptor(None, "Outputs", "i", [])]
+    longer LOCKED, so "next" from SOC finds it."""
+    tabs = [TabDescriptor("soc", "Soc", "i", []), TabDescriptor(None, "Outputs", "i", [])]
     _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=True)
     assert next_t == 1
 
@@ -713,7 +722,7 @@ def test_nav_targets_skips_a_run_of_more_than_one_locked_tab():
     never produce more than one (``_tab_state`` locks every ``step=None``
     tab identically, off the same ``has_maps``)."""
     tabs = [
-        TabDescriptor("run", "Run", "i", []),
+        TabDescriptor("soc", "Soc", "i", []),
         TabDescriptor(None, "Locked 1", "i", []),
         TabDescriptor(None, "Locked 2", "i", []),
     ]
@@ -748,16 +757,17 @@ def test_the_prev_arrow_is_disabled_and_the_next_arrow_enabled_on_the_first_tab(
     assert next_arrow.disabled is False
 
 
-def test_the_next_arrow_is_disabled_on_run_while_the_outputs_tab_is_still_locked():
+def test_the_next_arrow_is_disabled_on_soc_while_the_outputs_tab_is_still_locked():
     """The default, empty spec has no build, so the merged outputs tab --
-    the only tab after Run -- is LOCKED. The next arrow must show that,
-    not just silently refuse to navigate.
+    the only tab after SOC, task 28's reorder put the renamed "Run"
+    (Assessment period) step second instead -- is LOCKED. The next arrow
+    must show that, not just silently refuse to navigate.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_RUN_INDEX].fire_event("click", None)
+    cells[_SOC_INDEX].fire_event("click", None)
     rc.force_update()
 
     _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
@@ -779,7 +789,7 @@ def test_clicking_the_next_arrow_moves_forward_and_the_prev_arrow_moves_back():
 
     tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
     assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _PRODUCTIVITY_INDEX
+    assert tabs_items_widget.v_model == _PERIOD_INDEX
 
     prev_arrow, _next_arrow = _nav_arrows(_workflow_widget(box))
     prev_arrow.fire_event("click", None)
@@ -790,7 +800,7 @@ def test_clicking_the_next_arrow_moves_forward_and_the_prev_arrow_moves_back():
     assert tabs_items_widget.v_model == _AOI_INDEX
 
 
-def test_clicking_the_next_arrow_on_run_does_not_navigate_into_a_locked_outputs_tab():
+def test_clicking_the_next_arrow_on_soc_does_not_navigate_into_a_locked_outputs_tab():
     """The direct counter-proof for "'next' no longer skips a locked tab":
     under that mutation this click WOULD move ``v_model`` to the outputs tab
     even though it is still LOCKED. Uses ``fire_event``, which bypasses the
@@ -803,7 +813,7 @@ def test_clicking_the_next_arrow_on_run_does_not_navigate_into_a_locked_outputs_
     assert rc is not None
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_RUN_INDEX].fire_event("click", None)
+    cells[_SOC_INDEX].fire_event("click", None)
     rc.force_update()
 
     _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
@@ -812,13 +822,14 @@ def test_clicking_the_next_arrow_on_run_does_not_navigate_into_a_locked_outputs_
 
     tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
     assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _RUN_INDEX
+    assert tabs_items_widget.v_model == _SOC_INDEX
 
 
-def test_clicking_the_next_arrow_on_run_reaches_the_outputs_tab_once_unlocked(monkeypatch):
+def test_clicking_the_next_arrow_on_soc_reaches_the_outputs_tab_once_unlocked(monkeypatch):
     """The positive case, through the real render tree: once a build exists
-    the outputs tab is reachable, and "next" from Run lands on it directly
-    (there is nothing else after it to skip)."""
+    the outputs tab is reachable, and "next" from SOC (the last configuration
+    tab since task 28's reorder) lands on it directly (there is nothing else
+    after it to skip)."""
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -837,7 +848,7 @@ def test_clicking_the_next_arrow_on_run_reaches_the_outputs_tab_once_unlocked(mo
     captured["spec"].value = _BUILDABLE_SPEC
 
     cells = _wrapper_cells(_workflow_widget(box))
-    cells[_RUN_INDEX].fire_event("click", None)
+    cells[_SOC_INDEX].fire_event("click", None)
     rc.force_update()
 
     _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))

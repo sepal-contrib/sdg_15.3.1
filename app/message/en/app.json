@@ -11,7 +11,7 @@
     "productivity": "Productivity",
     "land_cover": "Land cover",
     "soc": "Soil organic carbon",
-    "run": "Run"
+    "run": "Assessment period"
   },
   "aoi": {
     "description": "Choose the area the indicator is computed over.",
@@ -61,7 +61,7 @@
     "end": "End year"
   },
   "run": {
-    "description": "Choose the overall period the indicator runs over; its status appears below.",
+    "description": "Choose the overall assessment period; its status appears below.",
     "start_year": "Start year",
     "end_year": "End year",
     "ready": {
@@ -162,7 +162,7 @@
   },
   "period_override": {
     "toggle": "Use a different period for this sub-indicator",
-    "inherited": "Uses the run's period: {start}–{end}."
+    "inherited": "Uses the assessment period: {start}–{end}."
   },
   "tabs": {
     "previous": "Previous step",
@@ -172,7 +172,7 @@
       "productivity": "PRD",
       "land_cover": "LC",
       "soc": "SOC",
-      "run": "RUN",
+      "run": "PER",
       "outputs": "RES"
     }
   }
