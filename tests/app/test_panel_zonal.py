@@ -18,9 +18,10 @@ from collections.abc import Callable
 from pathlib import PurePosixPath
 from typing import Any
 
+import geopandas as gpd
 import ipyvuetify
-import pandas as pd
 import solara
+from shapely.geometry import Polygon
 from solara.components.datatable import DataTableWidget
 
 from app.message import msg
@@ -110,7 +111,19 @@ class _FakeNotifier:
         self.errors.append(message)
 
 
-_FRAME = pd.DataFrame({"NoData": [0.0], "Improve": [1.5], "Stable": [2.5], "Degrade": [0.5]})
+# A GeoDataFrame in the shape `decode_zonal_areas` produces: one row per zone,
+# the named area columns, and a geometry column carrying the zone's own shape --
+# `fetch_zonal_areas` is declared to return `gpd.GeoDataFrame` (`sdg1531/stats/api.py`),
+# not `pd.DataFrame`, and the panel duck-types nothing here that a plain frame
+# would also satisfy: solara.DataFrame accepts pandas/polars/vaex, NOT geopandas,
+# so a fixture built from the wrong type would pass every assertion below while
+# the real app crashes the moment `ZonalPanel` renders a `GeoDataFrame` -- see
+# Task 26.
+_FRAME = gpd.GeoDataFrame(
+    {"NoData": [0.0], "Improve": [1.5], "Stable": [2.5], "Degrade": [0.5]},
+    geometry=[Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])],
+    crs="EPSG:4326",
+)
 
 
 async def _wait_for(predicate: Callable[[], bool], timeout: float = 2.0) -> bool:
