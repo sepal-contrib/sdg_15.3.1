@@ -429,3 +429,89 @@ def test_a_failed_download_reports_the_error_and_does_not_pretend_to_succeed(mon
     assert fake.successes == []
     assert fake.errors == ["could not write the shapefile"]
     assert sepal_client.files.writes == []
+
+
+def test_a_new_run_discards_the_table_the_previous_one_produced(monkeypatch):
+    """The repo owner's request, applied to the table: *"if I change params,
+    the map should gone and the graphs and calculations should also gone"*.
+
+    A new ``maps`` object is a new run (task 20). Zonal counts left over from
+    the previous one are areas for a spec the user has already changed, shown
+    under a heading that now describes a different one -- and the download
+    button beside them would write exactly those numbers into a shapefile.
+    Unlike the two chart panels, the evidence here is direct: the table is a
+    real ``DataTableWidget`` in the reacton tree.
+    """
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.zonal.use_notifications", lambda: fake)
+
+    async def fake_fetch(gee_interface, maps, zone_collection, *, scale):
+        return _FRAME
+
+    monkeypatch.setattr("app.panels.zonal.fetch_zonal_areas", fake_fetch)
+
+    resolved = _FakeResolvedScales(analysis_scale=300, zonal_scale=100)
+    first_run, second_run = _FakeMaps(resolved), _FakeMaps(resolved)
+    ctx = _FakeCtx(object())
+
+    def show(maps: Any) -> Any:
+        return ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=None)
+
+    async def main():
+        box, rc = solara.render(show(first_run), handle_error=False)
+        assert rc is not None
+        _buttons(box)[(msg("zonal.compute"),)].click()
+        assert await _wait_for(lambda: fake.successes or fake.errors)
+        assert find_widget(box, DataTableWidget) is not None, "nothing to discard"
+        assert (msg("zonal.download"),) in _buttons(box)
+
+        rc.render(show(second_run))
+        return box
+
+    box = asyncio.run(main())
+
+    assert find_widget(box, DataTableWidget) is None
+    # The download button goes with it: it uploads the frame that was on
+    # screen, so leaving it behind would offer to save the abandoned run.
+    assert (msg("zonal.download"),) not in _buttons(box)
+
+
+def test_a_zonal_compute_still_in_flight_when_the_run_changes_cannot_land_afterwards(monkeypatch):
+    """Clearing the stored frame is not enough on its own: a compute started
+    under the PREVIOUS run would otherwise finish afterwards and write its
+    stale table straight back into the reactive just cleared -- a table that
+    reappears a second later, counting the wrong run. Hence the cancel inside
+    the discard."""
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.zonal.use_notifications", lambda: fake)
+
+    release = asyncio.Event()
+
+    async def slow_fetch(gee_interface, maps, zone_collection, *, scale):
+        await release.wait()
+        return _FRAME
+
+    monkeypatch.setattr("app.panels.zonal.fetch_zonal_areas", slow_fetch)
+
+    resolved = _FakeResolvedScales(analysis_scale=300, zonal_scale=100)
+    first_run, second_run = _FakeMaps(resolved), _FakeMaps(resolved)
+    ctx = _FakeCtx(object())
+
+    def show(maps: Any) -> Any:
+        return ZonalPanel(maps=maps, ctx=ctx, gee_interface=None, sepal_client=None)
+
+    async def main():
+        box, rc = solara.render(show(first_run), handle_error=False)
+        assert rc is not None
+        _buttons(box)[(msg("zonal.compute"),)].click()
+        await asyncio.sleep(0)  # let the task start and block
+
+        rc.render(show(second_run))
+        release.set()
+        await asyncio.sleep(0.05)
+        return box
+
+    box = asyncio.run(main())
+
+    assert fake.successes == [], "a compute from the abandoned run reported a result"
+    assert find_widget(box, DataTableWidget) is None

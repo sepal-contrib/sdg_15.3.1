@@ -12,6 +12,7 @@ into the chart option and a toast.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -23,6 +24,7 @@ from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
 from app.panels.chart_theme import themed_option
+from app.panels.staleness import use_discard_on_new_run
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.enums import IndicatorLayer
@@ -124,6 +126,19 @@ def ResultsPanel(
         handle_task_state,
         [task.pending, task.finished, task.error, task.cancelled],
     )
+
+    def discard_stale_chart() -> None:
+        # `maps` is a different run: the chart on screen is a picture of the
+        # PREVIOUS one, under a heading that now describes this one. Cancel
+        # first -- a fetch started under the old run would otherwise finish
+        # after this and write its stale option straight back into the
+        # reactive just cleared.
+        with contextlib.suppress(RuntimeError):
+            if task.pending:
+                task.cancel()
+        option.value = None
+
+    use_discard_on_new_run(maps, discard_stale_chart)
 
     def start() -> None:
         # Snapshot both here, at click time -- not inside `_compute`, which the

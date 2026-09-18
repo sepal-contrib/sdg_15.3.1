@@ -2,15 +2,33 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import reacton.core
 import solara
 from pysepal.mapping.sepal_map import SepalMap
 from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
+from app import tabs as tabs_module
 from app.message import messages, msg
+from app.panels import map_layers as map_layers_module
 from app.tabs import workflow_tabs
+from sdg1531.enums import IndicatorLayer
+from sdg1531.spec import AdminAoi
 from tests.app.render_helpers import find_widget
+from tests.spec_factory import default_spec
+
+#: `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
+#: threshold before `build_indicator_maps()` will succeed -- see
+#: `tests/app/test_tabs.py`, which floors its own buildable spec the same way.
+_BUILDABLE_SPEC = default_spec(threshold=0.0)
+
+
+@solara.component
+def _noop_export_dialog_host(**_kwargs: Any) -> None:
+    """``use_export_dialog`` schedules async work at mount and this harness has
+    no running loop -- see ``tests/app/test_tabs.py``'s identical stand-in."""
 
 
 def test_page_is_a_solara_component():
@@ -112,3 +130,56 @@ def test_the_map_is_memoized_across_rerenders():
     mapapp_again = find_widget(box, MapApp)
     assert mapapp_again is not None
     assert mapapp_again.main_map[0] is first_map
+
+
+def test_changing_the_spec_takes_the_previous_runs_tiles_off_the_map(monkeypatch):
+    """The whole chain the repo owner described, through the real app: *"if I
+    change params, the map should gone ... the same if I change the AOI"*.
+
+    Every link is exercised for real -- ``spec`` -> ``build_outcome`` ->
+    ``use_memo`` -> ``WorkflowTabs`` -> ``OutputsPanel`` -> ``MapLayersPanel``
+    -> ``SepalMap.remove_layer`` -- because the parts that could break it are
+    exactly the ones a panel-level test replaces with a fake: whether a real
+    ``IndicatorMaps`` from a changed spec actually compares unequal (and
+    cheaply -- see ``test_staleness.py``), and whether the panel that owns the
+    sweep is even still mounted after a tab switch. Both were verified by
+    hand before this test existed; this is what keeps them verified.
+
+    Counting the sweep rather than watching real tiles keeps it offline:
+    ``clear_stale_layers`` removes every ``IndicatorLayer`` id on each run
+    change, whether or not that layer was ever drawn, so the count is the
+    signal.
+    """
+    removed: list[str] = []
+    monkeypatch.setattr(
+        page_module.SepalMap,
+        "remove_layer",
+        lambda self, key, none_ok=False: removed.append(key),
+    )
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["spec"] = spec
+
+    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    assert removed == [], "the mount is not a run change"
+
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+    after_first_build = len(removed)
+    assert after_first_build == len(IndicatorLayer)
+
+    captured["spec"].value = _BUILDABLE_SPEC.evolve(threshold=0.5)  # a PARAMS edit
+    rc.force_update()
+    assert len(removed) == 2 * len(IndicatorLayer)
+
+    captured["spec"].value = _BUILDABLE_SPEC.evolve(
+        threshold=0.5, aoi=AdminAoi(admin_code="76", name="Valle del Cauca")
+    )  # an AOI change
+    rc.force_update()
+    assert len(removed) == 3 * len(IndicatorLayer)

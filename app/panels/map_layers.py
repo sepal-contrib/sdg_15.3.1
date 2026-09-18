@@ -100,6 +100,7 @@ from reacton.ipyvue import use_event
 from app.message import msg
 from app.panels.exports import export_sources
 from app.panels.layer_style import display_image, layer_name, layer_vis_params
+from app.panels.staleness import use_discard_on_new_run
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import ClassifiedLayer, IndicatorMaps
 from sdg1531.enums import IndicatorLayer
@@ -402,9 +403,6 @@ def MapLayersPanel(
     # would otherwise make it differ between the "not built yet" and "built"
     # renders of the same panel instance.
     export_request, set_export_request = solara.use_state(_ExportRequest(0, ""))
-    # `clear_stale_layers` fires on mount as well as on a real change; this is
-    # what tells the two apart. See that function.
-    seen_a_run = solara.use_ref(False)
 
     def handle_task_state() -> None:
         if task.pending or task.cancelled:
@@ -455,13 +453,7 @@ def MapLayersPanel(
         # map back off, rather than leaving old-run tiles shown next to -- or
         # instead of -- the new run's.
         #
-        # The FIRST invocation is the mount, not a change, and is skipped.
-        # This panel has drawn nothing yet at that point, and the shared
-        # `shown` reactive may legitimately already name layers that ARE on
-        # the map -- it outlives this component (`page.py` owns it), so a
-        # remount must not treat the current run's own tiles as stale.
-        #
-        # After that it sweeps the whole `IndicatorLayer` enum rather than
+        # It sweeps the whole `IndicatorLayer` enum rather than
         # `shown_ids`, with `remove_layer(..., none_ok=True)` making each
         # removal a no-op when that layer is not on the map. `shown_ids` is a
         # RENDER-TIME snapshot and there is a real window in which it is
@@ -474,23 +466,18 @@ def MapLayersPanel(
         # `MapLegend`, and impossible to remove from the UI afterwards. The
         # enum is the complete set of keys `_add_layer` can ever have used, so
         # sweeping it cannot miss one.
-        if not seen_a_run.current:
-            seen_a_run.current = True
-            return
         cancel()
         if map_ is not None:
             for layer_id in IndicatorLayer:
                 map_.remove_layer(layer_id.value, none_ok=True)
         shown_reactive.value = frozenset()
 
-    # Keyed on `maps` alone -- identity/equality of the whole `IndicatorMaps`,
-    # never one of its fields, is what "a different run" means here (see
-    # `page.py`'s `outcome` comment on why `==` is the right comparison for a
-    # frozen dataclass built fresh per run). Fires again when `maps` becomes
-    # `None` (the spec is no longer runnable), which is
-    # required by the task, not only the "changed to a different runnable
-    # spec" case -- except the mount, which it skips (see above).
-    solara.use_effect(clear_stale_layers, [maps])
+    # Keyed on the whole `IndicatorMaps`, never one of its fields -- that is
+    # what "a different run" means, here and in the three panels below this
+    # one, which is why it is one shared hook. `app/panels/staleness.py`
+    # carries the mount rule and the measured reason the dependency must stay
+    # this object.
+    use_discard_on_new_run(maps, clear_stale_layers)
 
     def toggle(layer_id: IndicatorLayer, layer: ClassifiedLayer) -> None:
         if task.pending and pending_id == layer_id:

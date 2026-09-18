@@ -350,3 +350,108 @@ def test_a_chart_ready_while_its_section_is_collapsed_does_not_mount_until_reope
     asyncio.run(main())
 
     assert displayed  # reopening builds the widget now that data is ready
+
+
+def test_a_new_run_discards_the_chart_the_previous_one_produced(monkeypatch):
+    """The repo owner's request: *"if I change params, the map should gone and
+    the graphs and calculations should also gone, right? the same if I change
+    the AOI"*.
+
+    ``maps`` is a derivation of the run spec (task 20), so a new ``maps``
+    object IS a new run. A chart left over from the previous one is a picture
+    of a run the user has moved on from, sitting under a heading that now
+    describes a different one -- the silently-wrong-data failure the whole
+    ``BuildOutcome`` design exists to prevent, reappearing one layer up.
+    ``MapLayersPanel`` already discarded on this signal; this panel did not.
+
+    The ``is_open`` toggle is the probe, not decoration. ``solara.display`` is
+    this harness's only vantage point on a displayed widget, and it is called
+    from the render body -- which reacton skips entirely when nothing about
+    the element changed, so neither ``force_update`` nor a re-render with
+    equal props says anything about what is on screen. Closing and reopening
+    the section re-runs the body AND re-runs the chart memo (``is_open`` is
+    one of its dependencies), so what it displays afterwards is exactly "does
+    this panel still hold an option".
+    """
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
+
+    async def fake_fetch(gee_interface, maps, ctx, *, layer):
+        return _FRAME
+
+    monkeypatch.setattr("app.panels.results.fetch_areas_by_land_cover", fake_fetch)
+
+    displayed: list[Any] = []
+    monkeypatch.setattr(solara, "display", lambda obj: displayed.append(obj))
+
+    resolved = FakeResolved()
+    first_run, second_run = _FakeMaps(resolved), _FakeMaps(resolved)
+    ctx = object()
+
+    def show(maps: Any, *, is_open: bool) -> Any:
+        return ResultsPanel(maps=maps, ctx=ctx, gee_interface=None, is_open=is_open)
+
+    async def main():
+        box, rc = solara.render(show(first_run, is_open=True), handle_error=False)
+        assert rc is not None
+        find_widget(box, ipyvuetify.Btn).click()
+        assert await _wait_for(lambda: fake.successes or fake.errors)
+
+        # The floor: the SAME run survives a close/reopen with its chart, so
+        # the assertion below cannot pass merely because this probe stopped
+        # displaying anything at all.
+        rc.render(show(first_run, is_open=False))
+        displayed.clear()
+        rc.render(show(first_run, is_open=True))
+        assert displayed, "the chart vanished without any run change"
+
+        rc.render(show(second_run, is_open=True))
+        rc.render(show(second_run, is_open=False))
+        displayed.clear()
+        rc.render(show(second_run, is_open=True))
+
+    asyncio.run(main())
+
+    assert displayed == []
+
+
+def test_a_fetch_still_in_flight_when_the_run_changes_cannot_land_afterwards(monkeypatch):
+    """Discarding the stored option is not enough on its own: a fetch started
+    under the PREVIOUS run would otherwise finish afterwards and write its
+    stale option straight back into the reactive just cleared -- a chart that
+    reappears a second later, describing the wrong run, with nothing on screen
+    to say so. Hence the cancel inside the discard.
+    """
+    fake = _FakeNotifier()
+    monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
+    monkeypatch.setattr(solara, "display", lambda obj: None)
+
+    release = asyncio.Event()
+
+    async def slow_fetch(gee_interface, maps, ctx, *, layer):
+        await release.wait()
+        return _FRAME
+
+    monkeypatch.setattr("app.panels.results.fetch_areas_by_land_cover", slow_fetch)
+
+    resolved = FakeResolved()
+    first_run, second_run = _FakeMaps(resolved), _FakeMaps(resolved)
+    ctx = object()
+
+    async def main():
+        box, rc = solara.render(
+            ResultsPanel(maps=first_run, ctx=ctx, gee_interface=None), handle_error=False
+        )
+        assert rc is not None
+        find_widget(box, ipyvuetify.Btn).click()
+        await asyncio.sleep(0)  # let the task actually start and block
+
+        rc.render(ResultsPanel(maps=second_run, ctx=ctx, gee_interface=None))
+        rc.force_update()
+
+        release.set()
+        await asyncio.sleep(0.05)
+
+    asyncio.run(main())
+
+    assert fake.successes == [], "a fetch from the abandoned run reported a result"

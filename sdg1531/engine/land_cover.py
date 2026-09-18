@@ -91,12 +91,17 @@ _CCI_WATER_CLASS = 210
 _IPCC_WATER_CODE = 70
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class LandCoverMaps:
     """The land-cover sub-indicator stack.
 
     ``stack`` carries five bands, in this order (land_cover.py:104-109):
     ``degradation``, ``transition``, ``start``, ``end``, ``water``.
+
+    ``eq=False`` for the reason :class:`~sdg1531.engine.indicator.ClassifiedLayer`
+    records: value equality on an ee graph is unbounded, and this one rides
+    inside :class:`~sdg1531.engine.indicator.IndicatorMaps` where a single
+    field-by-field comparison would reach it.
     """
 
     stack: ee.Image

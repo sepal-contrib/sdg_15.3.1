@@ -18,6 +18,7 @@ the full dependency list mirrors that outcome into state and a toast.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -28,6 +29,7 @@ from pysepal.solara.components.task_button import TaskButtonComponent, use_task_
 from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
+from app.panels.staleness import use_discard_on_new_run
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.export import zonal_shapefile_zip
@@ -169,6 +171,17 @@ def ZonalPanel(
             compute_task.cancelled,
         ],
     )
+
+    def discard_stale_table() -> None:
+        # `maps` is a different run: the table on screen counts the PREVIOUS
+        # one's classes. Cancel first, or a compute started under the old run
+        # finishes after this and writes its stale frame straight back.
+        with contextlib.suppress(RuntimeError):
+            if compute_task.pending:
+                compute_task.cancel()
+        frame.value = None
+
+    use_discard_on_new_run(maps, discard_stale_table)
 
     def start_compute() -> None:
         # Snapshot both here, at click time -- not inside `_compute`, which the

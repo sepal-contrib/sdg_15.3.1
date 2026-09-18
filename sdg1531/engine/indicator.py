@@ -135,7 +135,7 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class ClassifiedLayer:
     """One of the seven outputs.
 
@@ -155,9 +155,18 @@ class ClassifiedLayer:
     -- the name is a near-twin of ``labels``, which is the class legend, so
     the distinction is worth stating.
 
-    ``frozen=True`` synthesises ``__hash__``, but hashing an instance raises
-    ``TypeError`` because ``labels`` is a mapping. Nothing hashes these today;
-    ``eq=False`` is not used because equality is worth having.
+    **``eq=False``: equality is by IDENTITY, and must stay that way.**
+    ``ee.ComputedObject.__eq__`` compares ``__dict__``, so a generated
+    field-by-field ``__eq__`` walks the whole graph -- and an ee graph is a DAG
+    whose shared subtrees get re-walked once per path. Measured: comparing two
+    structurally-equal SOC layers did not finish in 8 seconds. That is not a
+    hypothetical: reacton compares a component's props, and the closure cells
+    inside them, with ``==`` on every reconciliation, so a spec edit that left
+    ANY layer's graph unchanged (a threshold edit leaves SOC untouched) wedged
+    the whole kernel -- the map never cleared, because the render that would
+    have cleared it never finished. Two runs from the same spec are the same
+    run; identity says so in constant time, and value equality says so only in
+    principle.
     """
 
     id: IndicatorLayer
@@ -167,7 +176,7 @@ class ClassifiedLayer:
     labels: Mapping[int, str]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, eq=False)
 class IndicatorMaps:
     """The seven output images of one run.
 
@@ -177,10 +186,18 @@ class IndicatorMaps:
     ``fetch_transition_areas`` and ``fetch_areas_by_land_cover`` read
     ``maps.resolved``. It is the first field and is never an ``ee`` object.
 
-    As with :class:`ClassifiedLayer`, ``frozen=True`` synthesises a ``__hash__``
-    that raises ``TypeError: unhashable type: 'dict'`` -- here because
-    ``resolved`` carries mappings. (``ee.Image`` itself hashes fine; the images
-    are not the obstacle.)
+    **``eq=False``: equality is by IDENTITY, and must stay that way.**
+    ``ee.ComputedObject.__eq__`` compares ``__dict__``, so a generated
+    field-by-field ``__eq__`` walks the whole graph -- and an ee graph is a DAG
+    whose shared subtrees get re-walked once per path. Measured: comparing two
+    structurally-equal SOC layers did not finish in 8 seconds. That is not a
+    hypothetical: reacton compares a component's props, and the closure cells
+    inside them, with ``==`` on every reconciliation, so a spec edit that left
+    ANY layer's graph unchanged (a threshold edit leaves SOC untouched) wedged
+    the whole kernel -- the map never cleared, because the render that would
+    have cleared it never finished. Two runs from the same spec are the same
+    run; identity says so in constant time, and value equality says so only in
+    principle.
     """
 
     resolved: ResolvedSpec
