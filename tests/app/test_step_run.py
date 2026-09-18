@@ -15,11 +15,12 @@ import pytest
 import solara
 
 from app.message import msg
+from app.state import problems_for
 from app.steps.run import BuildOutcome, RunStep, _sensor_coverage_hint, build, build_outcome
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import Period, PeriodOverride, RunSpec, SensorSelection, SubPeriods
-from tests.app.render_helpers import find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, find_widgets
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # Every non-overall sub-period pinned to a range that resolves on its own,
@@ -90,7 +91,7 @@ def test_build_touches_no_network():
 
 def test_build_outcome_is_empty_for_a_spec_that_is_not_runnable():
     """An ordinary half-filled form, not an exception -- `RunStep` already
-    renders `problems_for` and `msg("run.blocked")` for this state."""
+    renders `problems_for` for this state."""
     assert build_outcome(RunSpec()) == BuildOutcome()
 
 
@@ -137,58 +138,73 @@ def test_build_outcome_carries_the_refusal_is_runnable_cannot_see():
 
 
 @pytest.mark.parametrize(
-    ("spec", "outcome", "expected_extra"),
+    ("spec", "outcome", "expected_alerts"),
     [
-        (
-            _BUILDABLE_SPEC,
-            BuildOutcome(maps=_StubMaps(7)),
-            [f"<p>{msg('run.ready', count=7)}</p>"],
-        ),
+        (_BUILDABLE_SPEC, BuildOutcome(maps=_StubMaps(7)), []),
         (
             _SPEC_WITH_A_RUN_PROBLEM,
             BuildOutcome(),
-            [
-                "<p><strong>The assessment start year must be earlier than the "
-                "end year.</strong></p>",
-                f"<p>{msg('run.blocked')}</p>",
-            ],
+            [("error", "The assessment start year must be earlier than the end year.")],
         ),
-        (
-            _SPEC_WITH_ANOTHER_STEPS_PROBLEM,
-            BuildOutcome(),
-            [f"<p>{msg('run.blocked')}</p>"],
-        ),
+        (_SPEC_WITH_ANOTHER_STEPS_PROBLEM, BuildOutcome(), []),
         (
             default_spec(),
             BuildOutcome(error="spec.threshold must be resolved before the ee graph can be built"),
-            [
-                "<p><strong>spec.threshold must be resolved before the ee "
-                "graph can be built</strong></p>"
-            ],
+            [("error", "spec.threshold must be resolved before the ee graph can be built")],
         ),
     ],
 )
-def test_the_step_renders_only_its_own_text(spec, outcome, expected_extra):
-    """Pins what the step actually shows, in four states: built (the status
-    line reports the real layer count), a fatal problem THIS step owns (that
-    problem's text plus the blocked notice), a fatal problem belonging to
-    ANOTHER step (the blocked notice but NOT that other step's text -- the
-    "only" half of this test's name), and a refusal `is_runnable` cannot see
-    (the error, bold). `RunStep` never calls `build_outcome` itself, so each
-    case hands it a `BuildOutcome` directly rather than relying on what the
-    real function would compute for that spec. Every case here shares
-    `default_spec()`'s sensor (MODIS MOD13Q1, coverage 2000-onward), so the
-    coverage hint leading the rest is the same line in all four. The
-    description itself is no longer rendered by this step (task 30: it rides
-    on `ParamsPanel`'s own `SectionHeader` now -- see `app/panels/params.py`).
+def test_the_step_renders_only_its_own_problems(spec, outcome, expected_alerts):
+    """Pins what the step actually shows, in four states: built (nothing to
+    report), a fatal problem THIS step owns, a fatal problem belonging to
+    ANOTHER step (nothing -- the "only" half of this test's name, guarded
+    below against being vacuous), and a refusal `is_runnable` cannot see.
+
+    Read off `rv.Alert` rather than markdown: every validation message now
+    goes through `app/panels/problems.py`'s single styled component, which
+    also means the severity is asserted directly (`"error"` for a fatal
+    problem) instead of being inferred from a `<strong>` wrapper.
+
+    The "Ready: N layers" and "Fix the problems above" lines this used to
+    check are deliberately gone -- informational restatements of what the
+    Results tab's own enabled state already says, which is exactly the noise
+    the repo owner asked to be rid of ("it should only report
+    errors/warnings, not useless info"). The layer count is still proven, by
+    `test_build_outcome_returns_the_real_maps_and_context_for_a_buildable_spec`.
+
+    `RunStep` never calls `build_outcome` itself, so each case hands it a
+    `BuildOutcome` directly rather than relying on what the real function
+    would compute for that spec.
     """
     spec_r = solara.reactive(spec)
     box, rc = solara.render(RunStep(spec=spec_r, outcome=outcome), handle_error=False)
     assert rc is not None
-    assert markdown_texts(box) == [
-        f"<p>{msg('run.sensor_coverage_open', start=2000)}</p>",
-        *expected_extra,
+    assert alert_texts(box) == expected_alerts
+
+
+def test_another_steps_fatal_problem_really_exists_and_is_still_not_shown_here():
+    """The floor under the third case above: `_SPEC_WITH_ANOTHER_STEPS_PROBLEM`
+    renders no alert, which proves nothing unless that spec really does carry
+    a fatal problem somewhere. It does -- it just belongs to the AOI step."""
+    assert any(p.fatal for p in problems_for("aoi", _SPEC_WITH_ANOTHER_STEPS_PROBLEM))
+    assert problems_for("run", _SPEC_WITH_ANOTHER_STEPS_PROBLEM) == ()
+
+
+def test_the_sensor_coverage_hint_renders_as_a_muted_caption_not_an_alert():
+    """It is a field hint about the two year Selects, not a problem, so it
+    must not be routed through `ProblemsAlert` -- see `app/panels/problems.py`
+    for why it is the one informational line that survived."""
+    spec_r = solara.reactive(_BUILDABLE_SPEC)
+    box, rc = solara.render(RunStep(spec=spec_r, outcome=BuildOutcome()), handle_error=False)
+    assert rc is not None
+
+    captions = [
+        w
+        for w in find_widgets(box, ipyvuetify.Html)
+        if w.tag == "div" and "caption" in (w.class_ or "")
     ]
+    assert [c.children[0] for c in captions] == [msg("run.sensor_coverage_open", start=2000)]
+    assert alert_texts(box) == []
 
 
 def test_the_year_selects_show_the_current_overall_period_and_the_legacy_range():

@@ -12,7 +12,7 @@ from pysepal.solara.components.aoi.aoi_spec import AoiSpec as PysepalAoiSpec
 from app.state import problems_for
 from app.steps.aoi import AoiStep, apply_selection
 from sdg1531.spec import AdminAoi, AssetAoi, RunSpec
-from tests.app.render_helpers import markdown_texts
+from tests.app.render_helpers import alert_texts, markdown_texts
 
 
 def _asset_selection(asset_id: str = "users/x/aoi", name: str = "aoi") -> AoiResult:
@@ -116,30 +116,26 @@ def test_the_view_is_wired_to_apply_the_selection_and_excludes_local_methods(mon
 
 
 @pytest.mark.parametrize(
-    ("aoi", "expected"),
+    ("aoi", "expected_alerts"),
     [
-        (
-            None,
-            [
-                "<p>Choose the area the indicator is computed over.</p>",
-                "<p><strong>Select an area of interest.</strong></p>",
-            ],
-        ),
-        (
-            AssetAoi(asset_id="users/x/aoi", name="aoi"),
-            [
-                "<p>Choose the area the indicator is computed over.</p>",
-                "<p>Selected: aoi</p>",
-            ],
-        ),
+        (None, [("error", "Select an area of interest.")]),
+        (AssetAoi(asset_id="users/x/aoi", name="aoi"), []),
     ],
 )
-def test_the_step_renders_only_its_own_text(aoi, expected):
+def test_the_step_renders_only_its_own_problems(aoi, expected_alerts):
     """Pins what the step actually shows, in both states, so that renaming the
     step passed to ``problems_for`` (which shows nothing for ``RunSpec()``'s
-    other steps), deleting the problems loop, or dropping the exclusion
-    rendered by ``AoiView`` cannot pass unnoticed."""
+    other steps) or deleting the ``ProblemsAlert`` cannot pass unnoticed.
+
+    The chosen-AOI case now shows NOTHING. It used to render "Selected:
+    {name}", which restated what ``AoiView``'s own controls already display
+    two rows above it -- the repo owner's own example of the noise this panel
+    should not carry ("in the AOI section remove the 'SELECTED...' that is
+    useless"). The description is not here either: it rides on this step's
+    ``SectionHeader`` (``app/panels/params.py``).
+    """
     spec = solara.reactive(RunSpec().evolve(aoi=aoi))
     box, rc = solara.render(AoiStep(spec=spec, map_=None), handle_error=False)
     assert rc is not None
-    assert markdown_texts(box) == expected
+    assert alert_texts(box) == expected_alerts
+    assert markdown_texts(box) == ["<p>Choose the area the indicator is computed over.</p>"]

@@ -28,6 +28,7 @@ from pysepal.sepalwidgets.vue_app import MapApp
 from app import page as page_module
 from app import tabs as tabs_module
 from app.message import msg
+from app.panels import map_layers as map_layers_module
 from app.panels import outputs as outputs_module
 from app.panels import params as params_module
 from app.panels.outputs import output_sections
@@ -62,7 +63,6 @@ _SECTION_TITLES_IN_ORDER = (
     msg("transitions.title"),
     msg("results.title"),
     msg("zonal.title"),
-    msg("exports.title"),
 )
 
 _SECTION_DESCRIPTIONS_IN_ORDER = (
@@ -70,21 +70,25 @@ _SECTION_DESCRIPTIONS_IN_ORDER = (
     msg("transitions.description"),
     msg("results.description"),
     msg("zonal.description"),
-    msg("exports.description"),
 )
 
 
 @solara.component
-def _noop_exports_panel(**_kwargs: Any) -> None:
-    """A stand-in for ``ExportsPanel`` in tests that drive a REAL build but
-    care about a different panel. ``ExportLauncher`` (the real component
-    behind ``ExportsPanel``) mounts one of its own tasks with
-    ``dependencies=[]`` -- pysepal's own, unrelated to this task's
+def _noop_export_dialog_host(**_kwargs: Any) -> None:
+    """A stand-in for ``map_layers._ExportDialogHost`` in tests that drive a
+    REAL build but care about a different panel.
+
+    ``use_export_dialog`` mounts one of its own tasks with
+    ``dependencies=[]`` -- pysepal's own, unrelated to this app's
     ``dependencies=None`` invariant -- which starts a real asyncio task the
-    moment it first mounts. That needs a running event loop this bare
-    ``solara.render()`` harness does not have, so tests that are not
-    exercising ``ExportsPanel`` itself substitute this instead of hitting it
-    by accident."""
+    moment it first renders. That needs a running event loop this bare
+    ``solara.render()`` harness does not have. The host only mounts once
+    ``maps``/``ctx`` exist (see its own docstring), so only tests with a
+    buildable spec reach it -- and those substitute this rather than hitting
+    the real dialog by accident. Before the Export section was folded into
+    the layers table this same stand-in was needed for ``ExportsPanel``, for
+    the identical reason.
+    """
 
 
 def _workflow_widget(box: object) -> Any:
@@ -99,13 +103,17 @@ def _workflow_widget(box: object) -> Any:
     return workflow_widget
 
 
-def _wrapper_cells(root: object) -> list[Any]:
-    """The segment-strip cells, in tab order -- duplicated from
-    ``tests/app/test_tabs.py``'s identical helper (a `title` attribute is
-    what picks a `_SegmentCell` wrapper out; see that module's own docstring)
-    rather than imported, matching this suite's existing per-file convention.
+def _select_tab(box: object, rc: Any, index: int) -> None:
+    """Activate a workflow tab the way a real click does -- duplicated from
+    ``tests/app/test_tabs.py``'s identical helper rather than imported,
+    matching this suite's existing per-file convention. Writing the strip's
+    ``v_model`` is the path Vuetify's own click handler takes; see that
+    module for the full reasoning.
     """
-    return [w for w in find_widgets(root, v.Html) if w.attributes.get("title")]
+    strip = find_widget(_workflow_widget(box), v.Tabs)
+    assert strip is not None
+    strip.v_model = index
+    rc.force_update()
 
 
 # ---------------------------------------------------------------------------
@@ -164,20 +172,23 @@ def test_the_sections_are_in_the_old_tab_order():
     assert sections[1].icon == "mdi-transit-transfer"
     assert sections[2].icon == "mdi-chart-bar"
     assert sections[3].icon == "mdi-table"
-    assert sections[4].icon == "mdi-export-variant"
 
 
-def test_there_are_exactly_five_sections():
-    assert len(output_sections()) == 5
+def test_there_are_exactly_four_sections():
+    """Four, not five: Export is no longer a section of its own -- each row of
+    the layers table carries its own export icon instead (see
+    ``app/panels/map_layers.py``). Pinned so re-adding a fifth is a deliberate
+    edit rather than a silent one."""
+    assert len(output_sections()) == 4
 
 
 def test_each_sections_own_description_travels_with_it():
     """Task 28: each section's own ``msg("<panel>.description")`` now rides
     along on the ``SectionDescriptor`` itself, for ``OutputsPanel`` to hand to
     ``SectionHeader`` -- the panel components themselves no longer render it.
-    A description test naming its section, per the brief -- these five
-    strings have already vanished once (task 21 dropped all five silently
-    when it collapsed ten right-panel sections into one).
+    A description test naming its section, per the brief -- these strings
+    have already vanished once (task 21 dropped all of them silently when it
+    collapsed ten right-panel sections into one).
     """
     sections = output_sections()
     assert [s.description for s in sections] == list(_SECTION_DESCRIPTIONS_IN_ORDER)
@@ -193,7 +204,7 @@ def test_the_expansion_panel_accordion_is_gone(monkeypatch):
     """Task 28's own ask: the repo owner disliked the accordion Task 27
     added ("I didn't like the expansion panels you added"). Regression guard
     against reintroducing it."""
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
@@ -204,7 +215,7 @@ def test_the_expansion_panel_accordion_is_gone(monkeypatch):
 
 def test_every_sections_title_and_description_render_on_screen(monkeypatch):
     """The render-level half of ``test_each_sections_own_description_travels_
-    with_it`` above: proves the five descriptions are not just carried on the
+    with_it`` above: proves the descriptions are not just carried on the
     dataclass but actually reach the screen, in order, alongside their
     titles -- the exact thing that silently broke once already (task 21).
 
@@ -218,11 +229,11 @@ def test_every_sections_title_and_description_render_on_screen(monkeypatch):
     unmounts an inactive tab (``app/tabs.py``'s own docstring), THAT tab's
     spans/paragraphs are also live in the same tree. Scoped to the outputs
     ``TabItem`` alone (``_OUTPUTS_TAB_INDEX``), not the whole workflow
-    widget, so this stays a proof about the five OUTPUT sections specifically
+    widget, so this stays a proof about the OUTPUT sections specifically
     -- ``tests/app/test_panel_params.py``'s own identical test covers PARAMS'
     four.
     """
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
@@ -234,7 +245,7 @@ def test_every_sections_title_and_description_render_on_screen(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # Identity wiring -- `app.tabs.WorkflowTabs` -> `OutputsPanel` -> each of the
-# five panels, end to end through the real `Sdg1531App` render.
+# four panels, end to end through the real `Sdg1531App` render.
 # ---------------------------------------------------------------------------
 
 
@@ -250,13 +261,25 @@ def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_
 
     @solara.component
     def _spy_map_layers_panel(
-        *, maps: Any = None, map_: Any = None, gee_interface: Any = None, shown: Any = None
+        *,
+        maps: Any = None,
+        ctx: Any = None,
+        map_: Any = None,
+        gee_interface: Any = None,
+        sepal_client: Any = None,
+        shown: Any = None,
     ) -> None:
-        captured.update(panel_maps=maps, map_=map_, gee_interface=gee_interface, panel_shown=shown)
+        captured.update(
+            panel_maps=maps,
+            panel_ctx=ctx,
+            map_=map_,
+            gee_interface=gee_interface,
+            panel_shown=shown,
+        )
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "MapLayersPanel", _spy_map_layers_panel)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -268,6 +291,10 @@ def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_
 
     assert captured["outcome"].maps is not None
     assert captured["panel_maps"] is captured["outcome"].maps
+    # `ctx` is what every drawn layer is clipped to (`app/panels/layer_style.py`'s
+    # `display_image`); a panel handed `maps` without it would draw the whole
+    # world in the palette's first colour.
+    assert captured["panel_ctx"] is captured["outcome"].ctx
     assert captured["map_"] is mapapp.main_map[0]
     assert captured["gee_interface"] is not None
     assert isinstance(captured["panel_shown"], solara.Reactive)
@@ -321,7 +348,7 @@ def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -335,9 +362,7 @@ def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is
     # The workflow starts on the AOI tab, not the merged outputs tab.
     assert captured["panel_is_open"] is False
 
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_OUTPUTS_TAB_INDEX].fire_event("click", None)
-    rc.force_update()
+    _select_tab(box, rc, _OUTPUTS_TAB_INDEX)
     assert captured["panel_is_open"] is True
 
 
@@ -362,7 +387,7 @@ def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_an
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -375,9 +400,7 @@ def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_an
     assert captured["gee_interface"] is not None
     assert captured["panel_is_open"] is False
 
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_OUTPUTS_TAB_INDEX].fire_event("click", None)
-    rc.force_update()
+    _select_tab(box, rc, _OUTPUTS_TAB_INDEX)
     assert captured["panel_is_open"] is True
 
 
@@ -407,7 +430,7 @@ def test_both_chart_panels_stay_closed_while_a_different_workflow_tab_is_active(
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
     monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -437,7 +460,7 @@ def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(mon
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ZonalPanel", _spy_zonal_panel)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -455,45 +478,6 @@ def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(mon
     assert "sepal_client" in captured
 
 
-def test_the_exports_panel_is_wired_with_the_shared_outcome_spec_and_gee_interface(monkeypatch):
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
-        captured["aoi_spec"] = spec
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["outcome"] = outcome
-
-    @solara.component
-    def _spy_exports_panel(
-        *, maps: Any = None, ctx: Any = None, spec: Any = None, gee_interface: Any = None
-    ) -> None:
-        captured.update(
-            exports_maps=maps,
-            exports_ctx=ctx,
-            exports_spec=spec,
-            exports_gee_interface=gee_interface,
-        )
-
-    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _spy_exports_panel)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    captured["aoi_spec"].value = _BUILDABLE_SPEC
-
-    assert captured["outcome"].maps is not None
-    assert captured["exports_maps"] is captured["outcome"].maps
-    assert captured["exports_ctx"] is captured["outcome"].ctx
-    assert isinstance(captured["exports_spec"], RunSpec)
-    assert captured["exports_spec"] is captured["aoi_spec"].value
-    assert captured["exports_gee_interface"] is not None
-
-
 def test_the_outcome_memo_recomputes_on_a_real_edit_not_on_an_unrelated_rerender(monkeypatch):
     """``RunSpec`` compares by field equality, and reacton's own ``use_memo``
     compares its dependency list the same way, so an unrelated re-render that
@@ -508,7 +492,7 @@ def test_the_outcome_memo_recomputes_on_a_real_edit_not_on_an_unrelated_rerender
         captured["outcome"] = outcome
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -527,7 +511,7 @@ def test_the_outcome_memo_recomputes_on_a_real_edit_not_on_an_unrelated_rerender
 
 def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
     """Build under one period, change it to a DIFFERENT buildable period, and
-    the exports panel must reflect the CURRENT spec, not a stale one.
+    an output panel must reflect the CURRENT spec, not a stale one.
 
     Anchored against ``resolved.spec.periods.overall``, a literal field the
     domain's own ``ResolvedSpec`` carries -- not a value ``build_outcome``
@@ -541,13 +525,14 @@ def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
         captured["spec"] = spec
 
     @solara.component
-    def _spy_exports_panel(
-        *, maps: Any = None, ctx: Any = None, spec: Any = None, gee_interface: Any = None
+    def _spy_zonal_panel(
+        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, sepal_client: Any = None
     ) -> None:
-        captured["exports_maps"] = maps
+        captured["panel_maps"] = maps
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _spy_exports_panel)
+    monkeypatch.setattr(outputs_module, "ZonalPanel", _spy_zonal_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
     _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
@@ -558,9 +543,9 @@ def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
         threshold=0.0, periods=replace(DEFAULT_PERIODS, overall=Period(2001, 2015))
     )
     spec.value = first
-    assert captured["exports_maps"] is not None
-    assert captured["exports_maps"].resolved.spec.periods.overall == Period(2001, 2015)
+    assert captured["panel_maps"] is not None
+    assert captured["panel_maps"].resolved.spec.periods.overall == Period(2001, 2015)
 
     second = first.evolve(periods=replace(first.periods, overall=Period(2005, 2020)))
     spec.value = second
-    assert captured["exports_maps"].resolved.spec.periods.overall == Period(2005, 2020)
+    assert captured["panel_maps"].resolved.spec.periods.overall == Period(2005, 2020)

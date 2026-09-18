@@ -12,8 +12,9 @@ to a layer's ``labels`` by the English label string -- breaks on the
 performance layer: its class 2 label, ``"Not degraded"``, is deliberately
 absent from ``DEGRADATION_COLORS`` (see ``sdg1531/tables.py``). Instead this
 reads the SAME ``layer_vis_params()`` the map itself draws with
-(``app/panels/map_layers.py``): pixel ``v`` gets ``palette[v - min]`` and
-``layer.labels[v]``, so the legend agrees with the tiles by construction
+(``app/panels/layer_style.py``, the module ``app/panels/map_layers.py`` draws
+from too): pixel ``v`` gets ``palette[v - min]`` and ``layer.labels[v]``, so
+the legend agrees with the tiles by construction
 rather than by two tables that happen to line up today. ``min`` starts at 1
 (the legacy's NoData/unclassified value is 0, outside the vis window), so
 pixel 0 is never drawn and never legended.
@@ -32,7 +33,7 @@ import solara
 from pysepal.solara.components.legend import DiscreteEntry, LegendComponent, LegendData
 
 from app.message import msg
-from app.panels.map_layers import layer_name, layer_vis_params
+from app.panels.layer_style import layer_name, layer_vis_params
 from sdg1531.engine.indicator import ClassifiedLayer, IndicatorMaps
 from sdg1531.enums import IndicatorLayer
 

@@ -1,5 +1,4 @@
-"""The right-panel workflow: three tabs, a segment strip and prev/next arrows
-to move between them.
+"""The right-panel workflow: three standard Vuetify tabs.
 
 Every ``page.py`` identity-wiring concern that used to be checked by
 monkeypatching ``app.page``'s step/panel imports now targets ``app.tabs``
@@ -19,9 +18,18 @@ four configuration tabs (Assessment period, Productivity, Land cover, SOC):
 they are folded into one PARAMS tab (``app.panels.params``), so their own
 identity-wiring tests moved to ``tests/app/test_panel_params.py``, patching
 ``params_module`` instead of ``tabs_module``. What stays here is everything
-about the TAB LEVEL: order/shape, lock state, the PARAMS chip's own combined
-state, theme-driven chip colours, navigation (segments and the arrows), and
-the AOI step's own identity wiring (still called directly from this module).
+about the TAB LEVEL: order/shape, lock state, the PARAMS tab's own combined
+state, navigation, and the AOI step's own identity wiring (still called
+directly from this module).
+
+The hand-built segment strip and its prev/next arrows are gone -- the repo
+owner asked for plain ``rv.Tabs`` instead (see ``app/tabs.py``'s docstring) --
+and with them every test that had no subject but the strip: abbreviations,
+per-state chip fills, the light/dark fill pair, ``pointer-events: none``, and
+``nav_targets``. What those tests were protecting that still EXISTS -- three
+navigable tabs, an outputs tab that cannot be reached before a build, the
+active index really driving ``TabsItems`` -- is all still proven below,
+against ``v.Tab`` instead of against a ``title``-carrying ``rv.Html``.
 """
 
 from __future__ import annotations
@@ -32,26 +40,22 @@ import ipyvuetify as v
 import pytest
 import solara
 from pysepal.sepalwidgets.vue_app import MapApp
-from pysepal.solara import get_current_theme_state
 
 from app import page as page_module
 from app import tabs as tabs_module
 from app.message import messages, msg
-from app.panels import outputs as outputs_module
+from app.panels import map_layers as map_layers_module
 from app.state import STEP_PREFIXES, problems_for
 from app.steps.run import build
 from app.tabs import (
     TabDescriptor,
-    _seg_style,
     _sync_draw_control,
-    _tab_abbrev,
     _tab_state,
     _TabState,
-    nav_targets,
     workflow_tabs,
 )
 from sdg1531.spec import RunSpec
-from tests.app.render_helpers import find_widget, find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, find_widget, find_widgets
 from tests.spec_factory import default_spec
 
 # `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
@@ -61,9 +65,9 @@ from tests.spec_factory import default_spec
 _BUILDABLE_SPEC = default_spec(threshold=0.0)
 
 _TAB_TITLES_IN_ORDER = (
-    msg("step.aoi"),
-    msg("params.title"),  # task 30: Assessment period/Productivity/Land cover/SOC, merged
-    msg("outputs.title"),  # the merged outputs tab: its own key, NOT the ResultsPanel section's
+    msg("tabs.aoi"),
+    msg("tabs.params"),  # task 30: Assessment period/Productivity/Land cover/SOC, merged
+    msg("tabs.results"),  # the merged outputs tab: its own key, NOT the ResultsPanel section's
 )
 
 
@@ -93,19 +97,6 @@ _PARAMS_INDEX = next(i for i, tab in enumerate(workflow_tabs()) if isinstance(ta
 _OUTPUTS_INDEX = _index_of(None)  # the merged outputs tab carries no step id
 
 
-@solara.component
-def _noop_exports_panel(**_kwargs: Any) -> None:
-    """A stand-in for ``ExportsPanel`` in tests that drive a REAL build but
-    care about a different panel. ``ExportLauncher`` (the real component
-    behind ``ExportsPanel``) mounts one of its own tasks with
-    ``dependencies=[]`` -- pysepal's own, unrelated to this task's
-    ``dependencies=None`` invariant -- which starts a real asyncio task the
-    moment it first mounts. That needs a running event loop this bare
-    ``solara.render()`` harness does not have, so tests that are not
-    exercising ``ExportsPanel`` itself substitute this instead of hitting it
-    by accident."""
-
-
 def _workflow_widget(box: object) -> Any:
     """The real, reconciled ``WorkflowTabs`` widget.
 
@@ -121,30 +112,53 @@ def _workflow_widget(box: object) -> Any:
     return workflow_widget
 
 
-def _wrapper_cells(root: object) -> list[Any]:
-    """The three segment-strip cells, in tab order.
-
-    ``_SegmentCell`` builds two ``rv.Html`` divs per tab -- a padded,
-    titled wrapper that owns the click and tooltip, and a plain inner bar
-    that carries only the visual style -- so a ``title`` attribute is what
-    picks the wrapper out from both. ``rv.Html`` is used nowhere else in this
-    app's render tree.
+@solara.component
+def _noop_export_dialog_host(**_kwargs: Any) -> None:
+    """A stand-in for ``map_layers._ExportDialogHost`` in tests that drive a
+    REAL build. ``use_export_dialog`` mounts a task with ``dependencies=[]``,
+    which schedules real async work through ``asyncio.create_task`` the moment
+    it first renders -- and this bare ``solara.render()`` harness has no
+    running loop. The host only mounts once a build exists (see its own
+    docstring), so only the tests below that set a buildable spec need this.
     """
-    return [w for w in find_widgets(root, v.Html) if w.attributes.get("title")]
 
 
-def _nav_arrows(root: object) -> list[Any]:
-    """The prev/next arrow ``v.Btn`` widgets, in that order.
+def _tab_buttons(root: object) -> list[Any]:
+    """The three ``v.Tab`` widgets, in tab order.
 
-    ``_NavArrow`` is the only place in this app's whole render tree that
-    passes ``icon=True`` to a ``v.Btn`` -- ``TaskButtonComponent`` (used by
-    every compute/download button) never does (see
-    ``pysepal/solara/components/task_button.py``), and ``map_layers.py``'s
-    own ``_RemoveButton`` passes ``outlined=True``, not ``icon=True`` -- so
-    that trait alone picks the two arrows out from every other button in the
-    tree, real or not-yet-visited.
+    ``v.Tab`` appears nowhere else in this app's render tree, so the class
+    alone identifies them -- no ``title``-attribute filter of the kind the
+    old hand-built strip needed to tell its wrapper div from its inner one.
     """
-    return [w for w in find_widgets(root, v.Btn) if w.icon]
+    return find_widgets(root, v.Tab)
+
+
+def _active_index(box: object) -> int:
+    """Which tab's content ``rv.TabsItems`` is currently showing.
+
+    Read off ``TabsItems``, not off the ``Tabs`` strip: the strip is the
+    control, but ``TabsItems.v_model`` is what actually decides which
+    ``TabItem`` is live, so it is the thing worth asserting on.
+    """
+    widget = find_widget(_workflow_widget(box), v.TabsItems)
+    assert widget is not None
+    index: int = widget.v_model
+    return index
+
+
+def _select_tab(box: object, rc: Any, index: int) -> None:
+    """Activate a tab the way a real click does.
+
+    Vuetify's own click handler sets the strip's ``v_model``; reacton's
+    ``on_v_model`` then calls back into ``WorkflowTabs``. Writing the trait
+    directly drives that same path, and -- unlike ``fire_event`` on a
+    ``v.Tab`` -- it goes through the ``Tabs`` component that owns the
+    selection, rather than around it.
+    """
+    strip = find_widget(_workflow_widget(box), v.Tabs)
+    assert strip is not None
+    strip.v_model = index
+    rc.force_update()
 
 
 # ---------------------------------------------------------------------------
@@ -213,73 +227,6 @@ def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_ta
 
 
 # ---------------------------------------------------------------------------
-# `_tab_abbrev` -- each segment chip's up-to-three-character label.
-# ---------------------------------------------------------------------------
-
-
-def test_every_tabs_abbreviation_is_unique_and_at_most_three_characters():
-    """The owner's own words: "show inside them a max-three-char reference".
-    Directly catches the brief's own named mutation: two chips sharing an
-    abbreviation."""
-    tabs = workflow_tabs()
-    abbrevs = [_tab_abbrev(tab) for tab in tabs]
-    assert len(abbrevs) == len(set(abbrevs)), abbrevs
-    for abbrev in abbrevs:
-        assert 1 <= len(abbrev) <= 3, abbrev
-
-
-def test_every_locales_abbreviations_are_unique_and_at_most_three_characters(monkeypatch):
-    """Walks every shipped locale, not only English -- an abbreviation MAY
-    legitimately repeat across locales (the brief's own words), but within
-    one locale the three must stay distinct and short.
-
-    Monkeypatches ``current_locale`` where ``BoundCatalog.msg`` looks it up,
-    rather than calling the real, global ``pysepal.i18n.set_locale`` -- see
-    ``tests/app/test_panel_map_layers.py``'s identical comment for why: that
-    would re-render every earlier test's still-mounted render tree with that
-    test's own monkeypatches already undone.
-    """
-    import pysepal.i18n.binding as i18n_binding
-
-    tabs = workflow_tabs()
-    for code in messages.available_locales():
-        monkeypatch.setattr(i18n_binding, "current_locale", lambda code=code: code)
-        abbrevs = [_tab_abbrev(tab) for tab in tabs]
-        assert len(abbrevs) == len(set(abbrevs)), (code, abbrevs)
-        for abbrev in abbrevs:
-            assert 1 <= len(abbrev) <= 3, (code, abbrev)
-
-
-def test_the_segment_chips_render_their_abbreviation_as_text():
-    """The render-level half of the abbreviation tests above: proves the
-    label actually reaches the rendered chip, not just ``_tab_abbrev``
-    itself. ``cell.children[0]`` is the inner, coloured chip div
-    ``_SegmentCell`` builds; its own ``children`` is the one-item
-    ``[label]`` list passed to it."""
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    tabs = workflow_tabs()
-    expected = [_tab_abbrev(tab) for tab in tabs]
-
-    cells = _wrapper_cells(_workflow_widget(box))
-    rendered = [cell.children[0].children[0] for cell in cells]
-    assert rendered == expected
-
-
-def test_the_full_title_tooltip_still_exists_alongside_the_abbreviation():
-    """The abbreviation is an ADDITION to the hover tooltip, never a
-    replacement for it -- the owner's own words: "show inside them a
-    max-three-char reference", not "replace the label with one"."""
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    tabs = workflow_tabs()
-    cells = _wrapper_cells(_workflow_widget(box))
-    assert [cell.attributes.get("title") for cell in cells] == [tab.title for tab in tabs]
-
-
-# ---------------------------------------------------------------------------
 # `_tab_state` -- derived from `problems_for`/`outcome.maps`, not hand-assigned.
 # ---------------------------------------------------------------------------
 
@@ -333,118 +280,6 @@ def test_a_combined_tab_is_satisfied_only_once_every_named_step_is():
     step being fatal-free reads as SATISFIED."""
     params_tab = next(tab for tab in workflow_tabs() if isinstance(tab.step, tuple))
     assert _tab_state(params_tab, _BUILDABLE_SPEC, has_maps=False) is _TabState.SATISFIED
-
-
-# ---------------------------------------------------------------------------
-# Theme-driven chip colours (task 30). A first attempt used
-# `var(--v-divider-base, <literal fallback>)` -- `app/panels/section_header.py`'s
-# own technique -- but a real browser check (this task's report) measured
-# that CSS variable as never defined in this app's actual Vuetify/ipyvuetify
-# setup: `getComputedStyle(...).getPropertyValue("--v-divider-base")` on
-# `.v-application` returned `""` in BOTH themes, so the chip's rendered
-# background was IDENTICAL in light and dark mode despite the source
-# embedding a `var(...)` wrapper -- looks theme-aware, is not. Replaced with
-# the route already proven to work in this exact file: picking between two
-# literals in PYTHON, off the live `solara.lab.use_dark_effective()` flag,
-# the same mechanism `_WorkflowSegments` already uses for `primary`. The
-# tests below are the render-level proof that replaced the (wrong) static
-# source scan: a literal that never changes with the theme cannot be caught
-# by reading the source text alone, only by rendering both themes and
-# comparing what actually comes out -- exactly what a static scan cannot see,
-# and exactly why the brief asked for a browser check here specifically.
-# ---------------------------------------------------------------------------
-
-
-def test_seg_style_uses_whichever_incomplete_and_locked_fill_it_is_given():
-    """``_seg_style`` itself is theme-agnostic -- it renders exactly the
-    ``incomplete_fill``/``locked_fill`` its caller hands it, never a value of
-    its own. The theme-AWARE half is ``_WorkflowSegments``'s own choice of
-    which pair to pass, proven separately below; this pins that
-    ``_seg_style`` cannot silently ignore that choice and fall back to a
-    fixed value regardless of the argument.
-    """
-    incomplete_light = _seg_style(
-        _TabState.INCOMPLETE, "#000000", "LIGHT-FILL", "LOCKED-FILL", active=False
-    )
-    incomplete_dark = _seg_style(
-        _TabState.INCOMPLETE, "#000000", "DARK-FILL", "LOCKED-FILL", active=False
-    )
-    assert "LIGHT-FILL" in incomplete_light
-    assert "DARK-FILL" in incomplete_dark
-    assert incomplete_light != incomplete_dark
-
-    locked_a = _seg_style(_TabState.LOCKED, "#000000", "INCOMPLETE-FILL", "LOCKED-A", active=False)
-    locked_b = _seg_style(_TabState.LOCKED, "#000000", "INCOMPLETE-FILL", "LOCKED-B", active=False)
-    assert "LOCKED-A" in locked_a
-    assert "LOCKED-B" in locked_b
-    assert locked_a != locked_b
-
-
-def test_the_incomplete_fill_is_two_distinct_literals_for_light_and_dark():
-    """A floor beneath the render-level test below: the two constants
-    ``_WorkflowSegments`` picks between must actually differ, or that test
-    would pass by coincidence (both branches choosing the identical value).
-    Directly catches the brief's own named mutation in the exact shape it
-    was actually found here: a single shared literal used for both themes.
-    """
-    assert tabs_module._SEG_INCOMPLETE_LIGHT != tabs_module._SEG_INCOMPLETE_DARK
-    assert tabs_module._SEG_LOCKED_LIGHT != tabs_module._SEG_LOCKED_DARK
-
-
-def test_the_incomplete_fill_actually_differs_between_light_and_dark_mode_on_screen():
-    """The render-level proof the source-only tests above cannot give: a
-    genuinely rendered INCOMPLETE chip's computed style must differ between
-    themes, driven through the real component the same way a live theme
-    toggle would. This is the exact check that would have caught BOTH dead
-    ends this module's own comment describes: a CSS-variable attempt with
-    two different-LOOKING source strings that rendered identically in both
-    themes, and then a ``solara.lab.use_dark_effective()`` attempt that
-    changed nothing when THIS APP'S real theme toggle was clicked in a
-    browser, because that flag is a disconnected, process-wide default
-    rather than this app's own per-session state. Only reading the ACTUAL
-    rendered style after flipping the SAME state the app's real toggle
-    drives catches either failure; a plain source read cannot.
-
-    ``get_current_theme_state().dark`` is set directly, not through a real
-    frontend click -- ``use_theme_dark()`` is a subscription over exactly
-    that trait, and toggling it is what a real click on the app's own theme
-    control also does (that control is wired to this same
-    ``ThemeState``, threaded into ``MapApp`` by ``page.py``). Restored in a
-    ``finally`` block: ``get_current_theme_state()`` is scoped per kernel,
-    not per test, so leaving it flipped could leak into a later test's
-    render in the same process.
-    """
-    theme_state = get_current_theme_state()
-    original = theme_state.dark
-    try:
-        theme_state.dark = False
-        box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-        assert rc is not None
-
-        # `_PARAMS_INDEX`, NOT `_AOI_INDEX`: AOI is the ACTIVE tab, and an
-        # active cell carries the ring, whose colour is the already-theme-aware
-        # `primary`. Reading it made `light_style != dark_style` true whichever
-        # fills were in play, so this test passed unchanged when the two
-        # INCOMPLETE literals were mutated to one identical string -- the exact
-        # bug its own name claims to catch. An INACTIVE, INCOMPLETE cell has no
-        # ring, so its background IS the fill under test and nothing else.
-        def cell() -> str:
-            return _wrapper_cells(_workflow_widget(box))[_PARAMS_INDEX].children[0].style_
-
-        light_style = cell()
-
-        theme_state.dark = True
-        rc.force_update()
-        dark_style = cell()
-
-        assert light_style != dark_style
-        assert tabs_module._SEG_INCOMPLETE_LIGHT in light_style
-        assert tabs_module._SEG_INCOMPLETE_DARK in dark_style
-        # Both `in` assertions above still pass when the two constants are the
-        # SAME string, so neither of them closes the hole on its own.
-        assert tabs_module._SEG_INCOMPLETE_LIGHT not in dark_style
-    finally:
-        theme_state.dark = original
 
 
 # ---------------------------------------------------------------------------
@@ -553,11 +388,13 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
     a widget PROPERTY of ``MapApp.right_panel_content``'s sole section, not a
     reacton child of ``box`` -- the same reason every other test in this file
     reads identity off a spy instead of rendered text. Checked by MEMBERSHIP
-    in every markdown fragment the PARAMS tab renders, not by position: since
-    task 30, Run's own section is FIRST among four (see
-    ``app/panels/params.py``), not the tab's only content, so its refusal
-    text is no longer reliably the LAST markdown fragment the way it was
-    when Run held its own tab.
+    in every alert the PARAMS tab renders, not by position: since task 30,
+    Run's own section is FIRST among four (see ``app/panels/params.py``), not
+    the tab's only content, so its refusal is no longer reliably the last
+    message on the tab the way it was when Run held its own tab. Read off
+    ``rv.Alert`` (``app/panels/problems.py``) rather than markdown, and as an
+    ``"error"`` -- a build refusal is blocking, and the styled component is
+    what now says so.
 
     Anchored against a direct call to ``build()``, not a hardcoded guess at
     the domain's wording, so a change to that message updates both sides
@@ -586,109 +423,135 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
     tab_items = find_widgets(workflow_widget, v.TabItem)
     assert len(tab_items) == 3
     params_sheet = tab_items[_PARAMS_INDEX]
-    assert f"<p><strong>{exc_info.value}</strong></p>" in markdown_texts(params_sheet)
+    assert ("error", str(exc_info.value)) in alert_texts(params_sheet)
 
 
 # ---------------------------------------------------------------------------
-# `WorkflowTabs` itself: renders three tabs, the active index selects which
-# `TabItem`'s content is live, and switching tabs does not rebuild the rest.
+# `WorkflowTabs` itself: a standard `rv.Tabs` strip over three `TabItem`s, the
+# active index selects which one's content is live, and switching does not
+# rebuild the rest.
+#
+# The hand-built segment strip these tests used to drive is gone (see
+# `app/tabs.py`'s own docstring: the repo owner asked for standard Vuetify
+# tabs and no arrows). Everything it was tested FOR still has a test here --
+# three navigable tabs, a locked outputs tab that cannot be reached, the
+# active index actually driving `TabsItems` -- expressed against `v.Tab`
+# instead of against a `title`-carrying `rv.Html` wrapper. What has no
+# successor is what the strip alone had: abbreviations, per-state fills,
+# `pointer-events: none`, and the arrows. Vuetify draws a disabled tab itself.
 # ---------------------------------------------------------------------------
 
 
-def test_workflow_tabs_renders_three_tab_items_and_three_segments():
+def test_workflow_tabs_renders_three_tab_items_and_three_tab_buttons():
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
     workflow_widget = _workflow_widget(box)
 
-    tab_items = find_widgets(workflow_widget, v.TabItem)
-    assert len(tab_items) == 3
-
-    cells = _wrapper_cells(workflow_widget)
-    assert len(cells) == 3
+    assert len(find_widgets(workflow_widget, v.TabItem)) == 3
+    assert len(_tab_buttons(workflow_widget)) == 3
 
 
-def test_clicking_a_segment_moves_the_active_tab():
+def test_each_tab_button_carries_its_title():
+    """Standard tabs show the title itself -- there is no abbreviation and no
+    hover tooltip standing in for one any more, so the label IS the whole
+    affordance and must be the real, translated tab title."""
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    rendered = [button.children[0] for button in _tab_buttons(_workflow_widget(box))]
+    assert rendered == [tab.title for tab in workflow_tabs()]
+
+
+def test_every_locales_tab_labels_fit_the_strip_without_overflow_chevrons(monkeypatch):
+    """The reason the strip does not reuse each step's own full title.
+
+    Measured in a real browser at the app's own 450px panel: the strip is
+    418px wide, Vuetify gives a tab ``min-width: 90px`` and ``padding: 0
+    16px``, and its uppercase 14px Roboto label runs about 8.5px per
+    character. The three full titles came to 418px in English -- exactly at
+    the limit -- and 429px in Spanish, which tips Vuetify into drawing the
+    overflow chevrons the repo owner asked to be rid of ("remove the arrows
+    as well").
+
+    This is a proxy for that measurement, not a re-measurement: it cannot see
+    the real font, so it checks the thing a translator can actually break --
+    total label LENGTH -- against a budget derived from the same geometry.
+    The English titles that overflowed are 16 + 10 + 7 = 33 characters; the
+    short labels are 3 + 10 + 7 = 20. A budget of 26 sits between them, so
+    this fails on the layout that was measured as broken and passes on the
+    one measured as fitting, in every shipped locale rather than only the one
+    a developer happens to be running.
+
+    Monkeypatches ``current_locale`` where ``BoundCatalog.msg`` looks it up
+    rather than calling the global ``pysepal.i18n.set_locale`` -- see
+    ``tests/app/test_panel_map_layers.py``'s identical comment for why.
+    """
+    import pysepal.i18n.binding as i18n_binding
+
+    for code in messages.available_locales():
+        monkeypatch.setattr(i18n_binding, "current_locale", lambda code=code: code)
+        titles = [tab.title for tab in workflow_tabs()]
+        assert len(titles) == 3, (code, titles)
+        budget = sum(max(len(title), 3) for title in titles)
+        assert budget <= 26, (code, titles, budget)
+
+
+def test_selecting_a_tab_moves_the_active_tab():
     """The active index selects which ``TabItem``'s content is live:
-    ``rv.TabsItems.v_model`` is what Vuetify reads to decide that, so a real
-    click through the real segment cell must change it. Also the direct
-    counter-proof for the ``rv.TabsItems(v_model=0)`` mutation: hardcoding
-    the index would leave this stuck at 0."""
+    ``rv.TabsItems.v_model`` is what Vuetify reads to decide that, so driving
+    the strip's own ``v_model`` -- which is what a real click does -- must
+    change it. Also the direct counter-proof for the
+    ``rv.TabsItems(v_model=0)`` mutation: hardcoding the index would leave
+    this stuck at 0."""
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
-    workflow_widget = _workflow_widget(box)
 
-    tabs_items_widget = find_widget(workflow_widget, v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _AOI_INDEX
+    assert _active_index(box) == _AOI_INDEX
 
-    cells = _wrapper_cells(workflow_widget)
-    cells[_PARAMS_INDEX].fire_event("click", None)
-    rc.force_update()
+    _select_tab(box, rc, _PARAMS_INDEX)
 
-    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _PARAMS_INDEX
+    assert _active_index(box) == _PARAMS_INDEX
 
 
-def test_a_locked_output_tab_does_not_navigate_on_click():
+def test_the_locked_output_tab_is_rendered_disabled():
     """The merged outputs tab is LOCKED while ``outcome.maps`` is ``None``
-    (the default, empty spec) -- clicking its segment must be a genuine
-    no-op, not merely visually muted. Directly catches "mark every step
-    unlocked regardless of state": under that mutation this click WOULD
-    navigate.
+    (the default, empty spec). Vuetify refuses to activate a disabled tab and
+    draws it dimmed, which is the whole of what the old strip needed a
+    ``pointer-events: none`` wrapper plus a re-check inside its own click
+    handler to achieve. Directly catches "mark every step unlocked regardless
+    of state": under that mutation this tab's ``disabled`` reads ``False``.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_OUTPUTS_INDEX].fire_event("click", None)
+    buttons = _tab_buttons(_workflow_widget(box))
+    assert buttons[_OUTPUTS_INDEX].disabled is True
+    assert buttons[_AOI_INDEX].disabled is False
+    assert buttons[_PARAMS_INDEX].disabled is False
+
+
+def test_the_output_tab_stops_being_disabled_once_a_build_exists(monkeypatch):
+    """The positive half of the test above, through the real render tree: the
+    lock is derived from ``outcome.maps``, so a buildable spec must release
+    it. Without this, ``disabled=True`` hardcoded on the outputs tab would
+    pass every other test in this file."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["spec"] = spec
+
+    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    assert _tab_buttons(_workflow_widget(box))[_OUTPUTS_INDEX].disabled is True
+
+    captured["spec"].value = _BUILDABLE_SPEC
     rc.force_update()
 
-    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _AOI_INDEX
-
-
-def test_both_nav_arrows_carry_a_hover_and_screen_reader_label():
-    """An icon-only button has no text, so its `title`/`aria-label` is the
-    only affordance it has -- a user hovering sees nothing and a screen
-    reader announces nothing without them. The segment cells already solve
-    this the same way; the arrows were added later and did not.
-    """
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-    rc.force_update()
-
-    arrows = [
-        b
-        for b in find_widgets(_workflow_widget(box), v.Btn)
-        if b.attributes.get("title") in (msg("tabs.previous"), msg("tabs.next"))
-    ]
-    assert len(arrows) == 2, "expected exactly one previous and one next arrow"
-    for arrow in arrows:
-        assert arrow.attributes.get("title"), "arrow has no hover label"
-        assert arrow.attributes.get("aria-label") == arrow.attributes["title"]
-
-
-def test_a_locked_segment_cell_also_carries_pointer_events_none():
-    """The test above proves inertness through the HANDLER's ``if not
-    locked`` recheck alone -- ``fire_event`` calls the registered Python
-    callback directly and never dispatches a real browser pointer event, so
-    nothing else in this suite exercises ``_SegmentCell``'s CSS half. The
-    handler recheck is genuinely sufficient on its own (the hook must attach
-    on every render regardless of state, so the no-op has to live inside it
-    either way) -- but the reference this mirrors carries BOTH mechanisms for
-    a reason: the CSS is what stops a locked cell from looking clickable in
-    the first place, a job the handler alone does not do. Pinned here so a
-    future edit does not read the CSS line as redundant and drop it.
-    """
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-    rc.force_update()  # settle ProductivityStep's mount-time threshold-seeding effect first
-
-    cells = _wrapper_cells(_workflow_widget(box))
-    assert "pointer-events: none" in cells[_OUTPUTS_INDEX].style_
-    assert "pointer-events: none" not in cells[_AOI_INDEX].style_
+    assert _tab_buttons(_workflow_widget(box))[_OUTPUTS_INDEX].disabled is False
 
 
 def test_switching_tabs_does_not_rebuild_the_others_widgets():
@@ -707,9 +570,7 @@ def test_switching_tabs_does_not_rebuild_the_others_widgets():
     before = find_widgets(_workflow_widget(box), v.TabItem)
     assert len(before) == 3
 
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_PARAMS_INDEX].fire_event("click", None)
-    rc.force_update()
+    _select_tab(box, rc, _PARAMS_INDEX)
 
     after = find_widgets(_workflow_widget(box), v.TabItem)
     assert len(after) == 3
@@ -736,214 +597,8 @@ def test_switching_away_from_aoi_clears_the_draw_control_and_restores_it_on_retu
     sepal_map.add_control(sepal_map.dc)
     assert sepal_map.dc in sepal_map.controls
 
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_PARAMS_INDEX].fire_event("click", None)
-    rc.force_update()
-
+    _select_tab(box, rc, _PARAMS_INDEX)
     assert sepal_map.dc not in sepal_map.controls
 
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_AOI_INDEX].fire_event("click", None)
-    rc.force_update()
-
+    _select_tab(box, rc, _AOI_INDEX)
     assert sepal_map.dc in sepal_map.controls
-
-
-# ---------------------------------------------------------------------------
-# `nav_targets` -- pure, ported from spatial-risk's own
-# `pipeline_header.nav_targets`. No render context needed: it only reads
-# `_tab_state` over a plain `TabDescriptor` list.
-# ---------------------------------------------------------------------------
-
-_UNLOCKED_SPEC = RunSpec()  # configuration tabs are never LOCKED, whatever their state
-
-
-def test_nav_targets_returns_the_adjacent_indices_with_nothing_locked():
-    tabs = [
-        TabDescriptor("aoi", "AOI", "i", []),
-        TabDescriptor("productivity", "Productivity", "i", []),
-        TabDescriptor("land_cover", "Land cover", "i", []),
-    ]
-    assert nav_targets(tabs, 1, _UNLOCKED_SPEC, has_maps=False) == (0, 2)
-
-
-def test_nav_targets_prev_is_none_at_the_first_tab():
-    tabs = [TabDescriptor("aoi", "AOI", "i", []), TabDescriptor("productivity", "P", "i", [])]
-    prev_t, _next_t = nav_targets(tabs, 0, _UNLOCKED_SPEC, has_maps=False)
-    assert prev_t is None
-
-
-def test_nav_targets_next_is_none_at_the_last_tab():
-    tabs = [TabDescriptor("aoi", "AOI", "i", []), TabDescriptor("productivity", "P", "i", [])]
-    _prev_t, next_t = nav_targets(tabs, 1, _UNLOCKED_SPEC, has_maps=False)
-    assert next_t is None
-
-
-def test_nav_targets_next_skips_a_locked_tab_and_finds_nothing_past_it():
-    """The shape of this app's own three tabs since task 30's second fold:
-    PARAMS, then one LOCKED output tab, nothing after it. "Next" from PARAMS
-    must not land on the locked tab -- it must find nothing. Directly catches
-    the mutation the brief names: "'next' no longer skips a locked tab" would
-    instead return the locked tab's own index here. Uses a generic
-    single-step tab (``"soc"``, still a real ``STEP_PREFIXES`` key) rather
-    than the real combined PARAMS tuple -- ``nav_targets`` and ``_tab_state``
-    treat a 1-tuple and several names identically (see ``_tab_state``'s own
-    docstring), so this pins the algorithm generically rather than re-typing
-    the real app's own shape.
-    """
-    tabs = [TabDescriptor("soc", "Soc", "i", []), TabDescriptor(None, "Outputs", "i", [])]
-    _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=False)
-    assert next_t is None
-
-
-def test_nav_targets_next_reaches_the_output_tab_once_it_unlocks():
-    """The positive case: once ``has_maps`` is true the same tab is no
-    longer LOCKED, so "next" from SOC finds it."""
-    tabs = [TabDescriptor("soc", "Soc", "i", []), TabDescriptor(None, "Outputs", "i", [])]
-    _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=True)
-    assert next_t == 1
-
-
-def test_nav_targets_skips_a_run_of_more_than_one_locked_tab():
-    """``nav_targets`` itself has no notion of "exactly one" locked tab --
-    proven generically here with two, even though this app's own three tabs
-    never produce more than one (``_tab_state`` locks every ``step=None``
-    tab identically, off the same ``has_maps``)."""
-    tabs = [
-        TabDescriptor("soc", "Soc", "i", []),
-        TabDescriptor(None, "Locked 1", "i", []),
-        TabDescriptor(None, "Locked 2", "i", []),
-    ]
-    _prev_t, next_t = nav_targets(tabs, 0, RunSpec(), has_maps=False)
-    assert next_t is None
-
-
-# ---------------------------------------------------------------------------
-# The prev/next arrows, rendered -- the repo owner asked for these directly
-# ("can we add arrows to the tabs component? so I can easily navigate
-# back-and-forth?"); task 21 had deliberately left them out.
-# ---------------------------------------------------------------------------
-
-
-def test_the_arrows_render_exactly_two_icon_buttons():
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-    arrows = _nav_arrows(_workflow_widget(box))
-    assert len(arrows) == 2
-
-
-def test_the_prev_arrow_is_disabled_and_the_next_arrow_enabled_on_the_first_tab():
-    """Disabled, not hidden or absent -- a disabled control tells the user
-    where they are; a vanishing one would make the strip jump. Directly
-    catches "arrows stay enabled at the first/last tab": under that mutation
-    the prev arrow's ``disabled`` would read ``False`` here.
-    """
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-    prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
-    assert prev_arrow.disabled is True
-    assert next_arrow.disabled is False
-
-
-def test_the_next_arrow_is_disabled_on_params_while_the_outputs_tab_is_still_locked():
-    """The default, empty spec has no build, so the merged outputs tab --
-    the only tab after PARAMS, task 30's second fold made it the last
-    configuration tab -- is LOCKED. The next arrow must show that, not just
-    silently refuse to navigate.
-    """
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_PARAMS_INDEX].fire_event("click", None)
-    rc.force_update()
-
-    _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
-    assert next_arrow.disabled is True
-
-
-def test_clicking_the_next_arrow_moves_forward_and_the_prev_arrow_moves_back():
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-    workflow_widget = _workflow_widget(box)
-
-    tabs_items_widget = find_widget(workflow_widget, v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _AOI_INDEX
-
-    _prev_arrow, next_arrow = _nav_arrows(workflow_widget)
-    next_arrow.fire_event("click", None)
-    rc.force_update()
-
-    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _PARAMS_INDEX
-
-    prev_arrow, _next_arrow = _nav_arrows(_workflow_widget(box))
-    prev_arrow.fire_event("click", None)
-    rc.force_update()
-
-    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _AOI_INDEX
-
-
-def test_clicking_the_next_arrow_on_params_does_not_navigate_into_a_locked_outputs_tab():
-    """The direct counter-proof for "'next' no longer skips a locked tab":
-    under that mutation this click WOULD move ``v_model`` to the outputs tab
-    even though it is still LOCKED. Uses ``fire_event``, which bypasses the
-    widget's own ``disabled`` prop (a raw Python-level call, not a real
-    browser click) -- so this also proves ``_activate_next``'s own
-    ``is not None`` recheck, not merely the CSS-level ``disabled`` state the
-    test above already covers.
-    """
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_PARAMS_INDEX].fire_event("click", None)
-    rc.force_update()
-
-    _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
-    next_arrow.fire_event("click", None)
-    rc.force_update()
-
-    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _PARAMS_INDEX
-
-
-def test_clicking_the_next_arrow_on_params_reaches_the_outputs_tab_once_unlocked(monkeypatch):
-    """The positive case, through the real render tree: once a build exists
-    the outputs tab is reachable, and "next" from PARAMS (the last
-    configuration tab since task 30's second fold) lands on it directly
-    (there is nothing else after it to skip)."""
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
-        captured["spec"] = spec
-
-    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
-    # `ExportsPanel`'s real `ExportLauncher` starts a task the moment it
-    # mounts (see `_noop_exports_panel`'s own docstring) -- a buildable spec
-    # makes `OutputsPanel` actually reach it, so it needs the same stand-in
-    # every panel-identity test in `test_panel_outputs.py` uses.
-    monkeypatch.setattr(outputs_module, "ExportsPanel", _noop_exports_panel)
-
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-    captured["spec"].value = _BUILDABLE_SPEC
-
-    cells = _wrapper_cells(_workflow_widget(box))
-    cells[_PARAMS_INDEX].fire_event("click", None)
-    rc.force_update()
-
-    _prev_arrow, next_arrow = _nav_arrows(_workflow_widget(box))
-    assert next_arrow.disabled is False
-    next_arrow.fire_event("click", None)
-    rc.force_update()
-
-    tabs_items_widget = find_widget(_workflow_widget(box), v.TabsItems)
-    assert tabs_items_widget is not None
-    assert tabs_items_widget.v_model == _OUTPUTS_INDEX

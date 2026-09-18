@@ -7,15 +7,13 @@
     "description": "Configurez les données de l'exécution, puis consultez ses couches, statistiques et exports."
   },
   "step": {
-    "aoi": "Zone d'intérêt",
     "productivity": "Productivité",
     "land_cover": "Couverture terrestre",
     "soc": "Carbone organique du sol",
     "run": "Période d'évaluation"
   },
   "aoi": {
-    "description": "Choisissez la zone sur laquelle l'indicateur est calculé.",
-    "selected": "Sélectionné : {name}"
+    "description": "Choisissez la zone sur laquelle l'indicateur est calculé."
   },
   "productivity": {
     "description": "Indice de végétation, méthode de tendance et unités écologiques.",
@@ -65,23 +63,15 @@
     "start_year": "Année de début",
     "end_year": "Année de fin",
     "sensor_coverage_bounded": "Les capteurs sélectionnés disposent de données de {start} à {end}.",
-    "sensor_coverage_open": "Les capteurs sélectionnés disposent de données depuis {start}.",
-    "ready": {
-      "one": "Prêt : {count} couche",
-      "other": "Prêt : {count} couches",
-      "many": "Prêt : {count} de couches"
-    },
-    "blocked": "Corrigez les problèmes ci-dessus pour que l'indicateur puisse être calculé."
+    "sensor_coverage_open": "Les capteurs sélectionnés disposent de données depuis {start}."
   },
   "layers": {
     "title": "Couches",
-    "description": "Ajouter les couches calculées à la carte.",
+    "description": "Affichez n'importe quelle couche calculée sur la carte, découpée à votre zone d'intérêt. L'œil affiche ou masque une couche ; l'icône de téléchargement l'exporte comme asset Earth Engine, vers Google Drive ou vers votre espace de travail SEPAL.",
     "columns": {
       "name": "Couche",
       "action": "Action"
     },
-    "add": "Ajouter",
-    "remove": "Retirer",
     "added": "Ajouté à la carte : {name}",
     "names": {
       "land_cover": "Couverture terrestre",
@@ -93,7 +83,11 @@
       "indicator_15_3_1": "Indicateur ODD 15.3.1"
     },
     "build_first": "Construisez d'abord l'indicateur.",
-    "add_failed": "Impossible d'ajouter {name} à la carte : {reason}"
+    "add_failed": "Impossible d'ajouter {name} à la carte : {reason}",
+    "show": "Afficher {name} sur la carte",
+    "hide": "Masquer {name}",
+    "cancel": "Arrêter l'ajout de {name}",
+    "export": "Exporter {name}"
   },
   "legend": {
     "classes": {
@@ -135,49 +129,36 @@
   },
   "transitions": {
     "title": "Transitions",
-    "description": "Transitions de la couverture terrestre entre les années de début et de fin.",
+    "description": "Quelle surface est passée d'une classe d'occupation du sol à une autre sur la période d'évaluation. Les lignes correspondent à la classe de départ d'un pixel, les colonnes à sa classe d'arrivée, et chaque valeur est une surface. C'est la matrice de transition dont découle le sous-indicateur d'occupation du sol.",
     "compute": "Calculer les transitions",
     "computed": "Transitions prêtes",
     "build_first": "Construisez d'abord l'indicateur."
   },
   "results": {
     "title": "Distribution",
-    "description": "Superficies des classes par type de couverture terrestre.",
+    "description": "Surface de chaque classe de dégradation — dégradé, stable, amélioré — ventilée par type d'occupation du sol. C'est ainsi que l'indicateur est généralement présenté : il montre dans quels types d'occupation du sol se concentre la dégradation de votre zone.",
     "compute": "Calculer les statistiques",
     "computed": "Statistiques prêtes",
     "build_first": "Construisez d'abord l'indicateur."
   },
   "zonal": {
     "title": "Statistiques zonales",
-    "description": "Superficies de l'indicateur par zone administrative.",
+    "description": "Surfaces de l'indicateur cumulées dans chaque entité de votre zone d'intérêt, une ligne par zone. Téléchargez-les au format shapefile pour rattacher les chiffres à vos propres limites dans QGIS ou pour rapporter des totaux par district.",
     "compute": "Calculer les statistiques zonales",
     "download": "Télécharger le shapefile",
     "ready": "Statistiques zonales prêtes",
     "build_first": "Construisez d'abord l'indicateur."
   },
   "exports": {
-    "title": "Export",
-    "description": "Exporter n'importe quelle couche en tant qu'asset GEE.",
-    "button": "Exporter",
-    "build_first": "Construisez d'abord l'indicateur."
-  },
-  "outputs": {
-    "title": "Résultats"
-  },
-  "params": {
-    "title": "Paramètres"
+    "title": "Export"
   },
   "period_override": {
     "toggle": "Utiliser une période différente pour ce sous-indicateur",
     "inherited": "Utilise la période d'évaluation : {start}–{end}."
   },
   "tabs": {
-    "previous": "Étape précédente",
-    "next": "Étape suivante",
-    "abbrev": {
-      "aoi": "ZI",
-      "params": "PAR",
-      "outputs": "RES"
-    }
+    "aoi": "AOI",
+    "params": "Paramètres",
+    "results": "Résultats"
   }
 }

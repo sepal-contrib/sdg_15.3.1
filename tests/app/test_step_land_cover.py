@@ -25,7 +25,7 @@ from sdg1531.spec import (
     PeriodOverride,
     PixelValueMask,
 )
-from tests.app.render_helpers import find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # Same range `soc.py`'s own control offers (see test_step_soc.py's `_YEARS`) --
@@ -617,35 +617,42 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("spec", "expected_extra"),
+    ("spec", "expected_markdown", "expected_alerts"),
     [
         # `periods.land_cover` is unset in every case below except the
         # explicit override one, so the inherited-window text leads
-        # `expected_extra` in all of them.
-        (default_spec(), [_INHERITED_TEXT]),
+        # `expected_markdown` in all of them.
+        (default_spec(), [_INHERITED_TEXT], []),
         (
             default_spec(land_cover=CustomLandCoverSource(start_asset="", end_asset="")),
             [
                 _INHERITED_TEXT,
                 "<p>Start land cover asset</p>",
                 "<p>End land cover asset</p>",
-                "<p><strong>Select the start land cover asset.</strong></p>",
-                "<p><strong>Select the end land cover asset.</strong></p>",
+            ],
+            [
+                ("error", "Select the start land cover asset."),
+                ("error", "Select the end land cover asset."),
             ],
         ),
         (
             # A non-fatal problem this step owns: two different custom assets
             # with no transition matrix file fall back to the default IPCC
-            # vocabulary. The only case here that exercises the non-bold
-            # `else` arm of the problems loop.
+            # vocabulary. The only case here that exercises the `warning`
+            # alert rather than the `error` one.
             default_spec(land_cover=CustomLandCoverSource(start_asset="a", end_asset="b")),
             [
                 _INHERITED_TEXT,
                 "<p>Start land cover asset</p>",
                 "<p>End land cover asset</p>",
-                "<p>Custom land cover assets are set without a transition matrix "
-                "file, so their pixel codes are remapped through the default "
-                "IPCC vocabulary.</p>",
+            ],
+            [
+                (
+                    "warning",
+                    "Custom land cover assets are set without a transition matrix "
+                    "file, so their pixel codes are remapped through the default "
+                    "IPCC vocabulary.",
+                )
             ],
         ),
         (
@@ -656,14 +663,20 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
                     default_spec().periods, land_cover=PeriodOverride(start=1980, end=1985)
                 )
             ),
+            [],
             [
-                "<p><strong>The land cover period lies outside the CCI land "
-                "cover record (1992-2022), so both of its years clamp to the "
-                "same one and there is no transition to measure.</strong></p>",
-                "<p>The land cover period starts before the CCI land cover "
-                "record (1992), so the transition is measured from 1992 "
-                "instead, and that is the year the chart will be labelled "
-                "with.</p>",
+                (
+                    "error",
+                    "The land cover period lies outside the CCI land cover record "
+                    "(1992-2022), so both of its years clamp to the same one and "
+                    "there is no transition to measure.",
+                ),
+                (
+                    "warning",
+                    "The land cover period starts before the CCI land cover record "
+                    "(1992), so the transition is measured from 1992 instead, and "
+                    "that is the year the chart will be labelled with.",
+                ),
             ],
         ),
         (
@@ -672,14 +685,24 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
             # ...)` from `validate(...)`. The override is still unset here.
             default_spec(aoi=None),
             [_INHERITED_TEXT],
+            [],
         ),
     ],
 )
-def test_the_step_renders_only_its_own_text(spec, expected_extra):
+def test_the_step_renders_only_its_own_text(spec, expected_markdown, expected_alerts):
     """The description no longer leads this list (task 30: it rides on
     ``ParamsPanel``'s own ``SectionHeader`` now -- see
-    ``app/panels/params.py``)."""
+    ``app/panels/params.py``).
+
+    Problems and prose are read separately now: the inherited-period line and
+    the asset labels are ordinary markdown, while validation messages go
+    through ``app/panels/problems.py``'s ``rv.Alert``, whose own ``type``
+    pins fatal-vs-not directly instead of via a ``<strong>`` wrapper. Errors
+    are grouped ahead of warnings, which is why the override case lists them
+    in that order.
+    """
     spec_r = solara.reactive(spec)
     box, rc = _render(spec_r, gee_interface=StubGee())
     assert rc is not None
-    assert markdown_texts(box) == expected_extra
+    assert markdown_texts(box) == expected_markdown
+    assert alert_texts(box) == expected_alerts

@@ -1,55 +1,18 @@
 """Seven export sources, one per layer, the user picks.
 
-``ExportLauncher`` is a real pysepal component that resolves
-``get_current_gee_interface()`` / ``get_current_drive_interface()`` /
-``get_current_sepal_client()`` synchronously, at render time, unless a
-non-``None`` value is threaded in -- see ``exports.py``'s ``ExportsPanel``
-docstring. pysepal's own test suite (``solara-export.md``'s testing section)
-always passes ``MagicMock()`` for exactly this reason. So the "built" branch
-here is checked with a spy standing in for ``ExportLauncher`` itself, never by
-rendering the real dialog machinery bare -- that would reach live session
-resolution outside a SEPAL runtime, which the domain suite has no fixture for
-(``tests/ee_offline.py`` initialises ``ee`` offline, not a SEPAL session).
+``app/panels/exports.py`` renders nothing any more: the Export section it used
+to own was folded into the layers table, whose rows each carry their own
+export icon (the repo owner asked for it -- see that module's docstring). So
+the render-level tests that lived here -- the "build first" placeholder, and
+the launcher's own wiring -- moved to ``tests/app/test_panel_map_layers.py``,
+where the dialog is now mounted. What stays is the part that was always this
+module's real subject: the SOURCES, which are pure and need no render tree at
+all.
 """
 
 from __future__ import annotations
 
-from typing import Any
-
-import ipyvuetify
-import solara
-
-from app.message import msg
-from app.panels.exports import ExportsPanel, export_sources
-from sdg1531.spec import RunSpec
-from tests.app.render_helpers import find_widget, markdown_texts
-
-
-def test_the_panel_renders_before_a_run():
-    box, rc = solara.render(
-        ExportsPanel(maps=None, ctx=None, spec=RunSpec(), gee_interface=None), handle_error=False
-    )
-    assert rc is not None
-    assert markdown_texts(box) == [f"<p>{msg('exports.build_first')}</p>"]
-    assert find_widget(box, ipyvuetify.Btn) is None  # no dead launcher before Build
-
-
-def test_the_panel_waits_for_both_maps_and_context():
-    """``maps`` and ``ctx`` land together, from one ``build_outcome`` call --
-    but they are still two separate fields on that ``BuildOutcome``, so
-    nothing stops a caller handing in one without the other. The panel must
-    not offer the launcher until both have landed."""
-    from app.steps.run import build
-    from tests.spec_factory import default_spec
-
-    maps_obj, _ctx_obj = build(default_spec(threshold=0.0))
-    box, rc = solara.render(
-        ExportsPanel(maps=maps_obj, ctx=None, spec=RunSpec(), gee_interface=None),
-        handle_error=False,
-    )
-    assert rc is not None
-    assert markdown_texts(box) == [f"<p>{msg('exports.build_first')}</p>"]
-    assert find_widget(box, ipyvuetify.Btn) is None
+from app.panels.exports import export_sources
 
 
 def test_there_is_one_source_per_layer_and_its_id_matches_a_domain_basename():
@@ -138,44 +101,3 @@ def test_resolve_carries_the_legacy_clip_region_scale_and_max_pixels():
         assert resolved.max_pixels == int(1e13)
         assert resolved.default_name == LAYER_BASENAMES[layer_id.value]
         assert resolved.vis_params == layer_vis_params(layer_id)
-
-
-def test_the_launcher_is_wired_with_the_localized_label_and_the_threaded_gee_interface(
-    monkeypatch,
-):
-    """A source grep can't tell a hardcoded ``"Export"`` from ``msg(...)``,
-    and can't tell a threaded ``gee_interface`` from one left for
-    ``ExportLauncher``'s own ``get_current_gee_interface()`` fallback to
-    resolve (which raises outside a SEPAL session -- see the module
-    docstring). Spying on the real kwargs proves both."""
-    from app.steps.run import build
-    from tests.spec_factory import default_spec
-
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_export_launcher(**kwargs: Any) -> None:
-        captured.update(kwargs)
-
-    monkeypatch.setattr("app.panels.exports.ExportLauncher", _spy_export_launcher)
-
-    maps_obj, ctx_obj = build(default_spec(threshold=0.0))
-    sentinel_gee_interface = object()
-
-    box, rc = solara.render(
-        ExportsPanel(
-            maps=maps_obj, ctx=ctx_obj, spec=RunSpec(), gee_interface=sentinel_gee_interface
-        ),
-        handle_error=False,
-    )
-    assert rc is not None
-
-    assert len(captured["sources"]) == 7
-    assert captured["label"] == msg("exports.button")
-    assert captured["button_text"] is True
-    assert captured["block"] is True
-    assert captured["gee_interface"] is sentinel_gee_interface
-    # No stray "build first" text now that a build exists -- the description
-    # itself no longer renders here at all; it moved to the section header
-    # (`app/panels/outputs.py`).
-    assert markdown_texts(box) == []

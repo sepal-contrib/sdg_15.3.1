@@ -1,4 +1,4 @@
-"""Exports: one source per layer, into a single launcher.
+"""Exports: one source per layer.
 
 The user picks what to export rather than exporting all seven at once, which is
 what the legacy offered. Asset basenames come from ``sdg1531.naming`` so a
@@ -8,29 +8,30 @@ the domain.
 ``vis_params`` is a single dict: all seven layers use the ``default``
 visualization slot. Multi-slot exports arrive when pysepal widens the field to
 accept a list; this app needs nothing from that change.
+
+**This module renders nothing any more.** It used to own an ``ExportsPanel``
+-- a section of its own in the outputs tab, holding one ``ExportLauncher``
+button over all seven sources. The repo owner asked for export to move next to
+the layers instead (*"what if the export can someway included in the layer
+section?"*), so ``app/panels/map_layers.py`` now hosts the dialog and gives
+each table row its own export icon, and what is left here is the part that was
+always the interesting half: the sources themselves. The dialog, the targets
+and the submit flow are unchanged pysepal.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
-import solara
-from pysepal.solara.components.export import (
-    ExportLauncher,
-    ExportSource,
-    ResolvedExport,
-)
+from pysepal.solara.components.export import ExportSource, ResolvedExport
 
-from app.message import msg
-from app.panels.map_layers import layer_name, layer_vis_params
+from app.panels.layer_style import layer_name, layer_vis_params
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import ClassifiedLayer, IndicatorMaps
 from sdg1531.enums import IndicatorLayer
 from sdg1531.naming import LAYER_BASENAMES
-from sdg1531.spec import RunSpec
 
-__all__ = ("ExportsPanel", "export_sources")
+__all__ = ("export_sources",)
 
 #: What the legacy passed as maxPixels (gdrive.py:168). Carried so a large AOI
 #: fails the same way it used to rather than at a different threshold.
@@ -84,45 +85,3 @@ def export_sources(maps: IndicatorMaps, ctx: ExecutionContext) -> tuple[ExportSo
             )
         )
     return tuple(sources)
-
-
-@solara.component
-def ExportsPanel(
-    maps: IndicatorMaps | None,
-    ctx: ExecutionContext | None,
-    spec: RunSpec,
-    gee_interface: Any,
-) -> None:
-    """``spec`` is accepted but unused, for the same reason ``MapLayersPanel``
-    accepts an unused ``gee_interface``: ``page.py`` passes a uniform set of
-    objects to every right-panel output section, and this panel needs nothing
-    from the run spec -- asset basenames come from ``sdg1531.naming`` off the
-    layer id alone.
-
-    ``gee_interface`` IS used, and must be threaded through to
-    ``ExportLauncher`` rather than left for its own internal
-    ``get_current_gee_interface()`` fallback to resolve. Both
-    ``pysepal``'s own reference integration
-    (``demo_apps/solara_map_app/component/tile/export.py``) and
-    ``sepal-gee-bundle``'s shipped ``tmf_sepal`` app
-    (``apps/tmf_sepal/components/export_step.py``) resolve it once at the page
-    level and pass it down for the same documented reason: ``MapApp``'s
-    ``right_panel_content`` is a separate render root from the
-    ``@with_sepal_sessions`` page that establishes the session, so a nested
-    panel calling ``get_current_gee_interface()`` itself can raise
-    ``SepalSessionError`` even though the page-level lookup succeeds.
-
-    The description this panel used to render itself now lives in its
-    section's own header (``app/panels/outputs.py``).
-    """
-    if maps is None or ctx is None:
-        solara.Markdown(msg("exports.build_first"))
-        return
-
-    ExportLauncher(
-        sources=export_sources(maps, ctx),
-        label=msg("exports.button"),
-        button_text=True,
-        block=True,
-        gee_interface=gee_interface,
-    )

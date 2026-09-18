@@ -1,34 +1,44 @@
-"""The five output panels, as one tab's flat, headed sections.
+"""The output panels, as one tab's flat, headed sections.
 
 The repo owner asked for this after using the app: *"all the computation
 buttons ... should be in the same tab, like with multiple sections, similarly
 as se.plan does ... like all the computations in one single place."* Task 27
 first built this as an ``rv.ExpansionPanels`` accordion; the repo owner then
 asked for that to go -- *"I didn't like the expansion panels you added, what
-about using like subtitles?"* -- so this module now renders the same five
-panels as flat, always-visible sections, each introduced by
+about using like subtitles?"* -- so this module now renders them as flat,
+always-visible sections, each introduced by
 ``app/panels/section_header.py``'s ``SectionHeader`` (title, icon and the
 panel's own description as one styled unit) instead of an
 ``ExpansionPanelHeader``/``ExpansionPanelContent`` pair.
 
 **Section order is the old tab order and must not change**: Layers ->
-Transitions -> Results -> Zonal -> Export (``app/tabs.py``'s own docstring
-already names this as the tabs' DISPLAY order; task 27 folded five tabs into
-five sections without reordering them, and this task's move to flat sections
-does not reorder them either). Each section's header carries that panel's
-existing ``msg("<panel>.title")``, icon and ``msg("<panel>.description")`` --
-no new copy invented for any of the five. The description used to be rendered
-a second time, inside the panel component itself, as a plain
-``solara.Markdown`` line below its own title-less content; it has been
-removed from all five panel components (``map_layers.py``, ``transitions.py``,
-``results.py``, ``zonal.py``, ``exports.py``) now that the header shows it,
-so title and description read as one unit rather than a heading followed by a
-stray sentence.
+Transitions -> Results -> Zonal. Task 27 folded the output tabs into sections
+without reordering them, and neither the move to flat sections nor the loss of
+the fifth reorders the rest.
 
-Layers opens by default; SO DO the other four now, since flat sections are
-always visible -- there is no "default open index" left to choose. What
-survives from that concept is only which section's OWN chart, if any, needs
-special mount timing; see the chart-mount trap below.
+**There were five sections; Export is now the fourth's worth of icons
+instead.** The repo owner asked for it -- *"what if the export can someway
+included in the layer section?"* -- so ``app/panels/map_layers.py`` hosts the
+export dialog and each of its table rows opens it preselected on that row's
+own layer. ``app/panels/exports.py`` still owns the sources; it just no longer
+owns a section. One fewer heading, and export now sits next to the thing being
+exported.
+
+Each section's header carries that panel's ``msg("<panel>.title")``, icon and
+``msg("<panel>.description")``. The description used to be rendered a second
+time, inside the panel component itself, as a plain ``solara.Markdown`` line
+below its own title-less content; it was removed from every panel component
+once the header started showing it, so title and description read as one unit
+rather than a heading followed by a stray sentence. The descriptions
+themselves got longer in the same round the Export section went away -- the
+owner's *"the transitions, distribution, zonal stats that should show some
+info like 3 lines explanation text"*. They are the one place a user is told
+what a computation actually produces, so they now say that rather than naming
+the section a second time.
+
+Every section is always visible -- there is no "default open index" left to
+choose. What survives from that concept is only which section's OWN chart, if
+any, needs special mount timing; see the chart-mount trap below.
 
 **The chart-mount trap. This is now the THIRD container these charts have
 lived in**, and behaviour has changed with every one so far:
@@ -50,7 +60,7 @@ lived in**, and behaviour has changed with every one so far:
   pair, driven by ``pysepal/scripts/browser_probe.mjs --resize 1400x900``):
   the accordion is gone, but the outer container is NOT -- this whole panel
   still lives inside ``rv.TabItem`` (the merged outputs TAB, one of
-  ``app/tabs.py``'s six), which ``WorkflowTabs``'s own docstring already
+  ``app/tabs.py``'s three), which ``WorkflowTabs``'s own docstring already
   documents as mounting a tab's content once, on first visit, and never
   unmounting it afterwards. That is exactly ``rv.ExpansionPanel``'s own
   eager-DOM, CSS-toggled behaviour, not a lazier one: switching to a
@@ -80,7 +90,6 @@ import reacton.ipyvuetify as rv
 import solara
 
 from app.message import msg
-from app.panels.exports import ExportsPanel
 from app.panels.map_layers import MapLayersPanel
 from app.panels.results import ResultsPanel
 from app.panels.section_header import SectionHeader
@@ -118,19 +127,16 @@ def output_sections(
     | None = None,
     is_active: bool = True,
 ) -> list[SectionDescriptor]:
-    """The five sections, in DISPLAY order. Bare-callable with every argument
+    """The four sections, in DISPLAY order. Bare-callable with every argument
     defaulting to ``None`` (or ``True`` for ``is_active``) -- same reason
     ``app.tabs.workflow_tabs`` is bare-callable; see that function's
-    docstring. ``export_content`` is the one guarded build (``ExportsPanel.spec``
-    is a bare ``RunSpec``, unlike every other panel's already-``X | None``
-    ``maps``/``ctx``), for the exact same mypy-narrowing reason
-    ``workflow_tabs`` guards it.
+    docstring.
+
+    ``spec`` is accepted and unused. It reached the deleted Export section and
+    nothing else; the parameter stays because ``OutputsPanel`` takes a bare
+    ``RunSpec`` from ``app/tabs.py``, which is what forces that call site's own
+    mypy-narrowing guard, and dropping it here would only move the churn.
     """
-    export_content: list[object] = (
-        [ExportsPanel(maps=maps, ctx=ctx, spec=spec, gee_interface=gee_interface)]
-        if spec is not None
-        else []
-    )
     return [
         SectionDescriptor(
             msg("layers.title"),
@@ -139,8 +145,10 @@ def output_sections(
             [
                 MapLayersPanel(
                     maps=maps,
+                    ctx=ctx,
                     map_=map_,
                     gee_interface=gee_interface,
+                    sepal_client=sepal_client,
                     shown=shown_layers if shown_layers is not None else frozenset[IndicatorLayer](),
                 )
             ],
@@ -181,9 +189,6 @@ def output_sections(
                 )
             ],
         ),
-        SectionDescriptor(
-            msg("exports.title"), "mdi-export-variant", msg("exports.description"), export_content
-        ),
     ]
 
 
@@ -199,11 +204,11 @@ def OutputsPanel(
     | frozenset[IndicatorLayer] = frozenset[IndicatorLayer](),
     is_active: bool = True,
 ) -> None:
-    """The merged outputs tab's whole content: five flat, headed sections
+    """The merged outputs tab's whole content: four flat, headed sections
     over ``output_sections()``, stacked and always visible.
 
     ``is_active`` says whether the merged outputs TAB (``app/tabs.py``'s
-    ``WorkflowTabs``, one of six ``rv.TabItem``s) is the one currently
+    ``WorkflowTabs``, one of three ``rv.TabItem``s) is the one currently
     active -- see the module docstring's chart-mount trap for why this
     replaced the old per-accordion-section ``open_index``. Defaults to
     ``True`` so a bare, standalone render of this panel (as most of

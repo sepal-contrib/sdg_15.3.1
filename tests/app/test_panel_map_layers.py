@@ -4,6 +4,17 @@ The click path is asynchronous (``add_ee_layer_async``), so most of these tests
 render the panel on a live event loop -- the same harness pysepal's own
 ``test_asset_select.py`` uses for a ``use_task``-backed component -- click the
 real rendered button, and wait for the task to settle before asserting.
+
+**Two controls per row now, not one.** The eye toggles a layer on and off (and
+cancels an add in flight); the download icon opens the export dialog on that
+row's own layer. Both are plain ``ipyvuetify.Btn``, so anything reading
+buttons positionally goes through ``_row_actions`` rather than indexing
+``find_widgets(box, Btn)`` directly.
+
+``_ExportDialogHost`` is stubbed out for the whole module by an autouse
+fixture: the real one mounts ``use_export_dialog``, whose ``dependencies=[]``
+task needs a running event loop, and the export CONTENT is tested in
+``tests/app/test_panel_exports.py`` (the sources) plus one wiring test below.
 """
 
 from __future__ import annotations
@@ -12,22 +23,53 @@ import asyncio
 from collections.abc import Callable
 
 import ipyvuetify
+import pytest
 import solara
 
 from app.message import messages, msg
-from app.panels.map_layers import MapLayersPanel, layer_name, layer_vis_params
+from app.panels import map_layers as map_layers_module
+from app.panels.layer_style import layer_name, layer_vis_params
+from app.panels.map_layers import MapLayersPanel
 from sdg1531.enums import IndicatorLayer
 from tests.app.render_helpers import cell_texts, find_widget, find_widgets, markdown_texts
 
 
+@solara.component
+def _noop_export_dialog_host(**_kwargs: object) -> None:
+    """Stands in for the real dialog host -- see this module's docstring."""
+
+
+@pytest.fixture(autouse=True)
+def _stub_export_dialog(monkeypatch):
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+
 class _FakeImage:
-    """Stands in for ``ee.Image``: only ``.select(band)`` is ever called."""
+    """Stands in for ``ee.Image``: records the display chain as a name.
+
+    ``select``/``clip``/``selfMask`` each return a NEW ``_FakeImage`` whose
+    name carries what was applied, so a test can assert the whole chain --
+    and its ORDER -- from the single value that reaches
+    ``add_ee_layer_async``.
+    """
 
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def select(self, band: str) -> str:
-        return f"{self.name}:{band}"
+    def select(self, band: str) -> _FakeImage:
+        return _FakeImage(f"{self.name}:{band}")
+
+    def clip(self, region: object) -> _FakeImage:
+        return _FakeImage(f"{self.name}|clip({region})")
+
+    def selfMask(self) -> _FakeImage:
+        return _FakeImage(f"{self.name}|selfMask")
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _FakeImage) and other.name == self.name
+
+    def __repr__(self) -> str:
+        return f"_FakeImage({self.name!r})"
 
 
 class _FakeLayer:
@@ -48,6 +90,18 @@ class _FakeMaps:
 
     def layers(self) -> dict[IndicatorLayer, _FakeLayer]:
         return self._layers
+
+
+class _FakeCtx:
+    """Stands in for ``ExecutionContext``: only ``.geometry`` is read by this
+    panel (it is what every drawn layer is clipped to), plus
+    ``.feature_collection`` by ``export_sources``."""
+
+    geometry = "AOI-GEOMETRY"
+    feature_collection = "AOI-COLLECTION"
+
+
+_CTX = _FakeCtx()
 
 
 _TWO_LAYERS = {
@@ -114,11 +168,31 @@ async def _wait_for(predicate: Callable[[], bool], timeout: float = 2.0) -> bool
     return True
 
 
-def _add_button_labels(box: object) -> list[list[object]]:
-    """Every button's ``.children``, in row order -- an "Add" row renders
-    ``TaskButtonComponent``'s button, a "shown" row the plain remove button;
-    both are ``ipyvuetify.Btn`` instances."""
-    return [btn.children for btn in find_widgets(box, ipyvuetify.Btn)]
+def _row_actions(box: object) -> list[tuple[object, object]]:
+    """``(eye, export)`` for each row, in row order.
+
+    ``_LayerRow`` renders exactly two ``ipyvuetify.Btn`` per row, in that
+    order, and the panel renders no other button -- so pairing them off the
+    flat tree walk is what turns "the fourth button" back into "row two's
+    export icon".
+    """
+    buttons = find_widgets(box, ipyvuetify.Btn)
+    assert len(buttons) % 2 == 0, "every row renders exactly two buttons"
+    return [(buttons[i], buttons[i + 1]) for i in range(0, len(buttons), 2)]
+
+
+def _eye_icons(box: object) -> list[object]:
+    """Each row's eye icon name, or ``None`` while that row is pending (the
+    eye is replaced by a spinner, which carries no icon name)."""
+    icons = []
+    for eye, _export in _row_actions(box):
+        child = eye.children[0]
+        icons.append(child.children[0] if isinstance(child, ipyvuetify.Icon) else None)
+    return icons
+
+
+_HIDDEN = "mdi-eye-off-outline"
+_SHOWN = "mdi-eye"
 
 
 def test_the_panel_renders_with_no_maps(monkeypatch):
@@ -126,7 +200,7 @@ def test_the_panel_renders_with_no_maps(monkeypatch):
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
     box, rc = solara.render(
-        MapLayersPanel(maps=None, map_=None, gee_interface=None), handle_error=False
+        MapLayersPanel(maps=None, ctx=None, map_=None, gee_interface=None), handle_error=False
     )
     assert rc is not None
     assert markdown_texts(box) == [f"<p>{msg('layers.build_first')}</p>"]
@@ -186,16 +260,27 @@ def test_every_indicator_layer_resolves_to_a_translated_name_in_every_locale(mon
 def test_the_table_lists_every_layer_translated_and_every_row_starts_addable(monkeypatch):
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: _FakeNotifier())
     box, rc = solara.render(
-        MapLayersPanel(maps=_FakeMaps(_THREE_LAYERS), map_=_RecordingMap(), gee_interface=None),
+        MapLayersPanel(
+            maps=_FakeMaps(_THREE_LAYERS), ctx=_CTX, map_=_RecordingMap(), gee_interface=None
+        ),
         handle_error=False,
     )
     assert rc is not None
     assert cell_texts(box, "th") == [msg("layers.columns.name"), msg("layers.columns.action")]
     assert cell_texts(box, "td") == [layer_name(layer_id) for layer_id in _THREE_LAYERS]
 
-    buttons = find_widgets(box, ipyvuetify.Btn)
-    assert len(buttons) == len(_THREE_LAYERS)
-    assert all(btn.children == [msg("layers.add")] for btn in buttons)
+    rows = _row_actions(box)
+    assert len(rows) == len(_THREE_LAYERS)
+    assert _eye_icons(box) == [_HIDDEN] * len(_THREE_LAYERS)
+    # Every row's eye and export icon names the layer it belongs to -- an
+    # icon-only control has no text, so this tooltip is its only affordance
+    # (and its `aria-label`).
+    for (eye, export), layer_id in zip(rows, _THREE_LAYERS, strict=True):
+        name = layer_name(layer_id)
+        assert eye.attributes["title"] == msg("layers.show", name=name)
+        assert eye.attributes["aria-label"] == eye.attributes["title"]
+        assert export.attributes["title"] == msg("layers.export", name=name)
+        assert export.attributes["aria-label"] == export.attributes["title"]
 
 
 def test_clicking_add_draws_only_that_rows_layer_and_reports_its_name(monkeypatch):
@@ -208,13 +293,15 @@ def test_clicking_add_draws_only_that_rows_layer_and_reports_its_name(monkeypatc
 
     async def main():
         box, rc = solara.render(
-            MapLayersPanel(maps=_FakeMaps(_THREE_LAYERS), map_=fake_map, gee_interface=None),
+            MapLayersPanel(
+                maps=_FakeMaps(_THREE_LAYERS), ctx=_CTX, map_=fake_map, gee_interface=None
+            ),
             handle_error=False,
         )
         assert rc is not None
-        buttons = find_widgets(box, ipyvuetify.Btn)
-        assert len(buttons) == 3
-        buttons[2].click()  # PRODUCTIVITY_PERFORMANCE, the third layer -- not the first
+        rows = _row_actions(box)
+        assert len(rows) == 3
+        rows[2][0].click()  # PRODUCTIVITY_PERFORMANCE's eye -- the third row, not the first
         assert await _wait_for(lambda: fake.successes or fake.errors)
 
     asyncio.run(main())
@@ -225,21 +312,26 @@ def test_clicking_add_draws_only_that_rows_layer_and_reports_its_name(monkeypatc
     assert call["name"] == layer_name(target)
     assert call["key"] == target.value
     assert call["vis_params"] == layer_vis_params(target)
-    # `.select(layer.band)`, not `.image` alone -- `ClassifiedLayer.image` may
-    # carry more bands than the one this panel draws, and the fake's
-    # `select` bakes the band into its result, so a dropped `.select(...)`
-    # would show up as the bare `_FakeImage` instead.
-    assert call["image"] == "productivity_performance:productivity_performance_band"
+    # The whole display chain, in order: `.select(layer.band)`, then
+    # `.clip(ctx.geometry)`, then `.selfMask()`. `ClassifiedLayer.image` may
+    # carry more bands than the one this panel draws, and an image that is
+    # neither clipped nor self-masked paints the palette's first colour over
+    # the whole globe (see `app/panels/layer_style.py`). The fake bakes each
+    # call into its name, so dropping any of the three shows up here.
+    assert call["image"] == _FakeImage(
+        "productivity_performance:productivity_performance_band|clip(AOI-GEOMETRY)|selfMask"
+    )
     assert fake.successes == [msg("layers.added", name=layer_name(target))]
     assert fake.errors == []
     assert fake_map.removed == []  # adding never touches a layer that wasn't shown
 
 
-def test_a_shown_layer_switches_to_remove_and_re_adds_with_the_same_key(monkeypatch):
-    """Covers both remaining single-row rules at once: the remove action must
-    really call ``remove_layer`` (not be a no-op), and taking a layer off and
-    back on must reuse the same stable ``key`` both times -- what makes a
-    second add replace rather than accumulate.
+def test_a_shown_layer_switches_to_an_open_eye_and_re_adds_with_the_same_key(monkeypatch):
+    """Covers both remaining single-row rules at once: hiding must really
+    call ``remove_layer`` (not be a no-op), and taking a layer off and back
+    on must reuse the same stable ``key`` both times -- what makes a second
+    add replace rather than accumulate. One control does all three states
+    (hidden / pending / shown), so the eye's own icon is what says which.
     """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
@@ -253,24 +345,26 @@ def test_a_shown_layer_switches_to_remove_and_re_adds_with_the_same_key(monkeypa
     # panel's plumbing is exercised against elsewhere in the suite either.
     async def main() -> None:
         box, rc = solara.render(
-            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
+            MapLayersPanel(
+                maps=_FakeMaps(_TWO_LAYERS), ctx=_CTX, map_=fake_map, gee_interface=None
+            ),
             handle_error=False,
         )
         assert rc is not None
 
-        find_widgets(box, ipyvuetify.Btn)[1].click()
+        _row_actions(box)[1][0].click()
         assert await _wait_for(lambda: len(fake.successes) == 1)
-        assert _add_button_labels(box)[1] == [msg("layers.remove")]
+        assert _eye_icons(box)[1] == _SHOWN
         first_key = fake_map.calls[0]["key"]
 
-        find_widgets(box, ipyvuetify.Btn)[1].click()  # remove -- fully synchronous
+        _row_actions(box)[1][0].click()  # hide -- fully synchronous
         assert fake_map.removed == [(target.value, True)]
-        assert _add_button_labels(box)[1] == [msg("layers.add")]  # back to addable
+        assert _eye_icons(box)[1] == _HIDDEN  # back to hidden
 
-        find_widgets(box, ipyvuetify.Btn)[1].click()  # add again
+        _row_actions(box)[1][0].click()  # show again
         assert await _wait_for(lambda: len(fake.successes) == 2)
         assert fake_map.calls[1]["key"] == first_key == target.value
-        assert _add_button_labels(box)[1] == [msg("layers.remove")]
+        assert _eye_icons(box)[1] == _SHOWN
 
     asyncio.run(main())
     assert len(fake_map.calls) == 2
@@ -287,11 +381,13 @@ def test_a_layer_that_fails_to_add_reports_the_error_and_stays_addable(monkeypat
 
     async def main():
         box, rc = solara.render(
-            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
+            MapLayersPanel(
+                maps=_FakeMaps(_TWO_LAYERS), ctx=_CTX, map_=fake_map, gee_interface=None
+            ),
             handle_error=False,
         )
         assert rc is not None
-        find_widgets(box, ipyvuetify.Btn)[1].click()
+        _row_actions(box)[1][0].click()
         assert await _wait_for(lambda: fake.successes or fake.errors)
         return box
 
@@ -309,28 +405,31 @@ def test_a_layer_that_fails_to_add_reports_the_error_and_stays_addable(monkeypat
         )
     ]
     assert layer_name(target) in fake.errors[0]
-    assert _add_button_labels(box)[1] == [msg("layers.add")]  # never marked shown
+    assert _eye_icons(box)[1] == _HIDDEN  # never marked shown
     assert fake_map.removed == []
 
 
 def test_clicking_cancel_while_pending_stops_the_add_without_marking_it_shown(monkeypatch):
-    """The Async Button Convention's single toggle button: clicking it again
-    while the add is running must cancel the task, and cancelling must not
-    quietly leave the row looking as if the layer landed."""
+    """The Async Button Convention's single toggle control, kept through the
+    move to an icon: clicking the eye again while the add is running must
+    cancel the task, and cancelling must not quietly leave the row looking as
+    if the layer landed."""
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
     fake_map = _RecordingMap()
 
     async def main():
         box, rc = solara.render(
-            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
+            MapLayersPanel(
+                maps=_FakeMaps(_TWO_LAYERS), ctx=_CTX, map_=fake_map, gee_interface=None
+            ),
             handle_error=False,
         )
         assert rc is not None
-        button = find_widgets(box, ipyvuetify.Btn)[0]
-        button.click()  # start the add
+        eye = _row_actions(box)[0][0]
+        eye.click()  # start the add
         await asyncio.sleep(0)  # let the task begin, before its own `sleep(0)` resolves
-        button.click()  # the SAME button, now in cancel state
+        _row_actions(box)[0][0].click()  # the SAME control, now in cancel state
         await asyncio.sleep(0.05)
         return box
 
@@ -338,17 +437,16 @@ def test_clicking_cancel_while_pending_stops_the_add_without_marking_it_shown(mo
 
     assert fake_map.calls == []
     assert fake.successes == fake.errors == []
-    assert _add_button_labels(box)[0] == [msg("layers.add")]
+    assert _eye_icons(box)[0] == _HIDDEN
 
 
-def test_the_other_rows_add_is_disabled_while_one_is_pending(monkeypatch):
+def test_the_other_rows_eye_is_disabled_while_one_is_pending(monkeypatch):
     """One component-level ``use_task`` (the brief forbade a hook per row):
-    clicking a SECOND row's Add while the first is still in flight would not
+    clicking a SECOND row's eye while the first is still in flight would not
     queue it, it would REPLACE it -- the first row's add silently abandoned,
     with no toast and no explanation on either row. Disabling every other
-    row's Add while one is pending (``external_busy``, see ``_LayerRow``)
-    turns that into a click that cannot be made, rather than one that
-    silently does nothing.
+    row's eye while one is pending (see ``_LayerToggle``) turns that into a
+    click that cannot be made, rather than one that silently does nothing.
     """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: fake)
@@ -356,21 +454,22 @@ def test_the_other_rows_add_is_disabled_while_one_is_pending(monkeypatch):
 
     async def main():
         box, rc = solara.render(
-            MapLayersPanel(maps=_FakeMaps(_TWO_LAYERS), map_=fake_map, gee_interface=None),
+            MapLayersPanel(
+                maps=_FakeMaps(_TWO_LAYERS), ctx=_CTX, map_=fake_map, gee_interface=None
+            ),
             handle_error=False,
         )
         assert rc is not None
-        buttons = find_widgets(box, ipyvuetify.Btn)
-        buttons[0].click()  # start LAND_COVER's add
+        _row_actions(box)[0][0].click()  # start LAND_COVER's add
         await asyncio.sleep(0)  # let the task begin, before its own `sleep(0)` resolves
 
-        buttons = find_widgets(box, ipyvuetify.Btn)
-        assert buttons[0].disabled is False  # the pending row's own button: cancel, never disabled
-        assert buttons[1].disabled is True  # every OTHER row: disabled while busy elsewhere
+        rows = _row_actions(box)
+        assert rows[0][0].disabled is False  # the pending row's own eye: cancel, never disabled
+        assert _eye_icons(box)[0] is None  # ... and showing a spinner, not an eye
+        assert rows[1][0].disabled is True  # every OTHER row: disabled while busy elsewhere
 
         assert await _wait_for(lambda: fake.successes or fake.errors)
-        buttons = find_widgets(box, ipyvuetify.Btn)
-        assert buttons[1].disabled is False  # re-enabled once nothing is pending
+        assert _row_actions(box)[1][0].disabled is False  # re-enabled once nothing is pending
 
     asyncio.run(main())
 
@@ -383,7 +482,7 @@ def _Harness(maps_reactive: solara.Reactive[_FakeMaps | None], map_: object) -> 
     only be produced from a level above it, exactly as ``page.py`` does with
     its own memoised ``outcome``.
     """
-    MapLayersPanel(maps=maps_reactive.value, map_=map_, gee_interface=None)
+    MapLayersPanel(maps=maps_reactive.value, ctx=_CTX, map_=map_, gee_interface=None)
 
 
 def test_a_new_maps_identity_clears_every_layer_the_previous_run_added(monkeypatch):
@@ -405,7 +504,7 @@ def test_a_new_maps_identity_clears_every_layer_the_previous_run_added(monkeypat
         )
         assert rc is not None
         for index in range(2):
-            find_widgets(box, ipyvuetify.Btn)[index].click()
+            _row_actions(box)[index][0].click()
             assert await _wait_for(lambda n=index: len(fake.successes) == n + 1)
         return box
 
@@ -416,10 +515,14 @@ def test_a_new_maps_identity_clears_every_layer_the_previous_run_added(monkeypat
 
     maps_reactive.value = _FakeMaps(_TWO_LAYERS)  # a NEW object: a different run
 
-    assert sorted(fake_map.removed) == sorted((layer_id.value, True) for layer_id in _TWO_LAYERS)
+    # EVERY layer id is swept, not only the two this panel believes are shown
+    # -- see `clear_stale_layers` for the render-time-snapshot window that
+    # makes the narrower version leave an untracked tile on the map.
+    # `remove_layer(..., none_ok=True)` makes the other five no-ops.
+    assert sorted(fake_map.removed) == sorted((layer_id.value, True) for layer_id in IndicatorLayer)
     # The shown SET was cleared too, not just the map's own layers -- every
-    # row is addable again under the new run.
-    assert all(labels == [msg("layers.add")] for labels in _add_button_labels(box))
+    # row is hidden again under the new run.
+    assert _eye_icons(box) == [_HIDDEN] * len(_TWO_LAYERS)
 
 
 def test_maps_becoming_none_also_clears_the_map(monkeypatch):
@@ -446,5 +549,121 @@ def test_maps_becoming_none_also_clears_the_map(monkeypatch):
 
     maps_reactive.value = None
 
-    assert fake_map.removed == [(IndicatorLayer.LAND_COVER.value, True)]
+    assert sorted(fake_map.removed) == sorted((layer_id.value, True) for layer_id in IndicatorLayer)
     assert markdown_texts(box)[-1] == f"<p>{msg('layers.build_first')}</p>"
+
+
+def test_the_export_icon_asks_for_its_own_row_and_asks_again_on_a_second_press(monkeypatch):
+    """Each row's export icon opens the dialog on THAT row's layer.
+
+    The row never touches the export controller itself -- it raises an
+    ``_ExportRequest``, and ``_ExportDialogHost`` is what turns that into a
+    preselect-and-open (see those two in ``app/panels/map_layers.py``). So
+    this asserts the request, which is the whole of the panel's own side of
+    the contract.
+
+    The second press is not redundant: the host opens the dialog from a
+    ``use_effect`` keyed on the request value, so a request carrying only a
+    layer id would compare EQUAL to the previous one and re-opening a dialog
+    the user had closed would silently do nothing. The nonce is what stops
+    that, and this is what would catch its removal.
+    """
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: _FakeNotifier())
+    captured: list[object] = []
+
+    @solara.component
+    def _spy_host(*, request: object = None, **_kwargs: object) -> None:
+        captured.append(request)
+
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _spy_host)
+
+    box, rc = solara.render(
+        MapLayersPanel(
+            maps=_FakeMaps(_THREE_LAYERS), ctx=_CTX, map_=_RecordingMap(), gee_interface=None
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+    assert captured[-1].layer_id == ""  # nothing asked for yet
+
+    _row_actions(box)[1][1].click()  # SOC's export icon -- the second row, not the first
+    assert captured[-1].layer_id == IndicatorLayer.SOC.value
+    first_nonce = captured[-1].nonce
+
+    _row_actions(box)[1][1].click()  # the SAME row again
+    assert captured[-1].layer_id == IndicatorLayer.SOC.value
+    assert captured[-1].nonce != first_nonce, (
+        "a repeat press must be a distinct request, or the host's effect never re-fires"
+    )
+
+
+def test_the_export_host_is_only_mounted_once_a_build_exists(monkeypatch):
+    """``use_export_dialog`` schedules real async work at mount, so mounting
+    it before there is anything to export would make every render of this app
+    need an event loop for a dialog no one opened -- see
+    ``_ExportDialogHost``'s own docstring."""
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: _FakeNotifier())
+    mounted: list[bool] = []
+
+    @solara.component
+    def _spy_host(**_kwargs: object) -> None:
+        mounted.append(True)
+
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _spy_host)
+
+    _box, rc = solara.render(
+        MapLayersPanel(maps=None, ctx=None, map_=None, gee_interface=None), handle_error=False
+    )
+    assert rc is not None
+    assert mounted == []
+
+    _box, rc = solara.render(
+        MapLayersPanel(
+            maps=_FakeMaps(_TWO_LAYERS), ctx=_CTX, map_=_RecordingMap(), gee_interface=None
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+    assert mounted == [True]
+
+
+def test_the_export_host_is_wired_with_one_source_per_layer_and_the_threaded_gee_interface(
+    monkeypatch,
+):
+    """Moved here from ``tests/app/test_panel_exports.py`` when the Export
+    section became a column of icons in this table.
+
+    A source grep cannot tell a threaded ``gee_interface`` from one left for
+    ``use_export_dialog``'s own ``get_current_gee_interface()`` fallback to
+    resolve -- and that fallback raises outside a SEPAL session, which is why
+    it is threaded (see ``MapLayersPanel``'s docstring). Spying on the real
+    kwargs is what proves it.
+    """
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: _FakeNotifier())
+    captured: dict[str, object] = {}
+
+    @solara.component
+    def _spy_host(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _spy_host)
+    sentinel_gee = object()
+    sentinel_client = object()
+
+    _box, rc = solara.render(
+        MapLayersPanel(
+            maps=_FakeMaps(_THREE_LAYERS),
+            ctx=_CTX,
+            map_=_RecordingMap(),
+            gee_interface=sentinel_gee,
+            sepal_client=sentinel_client,
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+
+    assert captured["gee_interface"] is sentinel_gee
+    assert captured["sepal_client"] is sentinel_client
+    assert [source.id for source in captured["sources"]] == [
+        layer_id.value for layer_id in _THREE_LAYERS
+    ]

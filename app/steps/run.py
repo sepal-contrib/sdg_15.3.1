@@ -28,15 +28,18 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import date
 
+import reacton.ipyvuetify as rv
 import solara
 
 from app.message import msg
-from app.state import is_runnable, render_problems
+from app.panels.problems import ProblemsAlert, ProblemsList
+from app.state import is_runnable
 from sdg1531.catalog import L4_START, SENSORS
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps, build_indicator_maps
 from sdg1531.resolve import resolve
 from sdg1531.spec import Period, RunSpec, SensorSelection
+from sdg1531.validate import Problem
 
 __all__ = ("BuildOutcome", "RunStep", "build", "build_outcome")
 
@@ -151,15 +154,24 @@ def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
         ),
     )
 
+    # A field hint, not a status message: it describes what the two Selects
+    # above it can usefully be set to, so it stays a muted caption under them
+    # rather than going through `ProblemsAlert`. `app/panels/problems.py`
+    # explains why every OTHER informational line here is gone -- what it does
+    # not cover is this one, which is the only survivor, and only because it is
+    # the thing that stops a user choosing a period no selected sensor has data
+    # for (the crash `sensor_period_no_overlap` now refuses).
     coverage_hint = _sensor_coverage_hint(spec.value)
     if coverage_hint is not None:
-        solara.Markdown(coverage_hint)
+        rv.Html(tag="div", class_="caption text--secondary mb-2", children=[coverage_hint])
 
-    render_problems("run", spec.value)
+    ProblemsAlert(step="run", spec=spec.value)
 
+    # A build refusal `validate()` has no rule for (`spec.threshold`
+    # unresolved is the standing example). Not a `Problem`, so it is wrapped
+    # in one to reach the same styled component rather than falling back to a
+    # bold `solara.Markdown` -- see `ProblemsList`'s own docstring.
     if outcome.error is not None:
-        solara.Markdown(f"**{outcome.error}**")
-    elif outcome.maps is not None:
-        solara.Markdown(msg("run.ready", count=len(outcome.maps.layers())))
-    else:
-        solara.Markdown(msg("run.blocked"))
+        ProblemsList(
+            problems=(Problem(field="", code="build_refused", message=outcome.error, fatal=True),)
+        )

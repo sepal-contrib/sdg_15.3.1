@@ -7,15 +7,13 @@
     "description": "Configure los datos de la ejecución y luego revise sus capas, estadísticas y exportaciones."
   },
   "step": {
-    "aoi": "Área de interés",
     "productivity": "Productividad",
     "land_cover": "Cobertura del suelo",
     "soc": "Carbono orgánico del suelo",
     "run": "Período de evaluación"
   },
   "aoi": {
-    "description": "Elija el área sobre la que se calcula el indicador.",
-    "selected": "Seleccionado: {name}"
+    "description": "Elija el área sobre la que se calcula el indicador."
   },
   "productivity": {
     "description": "Índice de vegetación, método de tendencia y unidades ecológicas.",
@@ -65,23 +63,15 @@
     "start_year": "Año de inicio",
     "end_year": "Año final",
     "sensor_coverage_bounded": "Los sensores seleccionados tienen datos de {start} a {end}.",
-    "sensor_coverage_open": "Los sensores seleccionados tienen datos desde {start}.",
-    "ready": {
-      "one": "Listo: {count} capa",
-      "other": "Listo: {count} capas",
-      "many": "Listo: {count} de capas"
-    },
-    "blocked": "Corrija los problemas anteriores para poder calcular el indicador."
+    "sensor_coverage_open": "Los sensores seleccionados tienen datos desde {start}."
   },
   "layers": {
     "title": "Capas",
-    "description": "Añadir las capas calculadas al mapa.",
+    "description": "Dibuje cualquier capa calculada en el mapa, recortada a su área de interés. El ojo muestra u oculta una capa; el icono de descarga la exporta como asset de Earth Engine, a Google Drive o a su espacio de trabajo de SEPAL.",
     "columns": {
       "name": "Capa",
       "action": "Acción"
     },
-    "add": "Añadir",
-    "remove": "Quitar",
     "added": "Añadido al mapa: {name}",
     "names": {
       "land_cover": "Cobertura del suelo",
@@ -93,7 +83,11 @@
       "indicator_15_3_1": "Indicador ODS 15.3.1"
     },
     "build_first": "Construya primero el indicador.",
-    "add_failed": "No se pudo añadir {name} al mapa: {reason}"
+    "add_failed": "No se pudo añadir {name} al mapa: {reason}",
+    "show": "Mostrar {name} en el mapa",
+    "hide": "Ocultar {name}",
+    "cancel": "Detener la carga de {name}",
+    "export": "Exportar {name}"
   },
   "legend": {
     "classes": {
@@ -135,49 +129,36 @@
   },
   "transitions": {
     "title": "Transiciones",
-    "description": "Transiciones de la cobertura del suelo entre los años inicial y final.",
+    "description": "Cuánta superficie pasó de una clase de cobertura del suelo a otra durante el período de evaluación. Las filas son la clase inicial de cada píxel, las columnas la clase final, y cada valor es una superficie. Es la matriz de transición de la que se deriva el subindicador de cobertura del suelo.",
     "compute": "Calcular transiciones",
     "computed": "Transiciones listas",
     "build_first": "Construya primero el indicador."
   },
   "results": {
     "title": "Distribución",
-    "description": "Superficies de clases por tipo de cobertura del suelo.",
+    "description": "Superficie de cada clase de degradación — degradado, estable, mejorado — desglosada por tipo de cobertura del suelo. Así se suele presentar el indicador: muestra en qué tipos de cobertura se concentra la degradación de su área.",
     "compute": "Calcular estadísticas",
     "computed": "Estadísticas listas",
     "build_first": "Construya primero el indicador."
   },
   "zonal": {
     "title": "Estadísticas zonales",
-    "description": "Superficies del indicador por zona administrativa.",
+    "description": "Superficies del indicador sumadas dentro de cada entidad de su área de interés, una fila por zona. Descárguelas como shapefile para unir las cifras a sus propios límites en QGIS o para informar totales por distrito.",
     "compute": "Calcular estadísticas zonales",
     "download": "Descargar shapefile",
     "ready": "Estadísticas zonales listas",
     "build_first": "Construya primero el indicador."
   },
   "exports": {
-    "title": "Exportación",
-    "description": "Exportar cualquier capa como asset de GEE.",
-    "button": "Exportar",
-    "build_first": "Construya primero el indicador."
-  },
-  "outputs": {
-    "title": "Resultados"
-  },
-  "params": {
-    "title": "Parámetros"
+    "title": "Exportación"
   },
   "period_override": {
     "toggle": "Usar un período diferente para este subindicador",
     "inherited": "Usa el período de evaluación: {start}–{end}."
   },
   "tabs": {
-    "previous": "Paso anterior",
-    "next": "Paso siguiente",
-    "abbrev": {
-      "aoi": "AI",
-      "params": "PAR",
-      "outputs": "RES"
-    }
+    "aoi": "AOI",
+    "params": "Parámetros",
+    "results": "Resultados"
   }
 }

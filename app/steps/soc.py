@@ -23,7 +23,7 @@ from datetime import date
 import solara
 
 from app.message import msg
-from app.state import render_problems
+from app.panels.problems import ProblemsAlert
 from app.steps.period_override import PeriodOverrideControl
 from sdg1531.catalog import L4_START
 from sdg1531.spec import PeriodOverride, RunSpec
@@ -60,4 +60,4 @@ def SocStep(spec: solara.Reactive[RunSpec]) -> None:
         on_change=set_override,
     )
 
-    render_problems("soc", spec.value)
+    ProblemsAlert(step="soc", spec=spec.value)

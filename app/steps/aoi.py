@@ -14,7 +14,7 @@ from pysepal.solara.components.aoi.aoi_result import AoiResult
 
 from app.adapters import to_domain_aoi
 from app.message import msg
-from app.state import render_problems
+from app.panels.problems import ProblemsAlert
 from sdg1531.spec import RunSpec
 
 __all__ = ("AoiStep", "apply_selection")
@@ -48,7 +48,9 @@ def AoiStep(spec: solara.Reactive[RunSpec], map_: Any) -> None:
         gee=True,
     )
 
-    if spec.value.aoi is not None:
-        solara.Markdown(msg("aoi.selected", name=spec.value.aoi.name))
-
-    render_problems("aoi", spec.value)
+    # No "Selected: {name}" line here any more. `AoiView`'s own controls
+    # already show the current selection, so it restated what was on screen
+    # two rows above it -- the repo owner's own example of the noise this
+    # panel should not carry ("in the AOI section remove the 'SELECTED...'
+    # that is useless"). `app/panels/problems.py` records the rule.
+    ProblemsAlert(step="aoi", spec=spec.value)

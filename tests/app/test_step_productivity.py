@@ -13,7 +13,7 @@ from app.steps.productivity import ProductivityStep, selectable_trajectories
 from sdg1531.catalog import DISABLED_TRAJECTORIES, SENSORS
 from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
 from sdg1531.spec import PeriodOverride, PrecomputedViAsset, RunSpec, SensorSelection
-from tests.app.render_helpers import find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # `Trajectory` has four members and one (`S_RES_TREND`) is disabled -- named
@@ -267,48 +267,49 @@ def test_moving_the_threshold_slider_updates_only_threshold():
 
 
 @pytest.mark.parametrize(
-    ("spec", "expected_extra"),
+    ("spec", "expected_alerts"),
     [
         (default_spec(), []),
-        (
-            RunSpec(),
-            ["<p><strong>Select at least one sensor.</strong></p>"],
-        ),
+        (RunSpec(), [("error", "Select at least one sensor.")]),
         (
             default_spec(trajectory=Trajectory.S_RES_TREND),
-            ["<p><strong>The water use efficiency trajectory is not implemented.</strong></p>"],
+            [("error", "The water use efficiency trajectory is not implemented.")],
         ),
-        (
-            default_spec(aoi=None),
-            [],
-        ),
+        (default_spec(aoi=None), []),
         (
             # A non-fatal problem this step owns: `periods.state` falls back
             # to `periods.overall` (2000-2020 in `DEFAULT_PERIODS`), and a
-            # baseline under four years leaves it fully masked. Both branches
-            # of the problems loop render as plain `<p>...</p>` in this
-            # file's other cases (all fatal, all bold) -- this is the only
-            # case that exercises the non-bold `else` arm, so a mutation that
-            # always bolds (or never does) has something here to catch it.
+            # baseline under four years leaves it fully masked. Every other
+            # case in this file is fatal, so this is the only one that
+            # exercises the `warning` alert -- a mutation that files every
+            # problem as an error (or none) has something here to catch it.
             default_spec(periods=replace(DEFAULT_PERIODS, state=PeriodOverride(2018, 2020))),
             [
-                "<p>The productivity state period is shorter than four years, so its "
-                "baseline is empty and the state layer will be fully masked.</p>"
+                (
+                    "warning",
+                    "The productivity state period is shorter than four years, so "
+                    "its baseline is empty and the state layer will be fully masked.",
+                )
             ],
         ),
     ],
 )
-def test_the_step_renders_only_its_own_text(spec, expected_extra):
-    """Pins what the step actually shows: a fully-configured spec renders no
-    markdown at all now (task 30 moved the description into ``ParamsPanel``'s
-    own ``SectionHeader`` -- see ``app/panels/params.py``); a spec with a
-    fatal problem THIS step owns (no sensors, or the disabled trajectory)
-    shows that problem's text, bolded; a spec with a non-fatal problem THIS
-    step owns shows that problem's text unbolded; and a spec whose only fatal
-    problem belongs to ANOTHER step (missing AOI) shows nothing -- the case
-    that actually distinguishes ``problems_for("productivity", ...)`` from
-    ``validate(...)``."""
+def test_the_step_renders_only_its_own_problems(spec, expected_alerts):
+    """Pins what the step actually shows: a fully-configured spec renders
+    nothing (task 30 moved the description into ``ParamsPanel``'s own
+    ``SectionHeader`` -- see ``app/panels/params.py``); a spec with a fatal
+    problem THIS step owns (no sensors, or the disabled trajectory) shows it
+    as an ``error``; a spec with a non-fatal problem THIS step owns shows it
+    as a ``warning``; and a spec whose only fatal problem belongs to ANOTHER
+    step (missing AOI) shows nothing -- the case that actually distinguishes
+    ``problems_for("productivity", ...)`` from ``validate(...)``.
+
+    Read off ``rv.Alert``, since every validation message now goes through
+    ``app/panels/problems.py``; the severity is asserted directly rather than
+    inferred from a ``<strong>`` wrapper.
+    """
     spec_r = solara.reactive(spec)
     box, rc = solara.render(ProductivityStep(spec=spec_r), handle_error=False)
     assert rc is not None
-    assert markdown_texts(box) == expected_extra
+    assert alert_texts(box) == expected_alerts
+    assert markdown_texts(box) == []

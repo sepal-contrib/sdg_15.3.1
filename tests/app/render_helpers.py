@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ("cell_texts", "find_widget", "find_widgets", "markdown_texts")
+__all__ = ("alert_texts", "cell_texts", "find_widget", "find_widgets", "markdown_texts")
 
 _MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
 
@@ -70,4 +70,29 @@ def cell_texts(node: object, tag: str) -> list[str]:
     for child in children:
         if not isinstance(child, str):
             texts.extend(cell_texts(child, tag))
+    return texts
+
+
+def alert_texts(node: object) -> list[tuple[str, str]]:
+    """Every rendered validation message under ``node``, as ``(severity, text)``.
+
+    The ``markdown_texts`` counterpart for ``app/panels/problems.py``. Steps
+    used to render each problem as its own ``solara.Markdown``, bolded when
+    fatal, which ``markdown_texts`` could read; they now render one
+    ``rv.Alert`` per severity holding one ``rv.Html`` div per message, so the
+    severity lives on the alert and the text one level below it.
+
+    ``severity`` is the alert's own ``type`` trait -- ``"error"`` for a fatal
+    problem, ``"warning"`` otherwise -- so a test can assert that a problem
+    is shown AND that it is shown as blocking, which the old bold-or-not
+    markdown could only express as a string prefix.
+    """
+    import ipyvuetify as v
+
+    texts: list[tuple[str, str]] = []
+    for alert in find_widgets(node, v.Alert):
+        for row in getattr(alert, "children", None) or ():
+            for text in getattr(row, "children", None) or ():
+                if isinstance(text, str):
+                    texts.append((alert.type, text))
     return texts

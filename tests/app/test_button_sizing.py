@@ -5,21 +5,23 @@ button-sizing table, in the pysepal repo: right-panel content buttons take
 ``small=True``, adding ``block=True`` for full width).
 
 Two call shapes matter here: ``TaskButtonComponent(...)`` (every compute /
-download / add button) and a bare ``rv.Btn(...)`` / ``v.Btn(...)``
-(``map_layers.py``'s own remove button, and the two prev/next arrows in
-``app/tabs.py``). Both need ``small=True`` in a ~450px right panel -- this
-app has no navigation-drawer button to exempt (``page.py``'s
-``steps_data=[]`` is empty, so the table's one "never ``small=True``" row
-never applies here). ``block=True`` is narrower: the guide's own last row
-keeps navigation-drawer icons at their default size, and this app's own
-equivalent -- the two prev/next arrows, ``icon=True`` calls -- stay icon
-buttons the same way (the repo owner's own brief for this task: "the
-prev/next arrows are icon buttons and must stay icon buttons"). That
-exemption is read off ``icon=True`` at the call site itself
-(``_is_icon_call``), not a hand-typed file/line exemption list, so a NEW
-icon button needs no entry added anywhere to be exempted correctly, and a
-content button cannot be exempted by mistake just by living in the same
-file as one.
+download button) and a bare ``rv.Btn(...)`` / ``v.Btn(...)``
+(``map_layers.py``'s own ``_IconAction``). Both need ``small=True`` in a
+~450px right panel -- this app has no navigation-drawer button to exempt
+(``page.py``'s ``steps_data=[]`` is empty, so the table's one "never
+``small=True``" row never applies here). ``block=True`` is narrower: the
+guide's own last row keeps navigation-drawer icons at their default size,
+and this app's own equivalent -- the layer rows' eye and export controls,
+``icon=True`` calls -- stay icon buttons the same way. That exemption is
+read off ``icon=True`` at the call site itself (``_is_icon_call``), not a
+hand-typed file/line exemption list, so a NEW icon button needs no entry
+added anywhere to be exempted correctly, and a content button cannot be
+exempted by mistake just by living in the same file as one.
+
+The roster shrank when the prev/next arrows were deleted (standard
+``rv.Tabs`` needs none) and the layer rows' Add/Remove pair became one
+``_IconAction``; ``app/panels/exports.py`` lost its ``ExportLauncher``
+call in the same round, when export moved into the layers table.
 
 Checked the Selects and chips the brief also asked about, and found nothing
 to pin: no ``rv.Chip``/``solara.Chip`` call exists anywhere in ``app/``, and
@@ -45,10 +47,10 @@ import ast
 
 from hygiene_rules import iter_domain_sources
 
-#: The two call shapes this convention applies to. `ExportLauncher` (used by
-#: `app/panels/exports.py`) is deliberately NOT here: it is a pysepal
-#: component whose own `small` parameter already defaults to `True`, so
-#: exports.py has no bare button call of its own to pin.
+#: The two call shapes this convention applies to. `ExportDialog` (mounted by
+#: `app/panels/map_layers.py`'s `_ExportDialogHost`) is deliberately NOT
+#: here: it is a pysepal component that renders its own buttons, none of
+#: which this app passes sizing for.
 _TARGET_NAMES = frozenset({"TaskButtonComponent", "Btn"})
 
 
@@ -154,13 +156,13 @@ def test_every_button_call_carries_small_true():
         f"(regression in the scan itself, not necessarily the source): {sorted(missing)}"
     )
 
-    # A floor on the roster itself: today's app/ has seven such call SITES in
-    # source (transitions.py, results.py, zonal.py x2, map_layers.py x2,
-    # tabs.py's `_NavArrow` -- one call site in source, even though it is
-    # INVOKED twice, once per arrow; this is a static scan, not a trace). Not
-    # `>= 1` -- a regression that dropped this to one or two sites would
-    # still clear a bare non-empty check.
-    assert len(calls) >= 7, f"expected at least 7 button call sites, found {len(calls)}: {calls}"
+    # A floor on the roster itself: today's app/ has five such call SITES in
+    # source (transitions.py, results.py, zonal.py x2, and map_layers.py's
+    # `_IconAction` -- one call site in source, even though it is INVOKED
+    # twice per layer row, once for the eye and once for export; this is a
+    # static scan, not a trace). Not `>= 1` -- a regression that dropped this
+    # to one or two sites would still clear a bare non-empty check.
+    assert len(calls) >= 5, f"expected at least 5 button call sites, found {len(calls)}: {calls}"
 
     violations = [
         f"{rel}:{lineno} ({target})"
@@ -176,10 +178,11 @@ def test_every_button_call_carries_small_true():
 def test_every_non_icon_button_call_carries_block_true():
     """Task 30's own ask, pysepal's convention table's other half: right-panel
     content buttons take ``block=True`` for full width, alongside the
-    ``small=True`` checked above. Icon buttons (``app/tabs.py``'s prev/next
-    arrows) are exempted by ``_is_icon_call`` reading ``icon=True`` off the
-    call itself, not a hand-typed file/line list -- see this module's
-    docstring for why.
+    ``small=True`` checked above. Icon buttons (``map_layers.py``'s own
+    ``_IconAction``, which draws every layer row's eye and export control)
+    are exempted by ``_is_icon_call`` reading ``icon=True`` off the call
+    itself, not a hand-typed file/line list -- see this module's docstring
+    for why.
 
     Directly catches both mutations the brief names for this rule: dropping
     ``block=True`` from one outputs button (a violation, naming that exact
@@ -196,14 +199,14 @@ def test_every_non_icon_button_call_carries_block_true():
     icon_calls = [c for c in calls if _is_icon_call(c[3])]
     content_calls = [c for c in calls if not _is_icon_call(c[3])]
 
-    # A floor on each half of the split, for the same reason the bare `>= 7`
+    # A floor on each half of the split, for the same reason the bare `>= 5`
     # above is a floor: today's app/ has exactly one icon call site
-    # (`_NavArrow`) and six non-icon ones. A regression that misclassified a
-    # real content button as an icon button (exempting it by mistake) or the
+    # (`_IconAction`) and four non-icon ones. A regression that misclassified
+    # a real content button as an icon button (exempting it by mistake) or the
     # reverse would still pass a bare non-empty check on either side.
     assert len(icon_calls) == 1, f"expected exactly one icon button call site: {icon_calls}"
-    assert len(content_calls) == 6, (
-        f"expected exactly six non-icon button call sites: {content_calls}"
+    assert len(content_calls) == 4, (
+        f"expected exactly four non-icon button call sites: {content_calls}"
     )
 
     violations = [

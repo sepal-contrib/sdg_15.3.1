@@ -7,15 +7,13 @@
     "description": "Set up the run's inputs, then review its layers, statistics and exports."
   },
   "step": {
-    "aoi": "Area of interest",
     "productivity": "Productivity",
     "land_cover": "Land cover",
     "soc": "Soil organic carbon",
     "run": "Assessment period"
   },
   "aoi": {
-    "description": "Choose the area the indicator is computed over.",
-    "selected": "Selected: {name}"
+    "description": "Choose the area the indicator is computed over."
   },
   "productivity": {
     "description": "Vegetation index, trend method and ecological units.",
@@ -65,22 +63,15 @@
     "start_year": "Start year",
     "end_year": "End year",
     "sensor_coverage_bounded": "The selected sensors have data from {start} to {end}.",
-    "sensor_coverage_open": "The selected sensors have data from {start} onward.",
-    "ready": {
-      "one": "Ready: {count} layer",
-      "other": "Ready: {count} layers"
-    },
-    "blocked": "Fix the problems above before the indicator can be computed."
+    "sensor_coverage_open": "The selected sensors have data from {start} onward."
   },
   "layers": {
     "title": "Layers",
-    "description": "Add the computed layers to the map.",
+    "description": "Draw any computed layer on the map, clipped to your area of interest. The eye shows or hides a layer; the download icon exports it as an Earth Engine asset, to Google Drive, or to your SEPAL workspace.",
     "columns": {
       "name": "Layer",
       "action": "Action"
     },
-    "add": "Add",
-    "remove": "Remove",
     "added": "Added to the map: {name}",
     "names": {
       "land_cover": "Land cover",
@@ -92,7 +83,11 @@
       "indicator_15_3_1": "SDG Indicator 15.3.1"
     },
     "build_first": "Build the indicator first.",
-    "add_failed": "Could not add {name} to the map: {reason}"
+    "add_failed": "Could not add {name} to the map: {reason}",
+    "show": "Show {name} on the map",
+    "hide": "Hide {name}",
+    "cancel": "Stop adding {name}",
+    "export": "Export {name}"
   },
   "legend": {
     "classes": {
@@ -134,49 +129,36 @@
   },
   "transitions": {
     "title": "Transitions",
-    "description": "Land cover transitions between the start and end years.",
+    "description": "How much land moved between each pair of land cover classes over the assessment period. Rows are the class a pixel started in, columns the class it ended in, and each value is an area. This is the transition matrix the land cover sub-indicator is derived from.",
     "compute": "Compute transitions",
     "computed": "Transitions ready",
     "build_first": "Build the indicator first."
   },
   "results": {
     "title": "Distribution",
-    "description": "Class areas per land cover type.",
+    "description": "Area of each degradation class — degraded, stable, improved — broken down by land cover type. This is how the indicator is usually reported: it shows which land cover types the degradation in your area is concentrated in.",
     "compute": "Compute statistics",
     "computed": "Statistics ready",
     "build_first": "Build the indicator first."
   },
   "zonal": {
     "title": "Zonal statistics",
-    "description": "Indicator areas per administrative zone.",
+    "description": "Indicator areas summed inside each feature of your area of interest, one row per zone. Download it as a shapefile to join the figures back to your own boundaries in QGIS, or to report per-district totals.",
     "compute": "Compute zonal statistics",
     "download": "Download shapefile",
     "ready": "Zonal statistics ready",
     "build_first": "Build the indicator first."
   },
   "exports": {
-    "title": "Export",
-    "description": "Export any layer as a GEE asset.",
-    "button": "Export",
-    "build_first": "Build the indicator first."
-  },
-  "outputs": {
-    "title": "Results"
-  },
-  "params": {
-    "title": "Parameters"
+    "title": "Export"
   },
   "period_override": {
     "toggle": "Use a different period for this sub-indicator",
     "inherited": "Uses the assessment period: {start}–{end}."
   },
   "tabs": {
-    "previous": "Previous step",
-    "next": "Next step",
-    "abbrev": {
-      "aoi": "AOI",
-      "params": "PAR",
-      "outputs": "RES"
-    }
+    "aoi": "AOI",
+    "params": "Parameters",
+    "results": "Results"
   }
 }

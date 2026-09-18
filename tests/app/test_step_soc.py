@@ -15,7 +15,7 @@ from app.steps.soc import SocStep
 from sdg1531.catalog import L4_START
 from sdg1531.resolve import resolve
 from sdg1531.spec import Period, PeriodOverride
-from tests.app.render_helpers import find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # Same range the legacy's PickerLineSOC offers (component/widget/picker_line_soc.py:8):
@@ -287,9 +287,9 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("spec", "expected_extra"),
+    ("spec", "expected_markdown", "expected_alerts"),
     [
-        (default_spec(), [_INHERITED_TEXT]),
+        (default_spec(), [_INHERITED_TEXT], []),
         (
             # 1985, not the 1980 `test_a_soc_start_before_the_cci_range_warns_
             # rather_than_blocks` above uses (that value is the brief's own,
@@ -299,20 +299,28 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
             # is SET here, so the checkbox starts checked and shows no
             # inherited text.
             default_spec(periods=replace(default_spec().periods, soc=PeriodOverride(1985, 2015))),
+            [],
             [
-                "<p>The soil organic carbon period starts before the CCI land "
-                "cover record (1992); the years before it contribute no land "
-                "cover transition.</p>"
+                (
+                    "warning",
+                    "The soil organic carbon period starts before the CCI land "
+                    "cover record (1992); the years before it contribute no land "
+                    "cover transition.",
+                )
             ],
         ),
         (
             # Entirely after the CCI record (soil_organic_carbon.py:161 -- a
             # negative band index): fatal, unlike the warning case above.
             default_spec(periods=replace(default_spec().periods, soc=PeriodOverride(2023, 2024))),
+            [],
             [
-                "<p><strong>The soil organic carbon period lies entirely after "
-                "the end of the CCI land cover record (2022), so it collapses "
-                "to nothing.</strong></p>"
+                (
+                    "error",
+                    "The soil organic carbon period lies entirely after the end "
+                    "of the CCI land cover record (2022), so it collapses to "
+                    "nothing.",
+                )
             ],
         ),
         (
@@ -322,14 +330,24 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
             # inherited text still shows.
             default_spec(aoi=None),
             [_INHERITED_TEXT],
+            [],
         ),
     ],
 )
-def test_the_step_renders_only_its_own_text(spec, expected_extra):
+def test_the_step_renders_only_its_own_text(spec, expected_markdown, expected_alerts):
     """The description no longer leads this list (task 30: it rides on
     ``ParamsPanel``'s own ``SectionHeader`` now -- see
-    ``app/panels/params.py``)."""
+    ``app/panels/params.py``).
+
+    Problems and prose are now read separately: the inherited-period line is
+    still ordinary markdown, while validation messages go through
+    ``app/panels/problems.py``'s ``rv.Alert``. Reading the alert's own ``type``
+    is also what pins fatal-vs-not, which the old bold-or-not markdown could
+    only express as a string prefix -- so the warning case above is now
+    asserted to be a warning, not merely to be unbolded.
+    """
     spec_r = solara.reactive(spec)
     box, rc = solara.render(SocStep(spec=spec_r), handle_error=False)
     assert rc is not None
-    assert markdown_texts(box) == expected_extra
+    assert markdown_texts(box) == expected_markdown
+    assert alert_texts(box) == expected_alerts
