@@ -13,11 +13,11 @@ The legacy had no total validator, so in one sense every :class:`Problem` here i
 new. What is recorded below is the narrower set that changes WHICH RUNS ARE
 POSSIBLE: a ``fatal=True`` rule refusing a configuration the legacy computed, or a
 rule accepting one it refused. The rest are transcriptions of ``input_tile.py``'s
-own checks, or non-fatal warnings, which leave the Process button enabled and
-therefore change nothing about what runs -- ``state_period_too_short``,
-``soc_start_before_cci``, ``land_cover_start_before_cci`` and
-``half_custom_land_cover`` are all of that kind; the first of those was
-deliberately left non-fatal, for the reason note 1 quotes.
+own checks, or non-fatal warnings, which leave the run possible and therefore
+change nothing about what runs -- ``soc_start_before_cci``,
+``land_cover_start_before_cci`` and ``half_custom_land_cover`` are all of that
+kind. ``state_period_too_short`` used to be in that list and is now fatal; see
+note 4.
 
 1. **Behaviour-changing, and it refuses runs the legacy performed.** The three
    land-cover period rules of :func:`_land_cover_period_problems` have no legacy
@@ -31,7 +31,8 @@ deliberately left non-fatal, for the reason note 1 quotes.
    and the trade-off that kept ``state_period_too_short`` a warning ("making it
    fatal would refuse configurations the legacy accepts") was not re-applied; the
    justification is that the failure it prevents is downstream and unattributable,
-   at ``sankey_option``, rather than a masked layer.
+   at ``sankey_option``, rather than a masked layer. That trade-off has since
+   been reversed on its own terms -- see note 4.
 2. **Behaviour-changing, and it refuses runs the legacy performed.**
    ``soc_period_collapses`` (fatal, :func:`_soc_period_problems`) rejects a SOC
    period lying entirely after the CCI record, where soil_organic_carbon.py:161
@@ -67,6 +68,30 @@ deliberately left non-fatal, for the reason note 1 quotes.
    into one), so the rule fires only when NONE of the selected sensors has any
    data anywhere in the period -- the one case that is guaranteed to build a
    wholly empty collection regardless of which other sensors ride along.
+6. **Behaviour-changing, and it refuses runs the legacy performed.**
+   ``state_period_too_short`` (:func:`_state_period_problems`) was a WARNING
+   until the repo owner hit it in production, and the note that kept it one --
+   quoted in note 1 -- rested on a claim that turned out to be false: that the
+   cost is "a masked layer", so the run still completes. It is not. With a
+   state period under four years, ``build_state``'s baseline filter
+   (``rangeContains("year", start, end - 3)``, engine/productivity.py:469) is
+   an EMPTY range; reducing an empty ``ImageCollection`` yields an image with
+   ZERO bands; and the very next line divides it by ``ee.Number(3).sqrt()``,
+   which Earth Engine promotes to a one-band constant. That is a hard
+   server-side refusal -- ``Image.divide: If one image has no bands, the other
+   must also have no bands. Got 0 and 1`` -- which kills the productivity
+   layer and every statistic derived from it, not merely the state band.
+
+   This was already known one tier away and never carried back here:
+   ``tests/test_network_smoke.py``'s own ``_spec`` comment (written when its
+   window was widened from two years to six) says in as many words that the
+   band-less reduction "is a server-side error". The validator's module
+   docstring said "fully masked" at the same time. The measured note is the
+   one that was right.
+
+   Nothing in the parity corpus is refused by the change: all 28 scenarios
+   carry windows of ten years or more (checked, not assumed). The threshold is
+   unchanged -- only ``fatal`` moved from ``False`` to ``True``.
 """
 
 from __future__ import annotations
@@ -260,7 +285,14 @@ def _land_cover_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
 
 
 def _state_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
-    """productivity.py:198-200 — the baseline filter is empty under four years."""
+    """productivity.py:198-200 — the baseline filter is empty under four years.
+
+    FATAL, and the threshold has not moved: ``end - 3 >= start`` is exactly
+    when ``build_state``'s ``rangeContains("year", start, end - 3)`` has at
+    least one year in it. Only the severity changed, and only because the
+    consequence this rule was filed under turned out to be wrong -- see the
+    module docstring's note 4.
+    """
     period = spec.periods.state.resolve(spec.periods.overall)
     if period is None:
         return ()
@@ -273,10 +305,12 @@ def _state_period_problems(spec: RunSpec) -> tuple[Problem, ...]:
             field="periods.state",
             code="state_period_too_short",
             message=(
-                "The productivity state period is shorter than four years, so its "
-                "baseline is empty and the state layer will be fully masked."
+                "The productivity state period needs at least four years: its "
+                "baseline is measured over everything up to the last three, so a "
+                "shorter window leaves nothing to compare the recent years "
+                "against and Earth Engine refuses the productivity layer."
             ),
-            fatal=False,
+            fatal=True,
         ),
     )
 

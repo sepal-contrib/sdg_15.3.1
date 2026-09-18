@@ -797,6 +797,29 @@ EXPECTED_OFF_GRAPH: dict[str, OffGraph] = {
             "test_sensor_period_no_overlap_is_silent_when_any_selected_sensor_overlaps",
         ),
     },
+    "state_period_too_short_is_fatal": {
+        "note": "sdg1531/validate.py:6",
+        "reason": (
+            "state_period_too_short was a WARNING, on the recorded belief that a "
+            "state period under four years only costs 'a masked layer'. It does "
+            "not: build_state's baseline filter (rangeContains(year, start, "
+            "end - 3)) is an EMPTY range, reducing an empty ImageCollection gives "
+            "a ZERO-band image, and the next line divides it by ee.Number(3)."
+            "sqrt(), which ee promotes to a one-band constant -- 'Image.divide: "
+            "If one image has no bands, the other must also have no bands. Got 0 "
+            "and 1'. That refusal takes the whole productivity layer and every "
+            "statistic derived from it, so the rule is now fatal. The legacy "
+            "accepted such a configuration and reached the same server-side "
+            "refusal unnamed; this refuses it up front instead. The THRESHOLD is "
+            "unchanged, and no corpus scenario is affected -- all 28 carry "
+            "windows of ten years or more."
+        ),
+        "tests": (
+            "test_short_state_period_is_fatal",
+            "test_four_year_state_period_is_accepted",
+            "test_the_state_period_message_names_the_four_year_requirement",
+        ),
+    },
     # --- naming.py --------------------------------------------------------------
     "run_label_is_total": {
         "note": "sdg1531/naming.py:1",

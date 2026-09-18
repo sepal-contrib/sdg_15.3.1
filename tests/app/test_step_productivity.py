@@ -277,18 +277,21 @@ def test_moving_the_threshold_slider_updates_only_threshold():
         ),
         (default_spec(aoi=None), []),
         (
-            # A non-fatal problem this step owns: `periods.state` falls back
-            # to `periods.overall` (2000-2020 in `DEFAULT_PERIODS`), and a
-            # baseline under four years leaves it fully masked. Every other
-            # case in this file is fatal, so this is the only one that
-            # exercises the `warning` alert -- a mutation that files every
-            # problem as an error (or none) has something here to catch it.
+            # `periods.state` under four years. This USED to be this file's
+            # one `warning` case; it is now fatal, because the empty baseline
+            # it describes is a server-side refusal rather than a masked layer
+            # (`sdg1531/validate.py`'s note 6). Kept as an `error` case rather
+            # than deleted: it is the specific configuration the repo owner
+            # actually hit, so it is worth pinning that the step now shows it
+            # as blocking.
             default_spec(periods=replace(DEFAULT_PERIODS, state=PeriodOverride(2018, 2020))),
             [
                 (
-                    "warning",
-                    "The productivity state period is shorter than four years, so "
-                    "its baseline is empty and the state layer will be fully masked.",
+                    "error",
+                    "The productivity state period needs at least four years: its "
+                    "baseline is measured over everything up to the last three, so "
+                    "a shorter window leaves nothing to compare the recent years "
+                    "against and Earth Engine refuses the productivity layer.",
                 )
             ],
         ),
@@ -298,11 +301,18 @@ def test_the_step_renders_only_its_own_problems(spec, expected_alerts):
     """Pins what the step actually shows: a fully-configured spec renders
     nothing (task 30 moved the description into ``ParamsPanel``'s own
     ``SectionHeader`` -- see ``app/panels/params.py``); a spec with a fatal
-    problem THIS step owns (no sensors, or the disabled trajectory) shows it
-    as an ``error``; a spec with a non-fatal problem THIS step owns shows it
-    as a ``warning``; and a spec whose only fatal problem belongs to ANOTHER
-    step (missing AOI) shows nothing -- the case that actually distinguishes
-    ``problems_for("productivity", ...)`` from ``validate(...)``.
+    problem THIS step owns (no sensors, the disabled trajectory, or a state
+    period under four years) shows it as an ``error``; and a spec whose only
+    fatal problem belongs to ANOTHER step (missing AOI) shows nothing -- the
+    case that actually distinguishes ``problems_for("productivity", ...)``
+    from ``validate(...)``.
+
+    Every problem THIS step owns is now fatal, so nothing here exercises the
+    ``warning`` alert any more (the state-period case did, until it turned out
+    to be a server-side refusal -- ``sdg1531/validate.py``'s note 6).
+    ``tests/app/test_step_land_cover.py`` and ``tests/app/test_step_soc.py``
+    each still carry a genuine warning case, so the two-severity rendering is
+    not left unproven anywhere -- it is just not provable here.
 
     Read off ``rv.Alert``, since every validation message now goes through
     ``app/panels/problems.py``; the severity is asserted directly rather than

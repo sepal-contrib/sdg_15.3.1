@@ -17,10 +17,12 @@ from typing import Any, cast
 
 import solara
 from ipecharts import EChartsRawWidget
+from pysepal.solara import use_theme_dark
 from pysepal.solara.components.task_button import TaskButtonComponent, use_task_button
 from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
+from app.panels.chart_theme import themed_option
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.enums import IndicatorLayer
@@ -162,12 +164,22 @@ def ResultsPanel(
     # built during a render where its section is already the open one -- the
     # reopen itself is what re-runs this memo once `option.value` is already
     # sitting there waiting.
+    # Theming is applied HERE, not inside `_fetch`: the option the task stores
+    # is the domain's, and the theme can flip long after the fetch finished
+    # without any new data arriving. Keyed into the memo so a flip rebuilds the
+    # chart -- an `EChartsRawWidget` reads its option once, at construction, so
+    # re-theming an existing one would change nothing on screen. The rebuild
+    # happens while `is_open` is already true (the user is looking at the
+    # chart when they toggle the theme), so it cannot reintroduce the
+    # zero-width canvas the gate above exists for.
+    dark = use_theme_dark()
+
     def _build_chart() -> EChartsRawWidget | None:
         if option.value is None or not is_open:
             return None
-        return EChartsRawWidget(option=option.value)
+        return EChartsRawWidget(option=themed_option(option.value, dark))
 
-    chart = solara.use_memo(_build_chart, [option.value, is_open])
+    chart = solara.use_memo(_build_chart, [option.value, is_open, dark])
 
     if current_maps is None or current_ctx is None:
         solara.Markdown(msg("results.build_first"))

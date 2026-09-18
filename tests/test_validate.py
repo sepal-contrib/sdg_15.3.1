@@ -223,18 +223,33 @@ def test_soc_period_ending_at_the_cci_ceiling_does_not_collapse():
     assert "soc_period_collapses" not in codes(spec)
 
 
-def test_short_state_period_is_a_warning_not_an_error():
-    # productivity.py:198-200 — rangeContains("year", start, end - 3) is empty
-    # for any state period shorter than four years: an all-masked z-score.
+def test_short_state_period_is_fatal():
+    """productivity.py:198-200 — ``rangeContains("year", start, end - 3)`` is
+    empty for any state period shorter than four years, the reduction over it
+    has zero bands, and the divide on the next line refuses server-side
+    (``Image.divide: ... Got 0 and 1``). This was a WARNING until that refusal
+    was hit in production; see ``sdg1531/validate.py``'s note 6 for why the
+    original "the layer is merely masked" reasoning was wrong.
+    """
     spec = BASE.evolve(periods=state(start=2013, end=2015))
     problem = only(spec, "state_period_too_short")
     assert problem.field == "periods.state"
-    assert problem.fatal is False
-    assert all(p.fatal is False for p in validate(spec))
+    assert problem.fatal is True
 
 
 def test_four_year_state_period_is_accepted():
+    """The threshold did not move when the severity did: four years is exactly
+    when ``build_state``'s baseline filter has a year in it."""
     assert "state_period_too_short" not in codes(BASE.evolve(periods=state(start=2012, end=2015)))
+
+
+def test_the_state_period_message_names_the_four_year_requirement():
+    """The user acts on this text, and the only action that clears it is
+    widening the window -- so the number has to be in the message. The old
+    wording ("the state layer will be fully masked") described a consequence
+    that does not happen and left the remedy implicit."""
+    problem = only(BASE.evolve(periods=state(start=2013, end=2015)), "state_period_too_short")
+    assert "four years" in problem.message
 
 
 def land_cover(**override) -> SubPeriods:

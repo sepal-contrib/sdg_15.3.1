@@ -231,6 +231,68 @@ def test_the_configuration_tabs_carry_their_state_prefixes_key_and_the_output_ta
 # ---------------------------------------------------------------------------
 
 
+def test_a_configuration_tab_other_than_aoi_is_locked_until_an_aoi_exists():
+    """The repo owner's own ask: *"if the AOI is not set, PARAMS should be
+    deactivated"*. Every parameter in PARAMS describes how to compute
+    something over an area, so with no area chosen there is nothing any of
+    them can be checked against.
+
+    `RunSpec()` has no AOI AND fatal problems in all four PARAMS steps, so
+    LOCKED must beat INCOMPLETE here -- a naive "report the worst state"
+    ordering would return INCOMPLETE and leave the tab reachable.
+    """
+    params_tab = TabDescriptor(("run", "productivity", "land_cover", "soc"), "P", "i", [])
+    assert _tab_state(params_tab, RunSpec(), has_maps=False) is _TabState.LOCKED
+
+
+def test_the_aoi_tab_itself_is_never_locked_by_its_own_missing_aoi():
+    """The asymmetry is the point: AOI is the one tab that is always
+    reachable, because it is where the thing every other tab waits for gets
+    chosen. Locking it would leave the app with no reachable tab at all.
+    """
+    aoi_tab = TabDescriptor("aoi", "AOI", "i", [])
+    assert _tab_state(aoi_tab, RunSpec(), has_maps=False) is _TabState.INCOMPLETE
+
+
+def test_choosing_an_aoi_unlocks_the_other_configuration_tabs():
+    """The positive half: the lock is derived from the AOI's own problems, not
+    hardcoded, so a spec that HAS an AOI must release it. Without this,
+    `LOCKED` returned unconditionally would pass the two tests above."""
+    params_tab = TabDescriptor(("run", "productivity", "land_cover", "soc"), "P", "i", [])
+    with_aoi = RunSpec().evolve(aoi=default_spec().aoi)
+
+    assert any(p.fatal for p in problems_for("productivity", with_aoi)), (
+        "this spec must still have PARAMS problems, or the test cannot tell "
+        "'unlocked' from 'satisfied'"
+    )
+    assert _tab_state(params_tab, with_aoi, has_maps=False) is _TabState.INCOMPLETE
+
+
+def test_the_params_tab_is_rendered_disabled_until_an_aoi_is_chosen(monkeypatch):
+    """The render-level half, through the real tree: `rv.Tab(disabled=...)` is
+    what a user actually meets, and Vuetify refuses to activate it."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["spec"] = spec
+
+    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    buttons = _tab_buttons(_workflow_widget(box))
+    assert buttons[_PARAMS_INDEX].disabled is True
+    assert buttons[_AOI_INDEX].disabled is False
+
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+
+    assert _tab_buttons(_workflow_widget(box))[_PARAMS_INDEX].disabled is False
+
+
 def test_a_configuration_tab_with_a_fatal_problem_is_incomplete():
     empty_spec = RunSpec()
     aoi_tab = TabDescriptor("aoi", "AOI", "mdi-x", [])
@@ -526,8 +588,10 @@ def test_the_locked_output_tab_is_rendered_disabled():
 
     buttons = _tab_buttons(_workflow_widget(box))
     assert buttons[_OUTPUTS_INDEX].disabled is True
+    # AOI is the only tab reachable from the empty spec this renders: PARAMS
+    # is locked too, on the missing AOI rather than on a missing build (see
+    # `test_the_params_tab_is_rendered_disabled_until_an_aoi_is_chosen`).
     assert buttons[_AOI_INDEX].disabled is False
-    assert buttons[_PARAMS_INDEX].disabled is False
 
 
 def test_the_output_tab_stops_being_disabled_once_a_build_exists(monkeypatch):

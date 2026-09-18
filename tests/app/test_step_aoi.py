@@ -115,27 +115,51 @@ def test_the_view_is_wired_to_apply_the_selection_and_excludes_local_methods(mon
     assert spec.value.aoi == AssetAoi(asset_id="users/x/aoi", name="aoi")
 
 
-@pytest.mark.parametrize(
-    ("aoi", "expected_alerts"),
-    [
-        (None, [("error", "Select an area of interest.")]),
-        (AssetAoi(asset_id="users/x/aoi", name="aoi"), []),
-    ],
-)
-def test_the_step_renders_only_its_own_problems(aoi, expected_alerts):
-    """Pins what the step actually shows, in both states, so that renaming the
-    step passed to ``problems_for`` (which shows nothing for ``RunSpec()``'s
-    other steps) or deleting the ``ProblemsAlert`` cannot pass unnoticed.
+@pytest.mark.parametrize("aoi", [None, AssetAoi(asset_id="users/x/aoi", name="aoi")])
+def test_the_step_shows_its_description_and_nothing_else(aoi):
+    """Pins what the step actually shows, in both states: its description, and
+    no status or validation text at all.
 
-    The chosen-AOI case now shows NOTHING. It used to render "Selected:
-    {name}", which restated what ``AoiView``'s own controls already display
-    two rows above it -- the repo owner's own example of the noise this panel
-    should not carry ("in the AOI section remove the 'SELECTED...' that is
-    useless"). The description is not here either: it rides on this step's
-    ``SectionHeader`` (``app/panels/params.py``).
+    Two lines were removed, one request apart. "Selected: {name}" restated
+    what ``AoiView``'s own controls already display two rows above it. The
+    ``ProblemsAlert`` went next: this step owns exactly one rule
+    (``missing_aoi``, "Select an area of interest"), rendered on the tab whose
+    entire content is the area picker, under a heading that already says
+    "Choose the area the indicator is computed over". The consequence it was
+    really reporting is now shown by the tab strip instead -- PARAMS and
+    Results are visibly locked until an AOI exists (see
+    ``tests/app/test_tabs.py``).
+
+    Both parameters are checked so that "shows nothing" cannot pass merely
+    because the state under test happens to have no problem to show.
     """
     spec = solara.reactive(RunSpec().evolve(aoi=aoi))
     box, rc = solara.render(AoiStep(spec=spec, map_=None), handle_error=False)
     assert rc is not None
-    assert alert_texts(box) == expected_alerts
+    assert alert_texts(box) == []
     assert markdown_texts(box) == ["<p>Choose the area the indicator is computed over.</p>"]
+
+
+def test_the_aoi_step_still_owns_exactly_the_one_rule_its_silence_assumes():
+    """The floor under the test above.
+
+    Dropping the step's ``ProblemsAlert`` is only safe while ``missing_aoi``
+    is the ONLY rule the AOI step owns -- a second one would have nowhere to
+    appear, and no test anywhere would notice, because "the step renders no
+    alert" is exactly what the test above asserts.
+
+    So this walks every spec shape the AOI field can take and asserts the set
+    of codes the step can ever own is that one. A new domain rule under the
+    ``aoi`` prefix fails here, naming itself, which is the signal to give this
+    step its alert back.
+    """
+    shapes = [
+        RunSpec(),
+        RunSpec().evolve(aoi=None),
+        RunSpec().evolve(aoi=AssetAoi(asset_id="users/x/aoi", name="aoi")),
+        RunSpec().evolve(aoi=AssetAoi(asset_id="", name="")),
+    ]
+    found = {problem.code for shape in shapes for problem in problems_for("aoi", shape)}
+    assert found == {"missing_aoi"}, (
+        f"the AOI step owns rules its silent step cannot show: {sorted(found - {'missing_aoi'})}"
+    )

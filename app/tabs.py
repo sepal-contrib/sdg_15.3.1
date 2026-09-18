@@ -213,11 +213,31 @@ class _TabState(Enum):
     SATISFIED = "satisfied"
 
 
+def _aoi_ready(spec: RunSpec) -> bool:
+    """Whether an area of interest has actually been chosen.
+
+    Asked of ``problems_for("aoi", ...)`` rather than of ``spec.aoi is not
+    None``: the AOI step's own rules are what decide whether a selection is
+    usable, and a second, hand-written notion of "set" here would be one more
+    thing to keep in sync with them.
+    """
+    return not any(problem.fatal for problem in problems_for("aoi", spec))
+
+
 def _tab_state(tab: TabDescriptor, spec: RunSpec, has_maps: bool) -> _TabState:
-    """A configuration tab (``tab.step`` set) is INCOMPLETE while ANY step it
-    names owns a fatal problem, and SATISFIED only once NONE of them do -- it
-    is never LOCKED, since every configuration field is always editable. AOI
-    names one step; PARAMS (task 30) names four (``("run", "productivity",
+    """**A configuration tab other than AOI is LOCKED until an AOI exists.**
+    The repo owner asked for this after using the app: *"if the AOI is not
+    set, PARAMS should be deactivated"*. It is not merely cosmetic -- every
+    parameter in PARAMS describes how to compute something over an area, and
+    with no area there is nothing any of them can be checked against, so the
+    tab would present four sections of settings that cannot produce a run.
+    Making it unreachable is also what lets the AOI step stop repeating
+    "Select an area of interest" as an error (see ``app/steps/aoi.py``): the
+    locked tab says the same thing, at the moment it matters.
+
+    Past that gate, a configuration tab is INCOMPLETE while ANY step it names
+    owns a fatal problem, and SATISFIED only once NONE of them do. AOI names
+    one step; PARAMS (task 30) names four (``("run", "productivity",
     "land_cover", "soc")``), and the combining rule is the same either way:
     "satisfied" means every step behind it is, because a single tab is the
     only signal a user has for everything folded behind it -- reading it as
@@ -226,6 +246,10 @@ def _tab_state(tab: TabDescriptor, spec: RunSpec, has_maps: bool) -> _TabState:
     is LOCKED until ``outcome.maps`` exists and SATISFIED after -- the same
     gate ``is_runnable``/``build_outcome`` already apply before any of its
     sections can show anything.
+
+    The AOI tab itself is never LOCKED, and the asymmetry is the point: it is
+    the one tab that is always reachable, because it is where the thing every
+    other tab waits for gets chosen.
 
     Reads ``problems_for`` and ``has_maps`` -- the same predicates the steps
     and panels themselves already render against -- rather than a second,
@@ -244,6 +268,8 @@ def _tab_state(tab: TabDescriptor, spec: RunSpec, has_maps: bool) -> _TabState:
     if tab.step is None:
         return _TabState.SATISFIED if has_maps else _TabState.LOCKED
     steps = (tab.step,) if isinstance(tab.step, str) else tab.step
+    if "aoi" not in steps and not _aoi_ready(spec):
+        return _TabState.LOCKED
     fatal = any(problem.fatal for step in steps for problem in problems_for(step, spec))
     return _TabState.INCOMPLETE if fatal else _TabState.SATISFIED
 

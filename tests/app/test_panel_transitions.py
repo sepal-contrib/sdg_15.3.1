@@ -18,6 +18,7 @@ import pandas as pd
 import solara
 
 from app.message import msg
+from app.panels.chart_theme import themed_option
 from app.panels.transitions import TransitionsPanel
 from tests.app.render_helpers import find_widget, markdown_texts
 from tests.helpers_stats import FakeResolved
@@ -175,7 +176,13 @@ def test_clicking_compute_fetches_and_mounts_the_real_chart_option(monkeypatch):
     assert displayed
     chart = displayed[-1]
     assert isinstance(chart, EChartsRawWidget)
-    assert chart.option == expected_option
+    # `themed_option(..., dark=False)`, not the bare builder's output: the
+    # domain owns the chart's CONTENT and the app layer merges light/dark
+    # presentation on top (`app/panels/chart_theme.py`). Anchoring on the real
+    # builder run through the real themer keeps this a test of the panel's
+    # wiring rather than a hand-typed option -- and it still fails if the panel
+    # mounts an option the domain did not build.
+    assert chart.option == themed_option(expected_option, dark=False)
     # No stray "build first" text now that a build exists -- the description
     # itself no longer renders here at all; it moved to the section header
     # (`app/panels/outputs.py`).

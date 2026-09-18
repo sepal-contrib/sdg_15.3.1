@@ -465,8 +465,12 @@ def build_state(r: ResolvedSpec, vi: ee.ImageCollection) -> ee.Image:
     Transcribed from productivity.py:177-249 (``productivity_state``); its
     unused ``aoi_model`` and ``output`` parameters are dropped. Reads r.state.
     Note :198-200's baseline window is [start, end - 3], so a state period
-    shorter than four years yields an all-masked z-score; validate() reports
-    that as a warning rather than rejecting it.
+    shorter than four years leaves that filter EMPTY. Reducing an empty
+    collection gives a zero-band image, and ``previous_vi_sigma.divide(...)``
+    below then divides it by a one-band constant -- ``Image.divide: ... Got 0
+    and 1``, a server-side refusal that takes the whole productivity layer
+    with it, not an all-masked z-score. ``validate()`` refuses such a spec
+    outright (``state_period_too_short``, fatal); see that module's note 6.
     """
     state_start = require_int(r.state.start, "state.start")
     state_end = require_int(r.state.end, "state.end")

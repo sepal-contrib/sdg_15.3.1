@@ -362,14 +362,22 @@ def test_a_sensor_period_mismatch_is_not_runnable_before_any_graph_is_touched():
 
 
 def test_a_spec_with_only_a_warning_is_runnable():
-    """Warnings must not block a run. `state_period_too_short` is one of four
-    rules `sdg1531/validate.py`'s module docstring commits to non-fatal
-    specifically so the Process button stays enabled -- an `is_runnable` that
-    went warning-sensitive would silently undo that port decision.
+    """Warnings must not block a run. `soc_start_before_cci` is one of three
+    rules `sdg1531/validate.py`'s module docstring still commits to non-fatal
+    specifically so the run stays possible -- an `is_runnable` that went
+    warning-sensitive would silently undo that port decision.
+
+    This used to use `state_period_too_short`, which is now FATAL (see that
+    module's note 6: the "merely masked" consequence it was filed under turned
+    out to be a server-side refusal). A test of "a warning does not block"
+    needs a rule that is actually still a warning, or it stops testing
+    anything -- flipping the severity would otherwise have left it asserting
+    that a fatal problem is runnable, which is a different claim entirely.
     """
-    spec = default_spec(periods=replace(DEFAULT_PERIODS, state=PeriodOverride(2018, 2020)))
+    spec = default_spec(periods=replace(DEFAULT_PERIODS, soc=PeriodOverride(1985, 2015)))
     problems = validate(spec)
     assert problems and not any(p.fatal for p in problems)
+    assert {p.code for p in problems} == {"soc_start_before_cci"}
     assert is_runnable(spec) is True
 
 
