@@ -6,7 +6,7 @@ render the panel on a live event loop -- the same harness pysepal's own
 real rendered button, and wait for the task to settle before asserting.
 
 **Two controls per row now, not one.** The eye toggles a layer on and off (and
-cancels an add in flight); the download icon opens the export dialog on that
+cancels an add in flight); the export icon opens the export dialog on that
 row's own layer. Both are plain ``ipyvuetify.Btn``, so anything reading
 buttons positionally goes through ``_row_actions`` rather than indexing
 ``find_widgets(box, Btn)`` directly.
@@ -28,8 +28,9 @@ import solara
 
 from app.message import messages, msg
 from app.panels import map_layers as map_layers_module
+from app.panels.exports import export_sources
 from app.panels.layer_style import layer_name, layer_vis_params
-from app.panels.map_layers import MapLayersPanel
+from app.panels.map_layers import MapLayersPanel, _ExportDialogHost
 from sdg1531.enums import IndicatorLayer
 from tests.app.render_helpers import cell_texts, find_widget, find_widgets, markdown_texts
 
@@ -667,3 +668,79 @@ def test_the_export_host_is_wired_with_one_source_per_layer_and_the_threaded_gee
     assert [source.id for source in captured["sources"]] == [
         layer_id.value for layer_id in _THREE_LAYERS
     ]
+
+
+def test_the_real_dialog_opens_on_the_row_that_asked_for_it(monkeypatch):
+    """The other side of the contract, against the REAL ``use_export_dialog``.
+
+    Every test above this one stubs ``_ExportDialogHost`` out, so the panel's
+    half -- "the icon raises a request naming its own layer" -- was covered
+    while the half that turns a request into a selection was not tested at
+    all. It was also wrong: ``open_dialog()`` RESETS the form, including
+    ``selected_source_id.set("")`` (pysepal ``export_hook.py:803-805``), so
+    preselecting before opening opened the dialog on nothing. The repo owner
+    is the one who noticed -- *"if I select any of them, the export should
+    populate that selection I believe no?"*.
+
+    A fake controller could not have caught that: the bug lives entirely in
+    pysepal's ordering, so the only thing worth asserting against is the real
+    hook. It is mounted directly here rather than through ``MapLayersPanel``
+    (whose module-level fixture replaces it), inside ``asyncio.run`` because
+    the hook's ``dependencies=[]`` task schedules at first render.
+    """
+    captured: dict[str, object] = {}
+
+    @solara.component
+    def _spy_dialog(controller: object = None, **_kwargs: object) -> None:
+        captured["controller"] = controller
+
+    monkeypatch.setattr(map_layers_module, "ExportDialog", _spy_dialog)
+
+    async def render_host() -> None:
+        sources = export_sources(_FakeMaps(_THREE_LAYERS), _CTX)
+        _box, rc = solara.render(
+            _ExportDialogHost(
+                sources=sources,
+                request=map_layers_module._ExportRequest(1, IndicatorLayer.SOC.value),
+                gee_interface=None,
+                sepal_client=None,
+            ),
+            handle_error=False,
+        )
+        assert rc is not None
+
+    asyncio.run(render_host())
+
+    controller = captured["controller"]
+    assert controller.open.value is True
+    assert controller.selected_source_id.value == IndicatorLayer.SOC.value
+
+
+def test_an_empty_request_leaves_the_real_dialog_shut(monkeypatch):
+    """The first render carries the sentinel request nobody pressed. Without
+    its guard the host would open an empty dialog over the panel the moment a
+    build appeared -- and the test above, which only ever asserts an OPEN
+    dialog, would still pass."""
+    captured: dict[str, object] = {}
+
+    @solara.component
+    def _spy_dialog(controller: object = None, **_kwargs: object) -> None:
+        captured["controller"] = controller
+
+    monkeypatch.setattr(map_layers_module, "ExportDialog", _spy_dialog)
+
+    async def render_host() -> None:
+        _box, rc = solara.render(
+            _ExportDialogHost(
+                sources=export_sources(_FakeMaps(_THREE_LAYERS), _CTX),
+                request=map_layers_module._ExportRequest(0, ""),
+                gee_interface=None,
+                sepal_client=None,
+            ),
+            handle_error=False,
+        )
+        assert rc is not None
+
+    asyncio.run(render_host())
+
+    assert captured["controller"].open.value is False

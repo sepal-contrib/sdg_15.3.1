@@ -16,8 +16,17 @@ where export belongs: *"what if the export can someway included in the layer
 section?"*. So a row now carries an eye toggle and an export icon, and
 ``app/panels/outputs.py`` no longer renders an Export section of its own. The
 export dialog is still pysepal's (``use_export_dialog`` + ``ExportDialog``,
-the documented route for a custom trigger layout); the row icon only
-preselects its own layer and opens it.
+the documented route for a custom trigger layout); the row icon only opens it
+and preselects its own layer -- in that order, because opening resets the form
+(see ``_ExportDialogHost.open_requested``).
+
+The export glyph is ``mdi-export-variant``, which is also what pysepal's own
+``ExportLauncher`` defaults to. It is not a free choice: this stack serves MDI
+**4.9.95** (solara's ``plain.html`` pins it; the ``jupyter-vuetify``
+labextension bundles the same generation), and Vuetify renders a name the font
+lacks as an empty box with no error -- which is how the first attempt at this
+icon shipped invisible. ``tests/app/test_icons.py`` checks every name in this
+package against the font actually on disk.
 
 **Every layer is clipped to the AOI and self-masked before it is drawn.**
 Without it the whole world renders in the palette's FIRST colour: these are
@@ -144,12 +153,18 @@ def _ExportDialogHost(
     def open_requested() -> None:
         if not request.layer_id:
             return
-        # The dialog's own source list is `export_sources(...)`, keyed by
-        # `layer_id.value` (`app/panels/exports.py`), so preselecting is a
-        # plain assignment to the controller's public reactive rather than a
-        # second lookup table mapping rows to sources.
-        controller.selected_source_id.value = request.layer_id
+        # AFTER open_dialog(), never before: opening RESETS the whole form,
+        # `selected_source_id.set("")` included (pysepal
+        # `export_hook.py:803-805`). Preselecting first therefore opens the
+        # dialog on nothing at all, which is what the repo owner hit -- *"if I
+        # select any of them, the export should populate that selection I
+        # believe no?"*. Both calls are plain synchronous writes in one event
+        # handler, so the reset lands first and this selection survives it.
+        # The id is the layer's own `layer_id.value`, which is exactly how
+        # `export_sources(...)` keys its sources (`app/panels/exports.py`), so
+        # the hook's `_reconcile_selected_source` finds it and keeps it.
         controller.open_dialog()
+        controller.selected_source_id.value = request.layer_id
 
     solara.use_effect(open_requested, [request])
 
@@ -324,7 +339,7 @@ def _LayerRow(
                 on_toggle=on_toggle,
             )
             _IconAction(
-                icon_name="mdi-tray-arrow-down",
+                icon_name="mdi-export-variant",
                 tooltip=msg("layers.export", name=name),
                 on_click=on_export,
                 disabled=not can_export,
