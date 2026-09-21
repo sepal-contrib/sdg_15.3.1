@@ -1,0 +1,12 @@
+services:
+  sdg_15_3_1:
+    ports:
+      - "8767:8767"
+    extra_hosts:
+      - "${SEPAL_HOST:?SEPAL_HOST must be set}:host-gateway"
+    environment:
+      SEPAL_HOST: ${SEPAL_HOST}
+      # local dev: Python doesn't trust the Caddy local CA. ee-client has a
+      # global switch, pysepal-api only a host-scoped allowlist.
+      EECLIENT_INSECURE_TLS: "1"
+      PYSEPAL_INSECURE_TLS_HOSTS: "${SEPAL_HOST}"

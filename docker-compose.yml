@@ -1,0 +1,34 @@
+services:
+  sdg_15_3_1:
+    build:
+      dockerfile: ./Dockerfile
+      args:
+        - GIT_COMMIT=${GIT_COMMIT:-""}
+    image: "openforis/sdg_15_3_1"
+    container_name: sdg_15_3_1
+    volumes:
+      - "${EE_CREDENTIALS_PATH:-${HOME}/.config/earthengine/credentials}:/root/.config/earthengine/credentials"
+    environment:
+      SEPAL_HOST: "${SEPAL_HOST}"
+      FORWARDED_ALLOW_IPS: "*"
+      SOLARA_THEME_SHOW_BANNER: "False"
+      CARTODB_BASEMAP_KEY: "${CARTODB_BASEMAP_KEY:-}"
+      SOLARA_TEST: "${SOLARA_TEST:-false}"
+      DEPLOY_ENV: "${DEPLOY_ENV:-sepal_solara}"
+      LOCAL_SEPAL_USER: "${LOCAL_SEPAL_USER:-}"
+      LOCAL_SEPAL_PASSWORD: "${LOCAL_SEPAL_PASSWORD:-}"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8767"]
+      start_period: 60s
+      start_interval: 1s
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    networks:
+      - sepal
+    restart: always
+    labels:
+      org.opencontainers.image.source: https://github.com/sepal-contrib/sdg_15.3.1
+networks:
+  sepal:
+    external: true

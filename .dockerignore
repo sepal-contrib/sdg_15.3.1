@@ -1,0 +1,40 @@
+# The image runs `app/` over `sdg1531/` and nothing else. Everything below is
+# either a build artefact, a dev-only tool, or the legacy Voila implementation
+# that only the parity harness (CI) needs -- `tests/golden/` alone is ~3 MB of
+# serialized Earth Engine graphs.
+.git
+.github
+.gitignore
+.pre-commit-config.yaml
+
+component/
+tests/
+tools/
+noxfile.py
+ui.ipynb
+no_ui.ipynb
+
+doc/
+docs/
+CHANGELOG.md
+CLAUDE.md
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.nox/
+.coverage
+*.log
+
+.env
+.venv/
+env/
+venv/
+.vscode/
+.idea/

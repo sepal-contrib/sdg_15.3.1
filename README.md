@@ -82,6 +82,26 @@ Editing a parameter or the AOI discards the previous run: its layers come off th
 charts and tables are cleared, rather than being left on screen describing a run you have
 changed.
 
+## Deploying to SEPAL
+
+The app ships as a container: a Solara server behind supervisord, on the `sepal`
+network, reachable at `/api/app-launcher/sdg_15.3.1`.
+
+```bash
+export SEPAL_HOST=<your sepal host>
+docker compose up --build        # serves on :8767
+```
+
+The image is deliberately *not* built from `sepal_environment.yml`. That file pins
+`pysepal<4` for `component/`, which the image does not ship — `.dockerignore` drops
+the legacy package, the tests and the golden graphs, so only `app/` and `sdg1531/`
+go in. Dependencies come from `pyproject.toml`'s `app` extra instead, over the
+openforis `earthengine-api` fork the parity goldens were generated against.
+
+`docker-compose.override.yml` is the local-development half: it publishes the port
+and relaxes TLS for a Caddy-signed SEPAL host. Compose loads it automatically, so
+drop it on a real deployment.
+
 ## Tests
 
 ```bash
