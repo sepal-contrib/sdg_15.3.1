@@ -52,7 +52,11 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 WORKFLOWS = sorted(WORKFLOW_DIR.glob("*.y*ml"))
 
 LEGACY_JOB = "ci"
-APP_LAYER_STEPS = ("Verify ee-api fork", "Verify notebook kernelspec", "Test UI notebook")
+#: What the `ci` job must still do. "Test UI notebook" was here too, and is
+#: deliberately gone: nbmake EXECUTED ui.ipynb, and the app layer retired the
+#: Voila tiles it builds, so the step could only fail. Removing a name from
+#: this tuple is how that kind of decision gets recorded.
+APP_LAYER_STEPS = ("Verify ee-api fork", "Verify notebook kernelspec")
 
 # tests/app/conftest.py's own check, read the same way here: that file's silence
 # (and the RuntimeError its SDG_REQUIRE_APP_TESTS opt-in raises instead) both key
@@ -378,9 +382,13 @@ def test_the_nightly_workflow_is_scheduled_and_dispatchable() -> None:
 
 
 def test_the_app_layer_checks_are_intact() -> None:
-    """The `ci` job guards the Voila entrypoint and is the app-layer migration's to
-    retire, not this port's. Its kernelspec step reads ui.ipynb, so deleting the
-    notebook makes the workflow raise FileNotFoundError on the first port PR."""
+    """The `ci` job guards what is left of the Voila entrypoint, and spec 3 is
+    the one that retires it. Its kernelspec step reads ui.ipynb, so deleting the
+    notebook now would make the workflow raise FileNotFoundError.
+
+    The notebook is no longer EXECUTED here -- see `APP_LAYER_STEPS`. So this
+    asserts the file exists and the two surviving checks are wired, and
+    deliberately does not assert that the notebook runs, because it does not."""
     steps = _jobs(WORKFLOW_DIR / "ci.yaml")[LEGACY_JOB]["steps"]
     names = [step.get("name") for step in steps]
 

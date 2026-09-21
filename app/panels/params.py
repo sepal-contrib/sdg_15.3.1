@@ -1,50 +1,12 @@
 """The four configuration steps after AOI, as one tab's flat, headed sections.
 
-The repo owner asked for this straight after the outputs tab got the same
-treatment: *"I now think we could have just three tabs, AOI, PARAMS, Result"*
-... *"in params, we should have sections, as you just did in the results."*
-This module is ``app/panels/outputs.py`` for the OTHER four configuration
-tabs (Assessment period, Productivity, Land cover, SOC) -- same shape, same
-``SectionHeader``, same "no accordion" flatness -- read that module's
-docstring first; this one only records what differs.
+The same shape as ``app/panels/outputs.py`` -- same ``SectionHeader``, same
+flatness, no accordion -- for the configuration steps instead of the outputs.
 
-**Section order is the tab order these four steps already had, and is not
-arbitrary.** Task 28 moved the step long called "Run" (routing key ``"run"``,
-catalogue title "Assessment period") to be the FIRST of the five configuration
-tabs, ahead of Productivity, Land cover and SOC, because
-``app/steps/period_override.py``'s shared control shows the Land cover and SOC
-steps the window they *inherit* from this step's own ``periods.overall`` --
-that has to already be chosen, or the "inherited window" text they show is
-empty or misleading. Folding four tabs into four SECTIONS does not relax that
-dependency: Assessment period stays first here for the identical reason.
-Productivity, Land cover and SOC keep the relative order they already had.
-
-**Each section's own ``msg("<step>.description")`` now lives in its
-``SectionHeader``,** not inside the step component itself -- the exact move
-task 28 made for the five output panels (see that module's docstring for why
-duplicating the description inside AND above a section reads as "a heading
-followed by a stray sentence"). ``run.py``, ``productivity.py``,
-``land_cover.py`` and ``soc.py`` no longer render their own description.
-
-**Each section's own problems are still visible inside the tab**: this module
-adds no new rendering for them because it does not need to -- every one of the
-four step components already ends its own render body with
-``app.state.render_problems(<step>, spec.value)`` (unchanged by this task),
-so opening PARAMS and looking at, say, the Land cover section shows exactly
-the problems ``problems_for("land_cover", ...)`` reports, same as when it was
-its own tab. The single PARAMS chip in ``app/tabs.py``'s segment strip is a
-SUMMARY across all four steps (see that module's ``_tab_state`` for the
-combining rule), not a replacement for this per-section detail.
-
-No chart lives in any of these four sections, so none of the chart-mount
-trap ``app/panels/outputs.py`` documents applies here -- nothing in this
-module needs an ``is_active``/``is_open`` gate.
-
-Reuses ``app.panels.outputs``'s own ``SectionDescriptor`` rather than defining
-a second, identical dataclass: the two modules' sections are the same shape
-(title, icon, description, content, in DISPLAY order with no ``id``), so a
-second definition would only be a name away from the first with nothing new
-to say.
+**Section order is not arbitrary.** The assessment period comes first because
+``app/steps/period_override.py`` shows Land cover and SOC inheriting it, so it
+has to be chosen before them; Productivity sits between. Order lives in list
+position alone.
 """
 
 from __future__ import annotations

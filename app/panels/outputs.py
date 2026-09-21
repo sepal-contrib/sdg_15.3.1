@@ -1,84 +1,23 @@
 """The output panels, as one tab's flat, headed sections.
 
-The repo owner asked for this after using the app: *"all the computation
-buttons ... should be in the same tab, like with multiple sections, similarly
-as se.plan does ... like all the computations in one single place."* Task 27
-first built this as an ``rv.ExpansionPanels`` accordion; the repo owner then
-asked for that to go -- *"I didn't like the expansion panels you added, what
-about using like subtitles?"* -- so this module now renders them as flat,
-always-visible sections, each introduced by
-``app/panels/section_header.py``'s ``SectionHeader`` (title, icon and the
-panel's own description as one styled unit) instead of an
-``ExpansionPanelHeader``/``ExpansionPanelContent`` pair.
-
-**Section order is the old tab order and must not change**: Layers ->
-Transitions -> Results -> Zonal. Task 27 folded the output tabs into sections
-without reordering them, and neither the move to flat sections nor the loss of
-the fifth reorders the rest.
-
-**There were five sections; Export is now the fourth's worth of icons
-instead.** The repo owner asked for it -- *"what if the export can someway
-included in the layer section?"* -- so ``app/panels/map_layers.py`` hosts the
-export dialog and each of its table rows opens it preselected on that row's
-own layer. ``app/panels/exports.py`` still owns the sources; it just no longer
-owns a section. One fewer heading, and export now sits next to the thing being
-exported.
+**Section order is the sub-indicator order and must not change**: Layers ->
+Transitions -> Distribution -> Zonal statistics. Export is not a section: each
+Layers row carries its own export icon (``app/panels/map_layers.py``), while
+``app/panels/exports.py`` still owns the sources.
 
 Each section's header carries that panel's ``msg("<panel>.title")``, icon and
-``msg("<panel>.description")``. The description used to be rendered a second
-time, inside the panel component itself, as a plain ``solara.Markdown`` line
-below its own title-less content; it was removed from every panel component
-once the header started showing it, so title and description read as one unit
-rather than a heading followed by a stray sentence. The descriptions
-themselves got longer in the same round the Export section went away -- the
-owner's *"the transitions, distribution, zonal stats that should show some
-info like 3 lines explanation text"*. They are the one place a user is told
-what a computation actually produces, so they now say that rather than naming
-the section a second time.
+``msg("<panel>.description")``, rendered once by ``SectionHeader`` rather than
+a second time inside the panel itself. The descriptions are the one place a
+user is told what a computation actually produces, so they say that rather
+than naming the section again.
 
-Every section is always visible -- there is no "default open index" left to
-choose. What survives from that concept is only which section's OWN chart, if
-any, needs special mount timing; see the chart-mount trap below.
-
-**The chart-mount trap. This is now the THIRD container these charts have
-lived in**, and behaviour has changed with every one so far:
-
-* ``rv.TabItem`` (``app/tabs.py``, this app's OWN OTHER container) -- verified
-  fine for a chart that STAYS mounted after being built while visible, then
-  survives a tab switch away and back with its canvas intact.
-* ``rv.ExpansionPanel`` (task 27) -- broke: a chart built for the FIRST time
-  while its section was collapsed measured a fixed 100x500 canvas (ECharts'
-  own fallback, not the container's real width) that reopening never
-  corrected. Task 27's fix: an ``is_open`` flag gating each chart's
-  ``use_memo`` on "is MY section the one currently expanded", so the widget
-  is always first built during a render where its section is already open.
-* Flat sections (this task) -- the accordion (and its per-section open/closed
-  state) is gone, so naively deleting ``is_open`` and always building the
-  chart looked right: every section renders unconditionally now, all the
-  time. **Measured instead of assumed, with a throwaway probe mirroring task
-  27's own technique** (an ``EChartsRawWidget`` behind an ``rv.TabsItems``
-  pair, driven by ``pysepal/scripts/browser_probe.mjs --resize 1400x900``):
-  the accordion is gone, but the outer container is NOT -- this whole panel
-  still lives inside ``rv.TabItem`` (the merged outputs TAB, one of
-  ``app/tabs.py``'s three), which ``WorkflowTabs``'s own docstring already
-  documents as mounting a tab's content once, on first visit, and never
-  unmounting it afterwards. That is exactly ``rv.ExpansionPanel``'s own
-  eager-DOM, CSS-toggled behaviour, not a lazier one: switching to a
-  DIFFERENT workflow tab while a chart's async fetch is still in flight, then
-  letting it resolve while the outputs tab is hidden, reproduced the
-  IDENTICAL 100x500 fallback canvas task 27 found -- confirmed with the exact
-  same probe technique, gate removed, chart built while ``display: none``.
-  So the trap survives the move to flat sections unchanged; only its
-  ADDRESS moves, from "which accordion section is open" (a concept flat
-  sections no longer have) to "is the merged outputs TAB itself the one
-  currently active" (a concept ``app/tabs.py``'s ``WorkflowTabs`` owns, since
-  it is the only place that knows). ``is_open`` therefore becomes
-  ``is_active`` here: threaded from ``WorkflowTabs``'s own ``active_tab``
-  state, through ``workflow_tabs()``, into ``OutputsPanel``, and down into
-  ``ResultsPanel``/``TransitionsPanel`` exactly as before -- re-probed with
-  the gate restored (now keyed on the OUTER tab instead of an accordion
-  section): the widget builds ``None`` while the outputs tab is inactive, and
-  on switching to it, builds fresh at the real container width.
+**``is_active`` gates chart CONSTRUCTION, not just visibility.** An
+``EChartsRawWidget`` measures its canvas once, at construction, so one built
+while its container is hidden bakes in a 100x500 fallback that becoming
+visible never corrects. The flag says whether the merged outputs TAB is the
+active one, so a chart is always first built while its container is really on
+screen. Verified in a browser; see ``docs/guides/solara-app-gotchas.md`` in
+the pysepal checkout for the measurement.
 """
 
 from __future__ import annotations

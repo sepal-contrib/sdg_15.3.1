@@ -1,46 +1,16 @@
 """Land cover configuration.
 
 Owns: land_cover, transition_matrix, water_mask and the land-cover period.
-``transition_matrix`` has no control here yet -- like ``climate`` in the
-productivity step, it waits on a dedicated task.
+``transition_matrix`` has no control here yet.
 
-The land_cover union is what keeps its two arms apart: an ``EsaCciSource`` has
-no fields at all, while a ``CustomLandCoverSource`` needs a start and an end
-asset before it is usable, so the source Select renders a picker for each
-only when the custom arm is chosen -- leaving it selectable but permanently
-unsatisfiable would just move ``missing_custom_land_cover_asset`` from a
-validate() problem into a dead end. The picker is pysepal's
-``AssetSelectComponent``, the same widget ``AoiStep`` mounts through
-``AoiView`` -- not a bare text field: the legacy's own ``sw.AssetSelect``
-validated that a chosen asset is actually an IMAGE it can read
-(``select_lc.py:17``), and this replaces the two free-text boxes an earlier
-task used to close a gap its own brief left open.
-
-The legacy also checked a custom asset's pixel values against the
-classification (``input_tile.py:267-298``, ported as
-``sdg1531.validate.check_custom_lc_codes``). That check needs a GEE round
-trip, so ``validate()`` cannot run it -- its ``Problem``s never reach
-``problems_for``. This step runs it itself, once both assets are chosen, and
-reports through a notification instead: the same route a fetch failure from
-either picker would use. The legacy exposed an exact-vs-subset toggle for
-this (``lc_pixel_check``, spec.py:9-10's ``exact`` argument to
-``check_custom_lc_codes``) that nothing in this port surfaces yet, so this
-always runs the subset check -- the legacy widget's own docstring is "only
-include values within the classification" -- rather than guessing which
-default a still-missing control would carry.
-
-``water_mask`` is a three-arm union too (``JrcSeasonalityMask``,
-``PixelValueMask``, ``AssetBandMask``), plus ``None`` for "not chosen yet".
-Only the JRC arm has a control, matching how the productivity step's
-``vi_source`` control only ever writes ``SensorSelection`` -- but unlike that
-field, this one has no truthy "nothing selected" state to fall back to: a
-``PixelValueMask``/``AssetBandMask`` is a real, complete choice this step
-just does not offer a control for, so the threshold slider renders only when
-``water_mask`` actually IS the JRC arm, and a plain note stands in for it
-otherwise rather than fabricating a threshold that does not exist. ``None``
-is genuinely unset (``missing_water_mask``, fatal) and is the one case this
-step commits a real default for, on mount -- mirroring productivity.py's
-``_seed_threshold`` for its own genuinely-unset field.
+The ``land_cover`` union keeps its two arms apart: ``EsaCciSource`` has no
+fields, while ``CustomLandCoverSource`` needs a start and an end asset before
+it is usable, so the pickers render only when the custom arm is chosen --
+leaving it selectable but permanently unsatisfiable would move
+``missing_custom_land_cover_asset`` from a validate() problem into a dead end.
+The picker is pysepal's ``AssetSelectComponent``, which validates that the
+chosen asset is an IMAGE, as the legacy's ``sw.AssetSelect`` did
+(``select_lc.py:17``).
 """
 
 from __future__ import annotations

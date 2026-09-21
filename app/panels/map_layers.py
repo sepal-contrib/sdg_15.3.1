@@ -1,84 +1,31 @@
 """The computed layers: one row per layer, each with its own show and export.
 
 The seven layers come from ``IndicatorMaps.layers()``; this panel never decides
-which layers exist, what they are called, or how they are coloured. Colours
-come from the domain palette so the map and the exported assets agree. Names
-come from :func:`layer_name` -- ``ClassifiedLayer.label`` is the layer's raw
-snake id (frozen under decision D9; the domain's own docstring says the
-translated display label is the app layer's job).
+which layers exist, what they are called, or how they are coloured. A row
+carries an eye toggle and an export icon, and the export dialog is pysepal's
+(``use_export_dialog`` + ``ExportDialog``), opened preselected on that row's
+own layer.
 
-**Two icons per row, not two text buttons and a separate Export section.** The
-table replaced a single "show everything" button; the repo owner then used it
-and objected to its weight -- *"in the layers list, I'd like to remove the
-button, IDK, or maybe replace it with an eye? for me the problem is that all 7
-buttons are too much they're together"* -- and, in the same message, asked
-where export belongs: *"what if the export can someway included in the layer
-section?"*. So a row now carries an eye toggle and an export icon, and
-``app/panels/outputs.py`` no longer renders an Export section of its own. The
-export dialog is still pysepal's (``use_export_dialog`` + ``ExportDialog``,
-the documented route for a custom trigger layout); the row icon only opens it
-and preselects its own layer -- in that order, because opening resets the form
-(see ``_ExportDialogHost.open_requested``).
+**Every layer is clipped to the AOI and self-masked before it is drawn**
+(``app/panels/layer_style.py``). Without both, an unclipped classified layer
+covers the globe in the palette's first colour. The legacy did the same in
+``display_maps`` (``component/scripts/run_15_3_1.py:113-144``). This is DISPLAY
+only -- the domain graphs are untouched (decision D9) and the export path keeps
+its own ``.clip(ctx.feature_collection)``, so nothing here reaches the parity
+harness. One deliberate difference: the legacy clipped a non-ADMIN AOI to
+``geom.bounds()``, painting its whole bounding rectangle; this clips to
+``ctx.geometry`` for every arm.
 
-The export glyph is ``mdi-export-variant``, which is also what pysepal's own
-``ExportLauncher`` defaults to. It is not a free choice: this stack serves MDI
-**4.9.95** (solara's ``plain.html`` pins it; the ``jupyter-vuetify``
-labextension bundles the same generation), and Vuetify renders a name the font
-lacks as an empty box with no error -- which is how the first attempt at this
-icon shipped invisible. ``tests/app/test_icons.py`` checks every name in this
-package against the font actually on disk.
+The shown set is never read back from ``map_.find_layer``: the map's widget
+state changes without telling Solara, so a row driven from it would not
+re-render. It lives in a ``solara.Reactive`` threaded down from ``page.py``, so
+the same set drives the floating legend (``app/panels/legend.py``).
 
-**Every layer is clipped to the AOI and self-masked before it is drawn.**
-Without it the whole world renders in the palette's FIRST colour: these are
-classified images whose unclassified background is 0, the vis window starts at
-1, and Earth Engine paints everything at or below ``min`` with the min colour
--- so an unclipped indicator layer covers the globe in "Degraded" red. That is
-what the repo owner saw ("make sure all the layers that are being added to the
-map show only the AOI area, I see some of them not masked out and I see a
-large red tiles"). The legacy did this too, in ``display_maps``
-(``component/scripts/run_15_3_1.py:113-144``): every classified raster is
-``.clip(geom).selfMask()``. This is DISPLAY only -- the domain graphs are
-untouched (decision D9), and the export path keeps its own
-``.clip(ctx.feature_collection)`` (``app/panels/exports.py``), so nothing here
-reaches the parity harness.
-
-One deliberate difference from the legacy: it clipped a non-ADMIN AOI to
-``geom.bounds()`` rather than to the geometry, so a drawn or uploaded AOI
-still painted its whole bounding rectangle. The owner asked for "only the AOI
-area", so this clips to ``ctx.geometry`` for every AOI arm.
-
-The shown set is never read back from ``map_.find_layer``: the map's live
-widget state changes without telling Solara, so a row driven from it would not
-re-render when it did. It lives in a ``solara.Reactive`` instead, threaded down
-from ``page.py`` (see ``MapLayersPanel``'s own ``shown`` docstring) so the same
-set drives the floating legend (``app/panels/legend.py``) too, not a second,
-independent notion of "on the map".
-
-Adding a layer is GEE work (it fetches a map id), so it follows
-``docs/guides/solara-gee-patterns.md``'s Async Button Convention: one
-``use_task`` for the whole component, parameterised by which layer it is
-currently drawing, with a row's spinner driven by comparing its id against the
-in-flight one. NOT one task per row -- that would call ``use_task`` a number
-of times that depends on ``maps.layers()``, a hook inside a loop. Removing is
-synchronous and local, so it needs no task.
-
-One task also means one layer can draw at a time: clicking a second row's eye
-while the first is still in flight does not queue it, it REPLACES it (the same
-``task(...)`` call that started the first now starts the second). The abandoned
-layer never lands on the map and no row ends up wrongly marked shown, so this
-was never a correctness bug -- but the first row simply reverted to hidden with
-no toast, which read as the click having done nothing. Every OTHER row's eye is
-disabled (``is_busy_elsewhere``, see ``_LayerToggle``) while one is pending, so
-the interaction cannot be started rather than being started and silently
-dropped -- weighed against seven one-or-two-second adds becoming serial, which
-seemed the smaller cost.
-
-Task 20 made ``maps`` a derivation of the run spec: change the spec, and
-``maps`` is a new object describing a different run. Every tile this panel
-already drew is then from the run BEFORE it -- the same silently-wrong-data
-failure Task 20 exists to kill, reappearing on the map instead of in a panel.
-The effect keyed on ``maps`` below clears them; see ``clear_stale_layers`` for
-why it sweeps every layer id rather than only the ones it believes are shown.
+Adding a layer is GEE work, so it follows one ``use_task`` for the whole
+component, parameterised by which layer is drawing -- NOT one task per row,
+which would be a hook inside a data-dependent loop. One task also means one
+layer draws at a time: every other row's eye is disabled while one is pending,
+so a second click cannot silently replace the first.
 """
 
 from __future__ import annotations
@@ -113,9 +60,8 @@ class _ExportRequest:
     """One press of a row's export icon.
 
     ``nonce`` is what makes a second press of the SAME row a new request: the
-    dialog is opened by an effect keyed on this value, and a bare layer id
-    would compare equal to the previous request, so re-opening a dialog the
-    user had closed would silently do nothing.
+    dialog opens from an effect keyed on this value, so a bare layer id would
+    compare equal and re-opening a dialog the user had closed would do nothing.
     """
 
     nonce: int
@@ -131,21 +77,14 @@ def _ExportDialogHost(
 ) -> None:
     """Owns the export dialog and opens it on the layer a row asked for.
 
-    **Its own component, mounted only once a build exists**, for two reasons
-    that point the same way. ``use_export_dialog`` is a hook, so it cannot be
-    called behind ``MapLayersPanel``'s own ``maps is None`` guard; and one of
-    the tasks it mounts has ``dependencies=[]``, which schedules real async
-    work through ``asyncio.create_task`` the moment it first renders. In a
-    bare ``solara.render()`` harness with no running loop that raises
-    ``RuntimeError: no running event loop``, so a panel that mounted this
-    unconditionally would make every render test of the whole app need an
-    event loop just to reach a dialog it never opens. Mounting a whole child
-    component conditionally is ordinary reconciliation; calling its hooks
-    conditionally would not be.
+    Its own component, mounted only once a build exists: ``use_export_dialog``
+    is a hook, so it cannot sit behind ``MapLayersPanel``'s ``maps is None``
+    guard, and one of the tasks it mounts schedules real async work at first
+    render -- which needs a running event loop that a bare ``solara.render()``
+    harness has none of.
 
     ``request`` arrives as a plain value rather than the controller being
-    handed upward, so the row icons stay ignorant of pysepal's export API --
-    they set a request, and this decides what that means.
+    handed upward, so the row icons stay ignorant of pysepal's export API.
     """
     controller: ExportDialogController = use_export_dialog(
         sources, gee_interface=gee_interface, sepal_client=sepal_client
@@ -154,16 +93,9 @@ def _ExportDialogHost(
     def open_requested() -> None:
         if not request.layer_id:
             return
-        # AFTER open_dialog(), never before: opening RESETS the whole form,
-        # `selected_source_id.set("")` included (pysepal
-        # `export_hook.py:803-805`). Preselecting first therefore opens the
-        # dialog on nothing at all, which is what the repo owner hit -- *"if I
-        # select any of them, the export should populate that selection I
-        # believe no?"*. Both calls are plain synchronous writes in one event
-        # handler, so the reset lands first and this selection survives it.
-        # The id is the layer's own `layer_id.value`, which is exactly how
-        # `export_sources(...)` keys its sources (`app/panels/exports.py`), so
-        # the hook's `_reconcile_selected_source` finds it and keeps it.
+        # AFTER open_dialog(), never before: opening RESETS the form,
+        # `selected_source_id.set("")` included (pysepal export_hook.py:803).
+        # Both are synchronous writes in one handler, so this survives.
         controller.open_dialog()
         controller.selected_source_id.value = request.layer_id
 
@@ -323,11 +255,9 @@ def _LayerRow(
 ) -> None:
     """One table row: the layer's name, its eye, and its export.
 
-    Its own component, called once per layer inside ``MapLayersPanel``'s loop
-    over ``maps.layers()`` -- a python list whose length is data-dependent,
-    so no hook may be called directly at that outer loop's level (rules of
-    hooks). ``_LayerRow`` itself calls none directly either: every control it
-    mounts is a whole child component with its own stable hook count.
+    Called once per layer inside a data-dependent loop, so neither it nor its
+    caller may call a hook directly at that level; every control it mounts is
+    a whole child component with its own stable hook count.
     """
     with rv.Html(tag="tr"):
         rv.Html(tag="td", children=[name])
@@ -382,13 +312,6 @@ def MapLayersPanel(
     """
     notifications = use_notifications()
 
-    # `shown_reactive.set` -- unlike `use_state`'s own setter, which this
-    # replaced -- takes a plain value, not an updater callable, so every
-    # update below reads `.value` fresh rather than closing over a snapshot.
-    # `Reactive` is a stable, persistent object (the same one across this
-    # component's renders, and across renders of the sibling `MapLegend` that
-    # shares it), so a fresh `.value` read from inside a later callback is
-    # never stale the way a captured render-time snapshot would be.
     shown_reactive = solara.use_reactive(shown)
     shown_ids = shown_reactive.value
     pending_id, set_pending_id = solara.use_state(cast("IndicatorLayer | None", None))
@@ -447,36 +370,17 @@ def MapLayersPanel(
                 task.cancel()
 
     def clear_stale_layers() -> None:
-        # `maps` just became a different run (or stopped being runnable at
-        # all): cancel whatever this panel is still drawing from the
-        # PREVIOUS one, and take every layer this panel could have put on the
-        # map back off, rather than leaving old-run tiles shown next to -- or
-        # instead of -- the new run's.
-        #
-        # It sweeps the whole `IndicatorLayer` enum rather than
-        # `shown_ids`, with `remove_layer(..., none_ok=True)` making each
-        # removal a no-op when that layer is not on the map. `shown_ids` is a
-        # RENDER-TIME snapshot and there is a real window in which it is
-        # already out of date: a layer whose add finished during THIS render
-        # commit is put on the map by `handle_task_state`, whose effect runs
-        # before this one and writes the reactive -- but `shown_ids` was read
-        # from the render body, before either effect, so it does not name that
-        # layer. Removing by the snapshot alone would leave its tile on the
-        # map with nothing tracking it: invisible to this panel, invisible to
-        # `MapLegend`, and impossible to remove from the UI afterwards. The
-        # enum is the complete set of keys `_add_layer` can ever have used, so
-        # sweeping it cannot miss one.
+        # Sweeps the whole enum, not `shown_ids`. That snapshot is read in the
+        # render body, before `handle_task_state`'s effect runs, so a layer
+        # whose add finished in THIS commit is on the map but not in it --
+        # removing by the snapshot leaves a tile nothing tracks: invisible to
+        # this panel and to the legend, and unremovable from the UI.
         cancel()
         if map_ is not None:
             for layer_id in IndicatorLayer:
                 map_.remove_layer(layer_id.value, none_ok=True)
         shown_reactive.value = frozenset()
 
-    # Keyed on the whole `IndicatorMaps`, never one of its fields -- that is
-    # what "a different run" means, here and in the three panels below this
-    # one, which is why it is one shared hook. `app/panels/staleness.py`
-    # carries the mount rule and the measured reason the dependency must stay
-    # this object.
     use_discard_on_new_run(maps, clear_stale_layers)
 
     def toggle(layer_id: IndicatorLayer, layer: ClassifiedLayer) -> None:

@@ -1,26 +1,16 @@
 """The Run step: the overall period, and what the current spec derives.
 
 Deriving the maps and the context is pure ``ee`` graph construction -- no
-network, no task, no spinner. ``resolve()`` and ``build_indicator_maps()``
-make no request; the domain's own suite proves it, running entirely offline
-against a mock credential (``tests/app/test_step_run.py``'s
-``test_build_touches_no_network``). ``build_outcome`` below runs this on
-every render (``app/page.py`` wraps it in ``use_memo``, keyed on the spec)
-rather than behind a button: a button guarding a 19ms pure function guards
-nothing, and a stored copy behind a reactive is exactly what let a stale
-build survive a later spec edit -- the whole reason this step no longer
-takes writable ``maps``/``ctx`` reactives at all.
+network, no task, no spinner (pinned by
+``test_step_run.py::test_build_touches_no_network``). ``build_outcome`` runs
+on every render, wrapped in ``use_memo`` by ``app/page.py``, rather than
+behind a button: a button guarding a 19ms pure function guards nothing, and
+storing the result behind a reactive is exactly what let a stale build
+survive a later spec edit.
 
-``build_outcome`` is total: it never raises, for any spec. ``is_runnable`` is
-asked first so an ordinary half-filled form produces a plain empty outcome
-rather than an error message the user cannot act on -- this step already
-renders ``problems_for("run", ...)`` and ``msg("run.blocked")`` for that
-state. The ``except`` in ``build_outcome`` is for the narrower case
-``is_runnable`` cannot see: ``resolve()`` succeeds and
-``build_indicator_maps()`` still refuses (``spec.threshold`` unresolved is
-the standing example -- ``validate()`` has no rule for it). That refusal used
-to surface as an error toast from the Build button's handler; it must stay
-visible now that there is no handler to catch it.
+``build_outcome`` is total -- it never raises, for any spec. ``is_runnable``
+is asked first so an ordinary half-filled form produces no error, and the
+refusal ``build()`` alone can see is caught and carried as a problem.
 """
 
 from __future__ import annotations

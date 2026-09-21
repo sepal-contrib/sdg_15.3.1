@@ -160,33 +160,13 @@ def ResultsPanel(
     # does, so it stays above the guard below along with everything else.
     btn_props = use_task_button(task, on_start=start)
 
-    # `use_memo`, not a plain `if option.value is not None: EChartsRawWidget(...)`:
-    # solara's hooks-order check flags a `use_*` hook called inside an `if` block
-    # regardless of whether it precedes a return, so whether the widget exists at
-    # all has to be decided INSIDE the memoised factory. Keyed on `option.value`
-    # AND `is_open`, and gated on both: an `EChartsRawWidget` sizes its canvas
-    # from its container's live dimensions at construction time and never
-    # revisits that later, so building it while this section is collapsed (a
-    # real case -- the async fetch above can finish after the user has already
-    # expanded a DIFFERENT section) bakes in a zero-width canvas that reopening
-    # this one does not fix. Verified in a real browser with a throwaway probe
-    # (an `EChartsRawWidget` mounted via `solara.display()` inside an
-    # `rv.ExpansionPanel`, driven by `pysepal/scripts/browser_probe.mjs`): built
-    # while open, the canvas measured its real pixel size and kept it across a
-    # collapse/reopen cycle; built while collapsed, it measured 100x500 (an
-    # ECharts fallback, not the container's real width) and STAYED that size
-    # after reopening. Gating on `is_open` too means the widget is always first
-    # built during a render where its section is already the open one -- the
-    # reopen itself is what re-runs this memo once `option.value` is already
-    # sitting there waiting.
-    # Theming is applied HERE, not inside `_fetch`: the option the task stores
-    # is the domain's, and the theme can flip long after the fetch finished
-    # without any new data arriving. Keyed into the memo so a flip rebuilds the
-    # chart -- an `EChartsRawWidget` reads its option once, at construction, so
-    # re-theming an existing one would change nothing on screen. The rebuild
-    # happens while `is_open` is already true (the user is looking at the
-    # chart when they toggle the theme), so it cannot reintroduce the
-    # zero-width canvas the gate above exists for.
+    # `use_memo`, not `if option.value is not None: EChartsRawWidget(...)`:
+    # solara flags a `use_*` hook inside an `if`, so whether the widget exists
+    # at all is decided INSIDE the factory. Keyed on `is_open` too because an
+    # `EChartsRawWidget` measures its canvas once, at construction -- built
+    # while hidden it bakes a 100x500 fallback that reopening never fixes.
+    # Themed here rather than in the fetch: the option stored is the domain's,
+    # and the theme can flip long after the fetch finished.
     dark = use_theme_dark()
 
     def _build_chart() -> EChartsRawWidget | None:
@@ -202,16 +182,9 @@ def ResultsPanel(
 
     TaskButtonComponent(label=msg("results.compute"), **btn_props, small=True, block=True)
 
-    # `solara.display`, not a declarative `EChartsRawWidget.element(...)`: ipecharts
-    # 1.4.0 gives neither chart class an `.element()` factory. Called directly in
-    # the render body here (not deferred into a `use_effect`) because
-    # `solara/server/shell.py`'s `display_in_reacton_hook` only captures a
-    # `display()` call into the reacton tree -- as a reconciled `Output(...)`
-    # element, updated in place rather than duplicated -- while a render context is
-    # active and not reconsolidating; an effect runs after that window closes, and
-    # a version that called `solara.display` from one mounted NOTHING in a real
-    # browser (verified: no `<canvas>` at all). Verified the reverse too: called
-    # here, a real ECharts `<canvas>` painted with non-zero dimensions, and forcing
-    # further re-renders left exactly one `<canvas>` in the DOM, not a second copy.
+    # `solara.display`, not a declarative element: ipecharts gives no
+    # `.element()` factory. Called in the render body, not an effect -- solara
+    # only captures a `display()` into the reacton tree while a render context
+    # is active, and from an effect it mounts nothing at all.
     if chart is not None:
         solara.display(chart)
