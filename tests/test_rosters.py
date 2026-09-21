@@ -162,6 +162,7 @@ ROSTER_ACCOUNTS: Mapping[str, str] = {
     "tests/test_stats_requests.py:_RECEIVER_ARG": "vocabulary: ee's encoder -- which argument each node carries its receiver in",
     "tests/test_validate.py:SENSOR_NAMES": "one direction: test_the_sensor_sample_names_real_sensors",
     "tests/test_workflows.py:APP_LAYER_STEPS": "one direction: test_the_app_layer_checks_are_intact",
+    "tests/test_workflows.py:NON_GATE_WORKFLOWS": "both directions: test_a_non_gate_workflow_proves_nothing",
     "tests/test_workflows.py:_REPORTING_FLAGS": "vocabulary: pytest's flags that change how a run is reported, not which tests it selects",
     "tests/test_workflows.py:_SUPPRESSORS": "vocabulary: the shell spellings that swallow a command's exit code",
 }

@@ -51,6 +51,19 @@ from conftest import REPO_ROOT
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 WORKFLOWS = sorted(WORKFLOW_DIR.glob("*.y*ml"))
 
+#: Workflows that gate nothing and run none of the project's code: they react to a
+#: release that has already been cut. Every rule in this module measures whether a
+#: PROOF can pass without proving anything, and a dispatch that posts a payload
+#: makes no such claim -- there is no selection to narrow and no suite to skip. The
+#: two rules it cannot satisfy are the two that assume a proof: its ``if:`` filters
+#: prereleases, which IS the feature, and it has no micromamba environment to run
+#: inside because it installs nothing.
+#:
+#: Naming a workflow here exempts it from those two rules and NOTHING else; the
+#: rest of the module still reads it, and ``test_a_non_gate_workflow_proves_nothing``
+#: below refuses the name to any workflow that actually runs the suite.
+NON_GATE_WORKFLOWS = ("notify-catalog.yml",)
+
 LEGACY_JOB = "ci"
 #: What the `ci` job must still do. "Test UI notebook" was here too, and is
 #: deliberately gone: nbmake EXECUTED ui.ipynb, and the app layer retired the
@@ -558,6 +571,8 @@ def test_no_job_or_step_is_switched_off_by_a_condition() -> None:
     """
     offenders = []
     for path in WORKFLOWS:
+        if path.name in NON_GATE_WORKFLOWS:
+            continue
         for job_name, job in _jobs(path).items():
             if "if" in job:
                 offenders.append(f"{path.name}:{job_name}: if: {job['if']}")
@@ -615,10 +630,47 @@ def test_every_new_step_runs_inside_the_micromamba_environment() -> None:
     offenders = [
         f"{workflow}:{job}:{step.get('name')}"
         for workflow, job, step in _run_steps()
-        if job != LEGACY_JOB and step.get("shell") != "micromamba-shell {0}"
+        if job != LEGACY_JOB
+        and workflow not in NON_GATE_WORKFLOWS
+        and step.get("shell") != "micromamba-shell {0}"
     ]
 
     assert offenders == [], offenders
+
+
+def test_a_non_gate_workflow_proves_nothing() -> None:
+    """The exemption above is only honest while the workflows it names really do
+    gate nothing. Two rules stop reading a file the moment it is listed, so the
+    list is the one place in this module where a typo buys silence rather than a
+    failure -- name ``ci.yaml`` here and the domain suite could be switched off by
+    an ``if:`` with every assertion green.
+
+    So each name is held to the four things that made it exempt: the file exists,
+    it runs no part of the suite, it installs no environment to run one in, and it
+    is not on the PR gate's triggers. A workflow that starts doing any of those is
+    a gate again, and its name has to come back out of the roster.
+    """
+    names = {path.name for path in WORKFLOWS}
+    gate_triggers = {"pull_request", "push", "schedule", "merge_group"}
+
+    for name in NON_GATE_WORKFLOWS:
+        assert name in names, f"{name} is exempted but does not exist: {sorted(names)}"
+
+        path = next(p for p in WORKFLOWS if p.name == name)
+
+        ran = [job for workflow, job, _ in _pytest_commands() if workflow == name]
+        assert ran == [], f"{name} is exempted from the gate rules but runs pytest in {ran}"
+
+        installs = [
+            step.get("uses")
+            for job in _jobs(path).values()
+            for step in job["steps"]
+            if "setup-micromamba" in str(step.get("uses", ""))
+        ]
+        assert installs == [], f"{name} is exempted but builds an environment: {installs}"
+
+        triggers = gate_triggers & set(_triggers(_load(path)))
+        assert triggers == set(), f"{name} is exempted but runs on the gate: {sorted(triggers)}"
 
 
 def test_the_lint_job_names_no_paths() -> None:
