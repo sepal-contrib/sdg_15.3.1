@@ -187,7 +187,7 @@ def _IconAction(
     and a disabled start while another row is busy (see ``_LayerToggle``). What
     it cannot do is be an icon -- it always renders a filled, coloured
     ``v-btn`` with a label -- and seven of those stacked in a table is exactly
-    what the repo owner asked to be rid of.
+    what this panel exists to avoid.
     """
 
     def _handle_click(*_: object) -> None:

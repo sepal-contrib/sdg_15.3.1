@@ -1,15 +1,10 @@
 """A single override toggle, shared by the SOC and land-cover steps.
 
-Both steps own an optional ``PeriodOverride`` that inherits from
-``periods.overall`` when unset (``PeriodOverride.resolve``, ``sdg1531.spec``).
-Presenting two equal-looking year Selects for what is really ONE required
-control (the Run step's overall period) and TWO optional narrowings made the
-app look like it wanted three answers -- the repo owner's own words: *"IDK,
-im bothered by having to add 3 different date ranges, is that actually
-neccesary?"* Measured: it is not. This collapses each optional override
-behind one checkbox, off by default, showing the plain, INHERITED window
-instead; the two year Selects only appear once the user actually asks to
-narrow it.
+Both own an optional ``PeriodOverride`` that inherits from ``periods.overall``
+when unset (``PeriodOverride.resolve``). Two equal-looking year Selects for
+what is really ONE required window plus TWO optional narrowings made the app
+look like it wanted three answers, so each override hides behind a checkbox,
+off by default, showing the inherited window instead.
 """
 
 from __future__ import annotations

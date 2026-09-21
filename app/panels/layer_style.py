@@ -1,21 +1,13 @@
 """How one computed layer is named, coloured, and drawn.
 
-Three functions, and everything that shows a layer reads them rather than
-deriving its own: ``app/panels/map_layers.py`` draws the map tiles,
-``app/panels/legend.py`` colours the floating legend, and
-``app/panels/exports.py`` stamps the vis params onto the exported asset. That
-is the point of the module -- the legend agrees with the tiles by construction
-instead of by two tables that happen to line up today.
+Everything that shows a layer reads these three rather than deriving its own:
+``map_layers.py`` draws the tiles, ``legend.py`` colours the floating legend,
+``exports.py`` stamps the vis params onto the exported asset. The legend
+agrees with the tiles by construction rather than by two tables that happen to
+line up.
 
-It exists as its own module because the alternative is a cycle: the layers
-panel now hosts the export dialog (a row's own export icon, see that module's
-docstring), so it imports ``export_sources`` from ``app/panels/exports.py``,
-which needs the name and the vis params. These three lived in
-``map_layers.py`` until that edge appeared.
-
-Nothing here decides which layers exist -- that is ``IndicatorMaps.layers()``
--- and nothing here touches the domain's graphs: ``display_image`` builds a
-display-only derivative, and decision D9 keeps the graphs under it frozen.
+Its own module to break a cycle: the layers panel hosts the export dialog, so
+it imports from ``exports.py``, which needs the name and vis params too.
 """
 
 from __future__ import annotations

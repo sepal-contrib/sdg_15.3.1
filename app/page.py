@@ -3,18 +3,10 @@
 ``Sdg1531App`` holds the layout so the same code can serve both runtimes;
 ``Page`` wraps it with SEPAL session authentication for the Solara server.
 
-The whole workflow lives in ``right_panel_content``, not ``steps_data`` --
-the repo owner asked for the ``sbae-design`` / ``sepal-gee-bundle`` layout,
-then separately for the ten steps to be tabs. ``app/tabs.py``'s
-``WorkflowTabs`` does both at once, the way ``spatial-risk-module`` /
-``spatial-risk-main-branch``'s own ``WorkflowTabs`` does: ONE titleless
-section whose whole content is that single component (this supersedes
-decision A6's PLACEMENT a second time; the ORDER it chose is unchanged). List
-position, not any key, is still what orders the ten tabs inside it: AOI is
-first and Export is last; Productivity, Land cover, SOC and Run sit between
-them, then Layers, Transitions, Results and Zonal after Run, in that order
-(see ``app.tabs.workflow_tabs``). ``steps_data`` is left empty -- this app
-has no non-workflow entry (an About dialog, say) to put there.
+The whole workflow lives in ``right_panel_content`` as ONE titleless section
+whose content is ``app/tabs.py``'s ``WorkflowTabs`` -- pysepal renders a
+section with no title, icon or description as bare content, so the tabs get
+the full panel width instead of a heading stacked above them.
 """
 
 from __future__ import annotations
@@ -60,15 +52,10 @@ def Sdg1531App() -> None:
     setup_theme_colors()
 
     spec = solara.use_reactive(RunSpec())
-    # `RunSpec` is a frozen, slots dataclass of plain data -- no `ee` objects --
-    # so it compares by field equality, not identity (`dataclasses.dataclass`'s
-    # generated `__eq__`). reacton's `use_memo` compares its dependency list the
-    # same way (`reacton.utils.equals`, which falls through to `==` for any type
-    # it has no special case for), so an unrelated re-render that leaves `spec`
-    # equal to what it already was does NOT recompute this -- only a real edit
-    # does. Measured, not assumed: a re-render with a structurally-equal-but-new
-    # `RunSpec` object reuses the cached outcome; changing one nested field
-    # (`periods.overall`, say) recomputes it.
+    # `RunSpec` is plain data, so `use_memo` compares it by value: a re-render
+    # that leaves the spec equal reuses the cached outcome, and only a real
+    # edit rebuilds. (Its ee-bearing RESULT must never be compared that way --
+    # see `app/panels/staleness.py`.)
     outcome = solara.use_memo(lambda: build_outcome(spec.value), [spec.value])
 
     # Shared with `MapLegend` below and threaded into `WorkflowTabs` ->
@@ -82,14 +69,10 @@ def Sdg1531App() -> None:
     gee_interface = get_current_gee_interface()
     theme_state = get_current_theme_state()
 
-    # gee_interface, not gee_session: the session param is deprecated in favour of it
-    # (sepal_map.py's __init__ docstring), and passing the interface is what makes the
-    # map share this kernel's authenticated session instead of building its own.
-    #
-    # Wrapped in use_memo, keyed on id(gee_interface): without it a new SepalMap
-    # widget was built on every render, discarding the previous one's basemap,
-    # zoom and layers each time. sepal-gee-bundle's tmf_sepal/page.py, the
-    # layout reference for this task, memoizes the same way.
+    # `gee_interface`, not the deprecated `gee_session`, so the map shares this
+    # kernel's authenticated session. Memoized on `id(gee_interface)`: without
+    # it a new SepalMap is built every render, discarding the previous one's
+    # basemap, zoom and layers.
     sepal_map = solara.use_memo(
         lambda: SepalMap(
             gee=True, fullscreen=True, theme_state=theme_state, gee_interface=gee_interface

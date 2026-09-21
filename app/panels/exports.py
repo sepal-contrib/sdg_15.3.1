@@ -1,22 +1,15 @@
 """Exports: one source per layer.
 
-The user picks what to export rather than exporting all seven at once, which is
-what the legacy offered. Asset basenames come from ``sdg1531.naming`` so a
+The user picks what to export rather than exporting all seven at once, which
+is what the legacy offered. Asset basenames come from ``sdg1531.naming`` so a
 repeat run is named consistently and the collision suffix is applied once, in
 the domain.
 
 ``vis_params`` is a single dict: all seven layers use the ``default``
-visualization slot. Multi-slot exports arrive when pysepal widens the field to
-accept a list; this app needs nothing from that change.
+visualization slot.
 
-**This module renders nothing any more.** It used to own an ``ExportsPanel``
--- a section of its own in the outputs tab, holding one ``ExportLauncher``
-button over all seven sources. The repo owner asked for export to move next to
-the layers instead (*"what if the export can someway included in the layer
-section?"*), so ``app/panels/map_layers.py`` now hosts the dialog and gives
-each table row its own export icon, and what is left here is the part that was
-always the interesting half: the sources themselves. The dialog, the targets
-and the submit flow are unchanged pysepal.
+**This module renders nothing.** ``app/panels/map_layers.py`` hosts the dialog
+and gives each row its own export icon; what is left here is the sources.
 """
 
 from __future__ import annotations

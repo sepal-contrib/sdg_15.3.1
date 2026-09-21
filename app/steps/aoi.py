@@ -47,26 +47,11 @@ def AoiStep(spec: solara.Reactive[RunSpec], map_: Any) -> None:
         gee=True,
     )
 
-    # No "Selected: {name}" line here, and no `ProblemsAlert` either.
+    # Deliberately no "Selected: {name}" and no `ProblemsAlert`: `AoiView`
+    # already shows the selection, and this step's one rule (`missing_aoi`)
+    # says "Select an area of interest" under a heading that says the same.
+    # Its real consequence is drawn by the tab strip instead -- PARAMS and
+    # Results lock until an AOI exists (`app/tabs.py`'s `_tab_state`).
     #
-    # `AoiView`'s own controls already show the current selection, so the
-    # first restated what was on screen two rows above it -- the repo owner's
-    # own example of the noise this panel should not carry ("in the AOI
-    # section remove the 'SELECTED...' that is useless").
-    #
-    # The alert went for the same reason, one request later: this step owns
-    # exactly ONE validation rule, `missing_aoi`, whose message is "Select an
-    # area of interest" -- shown on the tab whose entire content is the area
-    # picker, under a heading that already says "Choose the area the indicator
-    # is computed over". What it was really reporting is the CONSEQUENCE, and
-    # since the owner asked for PARAMS to be deactivated until an AOI exists
-    # ("if the AOI is not set, PARAMS should be deactivated, and therefore,
-    # the 'select an AOI' should be deactivated"), the tab strip now shows
-    # that consequence directly: two visibly locked tabs, at the moment it
-    # matters. See `app/tabs.py`'s `_tab_state`.
-    #
-    # This is safe only while `missing_aoi` really is the step's only rule --
-    # a second AOI rule would silently have nowhere to appear. Pinned by
-    # `tests/app/test_step_aoi.py::test_the_aoi_step_still_owns_exactly_the_
-    # one_rule_its_missing_alert_assumes`, which fails loudly if the domain
-    # ever grows one.
+    # Safe ONLY while `missing_aoi` is the step's only rule; a second would
+    # have nowhere to appear. Pinned by `test_step_aoi.py`.

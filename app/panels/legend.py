@@ -1,28 +1,20 @@
 """The floating map legend for whichever layers are actually shown.
 
-Not a right-panel tab -- ``page.py`` mounts :func:`MapLegend` as ``MapApp``'s
-SIBLING, the same placement pysepal's own demo app uses
-(``demo_apps/solara_map_app/app.py:137``): ``LegendComponent``'s own ``.vue``
-positions it ``position: fixed`` bottom-centre, so where it sits in the DOM
-tree does not matter, and keeping it out of ``right_panel_content`` keeps it
-visible regardless of which workflow tab is active.
+Mounted as ``MapApp``'s SIBLING, not inside ``right_panel_content``:
+``LegendComponent`` positions itself ``fixed`` bottom-centre, so it stays
+visible whichever workflow tab is active.
 
-The obvious way to colour this -- join ``sdg1531.tables.DEGRADATION_COLORS``
-to a layer's ``labels`` by the English label string -- breaks on the
-performance layer: its class 2 label, ``"Not degraded"``, is deliberately
-absent from ``DEGRADATION_COLORS`` (see ``sdg1531/tables.py``). Instead this
-reads the SAME ``layer_vis_params()`` the map itself draws with
-(``app/panels/layer_style.py``, the module ``app/panels/map_layers.py`` draws
-from too): pixel ``v`` gets ``palette[v - min]`` and ``layer.labels[v]``, so
-the legend agrees with the tiles by construction
-rather than by two tables that happen to line up today. ``min`` starts at 1
-(the legacy's NoData/unclassified value is 0, outside the vis window), so
-pixel 0 is never drawn and never legended.
+The obvious way to colour it -- join ``DEGRADATION_COLORS`` to a layer's
+``labels`` by the English label -- breaks on the performance layer, whose
+class 2 label ``"Not degraded"`` is deliberately absent from that table. So it
+reads the SAME ``layer_vis_params()`` the map draws with: pixel ``v`` gets
+``palette[v - min]`` and ``layer.labels[v]``, and the legend agrees with the
+tiles by construction. ``min`` starts at 1, so the unclassified 0 is never
+drawn and never legended.
 
-Driven by the SAME shown set ``MapLayersPanel`` toggles (``page.py`` threads
-one shared ``solara.Reactive`` into both), never a second, independent
-reading of which layers are "on the map" -- see that module's docstring for
-why this can only be a ``Reactive``, not a live read of the map widget.
+Driven by the SAME shown set ``MapLayersPanel`` toggles -- one shared
+``Reactive`` threaded from ``page.py``, never a second reading of what is on
+the map.
 """
 
 from __future__ import annotations

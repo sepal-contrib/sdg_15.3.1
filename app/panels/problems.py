@@ -1,33 +1,13 @@
 """One styled component for every validation message the app reports.
 
-Replaces ``app.state.render_problems``, which emitted one bare
-``solara.Markdown`` per problem -- bolded when fatal, plain otherwise. The repo
-owner's objection was to exactly that: *"the parameters I believe should use a
-single component for reporting the errors? a single component that shows the
-validation errors, and with a proper styling, I don't like that plain
-markdown"*.
+Errors and warnings only -- never "3 selected" status lines -- grouped so
+every error appears above every warning, because an error is the thing that
+blocks and should not be read after the advice.
 
-**Kept where it is, not consolidated into one panel-wide list.** The owner
-weighed both -- *"I don't know if we should have them separate ... because is
-nice to have the feedback immediately"* -- and immediacy is the reason a
-message sits next to the control that causes it. So this is ONE component used
-in several places, not one place showing everything: each step still renders
-its own ``ProblemsAlert(step, spec)`` at the end of its body, exactly where
-``render_problems`` used to be called.
-
-**Errors and warnings only.** The other half of the same request: *"at least it
-should only report errors/warnings, not useless info like ('x selected')"*.
-Informational lines that were being rendered through the same channel are gone
--- ``aoi.selected`` ("Selected: {name}"), which restated what ``AoiView``'s own
-control already shows, and ``run.ready``/``run.blocked``, which restated what
-the Results tab's own enabled/disabled state already says. What survives is a
-real field hint (the sensor-coverage line under the year selects), and it is
-deliberately NOT routed through here -- see ``app/steps/run.py``.
-
-Severity is ``Problem.fatal``, never a second notion of it: fatal problems are
-what ``is_runnable`` blocks on, so they are errors, and everything else is a
-warning. The two are grouped rather than interleaved so a user reading a
-section sees what BLOCKS them before what merely warns them.
+**Kept per-section, not consolidated into one panel-wide list**: a message
+next to the control that caused it is read while the user is still looking at
+that control. What was wrong before was the STYLING (bare markdown), not the
+placement.
 """
 
 from __future__ import annotations

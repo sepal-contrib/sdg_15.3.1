@@ -33,10 +33,8 @@ __all__ = ("SocStep",)
 
 @solara.component
 def SocStep(spec: solara.Reactive[RunSpec]) -> None:
-    # The description used to render here; it now lives in this step's own
-    # PARAMS section header (`app/panels/params.py`), the same move task 28
-    # made for the five output panels (`app/panels/outputs.py`'s module
-    # docstring).
+    # The title is the PARAMS section header's (`app/panels/params.py`);
+    # this step renders only its own controls.
 
     def set_override(new: PeriodOverride) -> None:
         # dataclasses.replace, not .evolve: RunSpec has evolve(), SubPeriods

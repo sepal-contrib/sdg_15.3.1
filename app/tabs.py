@@ -215,7 +215,7 @@ def WorkflowTabs(
     # leaving them bunched at the left; `centered` is what keeps them centred
     # if a translation makes them narrow enough not to fill it. No
     # `show-arrows`: three tabs fit, and the overflow chevrons it adds are the
-    # very thing the repo owner asked to be rid of.
+    # very control this strip exists to avoid.
     with rv.Tabs(v_model=active_tab, on_v_model=set_active_tab, grow=True, centered=True):
         for tab in tabs:
             # Vuetify draws a disabled tab (dimmed, not clickable) and refuses
