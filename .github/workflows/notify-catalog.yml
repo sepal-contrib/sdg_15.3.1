@@ -6,7 +6,7 @@ on:
 
 env:
   CATALOG_REPO: dfguerrerom/sepal-apps-catalog
-  APP_ID: sdg_15.3.1
+  APP_ID: sdg_15_3_1
   APP_REPOSITORY: https://github.com/sepal-contrib/sdg_15.3.1
 
 permissions:

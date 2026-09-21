@@ -85,7 +85,7 @@ changed.
 ## Deploying to SEPAL
 
 The app ships as a container: a Solara server behind supervisord, on the `sepal`
-network, reachable at `/api/app-launcher/sdg_15.3.1`.
+network, reachable at `/api/app-launcher/sdg_15_3_1`.
 
 ```bash
 export SEPAL_HOST=<your sepal host>
