@@ -125,6 +125,24 @@ Two things to know before adding tests:
   Protocol. Several defects in this app — a chart that mounted in every test and rendered nothing,
   an icon that did not exist in the shipped font — were only visible from there.
 
+## Releasing
+
+Versions come from the commit subjects: `cz bump` reads everything since the last
+tag, writes the new version into `pyproject.toml`, regenerates `CHANGELOG.md` and
+tags the commit.
+
+```bash
+cz bump                       # --dry-run first to see the version it picks
+git push --follow-tags
+gh release create <tag> --generate-notes
+```
+
+Publishing the release (not the tag) is what notifies SEPAL's app catalogue, via
+`.github/workflows/notify-catalog.yml`. It dispatches the resolved 40-char commit
+SHA rather than the tag, so a tag moved afterwards cannot change what the catalogue
+already published. The workflow needs a `CATALOG_DISPATCH_TOKEN` repository secret,
+and it skips prereleases.
+
 ## Contributing
 
 Pull requests are welcome. The CI gate is the four jobs in `.github/workflows/ci.yaml`: the
