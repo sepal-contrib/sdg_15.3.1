@@ -1,0 +1,551 @@
+"""The merged outputs tab: five flat, headed sections.
+
+Task 27 folded the five output tabs (Layers, Transitions, Results, Zonal,
+Export) into one, ``app.panels.outputs.OutputsPanel``, as an
+``rv.ExpansionPanels`` accordion. Task 28 replaced that accordion with flat
+sections, each introduced by ``app/panels/section_header.py``'s
+``SectionHeader`` -- see ``app/panels/outputs.py``'s module docstring for the
+chart-mount trap this move carried over (in a new shape) from the accordion.
+The identity-wiring tests for the five panels moved here from
+``tests/app/test_tabs.py`` back in task 21 -- a monkeypatch targets the
+module that actually calls the thing, and that is no longer ``app.tabs`` for
+these five. Several tests below also spy on ``RunStep`` -- not one of the
+five, just the cheapest way to reach the shared spec reactive that flows into
+them -- and that spy's own monkeypatch target moved a second time, task 30:
+``RunStep`` is called from ``app.panels.params`` now, not ``app.tabs``, so it
+is patched as ``params_module.RunStep`` here.
+"""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from typing import Any
+
+import ipyvuetify as v
+import solara
+from pysepal.sepalwidgets.vue_app import MapApp
+
+from app import page as page_module
+from app import tabs as tabs_module
+from app.message import msg
+from app.panels import map_layers as map_layers_module
+from app.panels import outputs as outputs_module
+from app.panels import params as params_module
+from app.panels.outputs import output_sections
+from sdg1531.spec import Period, RunSpec
+from tests.app.render_helpers import cell_texts, find_widget, find_widgets
+from tests.spec_factory import DEFAULT_PERIODS, default_spec
+
+# `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
+# threshold for `build_indicator_maps()` to succeed (see
+# `tests/app/test_step_run.py`); every test below that needs a REAL build,
+# not just a runnable spec, uses this one.
+_BUILDABLE_SPEC = default_spec(threshold=0.0)
+
+# `output_sections()`'s own DISPLAY order -- see that function's docstring.
+_LAYERS_INDEX = 0
+_TRANSITIONS_INDEX = 1
+_RESULTS_INDEX = 2
+_ZONAL_INDEX = 3
+_EXPORTS_INDEX = 4
+
+# The merged outputs tab always follows the configuration tabs before it --
+# derived from `workflow_tabs()` itself (task 30 changed how many there are,
+# from five to one PARAMS tab; a hand-typed literal would have gone stale
+# again the same way `tests/app/test_tabs.py`'s own indices already learned
+# not to be).
+_OUTPUTS_TAB_INDEX = next(
+    i for i, tab in enumerate(tabs_module.workflow_tabs()) if tab.step is None
+)
+
+_SECTION_TITLES_IN_ORDER = (
+    msg("layers.title"),
+    msg("transitions.title"),
+    msg("results.title"),
+    msg("zonal.title"),
+)
+
+_SECTION_DESCRIPTIONS_IN_ORDER = (
+    msg("layers.description"),
+    msg("transitions.description"),
+    msg("results.description"),
+    msg("zonal.description"),
+)
+
+
+@solara.component
+def _noop_export_dialog_host(**_kwargs: Any) -> None:
+    """A stand-in for ``map_layers._ExportDialogHost`` in tests that drive a
+    REAL build but care about a different panel.
+
+    ``use_export_dialog`` mounts one of its own tasks with
+    ``dependencies=[]`` -- pysepal's own, unrelated to this app's
+    ``dependencies=None`` invariant -- which starts a real asyncio task the
+    moment it first renders. That needs a running event loop this bare
+    ``solara.render()`` harness does not have. The host only mounts once
+    ``maps``/``ctx`` exist (see its own docstring), so only tests with a
+    buildable spec reach it -- and those substitute this rather than hitting
+    the real dialog by accident. Before the Export section was folded into
+    the layers table this same stand-in was needed for ``ExportsPanel``, for
+    the identical reason.
+    """
+
+
+def _workflow_widget(box: object) -> Any:
+    """The real, reconciled ``WorkflowTabs`` widget -- same helper as
+    ``tests/app/test_tabs.py``'s, duplicated rather than imported: it is
+    three lines, and every other fixture/fake in this suite is per-file
+    already (``_FakeMaps``, ``_FakeNotifier``, ...).
+    """
+    mapapp = find_widget(box, MapApp)
+    assert mapapp is not None
+    workflow_widget: Any = mapapp.right_panel_content[0]["content"][0]
+    return workflow_widget
+
+
+def _select_tab(box: object, rc: Any, index: int) -> None:
+    """Activate a workflow tab the way a real click does -- duplicated from
+    ``tests/app/test_tabs.py``'s identical helper rather than imported,
+    matching this suite's existing per-file convention. Writing the strip's
+    ``v_model`` is the path Vuetify's own click handler takes; see that
+    module for the full reasoning.
+    """
+    strip = find_widget(_workflow_widget(box), v.Tabs)
+    assert strip is not None
+    strip.v_model = index
+    rc.force_update()
+
+
+# ---------------------------------------------------------------------------
+# `output_sections()` -- pure, no render context. Mirrors `app.tabs.
+# workflow_tabs`'s own order/shape tests.
+# ---------------------------------------------------------------------------
+
+
+def test_the_section_header_divider_follows_the_theme():
+    """`var(--v-divider-base, ...)` never resolved in this stack -- Vuetify 2
+    compiles its theme from SASS and `--v-*` custom properties are a Vuetify 3
+    feature, so the fallback always won and the divider was a light-theme
+    colour in dark mode. It looked fine in a browser because a fallback that
+    always applies is indistinguishable from a working default.
+    """
+    from pysepal.solara import get_current_theme_state
+
+    from app.panels.section_header import _DIVIDER_DARK, _DIVIDER_LIGHT, SectionHeader
+
+    assert _DIVIDER_LIGHT != _DIVIDER_DARK
+
+    theme_state = get_current_theme_state()
+    original = theme_state.dark
+    try:
+        theme_state.dark = False
+        box, rc = solara.render(SectionHeader(title="t", icon="mdi-cog"), handle_error=False)
+        assert rc is not None
+        light = find_widget(box, v.Html).style_
+
+        theme_state.dark = True
+        rc.force_update()
+        dark = find_widget(box, v.Html).style_
+
+        assert _DIVIDER_LIGHT in light
+        assert _DIVIDER_DARK in dark
+        assert _DIVIDER_LIGHT not in dark
+    finally:
+        theme_state.dark = original
+
+
+def test_the_sections_are_in_the_old_tab_order():
+    """Layers -> Transitions -> Results -> Zonal -> Export -- the brief's own
+    words: "Section order is the old tab order and must not change". This is
+    also the mutation-catching test for that promise: reordering two entries
+    in ``output_sections()``'s return list, or dropping one, fails here (see
+    ``test_there_are_exactly_five_sections`` for the drop case specifically).
+    """
+    sections = output_sections()
+    assert [s.title for s in sections] == list(_SECTION_TITLES_IN_ORDER)
+    # Individual literals, not a roster -- same reasoning as `app/tabs.py`'s
+    # own icon assertions (`tests/test_rosters.py` would flag a tuple here as
+    # an unaccounted-for hand-maintained string list; these five, like that
+    # file's ten, are a PIN against `app/panels/outputs.py`'s own hand-typed
+    # icons, not a derivation with a second source of truth to check against).
+    assert sections[0].icon == "mdi-layers"
+    assert sections[1].icon == "mdi-transit-transfer"
+    assert sections[2].icon == "mdi-chart-bar"
+    assert sections[3].icon == "mdi-table"
+
+
+def test_there_are_exactly_four_sections():
+    """Four, not five: Export is no longer a section of its own -- each row of
+    the layers table carries its own export icon instead (see
+    ``app/panels/map_layers.py``). Pinned so re-adding a fifth is a deliberate
+    edit rather than a silent one."""
+    assert len(output_sections()) == 4
+
+
+def test_each_sections_own_description_travels_with_it():
+    """Task 28: each section's own ``msg("<panel>.description")`` now rides
+    along on the ``SectionDescriptor`` itself, for ``OutputsPanel`` to hand to
+    ``SectionHeader`` -- the panel components themselves no longer render it.
+    A description test naming its section, per the brief -- these strings
+    have already vanished once (task 21 dropped all of them silently when it
+    collapsed ten right-panel sections into one).
+    """
+    sections = output_sections()
+    assert [s.description for s in sections] == list(_SECTION_DESCRIPTIONS_IN_ORDER)
+
+
+# ---------------------------------------------------------------------------
+# `OutputsPanel` rendered -- flat sections (no accordion), and the
+# chart-mount `is_open`/`is_active` wiring for Results/Transitions.
+# ---------------------------------------------------------------------------
+
+
+def test_the_expansion_panel_accordion_is_gone(monkeypatch):
+    """Task 28's own ask: the repo owner disliked the accordion Task 27
+    added ("I didn't like the expansion panels you added"). Regression guard
+    against reintroducing it."""
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    workflow_widget = _workflow_widget(box)
+    assert find_widget(workflow_widget, v.ExpansionPanels) is None
+    assert find_widgets(workflow_widget, v.ExpansionPanel) == []
+
+
+def test_every_sections_title_and_description_render_on_screen(monkeypatch):
+    """The render-level half of ``test_each_sections_own_description_travels_
+    with_it`` above: proves the descriptions are not just carried on the
+    dataclass but actually reach the screen, in order, alongside their
+    titles -- the exact thing that silently broke once already (task 21).
+
+    ``cell_texts`` walks any ``rv.Html(tag=..., children=[a_string])`` node,
+    not only a ``SimpleTable`` cell (see ``tests/app/render_helpers.py``);
+    ``SectionHeader`` is the ONLY place in this app's whole render tree that
+    builds a bare ``tag="span"``/``tag="p"`` element (grepped), so this
+    cannot coincidentally match some other panel's text -- but since task 30
+    ``app/panels/params.py``'s ``ParamsPanel`` uses the identical
+    ``SectionHeader`` for its own four sections, and ``rv.TabsItems`` never
+    unmounts an inactive tab (``app/tabs.py``'s own docstring), THAT tab's
+    spans/paragraphs are also live in the same tree. Scoped to the outputs
+    ``TabItem`` alone (``_OUTPUTS_TAB_INDEX``), not the whole workflow
+    widget, so this stays a proof about the OUTPUT sections specifically
+    -- ``tests/app/test_panel_params.py``'s own identical test covers PARAMS'
+    four.
+    """
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    workflow_widget = _workflow_widget(box)
+    outputs_sheet = find_widgets(workflow_widget, v.TabItem)[_OUTPUTS_TAB_INDEX]
+    assert cell_texts(outputs_sheet, "span") == list(_SECTION_TITLES_IN_ORDER)
+    assert cell_texts(outputs_sheet, "p") == list(_SECTION_DESCRIPTIONS_IN_ORDER)
+
+
+# ---------------------------------------------------------------------------
+# Identity wiring -- `app.tabs.WorkflowTabs` -> `OutputsPanel` -> each of the
+# four panels, end to end through the real `Sdg1531App` render.
+# ---------------------------------------------------------------------------
+
+
+def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_gee_interface(
+    monkeypatch,
+):
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
+
+    @solara.component
+    def _spy_map_layers_panel(
+        *,
+        maps: Any = None,
+        ctx: Any = None,
+        map_: Any = None,
+        gee_interface: Any = None,
+        sepal_client: Any = None,
+        shown: Any = None,
+    ) -> None:
+        captured.update(
+            panel_maps=maps,
+            panel_ctx=ctx,
+            map_=map_,
+            gee_interface=gee_interface,
+            panel_shown=shown,
+        )
+
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(outputs_module, "MapLayersPanel", _spy_map_layers_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    mapapp = find_widget(box, MapApp)
+    assert mapapp is not None
+
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
+    # `ctx` is what every drawn layer is clipped to (`app/panels/layer_style.py`'s
+    # `display_image`); a panel handed `maps` without it would draw the whole
+    # world in the palette's first colour.
+    assert captured["panel_ctx"] is captured["outcome"].ctx
+    assert captured["map_"] is mapapp.main_map[0]
+    assert captured["gee_interface"] is not None
+    assert isinstance(captured["panel_shown"], solara.Reactive)
+
+
+def test_the_layers_panel_and_the_legend_share_the_same_shown_reactive(monkeypatch):
+    """Task 24: a private copy of the shown set in either consumer would let
+    one add a layer the other never finds out about."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_map_layers_panel(*, shown: Any = None, **_kwargs: Any) -> None:
+        captured["panel_shown"] = shown
+
+    @solara.component
+    def _spy_map_legend(*, maps: Any = None, shown: Any = None) -> None:
+        captured["legend_shown"] = shown
+
+    monkeypatch.setattr(outputs_module, "MapLayersPanel", _spy_map_layers_panel)
+    monkeypatch.setattr(page_module, "MapLegend", _spy_map_legend)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert isinstance(captured["panel_shown"], solara.Reactive)
+    assert captured["panel_shown"] is captured["legend_shown"]
+
+
+def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is_open(monkeypatch):
+    """``is_open`` now reflects whether the merged outputs TAB itself is the
+    active one (task 28's flat sections removed the accordion this used to
+    key on) -- driven here by clicking the outputs tab's own segment cell,
+    the same real control a user would use, rather than an accordion
+    ``v_model``. See ``app/panels/outputs.py``'s module docstring for the
+    chart-mount trap this still guards against.
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
+
+    @solara.component
+    def _spy_results_panel(
+        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, is_open: Any = None
+    ) -> None:
+        captured.update(
+            panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, panel_is_open=is_open
+        )
+
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
+    assert captured["panel_ctx"] is captured["outcome"].ctx
+    assert captured["gee_interface"] is not None
+    # The workflow starts on the AOI tab, not the merged outputs tab.
+    assert captured["panel_is_open"] is False
+
+    _select_tab(box, rc, _OUTPUTS_TAB_INDEX)
+    assert captured["panel_is_open"] is True
+
+
+def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_and_is_open(
+    monkeypatch,
+):
+    """See ``test_the_results_panel_...``'s identical docstring above."""
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
+
+    @solara.component
+    def _spy_transitions_panel(
+        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, is_open: Any = None
+    ) -> None:
+        captured.update(
+            panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, panel_is_open=is_open
+        )
+
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
+    assert captured["panel_ctx"] is captured["outcome"].ctx
+    assert captured["gee_interface"] is not None
+    assert captured["panel_is_open"] is False
+
+    _select_tab(box, rc, _OUTPUTS_TAB_INDEX)
+    assert captured["panel_is_open"] is True
+
+
+def test_both_chart_panels_stay_closed_while_a_different_workflow_tab_is_active(monkeypatch):
+    """The exact regression a naive "sections are always open now, delete
+    ``is_open``" edit would reintroduce: measured with a real browser probe
+    (see ``app/panels/outputs.py``'s module docstring) that a chart built for
+    the first time while the merged outputs TAB is inactive bakes in a wrong,
+    fixed canvas size. Pinned here without a browser: with the outputs tab
+    never visited, both chart panels' ``is_open`` must read ``False``, not
+    ``True`` merely because their OWN accordion section no longer exists.
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+
+    @solara.component
+    def _spy_results_panel(*, is_open: Any = None, **_kwargs: Any) -> None:
+        captured["results_is_open"] = is_open
+
+    @solara.component
+    def _spy_transitions_panel(*, is_open: Any = None, **_kwargs: Any) -> None:
+        captured["transitions_is_open"] = is_open
+
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
+    monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+
+    assert captured["results_is_open"] is False
+    assert captured["transitions_is_open"] is False
+
+
+def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(monkeypatch):
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
+
+    @solara.component
+    def _spy_zonal_panel(
+        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, sepal_client: Any = None
+    ) -> None:
+        captured.update(
+            panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, sepal_client=sepal_client
+        )
+
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(outputs_module, "ZonalPanel", _spy_zonal_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    captured["spec"].value = _BUILDABLE_SPEC
+
+    assert captured["outcome"].maps is not None
+    assert captured["panel_maps"] is captured["outcome"].maps
+    assert captured["panel_ctx"] is captured["outcome"].ctx
+    assert captured["gee_interface"] is not None
+    # `get_current_sepal_client()`'s documented "no SEPAL identity" case returns
+    # `None` outside a sandbox, which is exactly this test environment -- the
+    # identity that matters here is that it is called and threaded through at
+    # all, not a particular truthiness.
+    assert "sepal_client" in captured
+
+
+def test_the_outcome_memo_recomputes_on_a_real_edit_not_on_an_unrelated_rerender(monkeypatch):
+    """``RunSpec`` compares by field equality, and reacton's own ``use_memo``
+    compares its dependency list the same way, so an unrelated re-render that
+    leaves ``spec`` structurally equal to what it already was must NOT
+    recompute ``page.py``'s ``outcome`` -- only a real edit does.
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+        captured["outcome"] = outcome
+
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    first_outcome = captured["outcome"]
+    spec = captured["spec"]
+
+    spec.value = RunSpec()
+    rc.force_update()
+    assert captured["outcome"] is first_outcome
+
+    spec.value = _BUILDABLE_SPEC
+    assert captured["outcome"] is not first_outcome
+    assert captured["outcome"].maps is not None
+
+
+def test_changing_the_spec_does_not_leave_a_stale_build_on_a_panel(monkeypatch):
+    """Build under one period, change it to a DIFFERENT buildable period, and
+    an output panel must reflect the CURRENT spec, not a stale one.
+
+    Anchored against ``resolved.spec.periods.overall``, a literal field the
+    domain's own ``ResolvedSpec`` carries -- not a value ``build_outcome``
+    computes itself, so a mutation that breaks ``build_outcome``'s own logic
+    cannot also fake this anchor into agreeing with itself.
+    """
+    captured: dict[str, Any] = {}
+
+    @solara.component
+    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
+        captured["spec"] = spec
+
+    @solara.component
+    def _spy_zonal_panel(
+        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, sepal_client: Any = None
+    ) -> None:
+        captured["panel_maps"] = maps
+
+    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
+    monkeypatch.setattr(outputs_module, "ZonalPanel", _spy_zonal_panel)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    spec = captured["spec"]
+
+    first = default_spec(
+        threshold=0.0, periods=replace(DEFAULT_PERIODS, overall=Period(2001, 2015))
+    )
+    spec.value = first
+    assert captured["panel_maps"] is not None
+    assert captured["panel_maps"].resolved.spec.periods.overall == Period(2001, 2015)
+
+    second = first.evolve(periods=replace(first.periods, overall=Period(2005, 2020)))
+    spec.value = second
+    assert captured["panel_maps"].resolved.spec.periods.overall == Period(2005, 2020)

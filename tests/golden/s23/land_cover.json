@@ -1,0 +1,655 @@
+{
+  "result": "0",
+  "values": {
+    "0": {
+      "functionInvocationValue": {
+        "arguments": {
+          "dstImg": {
+            "functionInvocationValue": {
+              "arguments": {
+                "dstImg": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "dstImg": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "dstImg": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "input": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "value": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "from": {
+                                                "constantValue": [
+                                                  1,
+                                                  0,
+                                                  -1,
+                                                  -32768
+                                                ]
+                                              },
+                                              "image": {
+                                                "functionInvocationValue": {
+                                                  "arguments": {
+                                                    "from": {
+                                                      "constantValue": [
+                                                        1010,
+                                                        1020,
+                                                        1030,
+                                                        1040,
+                                                        1050,
+                                                        1060,
+                                                        1070,
+                                                        2010,
+                                                        2020,
+                                                        2030,
+                                                        2040,
+                                                        2050,
+                                                        2060,
+                                                        2070,
+                                                        3010,
+                                                        3020,
+                                                        3030,
+                                                        3040,
+                                                        3050,
+                                                        3060,
+                                                        3070,
+                                                        4010,
+                                                        4020,
+                                                        4030,
+                                                        4040,
+                                                        4050,
+                                                        4060,
+                                                        4070,
+                                                        5010,
+                                                        5020,
+                                                        5030,
+                                                        5040,
+                                                        5050,
+                                                        5060,
+                                                        5070,
+                                                        6010,
+                                                        6020,
+                                                        6030,
+                                                        6040,
+                                                        6050,
+                                                        6060,
+                                                        6070,
+                                                        7010,
+                                                        7020,
+                                                        7030,
+                                                        7040,
+                                                        7050,
+                                                        7060,
+                                                        7070
+                                                      ]
+                                                    },
+                                                    "image": {
+                                                      "valueReference": "1"
+                                                    },
+                                                    "to": {
+                                                      "constantValue": [
+                                                        0,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        0,
+                                                        1,
+                                                        0,
+                                                        1,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        0,
+                                                        1,
+                                                        -1,
+                                                        0,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        0,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        0,
+                                                        -1,
+                                                        -1,
+                                                        0,
+                                                        1,
+                                                        1,
+                                                        1,
+                                                        1,
+                                                        0,
+                                                        1,
+                                                        0,
+                                                        1,
+                                                        1,
+                                                        1,
+                                                        1,
+                                                        -1,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0
+                                                      ]
+                                                    }
+                                                  },
+                                                  "functionName": "Image.remap"
+                                                }
+                                              },
+                                              "to": {
+                                                "constantValue": [
+                                                  3,
+                                                  2,
+                                                  1,
+                                                  0
+                                                ]
+                                              }
+                                            },
+                                            "functionName": "Image.remap"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "Image.uint16"
+                                    }
+                                  },
+                                  "names": {
+                                    "constantValue": [
+                                      "degradation"
+                                    ]
+                                  }
+                                },
+                                "functionName": "Image.rename"
+                              }
+                            },
+                            "srcImg": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "value": {
+                                    "valueReference": "1"
+                                  }
+                                },
+                                "functionName": "Image.uint16"
+                              }
+                            }
+                          },
+                          "functionName": "Image.addBands"
+                        }
+                      },
+                      "srcImg": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "value": {
+                              "valueReference": "2"
+                            }
+                          },
+                          "functionName": "Image.uint16"
+                        }
+                      }
+                    },
+                    "functionName": "Image.addBands"
+                  }
+                },
+                "srcImg": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "value": {
+                        "valueReference": "9"
+                      }
+                    },
+                    "functionName": "Image.uint16"
+                  }
+                }
+              },
+              "functionName": "Image.addBands"
+            }
+          },
+          "srcImg": {
+            "functionInvocationValue": {
+              "arguments": {
+                "value": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "image": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "image1": {
+                                    "valueReference": "10"
+                                  },
+                                  "image2": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "value": {
+                                          "constantValue": 210
+                                        }
+                                      },
+                                      "functionName": "Image.constant"
+                                    }
+                                  }
+                                },
+                                "functionName": "Image.eq"
+                              }
+                            }
+                          },
+                          "functionName": "Image.selfMask"
+                        }
+                      },
+                      "names": {
+                        "constantValue": [
+                          "water"
+                        ]
+                      }
+                    },
+                    "functionName": "Image.rename"
+                  }
+                }
+              },
+              "functionName": "Image.uint16"
+            }
+          }
+        },
+        "functionName": "Image.addBands"
+      }
+    },
+    "1": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "image1": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "image1": {
+                        "valueReference": "2"
+                      },
+                      "image2": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "value": {
+                              "constantValue": 100
+                            }
+                          },
+                          "functionName": "Image.constant"
+                        }
+                      }
+                    },
+                    "functionName": "Image.multiply"
+                  }
+                },
+                "image2": {
+                  "valueReference": "9"
+                }
+              },
+              "functionName": "Image.add"
+            }
+          },
+          "names": {
+            "constantValue": [
+              "transition"
+            ]
+          }
+        },
+        "functionName": "Image.rename"
+      }
+    },
+    "10": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "geometry": {
+                  "valueReference": "4"
+                },
+                "input": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "collection": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "collection": {
+                              "valueReference": "6"
+                            },
+                            "filter": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "end": {
+                                    "constantValue": 2022
+                                  },
+                                  "field": {
+                                    "valueReference": "7"
+                                  },
+                                  "start": {
+                                    "constantValue": 2022
+                                  }
+                                },
+                                "functionName": "Filter.calendarRange"
+                              }
+                            }
+                          },
+                          "functionName": "Collection.filter"
+                        }
+                      }
+                    },
+                    "functionName": "Collection.first"
+                  }
+                }
+              },
+              "functionName": "Image.clip"
+            }
+          },
+          "names": {
+            "constantValue": [
+              "landcover_end"
+            ]
+          }
+        },
+        "functionName": "Image.rename"
+      }
+    },
+    "2": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "from": {
+                  "valueReference": "3"
+                },
+                "image": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "input": {
+                        "functionInvocationValue": {
+                          "arguments": {
+                            "geometry": {
+                              "valueReference": "4"
+                            },
+                            "input": {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "collection": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "collection": {
+                                          "valueReference": "6"
+                                        },
+                                        "filter": {
+                                          "functionInvocationValue": {
+                                            "arguments": {
+                                              "end": {
+                                                "constantValue": 2010
+                                              },
+                                              "field": {
+                                                "valueReference": "7"
+                                              },
+                                              "start": {
+                                                "constantValue": 2010
+                                              }
+                                            },
+                                            "functionName": "Filter.calendarRange"
+                                          }
+                                        }
+                                      },
+                                      "functionName": "Collection.filter"
+                                    }
+                                  }
+                                },
+                                "functionName": "Collection.first"
+                              }
+                            }
+                          },
+                          "functionName": "Image.clip"
+                        }
+                      },
+                      "names": {
+                        "constantValue": [
+                          "landcover_start"
+                        ]
+                      }
+                    },
+                    "functionName": "Image.rename"
+                  }
+                },
+                "to": {
+                  "valueReference": "8"
+                }
+              },
+              "functionName": "Image.remap"
+            }
+          },
+          "names": {
+            "constantValue": [
+              "start"
+            ]
+          }
+        },
+        "functionName": "Image.rename"
+      }
+    },
+    "3": {
+      "constantValue": [
+        10,
+        11,
+        12,
+        20,
+        30,
+        40,
+        50,
+        60,
+        61,
+        62,
+        70,
+        71,
+        72,
+        80,
+        81,
+        82,
+        90,
+        100,
+        110,
+        120,
+        121,
+        122,
+        130,
+        140,
+        150,
+        151,
+        152,
+        153,
+        160,
+        170,
+        180,
+        190,
+        200,
+        201,
+        202,
+        210,
+        220
+      ]
+    },
+    "4": {
+      "functionInvocationValue": {
+        "arguments": {
+          "geometry": {
+            "functionInvocationValue": {
+              "arguments": {
+                "collection": {
+                  "functionInvocationValue": {
+                    "arguments": {
+                      "features": {
+                        "arrayValue": {
+                          "values": [
+                            {
+                              "functionInvocationValue": {
+                                "arguments": {
+                                  "geometry": {
+                                    "functionInvocationValue": {
+                                      "arguments": {
+                                        "coordinates": {
+                                          "arrayValue": {
+                                            "values": [
+                                              {
+                                                "arrayValue": {
+                                                  "values": [
+                                                    {
+                                                      "valueReference": "5"
+                                                    },
+                                                    {
+                                                      "constantValue": [
+                                                        -15.5,
+                                                        14.6
+                                                      ]
+                                                    },
+                                                    {
+                                                      "constantValue": [
+                                                        -15.5,
+                                                        14.7
+                                                      ]
+                                                    },
+                                                    {
+                                                      "constantValue": [
+                                                        -15.6,
+                                                        14.7
+                                                      ]
+                                                    },
+                                                    {
+                                                      "valueReference": "5"
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      "functionName": "GeometryConstructors.Polygon"
+                                    }
+                                  },
+                                  "metadata": {
+                                    "constantValue": {
+                                      "name": "test-box"
+                                    }
+                                  }
+                                },
+                                "functionName": "Feature"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "functionName": "Collection"
+                  }
+                }
+              },
+              "functionName": "Collection.geometry"
+            }
+          }
+        },
+        "functionName": "Geometry.bounds"
+      }
+    },
+    "5": {
+      "constantValue": [
+        -15.6,
+        14.6
+      ]
+    },
+    "6": {
+      "functionInvocationValue": {
+        "arguments": {
+          "id": {
+            "constantValue": "users/amitghosh/sdg_module/esa/cci_landcover"
+          }
+        },
+        "functionName": "ImageCollection.load"
+      }
+    },
+    "7": {
+      "constantValue": "year"
+    },
+    "8": {
+      "constantValue": [
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        40,
+        40,
+        40,
+        50,
+        60,
+        60,
+        60,
+        70,
+        60
+      ]
+    },
+    "9": {
+      "functionInvocationValue": {
+        "arguments": {
+          "input": {
+            "functionInvocationValue": {
+              "arguments": {
+                "from": {
+                  "valueReference": "3"
+                },
+                "image": {
+                  "valueReference": "10"
+                },
+                "to": {
+                  "valueReference": "8"
+                }
+              },
+              "functionName": "Image.remap"
+            }
+          },
+          "names": {
+            "constantValue": [
+              "end"
+            ]
+          }
+        },
+        "functionName": "Image.rename"
+      }
+    }
+  }
+}

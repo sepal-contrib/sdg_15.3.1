@@ -1,0 +1,164 @@
+{
+  "app": {
+    "title": "Indicateur ODD 15.3.1"
+  },
+  "panel": {
+    "title": "Flux de travail",
+    "description": "Configurez les données de l'exécution, puis consultez ses couches, statistiques et exports."
+  },
+  "step": {
+    "productivity": "Productivité",
+    "land_cover": "Couverture terrestre",
+    "soc": "Carbone organique du sol",
+    "run": "Période d'évaluation"
+  },
+  "aoi": {
+    "description": "Choisissez la zone sur laquelle l'indicateur est calculé."
+  },
+  "productivity": {
+    "description": "Indice de végétation, méthode de tendance et unités écologiques.",
+    "sensors": "Capteurs",
+    "index": "Indice de végétation",
+    "trajectory": "Méthode de tendance",
+    "lceu": "Unités écologiques",
+    "lookup": "Table de correspondance",
+    "threshold": "Seuil IV",
+    "index_value": {
+      "ndvi": "Indice de végétation par différence normalisée (NDVI)",
+      "evi": "Indice de végétation amélioré - 2 (EVI2)",
+      "msvi": "Indice de végétation ajusté au sol modifié - 2 (MSVI2)"
+    },
+    "trajectory_value": {
+      "ndvi_trend": "Tendance de productivité (IV)",
+      "p_res_trend": "Tendance résiduelle (IV observé - IV prédit)",
+      "ue_trend": "Efficacité d'utilisation de la pluie (RUE)"
+    },
+    "lceu_value": {
+      "gaes": "Stratification agro-environnementale mondiale",
+      "aez": "Zones agro-écologiques mondiales",
+      "wte": "Écosystèmes du monde",
+      "hru": "Unités de réponse homogènes mondiales",
+      "calculate": "Calculer à partir de la couverture terrestre et de la texture du sol"
+    }
+  },
+  "land_cover": {
+    "description": "Source de la couverture terrestre et masque d'eau.",
+    "source": "Source de la couverture terrestre",
+    "water_mask": "Masque d'eau",
+    "water_mask_other_arm": "Un masque d'eau différent est déjà configuré ; ce contrôle ne modifie que le seuil de saisonnalité.",
+    "esa": "ESA CCI",
+    "custom": "Assets personnalisés",
+    "start_asset": "Asset de couverture terrestre de début",
+    "end_asset": "Asset de couverture terrestre de fin",
+    "period_start": "Année de début",
+    "period_end": "Année de fin"
+  },
+  "soc": {
+    "description": "La période sur laquelle le changement de carbone organique du sol est mesuré.",
+    "start": "Année de début",
+    "end": "Année de fin"
+  },
+  "run": {
+    "description": "Choisissez la période d'évaluation globale ; son état apparaît ci-dessous.",
+    "start_year": "Année de début",
+    "end_year": "Année de fin",
+    "sensor_coverage_bounded": "Les capteurs sélectionnés disposent de données de {start} à {end}.",
+    "sensor_coverage_open": "Les capteurs sélectionnés disposent de données depuis {start}."
+  },
+  "layers": {
+    "title": "Couches",
+    "description": "Affichez n'importe quelle couche calculée sur la carte, découpée à votre zone d'intérêt. L'œil affiche ou masque une couche ; l'icône d'exportation l'envoie vers un asset Earth Engine, vers Google Drive ou vers votre espace de travail SEPAL.",
+    "columns": {
+      "name": "Couche",
+      "action": "Action"
+    },
+    "added": "Ajouté à la carte : {name}",
+    "names": {
+      "land_cover": "Couverture terrestre",
+      "soc": "Carbone organique du sol",
+      "productivity": "Productivité",
+      "productivity_trend": "Tendance de productivité",
+      "productivity_state": "État de productivité",
+      "productivity_performance": "Performance de productivité",
+      "indicator_15_3_1": "Indicateur ODD 15.3.1"
+    },
+    "build_first": "Construisez d'abord l'indicateur.",
+    "add_failed": "Impossible d'ajouter {name} à la carte : {reason}",
+    "show": "Afficher {name} sur la carte",
+    "hide": "Masquer {name}",
+    "cancel": "Arrêter l'ajout de {name}",
+    "export": "Exporter {name}"
+  },
+  "legend": {
+    "classes": {
+      "land_cover": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "soc": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity_trend": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity_state": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      },
+      "productivity_performance": {
+        "1": "Dégradé",
+        "2": "Non dégradé"
+      },
+      "indicator_15_3_1": {
+        "1": "Dégradé",
+        "2": "Stable",
+        "3": "Amélioré"
+      }
+    }
+  },
+  "transitions": {
+    "title": "Transitions",
+    "description": "Quelle surface est passée d'une classe d'occupation du sol à une autre sur la période d'évaluation. Les lignes correspondent à la classe de départ d'un pixel, les colonnes à sa classe d'arrivée, et chaque valeur est une surface. C'est la matrice de transition dont découle le sous-indicateur d'occupation du sol.",
+    "compute": "Calculer les transitions",
+    "computed": "Transitions prêtes",
+    "build_first": "Construisez d'abord l'indicateur."
+  },
+  "results": {
+    "title": "Distribution",
+    "description": "Surface de chaque classe de dégradation — dégradé, stable, amélioré — ventilée par type d'occupation du sol. C'est ainsi que l'indicateur est généralement présenté : il montre dans quels types d'occupation du sol se concentre la dégradation de votre zone.",
+    "compute": "Calculer les statistiques",
+    "computed": "Statistiques prêtes",
+    "build_first": "Construisez d'abord l'indicateur."
+  },
+  "zonal": {
+    "title": "Statistiques zonales",
+    "description": "Surfaces de l'indicateur cumulées dans chaque entité de votre zone d'intérêt, une ligne par zone. Téléchargez-les au format shapefile pour rattacher les chiffres à vos propres limites dans QGIS ou pour rapporter des totaux par district.",
+    "compute": "Calculer les statistiques zonales",
+    "download": "Télécharger le shapefile",
+    "ready": "Statistiques zonales prêtes",
+    "build_first": "Construisez d'abord l'indicateur."
+  },
+  "exports": {
+    "title": "Export"
+  },
+  "period_override": {
+    "toggle": "Utiliser une période différente pour ce sous-indicateur",
+    "inherited": "Utilise la période d'évaluation : {start}–{end}."
+  },
+  "tabs": {
+    "aoi": "AOI",
+    "params": "Paramètres",
+    "results": "Résultats"
+  }
+}

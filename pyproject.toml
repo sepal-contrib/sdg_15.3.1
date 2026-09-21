@@ -1,6 +1,157 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sdg_15.3.1"
 version = "1.2.0"
+description = "SDG indicator 15.3.1 (Land Degradation Neutrality) on Google Earth Engine"
+requires-python = ">=3.12"
+dependencies = [
+    # the openforis fork is installed from git by sepal_environment.yml; the pin
+    # here is the version the parity harness records and asserts
+    "earthengine-api==1.6.14",
+    "pandas>=2.2",
+    "geopandas>=1.0",
+    # pure-Python, zero dependencies; required so sdg1531.naming.normalize_str
+    # transliterates non-Latin AOI names byte-identically to the legacy
+    # pysepal scripts/utils.py:140, which is also anyascii-backed.
+    "anyascii>=0.3.2",
+    # ExecutionContext.from_aoi_spec rebuilds an ADMIN aoi through pygaul.Items,
+    # spelled exactly as pysepal's own GEE admin branch spells it. pysepal itself
+    # pins exactly this floor for the GAUL 2024 schema (iso3_code, gaul0_code
+    # columns) the arm's codes assume, so this pin tracks pysepal's, not a guess.
+    "pygaul>=0.4.2",
+]
+
+[project.optional-dependencies]
+app = [
+    "solara",
+    # `app/` imports `pysepal.i18n`, which is 4.0-only. Without this floor the extra
+    # installs cleanly against the `pysepal<4` that `sepal_environment.yml` pins and
+    # every module under `app/` fails to import -- which `tests/app/conftest.py` then
+    # converts into an empty collection rather than an error.
+    "pysepal>=4.0.0rc2",
+    # tests/test_plots.py transcribes OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS
+    # from the ipecharts 1.0.x sources; an unfloored install could resolve a later
+    # release whose ECharts option schema no longer matches those rosters.
+    "ipecharts>=1.0.8",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pandas-stubs",
+    # tests/test_workflows.py reads .github/workflows/*.yaml
+    "pyyaml>=6",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sdg1531*", "app*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["tests"]
+# `-m "not network"` by default, so a bare `pytest` is the PR gate's own selection
+# and the two cannot drift apart. A CLI `-m` overrides it (later wins), which is
+# how the nightly's `pytest -m "network"` still reaches the Tier-6 test.
+addopts = "-ra --strict-markers -m 'not network'"
+asyncio_mode = "strict"
+markers = [
+    "network: hits Google Earth Engine; excluded from the PR gate (pytest -m 'not network')",
+    "parity: compares serialized ee graphs against tests/golden (Tier 4)",
+    "slow: takes more than a second",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["component", "doc", "docs", "utils", "*.ipynb", "noxfile.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+"sdg1531/palette.py" = ["E501"]
+# the parity corpus is a pairwise-reduction table: one row per scenario, one
+# column per axis. Wrapping a row makes the columns unscannable, which is the
+# only way to read a reduction table for holes.
+"tools/scenarios.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["sdg1531", "app"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# `tools/` and `tests/parity/` are here because the two files this module's parity
+# guarantee rests on live in them: `tests/parity/canonical.py` decides whether two
+# ee graphs match, and `tools/to_legacy_model.py` is the sole adapter every golden
+# was recorded through. Both are fully annotated and both used to read as checked
+# while mypy never opened them.
+files = ["sdg1531", "app", "tools", "tests/parity"]
+
+[[tool.mypy.overrides]]
+# pysepal ships no stubs. It is also not pinned in the `app` extra above (it comes
+# from the editable checkout the app-layer plan installs), so the `lint` CI job,
+# which only installs `dev`, never has it either -- `app/` needs the same
+# missing-imports pass ee and the geo stack already get. pygaul ships no
+# py.typed marker either; it is imported inside `from_aoi_spec` and
+# `_feature_collection`, both in this same missing-imports boat. ipecharts (the
+# `app` extra pins it above) ships no py.typed marker either; `app/panels/results.py`
+# is its first import site.
+module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*", "pysepal.*", "pygaul.*", "ipecharts.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# `tools/` imports the legacy tree on purpose (stage A runs it). `component/` is
+# unported, untyped and slated for deletion: following it yields ~300 errors about
+# code nobody is going to annotate. `follow_imports = skip` makes everything it
+# exports `Any`, which is the honest description of it, and keeps the `tools/`
+# code that CALLS it checked.
+module = ["component.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# ee/__init__.py re-exports FeatureCollection, Image, Geometry etc. via plain
+# `from .x import Y`, with no `__all__` — strict mode's implicit-reexport check
+# otherwise treats every one of those as private to the submodule it came from.
+# solara/__init__.py and solara/lab/__init__.py do the same for `component`,
+# `on_kernel_start` and the rest of the public API `app/` renders through.
+# solara.hooks and solara.components need the same treatment one level down:
+# `solara/__init__.py`'s own `from .hooks import *` / `from .components import *`
+# only re-exports what those submodules themselves expose, and each imports its
+# public names (``use_reactive``, ``Markdown``, ...) the same unstarred way.
+module = ["ee", "solara", "solara.lab", "solara.hooks", "solara.components"]
+implicit_reexport = true
+
+[[tool.mypy.overrides]]
+# solara.Markdown (solara/components/markdown.py) has untyped parameters and no
+# return annotation, so strict mode's disallow_untyped_calls flags every call
+# into it. Every step under app/steps renders its description and its own
+# validation problems through it (see AoiStep), so this belongs on the package,
+# not one file at a time. app.panels.* joins it for the same reason -- every
+# panel renders a description through Markdown too (see MapLayersPanel).
+# app.state joins it too, narrowly: render_problems is the one shared spot
+# every step's Markdown-a-problem loop was extracted to, so state.py now
+# makes exactly that one call -- it is still logic rather than UI everywhere
+# else. app.page and app.adapters render nothing and stay off this list.
+module = ["app.steps.*", "app.panels.*", "app.state"]
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# pysepal's with_sepal_sessions (app/page.py's session-authenticated entrypoint
+# decorator) carries no return annotation and pysepal ships no py.typed marker,
+# so strict mode's disallow_untyped_decorators sees it as untyped. Scoped to the
+# one file that applies it rather than relaxed project-wide.
+module = ["app.page"]
+disallow_untyped_decorators = false
 
 [tool.commitizen]
 version = "1.2.0"

@@ -1,0 +1,15 @@
+Land cover,2015,Native forest,Exotic forest,Native grassland,Improve pasture,Managed parkland,Plantation,Cereals,Horticulture,Wetland-permanent,Wetland-ephemeral,Coastal wetland,Settlements,Other Land
+2000,Code,10,11,12,13,14,15,16,17,18,19,20,21,22
+Native forest,10,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+Exotic forest,11,1,0,0,-1,0,0,0,0,1,1,1,-1,-1
+Native grassland,12,1,0,0,-1,-1,-1,-1,-1,1,1,1,-1,-1
+Improve pasture,13,1,1,1,0,0,1,0,0,1,0,1,-1,-1
+Managed parkland,14,1,0,1,0,0,0,0,0,1,1,1,-1,-1
+Plantation,15,1,0,1,-1,0,0,0,0,1,0,1,-1,-1
+Cereals,16,1,0,1,0,0,0,0,0,1,1,1,-1,-1
+Horticulture,17,1,0,1,0,0,0,0,0,1,0,1,-1,-1
+Wetland-permanent,18,1,-1,-1,-1,-1,-1,-1,-1,0,-1,0,-1,-1
+Wetland-ephemeral,19,1,-1,1,0,-1,0,-1,0,1,0,0,-1,-1
+Coastal wetland,20,1,-1,1,-1,-1,-1,-1,-1,0,0,0,-1,-1
+Settlements,21,1,1,1,1,1,1,1,1,1,1,1,0,1
+Other Land,22,1,1,1,1,1,1,1,1,1,1,1,-1,0

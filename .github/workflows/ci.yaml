@@ -19,6 +19,18 @@ jobs:
           environment-file: sepal_environment.yml
           cache-environment: true
 
+      # This checks the VERSION, not the fork. The stock PyPI `earthengine-api`
+      # reports 1.6.14 too, and the `domain` and `lint` jobs both `pip install -e
+      # ".[dev]"` on top of this environment against a `earthengine-api==1.6.14`
+      # pin (pyproject.toml:13) that PyPI can satisfy -- so a resolver decision to
+      # take the wheel would swap the openforis fork out and leave this step, and
+      # `test_the_recorded_ee_version_matches_this_environment`, both green. What
+      # WOULD catch it is `test_scenario_graphs_match_the_goldens`: its 112
+      # comparisons run through the INSTALLED `ee.serializer` against committed
+      # goldens, so a build that serialized differently would redden them. (The
+      # algorithm-table digest would not -- both its sides are committed files.)
+      # Pinning the fork properly is the app-layer migration's to settle; until
+      # then, read this step as a version check and not as a provenance guard.
       - name: Verify ee-api fork
         shell: micromamba-shell {0}
         run: |
@@ -36,14 +48,142 @@ jobs:
           fi
           echo "kernelspec name OK: $kernel_name"
 
-      - name: Install test deps
-        shell: micromamba-shell {0}
-        run: pip install pytest nbmake ipykernel
+      # `nbmake` used to EXECUTE ui.ipynb here. It cannot any more: the app
+      # layer retired the Voila tiles the notebook builds (`tile.InputTile`,
+      # `tile.ResultTile`, `tile.ZonalTile`), so running it fails on
+      # `AttributeError: module 'component.tile' has no attribute 'ZonalTile'`.
+      # The file stays for SEPAL's launcher and the kernelspec check above
+      # until spec 3 removes the notebook and this job together; testing it
+      # would only assert that a retired UI still starts.
 
-      - name: Register kernel
-        shell: micromamba-shell {0}
-        run: python -m ipykernel install --user --name=test-kernel
+  domain:
+    name: Domain suite (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Test UI notebook
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: sepal_environment.yml
+          cache-environment: true
+
+      - name: Install the package and test extras
         shell: micromamba-shell {0}
-        run: pytest --nbmake ui.ipynb --nbmake-timeout=600 --nbmake-kernel=test-kernel
+        run: pip install -e ".[dev]"
+
+      - name: Run the offline suite
+        shell: micromamba-shell {0}
+        # The count is asserted, not inferred: "the command did not fail" is not
+        # the same claim as "the tests ran", and a job that runs zero tests passes
+        # every assertion it never made. Exit 5 IS the empty selection, so the
+        # status is taken first and read as that. Piping into awk under pipefail
+        # killed the step before any annotation printed; running the collection
+        # under `if !` printed the generic "collecting failed" instead, which is
+        # the less accurate of the two messages for the one case that matters.
+        run: |
+          set -euo pipefail
+          status=0
+          pytest -m "not network" --collect-only -q > collected.txt || status=$?
+          selected=$(awk '/::/ {n++} END {print n+0}' collected.txt)
+          if [ "$status" -eq 5 ] || [ "$selected" -eq 0 ]; then
+            echo "::error::the 'not network' selection is empty; this job would pass vacuously"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            cat collected.txt
+            echo "::error::collecting the 'not network' selection failed; nothing ran"
+            exit 1
+          fi
+          echo "selected ${selected} offline tests"
+          start=$SECONDS
+          pytest -m "not network" -q --durations=10
+          elapsed=$(( SECONDS - start ))
+          echo "offline suite took ${elapsed}s"
+          if [ "$elapsed" -gt 60 ]; then
+            echo "::warning::offline suite took ${elapsed}s; the target is 60s"
+            echo "It includes the parity harness and gates every PR - keep it fast."
+          fi
+
+  app:
+    name: app layer (pysepal 4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # the conftest guard is silent by default so a pysepal-3 environment can still
+      # run the domain suite; here an empty collection is the exact failure this job
+      # exists to catch, so make it loud.
+      SDG_REQUIRE_APP_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: sepal_environment.yml
+          cache-environment: true
+
+      - name: Install the package, the app extra and test extras
+        shell: micromamba-shell {0}
+        # `[app,dev]`, not `[dev]`: the app extra carries the pysepal>=4 floor that
+        # `sepal_environment.yml`'s `pysepal<4` pin would otherwise leave in place.
+        # pip resolves the newer floor and replaces the conda-installed pysepal.
+        run: pip install -e ".[app,dev]"
+
+      - name: Run the app suite
+        shell: micromamba-shell {0}
+        run: |
+          set -euo pipefail
+          status=0
+          pytest tests/app --collect-only -q > collected-app.txt || status=$?
+          selected=$(awk '/::/ {n++} END {print n+0}' collected-app.txt)
+          if [ "$status" -eq 5 ] || [ "$selected" -eq 0 ]; then
+            cat collected-app.txt
+            echo "::error::tests/app collected nothing; the app suite is not running"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            cat collected-app.txt
+            echo "::error::collecting tests/app failed; nothing ran"
+            exit 1
+          fi
+          echo "selected ${selected} app tests"
+          # tests/test_workflows.py's directory-reachability rule can only evaluate
+          # its tests/app claim where pysepal>=4 is importable -- this job is the
+          # only place in CI that is true, so it runs the module here too, on top
+          # of tests/app itself. The count above already proved tests/app on its
+          # own is non-empty, so folding test_workflows.py's own tests into one
+          # combined count cannot hide an empty tests/app behind them.
+          pytest tests/app tests/test_workflows.py -q --durations=10
+
+  lint:
+    name: ruff + mypy --strict
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: sepal_environment.yml
+          cache-environment: true
+
+      - name: Install the package and test extras
+        shell: micromamba-shell {0}
+        run: pip install -e ".[dev]"
+
+      # No path arguments in this job, deliberately. Naming paths is how a lint job
+      # silently narrows: `mypy sdg1531` reads 28 files where `[tool.mypy] files`
+      # reads 42, and `ruff check sdg1531 tests tools` stops covering the app
+      # package the day it lands. Bare invocations read the same configuration a
+      # developer's local run reads, so the two cannot drift apart.
+      - name: ruff check
+        shell: micromamba-shell {0}
+        run: ruff check
+
+      - name: ruff format
+        shell: micromamba-shell {0}
+        run: ruff format --check
+
+      - name: mypy
+        shell: micromamba-shell {0}
+        run: mypy

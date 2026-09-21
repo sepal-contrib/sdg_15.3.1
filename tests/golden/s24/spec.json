@@ -1,0 +1,126 @@
+{
+  "aoi": {
+    "asset_id": "users/amitghosh/sdg_module/parity_aoi",
+    "kind": "asset",
+    "name": "parity aoi"
+  },
+  "climate": {
+    "coefficient": 0.48,
+    "kind": "fixed"
+  },
+  "compatibility": {
+    "clamp_soc_start_year": false,
+    "derived_vi_msvi_uses_evi_asset": true,
+    "legacy_sensor_folder_token": true,
+    "soc_subsequent_transition_scale": 100
+  },
+  "land_cover": {
+    "kind": "esa_cci"
+  },
+  "lceu": "hru",
+  "periods": {
+    "land_cover": {
+      "end": 2014,
+      "start": 2001
+    },
+    "overall": {
+      "end": 2030,
+      "start": 2023
+    },
+    "performance": {
+      "end": null,
+      "start": null
+    },
+    "soc": {
+      "end": 2012,
+      "start": null
+    },
+    "state": {
+      "end": null,
+      "start": null
+    },
+    "trend": {
+      "end": null,
+      "start": null
+    }
+  },
+  "productivity_lookup": "GPGv1",
+  "threshold": -0.25,
+  "trajectory": "ue_trend",
+  "transition_matrix": [
+    [
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      0,
+      -1,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      -1,
+      0,
+      -1,
+      -1,
+      -1,
+      0
+    ],
+    [
+      -1,
+      -1,
+      -1,
+      0,
+      -1,
+      -1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      0,
+      1,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      -1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "vegetation_index": "evi",
+  "vi_source": {
+    "kind": "sensors",
+    "names": [
+      "Sentinel 2"
+    ]
+  },
+  "water_mask": {
+    "kind": "pixel_value",
+    "value": 10
+  }
+}

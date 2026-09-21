@@ -1,0 +1,4 @@
+{
+  "error": "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'",
+  "traceback": "Traceback (most recent call last):\n  File \"/home/dguerrero/1_modules/sdg_15.3.1/tools/dump_legacy_graphs.py\", line 115, in dump_scenario\n    compute_indicator_maps(aoi, model, NullOutput())\n  File \"/home/dguerrero/1_modules/sdg_15.3.1/component/scripts/run_15_3_1.py\", line 182, in compute_indicator_maps\n    model.land_cover = land_cover(model, aoi_model, output)\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/dguerrero/1_modules/sdg_15.3.1/component/scripts/land_cover.py\", line 78, in land_cover\n    .gte(int(model.seasonality))\n         ^^^^^^^^^^^^^^^^^^^^^^\nTypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'\n"
+}

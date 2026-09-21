@@ -1,0 +1,780 @@
+"""sdg1531.validate — the total validator: it never raises and never rejects a
+half-filled spec, it returns field-anchored Problem records."""
+
+import math
+from dataclasses import replace
+
+from _subprocess import run_python
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+
+from sdg1531.catalog import SENSORS
+from sdg1531.enums import Trajectory
+from sdg1531.scheme import LandCoverScheme, TransitionMatrix
+from sdg1531.spec import (
+    AssetAoi,
+    AssetBandMask,
+    Compatibility,
+    CustomLandCoverSource,
+    EsaCciSource,
+    FixedClimate,
+    JrcSeasonalityMask,
+    Period,
+    PeriodOverride,
+    PerPixelClimate,
+    PixelValueMask,
+    PrecomputedViAsset,
+    RunSpec,
+    SensorSelection,
+    SubPeriods,
+)
+from sdg1531.validate import Problem, check_custom_lc_codes, validate
+
+BASE = RunSpec().evolve(
+    periods=SubPeriods(overall=Period(2000, 2015)),
+    vi_source=SensorSelection(("MODIS MOD13Q1",)),
+    aoi=AssetAoi("users/someone/aoi", "someone-aoi"),
+)
+
+
+def overall(**override) -> SubPeriods:
+    """``BASE``'s sub-periods with a different base period, overrides untouched."""
+    return replace(BASE.periods, overall=Period(**override))
+
+
+def codes(spec: RunSpec) -> set[str]:
+    return {problem.code for problem in validate(spec)}
+
+
+def only(spec: RunSpec, code: str) -> Problem:
+    matches = [problem for problem in validate(spec) if problem.code == code]
+    assert len(matches) == 1, f"expected exactly one {code}, got {matches}"
+    return matches[0]
+
+
+def test_default_run_spec_yields_problems_rather_than_raising():
+    problems = validate(RunSpec())
+    assert isinstance(problems, tuple)
+    assert all(isinstance(problem, Problem) for problem in problems)
+    assert {"missing_aoi", "missing_sensors"} <= {p.code for p in problems}
+
+
+def test_a_complete_base_spec_has_no_problems():
+    assert validate(BASE) == ()
+
+
+def test_start_not_before_end_is_fatal():
+    problem = only(BASE.evolve(periods=overall(start=2015, end=2015)), "start_not_before_end")
+    assert problem.field == "periods.overall.start"
+    assert problem.fatal is True
+    assert "start_not_before_end" not in codes(BASE)
+
+
+def test_start_after_end_is_also_reported():
+    assert "start_not_before_end" in codes(BASE.evolve(periods=overall(start=2016, end=2015)))
+
+
+def test_half_filled_period_is_not_a_period_order_problem():
+    assert "start_not_before_end" not in codes(BASE.evolve(periods=overall(start=2000, end=None)))
+    assert "start_not_before_end" not in codes(BASE.evolve(periods=overall(start=None, end=None)))
+
+
+def test_missing_sensors_is_fatal_and_anchored():
+    problem = only(BASE.evolve(vi_source=SensorSelection(())), "missing_sensors")
+    assert problem.field == "vi_source.names"
+    assert problem.fatal is True
+
+
+def test_missing_sensors_when_vi_source_is_unset():
+    # RunSpec's actual default is `vi_source=None` (spec.py), not an empty
+    # SensorSelection — the half-filled-form state must be caught too.
+    problem = only(BASE.evolve(vi_source=None), "missing_sensors")
+    assert problem.field == "vi_source.names"
+    assert problem.fatal is True
+
+
+def test_missing_aoi_is_fatal_and_anchored():
+    problem = only(BASE.evolve(aoi=None), "missing_aoi")
+    assert problem.field == "aoi"
+    assert problem.fatal is True
+
+
+# --------------------------------------------------- sensor_period_no_overlap
+
+
+def test_sensor_period_no_overlap_is_fatal_and_anchored():
+    """The exact case the repo owner hit twice: Sentinel 2 (real coverage starts
+    2015) selected over 2001-2014. Before this rule, `is_runnable` said True and
+    Earth Engine refused the graph deep inside, naming neither the sensor nor the
+    period (`Image.select: ... no bands`, over an empty ImageCollection)."""
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Sentinel 2",)), periods=overall(start=2001, end=2014)
+    )
+    problem = only(spec, "sensor_period_no_overlap")
+    assert problem.field == "vi_source.names"
+    assert problem.fatal is True
+    assert "Sentinel 2" in problem.message
+    assert "2001" in problem.message and "2014" in problem.message
+
+
+def test_a_sensor_period_that_does_overlap_is_accepted():
+    """A period wholly inside the sensor's real coverage: must stay runnable."""
+    landsat8 = SENSORS["Landsat 8"]
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Landsat 8",)),
+        periods=overall(start=landsat8.first_year, end=landsat8.first_year + 5),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_a_partially_overlapping_sensor_period_is_accepted():
+    """Judgement call: partial overlap is fine, not a warning and not fatal.
+
+    Landsat 5's real archive ends in 2012 (see tests/test_sensor_bounds.py); a
+    period running past that still shares years with it, so the sub-indicators
+    integrate over real (if partial) data rather than nothing -- refusing this
+    would block a legitimate run for a reason the user cannot fix by picking a
+    different sensor.
+    """
+    landsat5 = SENSORS["Landsat 5"]
+    assert landsat5.last_year is not None  # retired archive; a fixed ceiling
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Landsat 5",)),
+        periods=overall(start=landsat5.last_year - 5, end=landsat5.last_year + 10),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_sensor_period_no_overlap_is_silent_when_any_selected_sensor_overlaps():
+    """Sensors are legitimately combined for continuous multi-mission coverage
+    (`_process_landsat_sensors` merges every selected Landsat collection into
+    one) -- so a selection where only ONE sensor reaches the period must stay
+    runnable, not be refused because another rides along uselessly."""
+    landsat4 = SENSORS["Landsat 4"]
+    sentinel2 = SENSORS["Sentinel 2"]
+    assert landsat4.last_year is not None and landsat4.last_year < sentinel2.first_year
+
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Landsat 4", "Sentinel 2")),
+        periods=overall(start=landsat4.first_year, end=landsat4.last_year),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_sensor_period_no_overlap_is_silent_for_a_half_filled_period():
+    """No endpoint pinned down yet on any period: nothing to compare against,
+    so this rule must stay silent rather than guess or raise."""
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Sentinel 2",)),
+        periods=SubPeriods(overall=Period(start=1995, end=None)),
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def test_sensor_period_no_overlap_ignores_an_unrecognised_sensor_name():
+    """An unknown name is `_vi_dispatch`'s problem (a `SpecError`, caught by
+    `is_runnable`), not this rule's -- there is no recorded coverage to compare
+    it against."""
+    spec = BASE.evolve(
+        vi_source=SensorSelection(("Not A Real Sensor",)), periods=overall(start=2001, end=2014)
+    )
+    assert "sensor_period_no_overlap" not in codes(spec)
+
+
+def soc(**override) -> SubPeriods:
+    return replace(BASE.periods, soc=PeriodOverride(**override))
+
+
+def state(**override) -> SubPeriods:
+    return replace(BASE.periods, state=PeriodOverride(**override))
+
+
+def test_soc_start_before_cci_is_a_warning():
+    # soil_organic_carbon.py:16 passes p_soc_t_start raw into calendarRange
+    spec = BASE.evolve(periods=overall(start=1985, end=2015))
+    problem = only(spec, "soc_start_before_cci")
+    assert problem.field == "periods.soc.start"
+    assert problem.fatal is False
+
+
+def test_soc_start_before_cci_is_silent_when_the_start_is_clamped():
+    spec = BASE.evolve(
+        periods=overall(start=1985, end=2015),
+        compatibility=Compatibility(clamp_soc_start_year=True),
+    )
+    assert "soc_start_before_cci" not in codes(spec)
+
+
+def test_soc_start_inside_cci_is_silent():
+    assert "soc_start_before_cci" not in codes(BASE)
+
+
+def test_soc_period_collapses_is_fatal():
+    # soil_organic_carbon.py:161 selects `lc_year_end - p_soc_t_start`, negative
+    # once the SOC period lies entirely after the 2022 CCI ceiling.
+    spec = BASE.evolve(periods=soc(start=2025, end=2030))
+    problem = only(spec, "soc_period_collapses")
+    assert problem.field == "periods.soc"
+    assert problem.fatal is True
+
+
+def test_soc_period_ending_at_the_cci_ceiling_does_not_collapse():
+    spec = BASE.evolve(periods=soc(start=2022, end=2030))
+    assert "soc_period_collapses" not in codes(spec)
+
+
+def test_short_state_period_is_fatal():
+    """productivity.py:198-200 — ``rangeContains("year", start, end - 3)`` is
+    empty for any state period shorter than four years, the reduction over it
+    has zero bands, and the divide on the next line refuses server-side
+    (``Image.divide: ... Got 0 and 1``). This was a WARNING until that refusal
+    was hit in production; see ``sdg1531/validate.py``'s note 6 for why the
+    original "the layer is merely masked" reasoning was wrong.
+    """
+    spec = BASE.evolve(periods=state(start=2013, end=2015))
+    problem = only(spec, "state_period_too_short")
+    assert problem.field == "periods.state"
+    assert problem.fatal is True
+
+
+def test_four_year_state_period_is_accepted():
+    """The threshold did not move when the severity did: four years is exactly
+    when ``build_state``'s baseline filter has a year in it."""
+    assert "state_period_too_short" not in codes(BASE.evolve(periods=state(start=2012, end=2015)))
+
+
+def test_the_state_period_message_names_the_four_year_requirement():
+    """The user acts on this text, and the only action that clears it is
+    widening the window -- so the number has to be in the message. The old
+    wording ("the state layer will be fully masked") described a consequence
+    that does not happen and left the remedy implicit."""
+    problem = only(BASE.evolve(periods=state(start=2013, end=2015)), "state_period_too_short")
+    assert "four years" in problem.message
+
+
+def land_cover(**override) -> SubPeriods:
+    return replace(BASE.periods, land_cover=PeriodOverride(**override))
+
+
+def test_land_cover_period_collapsing_before_the_cci_floor_is_fatal():
+    """resolve.py:241-242 clamps BOTH endpoints, so 1980-1985 resolves to 1992-1992;
+    decode_transition_areas then names its two year columns identically and
+    stats.plots.sankey_option dies on the duplicate label."""
+    problem = only(
+        BASE.evolve(periods=land_cover(start=1980, end=1985)), "land_cover_period_collapses"
+    )
+    assert problem.field == "periods.land_cover"
+    assert problem.fatal is True
+    assert "land_cover_period_collapses" not in codes(BASE)
+
+
+def test_land_cover_period_collapsing_after_the_cci_ceiling_is_fatal():
+    """The other direction the `>=` condition covers in one rule."""
+    assert "land_cover_period_collapses" in codes(
+        BASE.evolve(periods=land_cover(start=2030, end=2035))
+    )
+
+
+def test_a_land_cover_period_touching_the_cci_record_does_not_collapse():
+    # 1991-1993 clamps to 1992-1993: one real year of transition, so it stands
+    assert "land_cover_period_collapses" not in codes(
+        BASE.evolve(periods=land_cover(start=1991, end=1993))
+    )
+
+
+def test_a_zero_length_land_cover_period_is_not_tolerated_the_way_soc_is():
+    """soc_period_collapses fires on `< 0` because a zero-length SOC span is a legal
+    band index of 0 (soil_organic_carbon.py:161). For land cover, equality is exactly
+    the defect, so the same two years must be rejected here and accepted there."""
+    spec = BASE.evolve(periods=land_cover(start=2000, end=2000))
+    assert "land_cover_start_not_before_end" in codes(spec)
+    assert "soc_period_collapses" not in codes(BASE.evolve(periods=soc(start=2000, end=2000)))
+
+
+def test_an_inverted_land_cover_override_is_fatal():
+    """Only periods.overall was order-checked, so this reached the decoders unchallenged."""
+    problem = only(
+        BASE.evolve(periods=land_cover(start=2015, end=2000)), "land_cover_start_not_before_end"
+    )
+    assert problem.field == "periods.land_cover.start"
+    assert problem.fatal is True
+    assert "land_cover_start_not_before_end" not in codes(BASE)
+
+
+def test_an_inverted_land_cover_period_is_not_also_reported_as_a_collapse():
+    """One user error, one message: the collapse rule is about the clamp, not the order."""
+    assert "land_cover_period_collapses" not in codes(
+        BASE.evolve(periods=land_cover(start=2015, end=2000))
+    )
+
+
+def test_land_cover_start_before_cci_is_a_warning():
+    """Unlike the SOC shift, this one is visible: the clamped year is written into every
+    node label of the transition chart."""
+    problem = only(
+        BASE.evolve(periods=land_cover(start=1980, end=2000)), "land_cover_start_before_cci"
+    )
+    assert problem.field == "periods.land_cover.start"
+    assert problem.fatal is False
+
+
+def test_land_cover_start_inside_cci_is_silent():
+    assert "land_cover_start_before_cci" not in codes(BASE)
+
+
+def test_a_half_filled_land_cover_period_is_not_a_land_cover_problem():
+    """validate() runs on every keystroke, so a half-typed year is the common case, not
+    an edge one. `internal_error` is asserted here as well as in the Hypothesis run: an
+    unguarded `None >= int` would be swallowed into that code by validate()'s own
+    try/except and would otherwise show up only as an absence."""
+    spec = BASE.evolve(periods=replace(BASE.periods, overall=Period(2000, None)))
+    assert not {c for c in codes(spec) if c.startswith("land_cover_")}
+    assert "internal_error" not in codes(spec)
+
+
+def scheme(matrix: TransitionMatrix | None = None) -> LandCoverScheme:
+    # Stands in for a parsed CSV, so is_custom is True. It is a stored field, not
+    # something resolve() re-derives from the source arm, so it is set here.
+    return LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Cropland"),
+        end_codes=(10, 30),
+        matrix=matrix if matrix is not None else TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+
+
+def test_precomputed_vi_is_rejected():
+    spec = BASE.evolve(vi_source=PrecomputedViAsset("users/someone/vi", 30))
+    problem = only(spec, "unsupported_vi_source")
+    assert problem.field == "vi_source"
+    assert problem.fatal is True
+    assert "missing_sensors" not in codes(spec)
+
+
+def test_s_res_trend_is_rejected():
+    problem = only(BASE.evolve(trajectory=Trajectory.S_RES_TREND), "unsupported_trajectory")
+    assert problem.field == "trajectory"
+    assert problem.fatal is True
+
+
+def test_every_other_trajectory_is_accepted():
+    for trajectory in Trajectory:
+        if trajectory is Trajectory.S_RES_TREND:
+            continue
+        assert "unsupported_trajectory" not in codes(BASE.evolve(trajectory=trajectory))
+
+
+def test_non_finite_climate_coefficient_is_rejected():
+    for coefficient in (math.nan, math.inf, -math.inf):
+        spec = BASE.evolve(climate=FixedClimate(coefficient))
+        problem = only(spec, "non_finite_climate_coefficient")
+        assert problem.field == "climate.coefficient"
+        assert problem.fatal is True
+
+
+def test_finite_and_per_pixel_climates_are_accepted():
+    # the legacy never range-checks conversion_coef beyond the widget's own
+    # bounds (climate_regime.py:29, [0, 1]), and nothing blocks a value
+    # outside that range either - only nan/inf are rejected here.
+    for climate in (PerPixelClimate(), FixedClimate(0.58), FixedClimate(-5.0), FixedClimate(5.0)):
+        assert "non_finite_climate_coefficient" not in codes(BASE.evolve(climate=climate))
+
+
+def test_half_custom_land_cover_is_a_warning():
+    # land_cover.py:40 takes the custom branch on the two assets alone, while
+    # indicator_model.py:232 needs the CSV before it uses the custom vocabulary.
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start", end_asset="users/someone/end"
+        )
+    )
+    problem = only(spec, "half_custom_land_cover")
+    assert problem.field == "land_cover.scheme"
+    assert problem.fatal is False
+
+
+def test_fully_custom_land_cover_is_silent():
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=scheme(),
+        )
+    )
+    assert validate(spec) == ()
+
+
+def test_an_unset_water_mask_is_fatal_and_anchored():
+    # RunSpec.water_mask is `WaterMaskSpec | None` and from_json maps a null
+    # straight to None, so this is reachable without the widget. Left unchecked it
+    # passes a total validate() and then raises SpecError mid-run in
+    # engine.land_cover, which is exactly what this module exists to prevent.
+    problem = only(BASE.evolve(water_mask=None), "missing_water_mask")
+    assert problem.field == "water_mask"
+    assert problem.fatal is True
+
+
+def test_each_water_mask_arm_is_accepted():
+    for mask in (
+        JrcSeasonalityMask(threshold=8),
+        PixelValueMask(value=70),
+        AssetBandMask(asset_id="users/someone/water", band="occurrence"),
+    ):
+        assert validate(BASE.evolve(water_mask=mask)) == ()
+
+
+def test_missing_custom_land_cover_assets_are_reported_per_field():
+    # both asset fields are required, so an unselected asset is the empty string
+    # a half-filled form carries, not a missing constructor argument.
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(start_asset="", end_asset="users/someone/end")
+    )
+    problem = only(spec, "missing_custom_land_cover_asset")
+    assert problem.field == "land_cover.start_asset"
+    assert problem.fatal is True
+
+    both = BASE.evolve(land_cover=CustomLandCoverSource(start_asset="", end_asset=""))
+    fields = [p.field for p in validate(both) if p.code == "missing_custom_land_cover_asset"]
+    assert fields == ["land_cover.start_asset", "land_cover.end_asset"]
+
+
+def test_same_land_cover_asset_is_fatal():
+    # input_tile.py:259-265 — start and end must be different assets.
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/same", end_asset="users/someone/same"
+        )
+    )
+    problem = only(spec, "same_land_cover_asset")
+    assert problem.field == "land_cover"
+    assert problem.fatal is True
+
+
+def test_different_land_cover_assets_are_silent_on_that_rule():
+    assert "same_land_cover_asset" not in codes(
+        BASE.evolve(
+            land_cover=CustomLandCoverSource(
+                start_asset="users/someone/start", end_asset="users/someone/end"
+            )
+        )
+    )
+
+
+def test_custom_code_out_of_range_is_fatal():
+    # input_tile.py:303-308 — legacy checks only the start codelist, not the
+    # end one; preserved faithfully rather than silently widened.
+    out_of_range_scheme = LandCoverScheme(
+        start_names=("Forest", "Big code"),
+        start_codes=(10, 100),
+        end_names=("Forest", "Cropland"),
+        end_codes=(10, 30),
+        matrix=TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=out_of_range_scheme,
+        )
+    )
+    problem = only(spec, "custom_code_out_of_range")
+    assert problem.field == "land_cover.scheme.start_codes"
+    assert problem.fatal is True
+
+
+def test_out_of_range_end_code_is_not_checked():
+    # legacy's own asymmetry (input_tile.py:303-308): only start codes are
+    # range-checked. Not fixed here — this pins the faithfully-ported behaviour.
+    end_out_of_range_scheme = LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Big code"),
+        end_codes=(10, 100),
+        matrix=TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=end_out_of_range_scheme,
+        )
+    )
+    assert "custom_code_out_of_range" not in codes(spec)
+
+
+def test_land_cover_class_mismatch_is_fatal():
+    # input_tile.py:315-320 — start and end class-name sets must match.
+    mismatched_scheme = LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Wetland"),
+        end_codes=(10, 40),
+        matrix=TransitionMatrix(((0, -1), (1, 0))),
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=mismatched_scheme,
+        )
+    )
+    problem = only(spec, "land_cover_class_mismatch")
+    assert problem.field == "land_cover.scheme"
+    assert problem.fatal is True
+
+
+def test_matching_class_names_are_silent_on_that_rule():
+    assert "land_cover_class_mismatch" not in codes(
+        BASE.evolve(
+            land_cover=CustomLandCoverSource(
+                start_asset="users/someone/start",
+                end_asset="users/someone/end",
+                scheme=scheme(),
+            )
+        )
+    )
+
+
+# Two of the three legal values, and one foreign value, both built off the real
+# 7x7 default matrix (49 cells) rather than a toy 2x2 — the top-level
+# `transition_matrix` field has no vocabulary of its own, it is only ever meant
+# to pair with the built-in 7-class IPCC scheme, so a differently-shaped matrix
+# would trip the *shape* rule below and make these value-range tests ambiguous.
+TWO_VALUED_DEFAULT = TransitionMatrix(
+    tuple(tuple(0 if v == 1 else v for v in row) for row in TransitionMatrix.default().rows)
+)
+FOREIGN_VALUE_DEFAULT = TransitionMatrix.default().with_cell(0, 1, 2)
+
+
+def test_two_valued_matrix_is_accepted():
+    # input_tile.py:310 used set equality and rejected this matrix; validate()
+    # uses a subset test instead.
+    assert "invalid_transition_matrix" not in codes(
+        BASE.evolve(transition_matrix=TWO_VALUED_DEFAULT)
+    )
+
+
+def test_matrix_with_a_foreign_value_is_fatal():
+    problem = only(
+        BASE.evolve(transition_matrix=FOREIGN_VALUE_DEFAULT), "invalid_transition_matrix"
+    )
+    assert problem.field == "transition_matrix"
+    assert problem.fatal is True
+
+
+def test_custom_scheme_matrix_is_checked_under_its_own_field():
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=scheme(TransitionMatrix(((0, 2), (-1, 0)))),
+        )
+    )
+    problem = only(spec, "invalid_transition_matrix")
+    assert problem.field == "land_cover.scheme.matrix"
+
+
+def test_wrong_shape_transition_matrix_is_fatal():
+    # TransitionMatrix rejects a genuinely ragged shape at construction
+    # (test_scheme.py::test_ragged_rows_are_rejected) — but a matrix can be
+    # perfectly rectangular and still be the *wrong* rectangle. Cramming the
+    # default 7x7 into a single 49-value row keeps the same total cell count
+    # and the same legal values, so a bare `len(flatten()) == 49` check (the
+    # bug in the first cut of this rule) would miss it entirely.
+    wrong_shape = TransitionMatrix((TransitionMatrix.default().flatten(),))
+    assert len(wrong_shape.flatten()) == 49
+    problem = only(BASE.evolve(transition_matrix=wrong_shape), "invalid_transition_matrix")
+    assert problem.field == "transition_matrix"
+    assert problem.fatal is True
+    assert "1 row" in problem.message
+
+
+def test_undersized_custom_scheme_matrix_is_fatal():
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=scheme(TransitionMatrix(((0, -1),))),  # 1x2, the scheme needs 2x2
+        )
+    )
+    problem = only(spec, "invalid_transition_matrix")
+    assert problem.field == "land_cover.scheme.matrix"
+
+
+def test_transposed_custom_scheme_matrix_is_fatal():
+    # 2 start classes x 3 end classes needs a 2x3 matrix (6 cells); a 3x2
+    # transpose has the same 6 cells and the same legal values, so — like the
+    # single-row case above — a total-cell-count check alone would miss the
+    # swap. Only comparing rows and columns separately catches it.
+    transposed_scheme = LandCoverScheme(
+        start_names=("Forest", "Cropland"),
+        start_codes=(10, 30),
+        end_names=("Forest", "Cropland", "Wetland"),
+        end_codes=(10, 30, 40),
+        matrix=TransitionMatrix(((0, -1), (1, 0), (1, -1))),  # 3x2, the scheme needs 2x3
+        is_custom=True,
+    )
+    spec = BASE.evolve(
+        land_cover=CustomLandCoverSource(
+            start_asset="users/someone/start",
+            end_asset="users/someone/end",
+            scheme=transposed_scheme,
+        )
+    )
+    problem = only(spec, "invalid_transition_matrix")
+    assert problem.field == "land_cover.scheme.matrix"
+
+
+def test_exact_check_accepts_an_identical_code_set():
+    assert check_custom_lc_codes(scheme(), (30, 10), (10, 30), exact=True) == ()
+
+
+def test_exact_check_rejects_a_strict_subset():
+    # input_tile.py:267-278 — the lc_pixel_check=True branch demands equality.
+    problems = check_custom_lc_codes(scheme(), (10,), (10, 30), exact=True)
+    assert [p.code for p in problems] == ["custom_lc_codes_mismatch"]
+    assert problems[0].field == "land_cover.start_asset"
+    assert problems[0].fatal is True
+
+
+def test_exact_check_reports_both_assets_independently():
+    problems = check_custom_lc_codes(scheme(), (10,), (99,), exact=True)
+    assert [p.field for p in problems] == [
+        "land_cover.start_asset",
+        "land_cover.end_asset",
+    ]
+
+
+def test_subset_check_accepts_a_strict_subset():
+    # input_tile.py:282-298 — the lc_pixel_check=False branch demands a subset.
+    assert check_custom_lc_codes(scheme(), (10,), (), exact=False) == ()
+
+
+def test_subset_check_rejects_an_unknown_pixel_value():
+    problems = check_custom_lc_codes(scheme(), (10, 30), (10, 99), exact=False)
+    assert [p.code for p in problems] == ["custom_lc_codes_not_subset"]
+    assert problems[0].field == "land_cover.end_asset"
+    assert "99" in problems[0].message
+
+
+SENSOR_NAMES = ["MODIS MOD13Q1", "Sentinel 2", "Landsat 8", "Derived VI Landsat"]
+
+years = st.one_of(st.none(), st.integers(min_value=1900, max_value=2100))
+base_periods = st.builds(Period, start=years, end=years)
+overrides = st.builds(PeriodOverride, start=years, end=years)
+sub_periods = st.builds(
+    SubPeriods,
+    overall=base_periods,
+    trend=overrides,
+    state=overrides,
+    performance=overrides,
+    land_cover=overrides,
+    soc=overrides,
+)
+
+
+@st.composite
+def _matrices(draw: st.DrawFn) -> TransitionMatrix:
+    # TransitionMatrix rejects a ragged shape (scheme.py), so rows/cols are
+    # drawn first and every row is filled to that width — independently-sized
+    # rows would raise while Hypothesis is still generating the example.
+    rows = draw(st.integers(min_value=1, max_value=3))
+    cols = draw(st.integers(min_value=1, max_value=3))
+    values = draw(
+        st.lists(st.integers(min_value=-3, max_value=3), min_size=rows * cols, max_size=rows * cols)
+    )
+    return TransitionMatrix(tuple(tuple(values[i * cols : (i + 1) * cols]) for i in range(rows)))
+
+
+matrices = _matrices()
+schemes = st.builds(
+    LandCoverScheme,
+    # sometimes mismatched against end_names/end_codes below, so the fuzzer also
+    # exercises custom_code_out_of_range (100, 5) and land_cover_class_mismatch.
+    start_names=st.sampled_from((("Forest", "Cropland"), ("Forest", "Wetland"))),
+    start_codes=st.sampled_from(((10, 30), (10, 100), (5, 30))),
+    end_names=st.just(("Forest", "Cropland")),
+    end_codes=st.just((10, 30)),
+    matrix=matrices,
+    is_custom=st.booleans(),
+)
+vi_sources = st.one_of(
+    st.none(),
+    st.builds(
+        SensorSelection,
+        names=st.lists(st.sampled_from(SENSOR_NAMES), max_size=3).map(tuple),
+    ),
+    st.builds(
+        PrecomputedViAsset,
+        asset_id=st.text(max_size=8),
+        scale=st.integers(min_value=1, max_value=300),
+    ),
+)
+land_cover_sources = st.one_of(
+    st.just(EsaCciSource()),
+    st.builds(
+        CustomLandCoverSource,
+        # both asset fields are required strings; "" is the half-filled form,
+        # and "same" lets the two coincide so the fuzzer also exercises
+        # same_land_cover_asset.
+        start_asset=st.sampled_from(("", "users/someone/start", "users/someone/same")),
+        end_asset=st.sampled_from(("", "users/someone/end", "users/someone/same")),
+        scheme=st.one_of(st.none(), schemes),
+    ),
+)
+climates = st.one_of(
+    st.just(PerPixelClimate()),
+    st.builds(
+        FixedClimate,
+        # nan/+-inf included so the fuzz can prove _climate_problems handles
+        # them without raising, not just that it rejects them (see the
+        # explicit test_non_finite_climate_coefficient_is_rejected for that).
+        coefficient=st.one_of(
+            st.floats(min_value=-10, max_value=10, allow_nan=False, allow_infinity=False),
+            st.just(math.nan),
+            st.just(math.inf),
+            st.just(-math.inf),
+        ),
+    ),
+)
+run_specs = st.builds(
+    RunSpec,
+    periods=sub_periods,
+    vi_source=vi_sources,
+    trajectory=st.sampled_from(list(Trajectory)),
+    transition_matrix=matrices,
+    land_cover=land_cover_sources,
+    climate=climates,
+    aoi=st.one_of(
+        st.none(),
+        st.builds(
+            AssetAoi,
+            asset_id=st.just("users/someone/aoi"),
+            name=st.just("someone-aoi"),
+        ),
+    ),
+    compatibility=st.builds(Compatibility, clamp_soc_start_year=st.booleans()),
+)
+
+
+@settings(max_examples=300, suppress_health_check=[HealthCheck.too_slow])
+@given(run_specs)
+def test_validate_never_raises(spec):
+    problems = validate(spec)
+    assert isinstance(problems, tuple)
+    assert all(isinstance(problem, Problem) for problem in problems)
+    assert all(isinstance(problem.field, str) and problem.code for problem in problems)
+    assert "internal_error" not in {problem.code for problem in problems}
+
+
+def test_validate_does_not_import_ee():
+    # The JSON half of the domain must stay importable without earthengine-api.
+    # Run in a subprocess: the session ee fixture in conftest.py has
+    # already put `ee` in sys.modules for the in-process tests.
+    proc = run_python("import sys, sdg1531.validate; assert 'ee' not in sys.modules")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
