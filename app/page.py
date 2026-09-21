@@ -107,8 +107,9 @@ def Sdg1531App() -> None:
     )
 
 
+# Frozen: this is the directory legacy results already live in.
 @solara.component
-@with_sepal_sessions(module_name="sdg_15_3_1")
+@with_sepal_sessions(module_name="sdg_indicators/degraded_land")
 def Page() -> None:
     """Authenticated Solara-server entrypoint."""
     Sdg1531App()

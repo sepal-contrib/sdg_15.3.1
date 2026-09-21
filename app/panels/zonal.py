@@ -37,7 +37,9 @@ from sdg1531.stats.api import fetch_zonal_areas
 
 __all__ = ("ZonalPanel",)
 
-_MODULE_NAME = "sdg_15_3_1"
+# The legacy results path (component/parameter/directory.py), not the repo
+# name: renaming it strands every result a user has already saved.
+_MODULE_NAME = "sdg_indicators/degraded_land"
 _ZONAL_FILENAME = "sdg_15_3_1_zonal.zip"
 
 

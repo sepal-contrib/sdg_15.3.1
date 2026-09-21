@@ -382,7 +382,11 @@ def test_clicking_download_writes_the_zip_bytes_with_overwrite_and_the_right_tar
     assert len(zip_calls) == 1
     assert zip_calls[0] is _FRAME
     assert sepal_client.files.writes == [
-        ("/home/sepal-user/module_results/sdg_15_3_1/sdg_15_3_1_zonal.zip", b"the-zip-bytes", True)
+        (
+            "/home/sepal-user/module_results/sdg_indicators/degraded_land/sdg_15_3_1_zonal.zip",
+            b"the-zip-bytes",
+            True,
+        )
     ]
     assert fake.successes == [msg("zonal.download")]
     assert fake.errors == []
