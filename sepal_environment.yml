@@ -1,19 +1,21 @@
-# The environment CI solves from, and it still serves the LIVE Voila entrypoint
-# (`ui.ipynb`, the `ci` job's nbmake step) as well as the domain suite. So it
-# deliberately carries pins `sdg1531` itself does not use: `matplotlib`, `natsort`,
-# `rasterio` and `plotly` are all `component/`'s, and plotly is imported nowhere
-# even there. Dropping them is the app-layer migration's call, together with adding
-# `ipecharts` for the charts the app layer will render; doing it here would break
-# the notebook this file also has to keep working.
+# The conda environment CI solves from, and the base SEPAL installs.
+#
+# It carries dependencies `sdg1531` and `app/` never import: matplotlib, natsort
+# and rasterio are `component/`'s, and plotly is imported nowhere at all. They
+# go when `component/` does (spec 2/3), not before -- the parity harness runs
+# the legacy code to generate the graphs the port is compared against.
+#
+# The app layer is NOT installed from here. `pip install -e ".[app,dev]"` adds
+# pysepal>=4 and ipecharts over the top, replacing the pysepal pinned below.
 name: sdg_15.3.1
 channels:
   - conda-forge
   - defaults
 dependencies:
   - python=3.12
-  # sepal-ui was renamed to pysepal at 3.3.0; pysepal ships a sepal_ui shim that
-  # redirects the old imports, so component/ is unchanged. Nothing else in the
-  # solve moves: sepal-ui is simply replaced by pysepal and pysepal-api.
+  # `<4` is the floor `component/` still runs on, through the sepal_ui shim that
+  # redirects its old imports. The app extra installs pysepal>=4 over this; the
+  # cap can be lifted once `component/` is gone.
   - pysepal>=3.8.3,<4
   # pysepal declares this cap itself; kept explicit because ipyvuetify 3 drops
   # CalendarDaily, and below 1.8 there is no _version.semver
@@ -37,7 +39,6 @@ dependencies:
     - git+https://github.com/openforis/earthengine-api.git@v1.6.14#egg=earthengine-api&subdirectory=python
     - plotly>=5.2.2,<6.0
     - ee-extra<2025.7.2
-    # conda-forge tops out at 0.3.4, which predates the GAUL 2024 schema the
-    # ADMIN aoi arm's codes assume -- pinned here, not in `dependencies:`, so
-    # the solve cannot silently substitute the older schema.
+    # Under `pip:`, not `dependencies:`: conda-forge tops out at 0.3.4, which
+    # predates the GAUL 2024 schema the ADMIN aoi codes assume.
     - pygaul>=0.4.2
