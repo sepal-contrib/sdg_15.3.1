@@ -52,27 +52,16 @@ def Sdg1531App() -> None:
     setup_theme_colors()
 
     spec = solara.use_reactive(RunSpec())
-    # `RunSpec` is plain data, so `use_memo` compares it by value: a re-render
-    # that leaves the spec equal reuses the cached outcome, and only a real
-    # edit rebuilds. (Its ee-bearing RESULT must never be compared that way --
-    # see `app/panels/staleness.py`.)
     outcome = solara.use_memo(lambda: build_outcome(spec.value), [spec.value])
 
-    # Shared with `MapLegend` below and threaded into `WorkflowTabs` ->
-    # `MapLayersPanel`: which layers are on the map is state two independent
-    # components both need, not something either owns privately. Lives here,
-    # next to `spec`, rather than in `app/state.py` -- that module holds pure
-    # derivations over `RunSpec` and owns no reactive of its own; this is the
-    # same kind of per-render shared reactive `spec` already is.
     shown_layers = solara.use_reactive(frozenset[IndicatorLayer]())
 
     gee_interface = get_current_gee_interface()
     theme_state = get_current_theme_state()
 
-    # `gee_interface`, not the deprecated `gee_session`, so the map shares this
-    # kernel's authenticated session. Memoized on `id(gee_interface)`: without
-    # it a new SepalMap is built every render, discarding the previous one's
-    # basemap, zoom and layers.
+    # Keyed on `id(...)`, not the interface itself: without the memo a new
+    # SepalMap is built every render, losing the previous one's basemap, zoom
+    # and layers.
     sepal_map = solara.use_memo(
         lambda: SepalMap(
             gee=True, fullscreen=True, theme_state=theme_state, gee_interface=gee_interface
@@ -80,18 +69,11 @@ def Sdg1531App() -> None:
         [id(gee_interface)],
     )
 
-    # Mounted before anything that calls use_notifications(): the bus is
-    # created during render, via solara.use_memo (not an effect), specifically
-    # so sibling components in the same render pass can resolve a real
-    # notifier -- mounted later, a consumer would get the NoopNotifier
-    # fallback instead, which warns loudly (a UserWarning, once per call
-    # site), not silently.
+    # Must precede every `use_notifications()` consumer below.
     NotificationProvider()
 
-    # Mounted as `MapApp`'s SIBLING, not inside `right_panel_content`: the
-    # legend's own Vue template is `position: fixed` bottom-centre, so it
-    # stays visible over the map regardless of which workflow tab is active
-    # (the same placement pysepal's own demo app uses).
+    # `MapApp`'s sibling, not panel content: it positions itself `fixed`, so
+    # it stays visible whichever tab is active.
     MapLegend(maps=outcome.maps, shown=shown_layers)
 
     MapApp.element(
@@ -99,23 +81,12 @@ def Sdg1531App() -> None:
         app_icon="mdi-earth",
         main_map=[sepal_map],
         steps_data=[],
-        # A chart icon and the title "Results" were accurate while this panel
-        # held only the five output panels. Task 18 moved the whole workflow
-        # here and Task 21 tabbed it, so the panel now opens on AOI selection
-        # and holds the five configuration steps too -- "mdi-format-list-checks"
-        # and "Workflow" describe the whole titleless section, not one tab in it.
         right_panel_config={
             "title": msg("panel.title"),
             "icon": "mdi-format-list-checks",
             "width": 450,
             "description": msg("panel.description"),
         },
-        # ONE titleless section: pysepal's RightPanel.vue renders a section with
-        # no `title`, `icon` or `description` as bare content, so the tab
-        # component gets the full panel width instead of a stacked heading per
-        # step. See `app/tabs.py`'s module docstring for why -- the owner asked
-        # for the workflow in the right panel AND for the steps to be tabs; this
-        # is the reference app's structure for doing both at once.
         right_panel_content=[
             {
                 "content": [
