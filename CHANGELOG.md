@@ -1,3 +1,34 @@
+## 2.0.0 (2026-09-21)
+
+### Feat
+
+- Port to pysepal 4: a Solara app over a parity-tested domain package (#146)
+- update CCI land cover upto 2022 and sensor upto 2023
+- init gee in entry point
+- rebuild environment. init gee with sepal_ui. Add ui tests and workflows
+- Add authentication cell
+
+### Fix
+
+- cap ipyvuetify below 3
+- use literal block for ee-api fork assertion to avoid YAML error
+- move rasterio to conda and add ee-api fork verification
+- remove unused geemap and set the proper kernelspec
+- remove project ID find method and use ee function
+- revise some typos in the label text
+- update the code and issue links
+- adjust the legend and make it theme-aware
+- update the gdrive interface
+- remove geemap dependecy,update sepal_ui and fix minor issues
+- pin setuptools<=80 in sepal_environment.yml, revert environment.yml
+- pin setuptools<=80 to avoid compatibility issues
+- add setuptools dep for pkg_resources (geemap)
+- revise the landsat asset, fix sentinel 2 and  refactor the integration functions
+
+### Refactor
+
+- remove auth
+
 ## 1.2.0 (2023-12-11)
 
 ### Feat

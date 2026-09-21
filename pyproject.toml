@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sdg_15.3.1"
-version = "1.2.0"
+version = "2.0.0"
 description = "SDG indicator 15.3.1 (Land Degradation Neutrality) on Google Earth Engine"
 requires-python = ">=3.12"
 dependencies = [
@@ -154,7 +154,7 @@ module = ["app.page"]
 disallow_untyped_decorators = false
 
 [tool.commitizen]
-version = "1.2.0"
+version = "2.0.0"
 update_changelog_on_bump = true
 changelog_file = "CHANGELOG.md"
 changelog_incremental = true
