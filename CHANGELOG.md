@@ -1,3 +1,9 @@
+## 2.0.1 (2026-09-21)
+
+### Fix
+
+- serve the app at the catalog's `/api/app-launcher/sdg_15_3_1` path
+
 ## 2.0.0 (2026-09-21)
 
 ### Feat
