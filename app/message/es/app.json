@@ -158,5 +158,13 @@
     "aoi": "AOI",
     "params": "Parámetros",
     "results": "Resultados"
+  },
+  "nav": {
+    "next": "Siguiente: {target}",
+    "locked_params": "Seleccione primero un área de interés.",
+    "locked_results": "Complete primero todos los parámetros obligatorios.",
+    "back": "Atrás",
+    "forward": "Siguiente",
+    "back_to": "Volver a {target}"
   }
 }

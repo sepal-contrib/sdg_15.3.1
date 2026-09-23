@@ -46,12 +46,13 @@ from app import tabs as tabs_module
 from app.message import messages, msg
 from app.panels import map_layers as map_layers_module
 from app.state import STEP_PREFIXES, problems_for
-from app.steps.run import build
+from app.steps.run import BuildOutcome, build
 from app.tabs import (
     TabDescriptor,
     _sync_draw_control,
     _tab_state,
     _TabState,
+    tab_reachable,
     workflow_tabs,
 )
 from sdg1531.spec import RunSpec
@@ -668,6 +669,294 @@ def test_switching_away_from_aoi_clears_the_draw_control_and_restores_it_on_retu
     assert sepal_map.dc in sepal_map.controls
 
 
+# ---------------------------------------------------------------------------
+# The workflow footer: Back / Next, in the panel's own footer slot.
+# ---------------------------------------------------------------------------
+
+
+def _capture_spec(monkeypatch: Any, captured: dict[str, Any]) -> None:
+    """Swap ``AoiStep`` for a spy that hands back the shared spec reactive.
+
+    The same two monkeypatches ``test_the_params_tab_is_rendered_disabled_
+    until_an_aoi_is_chosen`` makes, factored out because the footer tests
+    below need the identical setup: a handle on the spec so a test can put a
+    real AOI on it, and no export dialog mounting real tasks.
+    """
+
+    @solara.component
+    def _spy_aoi_step(*, spec: Any = None, map_: Any = None) -> None:
+        captured["spec"] = spec
+
+    monkeypatch.setattr(tabs_module, "AoiStep", _spy_aoi_step)
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+
+
+def _footer_widget(box: object) -> Any:
+    """The rendered ``WorkflowFooter``, out of ``MapApp``'s footer slot.
+
+    ``right_panel_footer`` is a widget PROPERTY of ``MapApp``, reached the
+    same way ``_workflow_widget`` reaches the panel's content -- neither is a
+    reacton child of ``box``, so ``find_widgets(box, ...)`` walks past both.
+    """
+    mapapp = find_widget(box, MapApp)
+    assert mapapp is not None
+    footer: Any = mapapp.right_panel_footer[0]
+    return footer
+
+
+def _nav_buttons(root: object) -> dict[str, Any]:
+    """The footer's buttons, keyed ``"back"`` / ``"next"``.
+
+    A dict, not a pair: a direction that does not exist is not rendered at
+    all, so the count varies by tab and positional indexing would silently
+    read Next as Back on the first tab -- exactly the regression these tests
+    are here to catch.
+    """
+    labels = {msg("nav.back"): "back", msg("nav.forward"): "next"}
+    found: dict[str, Any] = {}
+    for btn in find_widgets(root, v.Btn):
+        text = next((c for c in btn.children if isinstance(c, str)), None)
+        assert text in labels, f"unexpected button in the footer: {text!r}"
+        found[labels[text]] = btn
+    return found
+
+
+def test_the_footer_is_mounted_in_the_panels_footer_slot_not_inside_a_tab():
+    """The whole point of the pysepal slot: navigation sits outside the
+    scrolling sections, so no tab's content carries it. Asserting BOTH halves
+    is what stops it quietly reverting to a button at the end of a tab.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    assert set(_nav_buttons(_footer_widget(box))) == {"next"}  # AOI is the first tab
+    items = find_widgets(_workflow_widget(box), v.TabItem)
+    assert [len(find_widgets(item, v.Btn)) for item in items] == [0, 0, 0]
+
+
+def test_the_footer_buttons_are_back_and_next(monkeypatch):
+    """Just the direction, not the destination -- the repo owner asked for
+    *"just the 'next >', or '< back'"*. The tab strip above already names
+    where you are."""
+    captured: dict[str, Any] = {}
+    _capture_spec(monkeypatch, captured)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+    _nav_buttons(_footer_widget(box))["next"].click()  # onto PARAMS, where both show
+    rc.force_update()
+
+    buttons = _nav_buttons(_footer_widget(box))
+    assert set(buttons) == {"back", "next"}
+    # The arrow leads on Back and trails on Next, so the pair reads outward
+    # from the middle of the bar.
+    assert buttons["back"].children[0].children == ["mdi-arrow-left"]
+    assert buttons["next"].children[1].children == ["mdi-arrow-right"]
+    # `secondary`, so the bar is findable at the bottom of a long panel
+    # without taking the colour the app spends on the work itself.
+    assert buttons["back"].color == "secondary"
+    assert buttons["next"].color == "secondary"
+
+
+def test_a_direction_that_does_not_exist_is_not_rendered(monkeypatch):
+    """No Back on the first tab, no Next on the last.
+
+    Drawing it disabled instead would spend half the bar on a control that
+    can never do anything. A direction that exists but is LOCKED is the other
+    case and still renders -- checked below -- because there the user has
+    something to fix.
+    """
+    captured: dict[str, Any] = {}
+    _capture_spec(monkeypatch, captured)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    first = _nav_buttons(_footer_widget(box))
+    assert set(first) == {"next"}
+    # Present but locked, on the missing AOI: the distinction this test is for.
+    assert first["next"].disabled is True
+    assert first["next"].attributes["title"] == msg("nav.locked_params")
+
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+    _nav_buttons(_footer_widget(box))["next"].click()
+    rc.force_update()
+    _nav_buttons(_footer_widget(box))["next"].click()  # onto the last tab
+    rc.force_update()
+
+    assert _active_index(box) == _OUTPUTS_INDEX
+    assert set(_nav_buttons(_footer_widget(box))) == {"back"}
+
+
+def test_next_unlocks_once_an_aoi_exists_and_names_where_it_goes(monkeypatch):
+    """It tracks the same condition ``_tab_state`` locks the DESTINATION tab
+    on -- a footer button that enabled while its target tab was still
+    disabled would look like a dead control. Direct counter-proof for
+    hardcoding ``enabled=True``.
+    """
+    captured: dict[str, Any] = {}
+    _capture_spec(monkeypatch, captured)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    assert _nav_buttons(_footer_widget(box))["next"].disabled is True
+
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+
+    forward = _nav_buttons(_footer_widget(box))["next"]
+    assert forward.disabled is False
+    assert forward.attributes["title"] == msg("nav.next", target=msg("tabs.params"))
+
+
+def test_the_footer_moves_the_active_tab_in_both_directions(monkeypatch):
+    """The footer and the tab strip drive the SAME index, which is why
+    ``active_tab`` is owned by ``page.py`` rather than by either of them: the
+    footer renders into a separate ``MapApp`` subtree, so a ``use_state``
+    inside ``WorkflowTabs`` would be invisible to it.
+    """
+    captured: dict[str, Any] = {}
+    _capture_spec(monkeypatch, captured)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+
+    assert _active_index(box) == _AOI_INDEX
+
+    _nav_buttons(_footer_widget(box))["next"].click()
+    rc.force_update()
+    assert _active_index(box) == _PARAMS_INDEX
+
+    _nav_buttons(_footer_widget(box))["back"].click()
+    rc.force_update()
+    assert _active_index(box) == _AOI_INDEX
+
+
+def test_a_disabled_footer_button_does_not_move_the_active_tab():
+    """Vuetify will not dispatch a click on a disabled button, but the handler
+    re-checks anyway (``NavButton``'s ``_handle_click``) because this test
+    drives the widget directly, past that guard. Without the re-check the
+    empty spec below would jump to a tab the strip still refuses.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    forward = _nav_buttons(_footer_widget(box))["next"]
+    assert forward.disabled is True
+    forward.click()
+    rc.force_update()
+
+    assert _active_index(box) == _AOI_INDEX
+
+
+def test_workflow_tabs_builds_no_navigation_of_its_own():
+    """Navigation left ``workflow_tabs`` when it moved to the footer. A bare
+    call is still content-free, which is what keeps every order/shape test
+    above callable with no render context."""
+    assert [len(tab.content) for tab in workflow_tabs()] == [0, 0, 0]
+
+
+def test_tab_reachable_agrees_with_the_lock_the_strip_draws():
+    """One rule, two readers: the footer must not enable a button onto a tab
+    the strip renders disabled. Asserted against ``_tab_state`` itself rather
+    than restating its conditions, and out of range is unreachable so the
+    ends of the workflow need no special case at the call site.
+    """
+    tabs = workflow_tabs()
+    empty = RunSpec()
+
+    for index, tab in enumerate(tabs):
+        locked = _tab_state(tab, empty, has_maps=False) is _TabState.LOCKED
+        assert tab_reachable(tabs, index, empty, has_maps=False) is not locked
+
+    assert tab_reachable(tabs, -1, empty, has_maps=False) is False
+    assert tab_reachable(tabs, len(tabs), empty, has_maps=False) is False
+
+
+def test_the_inline_fallback_renders_the_same_footer_inside_the_tabs(monkeypatch):
+    """The degraded mode for a pysepal whose right panel has no footer slot.
+
+    ``app/page.py``'s ``PANEL_FOOTER_SLOT`` is False there, and navigation
+    falls back into this subtree so the app still navigates on the published
+    pysepal that CI and the SEPAL image install. It is the SAME
+    ``WorkflowFooter`` -- there is no second set of buttons to keep in sync,
+    only a second place to put the one.
+    """
+    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
+    spec = solara.reactive(RunSpec())
+    active_tab = solara.reactive(0)
+
+    box, rc = solara.render(
+        tabs_module.WorkflowTabs(
+            spec=spec,
+            sepal_map=None,
+            outcome=BuildOutcome(),
+            shown_layers=solara.reactive(frozenset()),
+            active_tab=active_tab,
+            inline_footer=True,
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+
+    # The footer's button -- Next alone, since tab 0 has nothing behind it --
+    # and it is outside every TabItem.
+    in_tabs = sum(len(find_widgets(item, v.Btn)) for item in find_widgets(box, v.TabItem))
+    assert len(find_widgets(box, v.Btn)) == 1
+    assert in_tabs == 0
+
+
+def test_no_inline_footer_is_rendered_when_the_panel_slot_carries_it():
+    """The other half: with the slot available the tabs subtree holds no
+    navigation at all, so the footer is never drawn twice."""
+    spec = solara.reactive(RunSpec())
+
+    box, rc = solara.render(
+        tabs_module.WorkflowTabs(
+            spec=spec,
+            sepal_map=None,
+            outcome=BuildOutcome(),
+            shown_layers=solara.reactive(frozenset()),
+            active_tab=solara.reactive(0),
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+    assert find_widgets(box, v.Btn) == []
+
+
+def test_the_page_uses_the_footer_slot_when_the_installed_pysepal_has_one():
+    """The capability gate itself, against the pysepal actually installed.
+
+    ``PANEL_FOOTER_SLOT`` is read off ``MapApp.class_traits()`` rather than a
+    version string, so this asserts the two agree: whichever branch the gate
+    picks, the app must end up with exactly one footer -- in the slot, or
+    inline, never both and never neither.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+
+    mapapp = find_widget(box, MapApp)
+    assert mapapp is not None
+    in_slot = len(getattr(mapapp, "right_panel_footer", []))
+    inline = sum(
+        len(find_widgets(item, v.Btn)) for item in find_widgets(_workflow_widget(box), v.TabItem)
+    )
+    inline += len(find_widgets(_workflow_widget(box), v.Btn)) - inline
+
+    if page_module.PANEL_FOOTER_SLOT:
+        assert in_slot == 1
+        assert inline == 0
+    else:
+        assert in_slot == 0
+        assert inline == 1  # Next alone: the page opens on the first tab
+
+
 def test_neither_tab_surface_paints_over_the_panel():
     """The strip and the tab content stay transparent.
 
@@ -692,3 +981,36 @@ def test_neither_tab_surface_paints_over_the_panel():
 
     assert strip.background_color == "transparent"
     assert "background-color: transparent" in (items.style_ or "")
+
+
+def test_the_footer_is_one_unbroken_bar(monkeypatch):
+    """Back and Next meet in the middle and run flush to both panel edges.
+
+    A 6px seam was tried between them and taken back out: the pair reads as
+    one bar, not two floating controls. What this pins is the geometry that
+    makes that true -- no gap on the row, no margin on either button -- so
+    the bar cannot drift into a pair of insets by accident.
+
+    The margin half matters most at the ends of the workflow, where only one
+    button renders: an inset there would pull the lone button off the panel
+    edge it is supposed to sit flush against.
+    """
+    captured: dict[str, Any] = {}
+    _capture_spec(monkeypatch, captured)
+
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    captured["spec"].value = _BUILDABLE_SPEC
+    rc.force_update()
+    _nav_buttons(_footer_widget(box))["next"].click()
+    rc.force_update()
+
+    row = find_widget(_footer_widget(box), v.Html)
+    assert row is not None
+    assert "d-flex" in (row.class_ or "")
+    assert "gap" not in (row.style_ or "")
+
+    buttons = _nav_buttons(_footer_widget(box))
+    assert set(buttons) == {"back", "next"}
+    for button in buttons.values():
+        assert "margin" not in (button.style_ or "")

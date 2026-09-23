@@ -14,6 +14,7 @@ order within the tab.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -21,6 +22,7 @@ from typing import Any
 import reacton.ipyvuetify as rv
 import solara
 from pysepal.mapping.sepal_map import SepalMap
+from reacton.ipyvue import use_event
 
 from app.message import msg
 from app.panels.outputs import OutputsPanel
@@ -31,7 +33,100 @@ from app.steps.run import BuildOutcome
 from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
-__all__ = ("TabDescriptor", "WorkflowTabs", "workflow_tabs")
+__all__ = (
+    "NAV_BAR_HEIGHT",
+    "NavButton",
+    "TabDescriptor",
+    "WorkflowFooter",
+    "WorkflowTabs",
+    "tab_reachable",
+    "workflow_tabs",
+)
+
+
+#: The footer bar's height in px. Taller than the 28px ``small`` gives a
+#: button, because this one spans the whole panel: at button height a
+#: full-width bar reads as a sliver of chrome rather than a place to click.
+NAV_BAR_HEIGHT = 34
+
+#: One half of the footer bar. Given the bar's own height even when it holds
+#: no button, so an empty track still reserves its half rather than
+#: collapsing and letting the other button slide across.
+_TRACK_STYLE = f"flex: 1 1 0; min-height: {NAV_BAR_HEIGHT}px;"
+
+
+def _go_to(active_tab: solara.Reactive[int], index: int) -> Callable[[], None]:
+    """A zero-arg closure over one tab index -- a named function rather than a
+    default-argument lambda, whose type ``mypy --strict`` cannot pin against
+    the ``Callable[[], None]`` :func:`NavButton` declares (the same reason
+    ``app/panels/map_layers.py`` has ``_bind_toggle``)."""
+
+    def _go() -> None:
+        active_tab.value = index
+
+    return _go
+
+
+@solara.component
+def NavButton(
+    label: str,
+    tooltip: str,
+    icon: str,
+    enabled: bool,
+    on_click: Callable[[], None],
+    leading_icon: bool = False,
+) -> None:
+    """One step of the workflow navigation, in either direction.
+
+    ``block`` + ``tile``: square corners and full width of whatever track it
+    is given, so the bar fills the footer edge to edge. ``small`` with them,
+    not ``large``, because pysepal's right-panel button-sizing convention
+    applies here exactly as it does to every other button in this app --
+    ``tests/app/test_button_sizing.py`` pins both halves. ``height`` overrides
+    only the 28px ``small`` would otherwise impose: this is a bar spanning the
+    panel, and at button height it read as a sliver rather than a footer. The
+    compact type ``small`` also sets is kept.
+
+    ``secondary``, not ``primary``: the bar should be findable at the bottom
+    of a long panel, which plain grey was not, without taking the colour the
+    app spends on the work itself (Build, Export, a drawn layer).
+    ``depressed`` drops the shadow a raised button would cast onto the panel
+    edge it sits flush against.
+
+    ``disabled`` while the destination is locked, with the reason as its
+    hover title, because a button that silently does nothing is worse than
+    one that says why it cannot. A direction that does not EXIST is not drawn
+    at all -- see :func:`WorkflowFooter`.
+
+    A disabled button reacts to nothing -- no hover tint, no ripple -- which
+    is Vuetify's own ``.v-btn--disabled { pointer-events: none }`` doing its
+    job. That took a pysepal fix to get back: ``MapApp.vue``'s
+    ``.v-navigation-drawer .v-btn`` rule is specificity 0,2,0 against
+    Vuetify's 0,1,0 and was handing every disabled control in the panel its
+    pointer events back, so a dead button still lit up under the cursor.
+
+    ``rv.Btn`` + ``use_event``, not ``solara.Button``: the same missing
+    return-type annotation in solara's own stubs that
+    ``app/steps/period_override.py`` avoids ``solara.Checkbox`` over.
+    """
+
+    def _handle_click(*_: object) -> None:
+        if enabled:
+            on_click()
+
+    glyph = rv.Icon(left=leading_icon, right=not leading_icon, small=True, children=[icon])
+    btn = rv.Btn(
+        block=True,
+        tile=True,
+        small=True,
+        depressed=True,
+        color="secondary",
+        height=NAV_BAR_HEIGHT,
+        disabled=not enabled,
+        attributes={"title": tooltip, "aria-label": tooltip},
+        children=[glyph, label] if leading_icon else [label, glyph],
+    )
+    use_event(btn, "click", _handle_click)
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +169,11 @@ def workflow_tabs(
     ``active_tab`` is threaded down only so ``OutputsPanel`` can tell whether
     its own tab is active; see that module for why that gates more than
     visibility.
+
+    Navigation is NOT here. It used to append a button to each configuration
+    tab's own content, which put it at the end of whatever that tab happened
+    to render; it now lives in :func:`WorkflowFooter`, outside the tabs
+    entirely, so a tab's content is only ever the step it is for.
     """
     maps = outcome.maps if outcome is not None else None
     ctx = outcome.ctx if outcome is not None else None
@@ -171,14 +271,96 @@ def _tab_state(tab: TabDescriptor, spec: RunSpec, has_maps: bool) -> _TabState:
     return _TabState.INCOMPLETE if fatal else _TabState.SATISFIED
 
 
+def tab_reachable(tabs: list[TabDescriptor], index: int, spec: RunSpec, has_maps: bool) -> bool:
+    """Whether tab ``index`` can be activated at all.
+
+    The same question :func:`_tab_state` answers for ``rv.Tab(disabled=...)``,
+    asked by :func:`WorkflowFooter` of the tab a button would land on. One
+    rule, two readers: a footer button that enabled while the tab it targets
+    was still disabled would look like a dead control, and an index outside
+    the strip is simply not reachable.
+    """
+    if not 0 <= index < len(tabs):
+        return False
+    return _tab_state(tabs[index], spec, has_maps) is not _TabState.LOCKED
+
+
+@solara.component
+def WorkflowFooter(
+    active_tab: solara.Reactive[int],
+    spec: RunSpec,
+    outcome: BuildOutcome,
+) -> None:
+    """Back and Next, pinned below the panel's scrolling content.
+
+    The repo owner's report was that a tab's bottom was a dead end: *"if I'm
+    in parameters, I finish, I scroll all the way down, I don't know what to
+    do next, I have to go back to the top and find the results tab"*. Putting
+    the buttons inside a tab only moved the problem -- they still sat at the
+    end of a long scroll. This renders into ``MapApp``'s ``right_panel_footer``
+    slot instead, which is outside the scroll area, so it is on screen
+    wherever the content above it happens to be.
+
+    **A direction that does not exist is not drawn**: no Back on the first
+    tab, no Next on the last. The alternative -- drawing it disabled -- spends
+    half the bar on a control that can never do anything, and "this is the
+    first step" is already obvious from the tab strip. A direction that
+    exists but is LOCKED is a different case and still renders, disabled,
+    because there the user does have something to fix and the tooltip says
+    what.
+
+    **The bar is always two half-width tracks**, and a direction that does not
+    exist leaves its own track EMPTY rather than letting the other one grow
+    into it. So Back always occupies the left half and Next the right half,
+    wherever in the workflow the reader is: the one button on the first tab
+    sits exactly where it will sit on the second, instead of jumping from
+    centre to right as soon as Back appears beside it. No gap between the
+    tracks: they meet at the middle and run flush to both panel edges
+    (pysepal's footer slot adds no padding of its own), so the row reads as
+    one bar rather than a pair of floating controls.
+    """
+    tabs = workflow_tabs()
+    current = active_tab.value
+    has_maps = outcome.maps is not None
+
+    with rv.Html(tag="div", class_="d-flex"):
+        with rv.Html(tag="div", style_=_TRACK_STYLE):
+            if current > 0:
+                enabled = tab_reachable(tabs, current - 1, spec, has_maps)
+                NavButton(
+                    label=msg("nav.back"),
+                    tooltip=msg("nav.back_to", target=tabs[current - 1].title),
+                    icon="mdi-arrow-left",
+                    leading_icon=True,
+                    enabled=enabled,
+                    on_click=_go_to(active_tab, current - 1),
+                )
+        with rv.Html(tag="div", style_=_TRACK_STYLE):
+            if current < len(tabs) - 1:
+                enabled = tab_reachable(tabs, current + 1, spec, has_maps)
+                NavButton(
+                    label=msg("nav.forward"),
+                    tooltip=msg("nav.next", target=tabs[current + 1].title)
+                    if enabled
+                    # Two different reasons share one greyed-out button, and
+                    # "nothing happens" is the answer that helps nobody.
+                    else msg("nav.locked_params" if current == 0 else "nav.locked_results"),
+                    icon="mdi-arrow-right",
+                    enabled=enabled,
+                    on_click=_go_to(active_tab, current + 1),
+                )
+
+
 @solara.component
 def WorkflowTabs(
     spec: solara.Reactive[RunSpec],
     sepal_map: SepalMap,
     outcome: BuildOutcome,
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]],
+    active_tab: solara.Reactive[int],
     gee_interface: Any = None,
     sepal_client: Any = None,
+    inline_footer: bool = False,
 ) -> None:
     """The whole right-panel workflow: an ``rv.Tabs`` strip and its three tabs.
 
@@ -187,9 +369,19 @@ def WorkflowTabs(
     switch and would stay on the map after the user leaves the AOI tab. The
     ``use_ref``-guarded effect below mirrors the active tab onto the map
     instead.
-    """
-    active_tab, set_active_tab = solara.use_state(0)
 
+    ``active_tab`` is owned by ``app/page.py``, not by a ``use_state`` here,
+    because :func:`WorkflowFooter` reads and writes the same index from the
+    other side of the panel -- it renders into ``MapApp``'s footer slot, a
+    separate subtree from this one. Same reason ``shown_layers`` is threaded
+    down rather than owned here.
+
+    ``inline_footer`` renders the footer at the bottom of this subtree instead
+    of the panel's, for a pysepal without the slot (see ``app/page.py``). It
+    scrolls with the content there, which is exactly the problem the slot was
+    added to fix -- it exists so the app still navigates on the published
+    pysepal, and comes out when the floor is raised.
+    """
     tabs = workflow_tabs(
         spec=spec,
         sepal_map=sepal_map,
@@ -197,7 +389,7 @@ def WorkflowTabs(
         gee_interface=gee_interface,
         sepal_client=sepal_client,
         shown_layers=shown_layers,
-        active_tab=active_tab,
+        active_tab=active_tab.value,
     )
     has_maps = outcome.maps is not None
     aoi_index = next(i for i, tab in enumerate(tabs) if tab.step == "aoi")
@@ -206,10 +398,10 @@ def WorkflowTabs(
 
     def _sync_draw_control_effect() -> None:
         dc_hidden.current = _sync_draw_control(
-            sepal_map, active_tab == aoi_index, dc_hidden.current
+            sepal_map, active_tab.value == aoi_index, dc_hidden.current
         )
 
-    solara.use_effect(_sync_draw_control_effect, [active_tab])
+    solara.use_effect(_sync_draw_control_effect, [active_tab.value])
 
     # `grow` spreads three tabs across the panel's full 450px instead of
     # leaving them bunched at the left; `centered` is what keeps them centred
@@ -225,8 +417,8 @@ def WorkflowTabs(
     # no tabs, so its panel content sits straight on the drawer and showed the
     # difference.
     with rv.Tabs(
-        v_model=active_tab,
-        on_v_model=set_active_tab,
+        v_model=active_tab.value,
+        on_v_model=active_tab.set,
         grow=True,
         centered=True,
         background_color="transparent",
@@ -241,9 +433,12 @@ def WorkflowTabs(
                 children=[tab.title],
             )
 
-    with rv.TabsItems(v_model=active_tab, style_="background-color: transparent;"):
+    with rv.TabsItems(v_model=active_tab.value, style_="background-color: transparent;"):
         for tab in tabs:
             rv.TabItem(children=list(tab.content))
+
+    if inline_footer:
+        WorkflowFooter(active_tab=active_tab, spec=spec.value, outcome=outcome)
 
 
 def _sync_draw_control(map_: Any, aoi_active: bool, was_hidden: bool) -> bool:
