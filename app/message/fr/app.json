@@ -16,7 +16,7 @@
     "description": "Choisissez la zone sur laquelle l'indicateur est calculé."
   },
   "productivity": {
-    "description": "Indice de végétation, méthode de tendance et unités écologiques.",
+    "description": "Comment la productivité de la végétation est mesurée et comment son déclin est détecté. Les capteurs déterminent la résolution d'analyse et les années disponibles. Le seuil d'IV annule les valeurs d'indice inférieures ou égales à lui ; Terra NPP est le seul capteur qui l'ignore.",
     "sensors": "Capteurs",
     "index": "Indice de végétation",
     "trajectory": "Méthode de tendance",
@@ -42,7 +42,7 @@
     }
   },
   "land_cover": {
-    "description": "Source de la couverture terrestre et masque d'eau.",
+    "description": "D'où provient la couverture terrestre et quels pixels sont traités comme de l'eau. ESA CCI couvre 1992 à 2022, et les années hors de cette plage y sont ramenées. Les assets personnalisés exigent des codes de classe à deux chiffres (10–99) reconnus par la matrice de transition.",
     "source": "Source de la couverture terrestre",
     "water_mask": "Masque d'eau",
     "water_mask_other_arm": "Un masque d'eau différent est déjà configuré ; ce contrôle ne modifie que le seuil de saisonnalité.",
@@ -54,12 +54,12 @@
     "period_end": "Année de fin"
   },
   "soc": {
-    "description": "La période sur laquelle le changement de carbone organique du sol est mesuré.",
+    "description": "La période sur laquelle le changement de carbone organique du sol est mesuré. Elle hérite de la période d'évaluation sauf si vous la remplacez ici. Une année de fin postérieure à 2022 est ramenée à la fin de l'enregistrement CCI, et une année de début antérieure à 1992 est signalée plutôt que déplacée silencieusement.",
     "start": "Année de début",
     "end": "Année de fin"
   },
   "run": {
-    "description": "Choisissez la période d'évaluation globale ; son état apparaît ci-dessous.",
+    "description": "Les années sur lesquelles l'indicateur complet est mesuré. Chaque sous-indicateur en découle, et la couverture terrestre et le carbone organique du sol peuvent la remplacer dans leur propre section : définissez donc celle-ci en premier. La ligne sous les deux années indique ce que couvrent les capteurs choisis.",
     "start_year": "Année de début",
     "end_year": "Année de fin"
   },

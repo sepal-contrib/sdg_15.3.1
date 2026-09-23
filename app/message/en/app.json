@@ -16,7 +16,7 @@
     "description": "Choose the area the indicator is computed over."
   },
   "productivity": {
-    "description": "Vegetation index, trend method and ecological units.",
+    "description": "How vegetation productivity is measured, and how a decline in it is detected. The sensors decide the analysis resolution and which years have data. The VI threshold zeroes out index values at or below it — Terra NPP is the one sensor that ignores it.",
     "sensors": "Sensors",
     "index": "Vegetation index",
     "trajectory": "Trend method",
@@ -42,7 +42,7 @@
     }
   },
   "land_cover": {
-    "description": "Land cover source and the water mask.",
+    "description": "Where land cover comes from, and which pixels are treated as water. ESA CCI runs from 1992 to 2022, and years outside that range are clamped to it. Custom assets need two-digit class codes (10–99) that the transition matrix recognises.",
     "source": "Land cover source",
     "water_mask": "Water mask",
     "water_mask_other_arm": "A different water mask is already configured; this control only edits the seasonality threshold.",
@@ -54,12 +54,12 @@
     "period_end": "End year"
   },
   "soc": {
-    "description": "The period soil organic carbon change is measured over.",
+    "description": "The window soil organic carbon change is measured over. It inherits the assessment period unless you override it here. An end year past 2022 is clamped to the end of the CCI land cover record, and a start year before 1992 is reported rather than silently moved.",
     "start": "Start year",
     "end": "End year"
   },
   "run": {
-    "description": "Choose the overall assessment period; its status appears below.",
+    "description": "The years the whole indicator is measured over. Every sub-indicator is derived from it, and land cover and soil organic carbon can override it in their own section, so set this one first. The line under the two years shows what the sensors you picked actually cover.",
     "start_year": "Start year",
     "end_year": "End year"
   },
