@@ -24,7 +24,9 @@ from pysepal.solara.components.inputs.asset_select import AssetSelectComponent
 from pysepal.solara.notifications import use_notifications
 
 from app.message import msg
-from app.panels.problems import ProblemsAlert
+from app.panels.fields import FieldMessages, ProblemRouter, SelectField, SliderField
+from app.panels.problems import ProblemsList
+from app.state import problems_for
 from app.steps.period_override import PeriodOverrideControl
 from sdg1531.catalog import L4_START
 from sdg1531.scheme import LandCoverScheme
@@ -144,10 +146,26 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
     source_by_label = {label: key for key, label in source_labels.items()}
     is_custom = isinstance(current.land_cover, CustomLandCoverSource)
 
-    solara.Select(
+    router = ProblemRouter(problems_for("land_cover", spec.value))
+    # Every `land_cover.*` rule fires on the custom arm alone
+    # (`sdg1531.validate._land_cover_problems` returns () for any other
+    # source), so the whole subtree -- the two asset rules, the scheme's, and
+    # `same_land_cover_asset` on `land_cover` itself -- belongs to the pickers
+    # below. Claimed only while those pickers are actually on screen: under
+    # ESA it stays in `rest` instead, so a rule added later against the source
+    # choice still has somewhere to appear.
+    asset_problems = router.take("land_cover") if is_custom else ()
+    period_problems = router.take("periods.land_cover")
+    # Same conditional-claim reasoning: the slider exists only for the JRC
+    # arm, and `missing_water_mask` fires when there is no arm at all.
+    water_problems = (
+        router.take("water_mask") if isinstance(current.water_mask, JrcSeasonalityMask) else ()
+    )
+
+    SelectField(
         label=msg("land_cover.source"),
         value=source_labels["custom" if is_custom else "esa"],
-        values=list(source_labels.values()),
+        items=list(source_labels.values()),
         on_value=lambda label: spec.set(
             spec.value.evolve(
                 land_cover=(
@@ -177,6 +195,8 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
         start_label=msg("land_cover.period_start"),
         end_label=msg("land_cover.period_end"),
         on_change=_set_period,
+        field="periods.land_cover",
+        problems=period_problems,
     )
 
     if isinstance(current.land_cover, CustomLandCoverSource):
@@ -212,13 +232,19 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
             on_value=_on_end_value,
             gee_interface=gee_interface,
         )
+        # `AssetSelectComponent` is a whole pysepal component, not a `v-input`
+        # this app can hand `error-messages` to, so its messages are drawn
+        # underneath instead. Both pickers' problems share one block: each
+        # names the asset it is about ("Select the start land cover asset"),
+        # and splitting them would mean reaching into that component's layout.
+        FieldMessages(problems=asset_problems)
 
     # isinstance, not a truthiness guard: `water_mask` is `WaterMaskSpec | None`,
     # and the other two arms (`PixelValueMask`, `AssetBandMask`) have no
     # `.threshold` at all. Rendered only when the arm actually matches --
     # never a fabricated number for an arm this control cannot represent.
     if isinstance(current.water_mask, JrcSeasonalityMask):
-        solara.SliderInt(
+        SliderField(
             label=msg("land_cover.water_mask"),
             value=current.water_mask.threshold,
             min=1,
@@ -226,8 +252,12 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
             on_value=lambda v: spec.set(
                 spec.value.evolve(water_mask=JrcSeasonalityMask(threshold=v))
             ),
+            problems=water_problems,
         )
     elif current.water_mask is not None:
         solara.Markdown(msg("land_cover.water_mask_other_arm"))
 
-    ProblemsAlert(step="land_cover", spec=spec.value)
+    # `transition_matrix` has no control in this step, and the conditional
+    # claims above deliberately leave their problems here whenever the control
+    # that would draw them is not rendered.
+    ProblemsList(problems=router.rest)

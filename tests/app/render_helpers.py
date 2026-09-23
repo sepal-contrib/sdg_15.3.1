@@ -12,7 +12,14 @@ from __future__ import annotations
 
 import re
 
-__all__ = ("alert_texts", "cell_texts", "find_widget", "find_widgets", "markdown_texts")
+__all__ = (
+    "alert_texts",
+    "cell_texts",
+    "field_messages",
+    "find_widget",
+    "find_widgets",
+    "markdown_texts",
+)
 
 _MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
 
@@ -96,3 +103,43 @@ def alert_texts(node: object) -> list[tuple[str, str]]:
                 if isinstance(text, str):
                     texts.append((alert.type, text))
     return texts
+
+
+#: How `app/panels/fields.py`'s standalone message line marks its severity --
+#: a Vuetify theme colour class, not a style attribute, so the rendered widget
+#: still says which of the two it is.
+_SEVERITY_BY_CLASS = {"error--text": "error", "warning--text": "warning"}
+
+
+def field_messages(node: object) -> list[tuple[str, str]]:
+    """Every validation message a CONTROL carries, as ``(severity, text)``.
+
+    The counterpart to :func:`alert_texts` for ``app/panels/fields.py``. A
+    step's problems no longer collect in one alert at the bottom: a fatal one
+    is handed to its own control as Vuetify's ``error-messages``, and a
+    non-fatal one is drawn by ``FieldMessages`` directly underneath. This
+    reads both, in tree order, so a test can assert which control a message
+    landed on by reading the order it comes back in.
+
+    ``alert_texts`` still reports what no control claimed -- the two are
+    disjoint, and a test that wants "every message this step shows" asks both.
+    """
+    messages: list[tuple[str, str]] = []
+
+    def walk(current: object) -> None:
+        for text in getattr(current, "error_messages", None) or ():
+            if isinstance(text, str):
+                messages.append(("error", text))
+        severity = _SEVERITY_BY_CLASS.get(getattr(current, "class_", None) or "")
+        if severity is not None:
+            messages.extend(
+                (severity, child)
+                for child in getattr(current, "children", None) or ()
+                if isinstance(child, str)
+            )
+        for child in getattr(current, "children", None) or ():
+            if not isinstance(child, str):
+                walk(child)
+
+    walk(node)
+    return messages

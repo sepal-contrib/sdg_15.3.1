@@ -25,7 +25,7 @@ from sdg1531.spec import (
     PeriodOverride,
     PixelValueMask,
 )
-from tests.app.render_helpers import alert_texts, find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, field_messages, find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # Same range `soc.py`'s own control offers (see test_step_soc.py's `_YEARS`) --
@@ -617,7 +617,7 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("spec", "expected_markdown", "expected_alerts"),
+    ("spec", "expected_markdown", "expected_fields"),
     [
         # `periods.land_cover` is unset in every case below except the
         # explicit override one, so the inherited-window text leads
@@ -664,18 +664,25 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
                 )
             ),
             [],
+            # Warning FIRST here, which is the whole point of the change:
+            # `land_cover_start_before_cci` names `periods.land_cover.start`
+            # and so rides on the start-year Select, while
+            # `land_cover_period_collapses` names the period itself and lands
+            # under the pair. Position now follows the FIELD, not severity --
+            # the old single alert grouped every error ahead of every warning
+            # because it had nowhere else to put them.
             [
-                (
-                    "error",
-                    "The land cover period lies outside the CCI land cover record "
-                    "(1992-2022), so both of its years clamp to the same one and "
-                    "there is no transition to measure.",
-                ),
                 (
                     "warning",
                     "The land cover period starts before the CCI land cover record "
                     "(1992), so the transition is measured from 1992 instead, and "
                     "that is the year the chart will be labelled with.",
+                ),
+                (
+                    "error",
+                    "The land cover period lies outside the CCI land cover record "
+                    "(1992-2022), so both of its years clamp to the same one and "
+                    "there is no transition to measure.",
                 ),
             ],
         ),
@@ -689,20 +696,21 @@ def test_the_other_arm_note_routes_through_msg(monkeypatch):
         ),
     ],
 )
-def test_the_step_renders_only_its_own_text(spec, expected_markdown, expected_alerts):
+def test_the_step_renders_only_its_own_text(spec, expected_markdown, expected_fields):
     """The description no longer leads this list (task 30: it rides on
     ``ParamsPanel``'s own ``SectionHeader`` now -- see
     ``app/panels/params.py``).
 
-    Problems and prose are read separately now: the inherited-period line and
-    the asset labels are ordinary markdown, while validation messages go
-    through ``app/panels/problems.py``'s ``rv.Alert``, whose own ``type``
-    pins fatal-vs-not directly instead of via a ``<strong>`` wrapper. Errors
-    are grouped ahead of warnings, which is why the override case lists them
-    in that order.
+    Problems and prose are read separately: the inherited-period line and the
+    asset labels are ordinary markdown, while validation messages ride on the
+    control that owns them (``app/panels/fields.py``), which is also what pins
+    fatal-vs-not. The alert is asserted EMPTY in every case: this step's other
+    prefix, ``transition_matrix``, has no rule and no control, so anything
+    arriving there would be a routing regression rather than a new message.
     """
     spec_r = solara.reactive(spec)
     box, rc = _render(spec_r, gee_interface=StubGee())
     assert rc is not None
     assert markdown_texts(box) == expected_markdown
-    assert alert_texts(box) == expected_alerts
+    assert field_messages(box) == expected_fields
+    assert alert_texts(box) == []

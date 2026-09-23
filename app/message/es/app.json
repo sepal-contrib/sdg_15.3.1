@@ -61,9 +61,7 @@
   "run": {
     "description": "Elija el período de evaluación general; su estado aparece a continuación.",
     "start_year": "Año de inicio",
-    "end_year": "Año final",
-    "sensor_coverage_bounded": "Los sensores seleccionados tienen datos de {start} a {end}.",
-    "sensor_coverage_open": "Los sensores seleccionados tienen datos desde {start}."
+    "end_year": "Año final"
   },
   "layers": {
     "title": "Capas",

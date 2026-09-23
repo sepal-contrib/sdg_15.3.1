@@ -21,7 +21,7 @@ from dataclasses import replace
 import pytest
 
 import sdg1531.validate
-from app.state import STEP_PREFIXES, _owns, is_runnable, problems_for
+from app.state import STEP_PREFIXES, is_runnable, owns, problems_for
 from sdg1531.catalog import DISABLED_TRAJECTORIES
 from sdg1531.scheme import TransitionMatrix
 from sdg1531.spec import (
@@ -227,7 +227,7 @@ def test_every_problem_field_is_owned_by_exactly_one_step():
         field: [
             step
             for step, prefixes in STEP_PREFIXES.items()
-            if any(_owns(p, field) for p in prefixes)
+            if any(owns(p, field) for p in prefixes)
         ]
         for field in fields
     }

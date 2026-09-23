@@ -16,11 +16,11 @@ import solara
 
 from app.message import msg
 from app.state import problems_for
-from app.steps.run import BuildOutcome, RunStep, _sensor_coverage_hint, build, build_outcome
+from app.steps.run import BuildOutcome, RunStep, build, build_outcome
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps
 from sdg1531.spec import Period, PeriodOverride, RunSpec, SensorSelection, SubPeriods
-from tests.app.render_helpers import alert_texts, find_widgets
+from tests.app.render_helpers import alert_texts, field_messages, find_widgets
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # Every non-overall sub-period pinned to a range that resolves on its own,
@@ -138,32 +138,35 @@ def test_build_outcome_carries_the_refusal_is_runnable_cannot_see():
 
 
 @pytest.mark.parametrize(
-    ("spec", "outcome", "expected_alerts"),
+    ("spec", "outcome", "expected_fields", "expected_alerts"),
     [
-        (_BUILDABLE_SPEC, BuildOutcome(maps=_StubMaps(7)), []),
+        (_BUILDABLE_SPEC, BuildOutcome(maps=_StubMaps(7)), [], []),
         (
             _SPEC_WITH_A_RUN_PROBLEM,
             BuildOutcome(),
             [("error", "The assessment start year must be earlier than the end year.")],
+            [],
         ),
-        (_SPEC_WITH_ANOTHER_STEPS_PROBLEM, BuildOutcome(), []),
+        (_SPEC_WITH_ANOTHER_STEPS_PROBLEM, BuildOutcome(), [], []),
         (
             default_spec(),
             BuildOutcome(error="spec.threshold must be resolved before the ee graph can be built"),
+            [],
             [("error", "spec.threshold must be resolved before the ee graph can be built")],
         ),
     ],
 )
-def test_the_step_renders_only_its_own_problems(spec, outcome, expected_alerts):
+def test_the_step_renders_only_its_own_problems(spec, outcome, expected_fields, expected_alerts):
     """Pins what the step actually shows, in four states: built (nothing to
     report), a fatal problem THIS step owns, a fatal problem belonging to
     ANOTHER step (nothing -- the "only" half of this test's name, guarded
     below against being vacuous), and a refusal `is_runnable` cannot see.
 
-    Read off `rv.Alert` rather than markdown: every validation message now
-    goes through `app/panels/problems.py`'s single styled component, which
-    also means the severity is asserted directly (`"error"` for a fatal
-    problem) instead of being inferred from a `<strong>` wrapper.
+    Read off BOTH routes, because a step now has two. `start_not_before_end`
+    is emitted on `periods.overall.start`, so it is drawn by the start-year
+    Select itself (`field_messages`); the build refusal owns no field at all
+    and still goes to the alert (`alert_texts`). Asserting both, always, is
+    what stops a message moving from one to the other unnoticed.
 
     The "Ready: N layers" and "Fix the problems above" lines this used to
     check are deliberately gone -- informational restatements of what the
@@ -179,6 +182,7 @@ def test_the_step_renders_only_its_own_problems(spec, outcome, expected_alerts):
     spec_r = solara.reactive(spec)
     box, rc = solara.render(RunStep(spec=spec_r, outcome=outcome), handle_error=False)
     assert rc is not None
+    assert field_messages(box) == expected_fields
     assert alert_texts(box) == expected_alerts
 
 
@@ -190,10 +194,16 @@ def test_another_steps_fatal_problem_really_exists_and_is_still_not_shown_here()
     assert problems_for("run", _SPEC_WITH_ANOTHER_STEPS_PROBLEM) == ()
 
 
-def test_the_sensor_coverage_hint_renders_as_a_muted_caption_not_an_alert():
-    """It is a field hint about the two year Selects, not a problem, so it
-    must not be routed through `ProblemsAlert` -- see `app/panels/problems.py`
-    for why it is the one informational line that survived."""
+def test_the_year_step_says_nothing_about_sensor_coverage():
+    """The coverage caption is gone, and this is the guard against it coming back.
+
+    It restated on every render, under the year Selects, what
+    ``sensor_period_no_overlap`` already says only when it matters and on the
+    control that owns it -- that rule names each sensor with its own range and
+    is emitted on ``vi_source.names``, so it draws on the Productivity step's
+    Sensors field (``test_step_productivity.py``). A period is chosen HERE,
+    but it is the SENSORS that fail to cover it.
+    """
     spec_r = solara.reactive(_BUILDABLE_SPEC)
     box, rc = solara.render(RunStep(spec=spec_r, outcome=BuildOutcome()), handle_error=False)
     assert rc is not None
@@ -203,8 +213,28 @@ def test_the_sensor_coverage_hint_renders_as_a_muted_caption_not_an_alert():
         for w in find_widgets(box, ipyvuetify.Html)
         if w.tag == "div" and "caption" in (w.class_ or "")
     ]
-    assert [c.children[0] for c in captions] == [msg("run.sensor_coverage_open", start=2000)]
+    assert captions == []
     assert alert_texts(box) == []
+    assert field_messages(box) == []
+
+
+def test_the_overlap_error_really_does_carry_the_coverage_it_replaced():
+    """The floor under the deletion above: dropping the caption is only safe
+    while the error that replaces it actually names the ranges. It does --
+    asserted here rather than assumed, because a reworded rule that dropped
+    the per-sensor years would leave the user with no coverage information
+    anywhere.
+    """
+    spec = default_spec(vi_source=SensorSelection(names=("Landsat 4", "Landsat 5")))
+    spec = spec.evolve(periods=replace(spec.periods, overall=Period(2020, 2024)))
+
+    overlap = [
+        p for p in problems_for("productivity", spec) if p.code == "sensor_period_no_overlap"
+    ]
+    assert len(overlap) == 1
+    assert "Landsat 4 (1982-1993)" in overlap[0].message
+    assert "Landsat 5 (1984-2012)" in overlap[0].message
+    assert overlap[0].field == "vi_source.names"
 
 
 def test_the_year_selects_show_the_current_overall_period_and_the_legacy_range():
@@ -279,34 +309,3 @@ def test_selecting_an_end_year_updates_only_that_endpoint():
 
     assert spec.value.periods.overall == Period(start=2000, end=2010)
     assert spec.value.evolve(periods=before.periods) == before
-
-
-# --------------------------------------------------------- _sensor_coverage_hint
-
-
-def test_sensor_coverage_hint_is_open_ended_for_an_active_sensor():
-    """MODIS MOD13Q1 is still being ingested (`last_year=None`); the hint must
-    say so without naming a false ceiling."""
-    spec = default_spec(vi_source=SensorSelection(("MODIS MOD13Q1",)))
-    assert _sensor_coverage_hint(spec) == msg("run.sensor_coverage_open", start=2000)
-
-
-def test_sensor_coverage_hint_is_bounded_for_a_retired_sensor():
-    """Landsat 5's archive is closed (`last_year=2012`); the hint must show
-    both ends, not claim it is still active."""
-    spec = default_spec(vi_source=SensorSelection(("Landsat 5",)))
-    assert _sensor_coverage_hint(spec) == msg("run.sensor_coverage_bounded", start=1984, end=2012)
-
-
-def test_sensor_coverage_hint_spans_every_selected_sensor():
-    """Multiple sensors: the hint covers the UNION, matching the union
-    `sdg1531.validate.sensor_period_no_overlap` refuses against -- the widest
-    start, and open-ended if ANY selected sensor still is."""
-    spec = default_spec(vi_source=SensorSelection(("Landsat 4", "Landsat 8")))
-    assert _sensor_coverage_hint(spec) == msg("run.sensor_coverage_open", start=1982)
-
-
-def test_sensor_coverage_hint_is_none_without_a_recognised_sensor():
-    assert _sensor_coverage_hint(default_spec(vi_source=None)) is None
-    assert _sensor_coverage_hint(default_spec(vi_source=SensorSelection(()))) is None
-    assert _sensor_coverage_hint(default_spec(vi_source=SensorSelection(("Not Real",)))) is None

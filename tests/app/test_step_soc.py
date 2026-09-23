@@ -15,7 +15,7 @@ from app.steps.soc import SocStep
 from sdg1531.catalog import L4_START
 from sdg1531.resolve import resolve
 from sdg1531.spec import Period, PeriodOverride
-from tests.app.render_helpers import alert_texts, find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, field_messages, find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # Same range the legacy's PickerLineSOC offers (component/widget/picker_line_soc.py:8):
@@ -287,7 +287,7 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("spec", "expected_markdown", "expected_alerts"),
+    ("spec", "expected_markdown", "expected_fields"),
     [
         (default_spec(), [_INHERITED_TEXT], []),
         (
@@ -334,20 +334,25 @@ def test_every_label_and_the_description_route_through_msg(monkeypatch):
         ),
     ],
 )
-def test_the_step_renders_only_its_own_text(spec, expected_markdown, expected_alerts):
+def test_the_step_renders_only_its_own_text(spec, expected_markdown, expected_fields):
     """The description no longer leads this list (task 30: it rides on
     ``ParamsPanel``'s own ``SectionHeader`` now -- see
     ``app/panels/params.py``).
 
-    Problems and prose are now read separately: the inherited-period line is
-    still ordinary markdown, while validation messages go through
-    ``app/panels/problems.py``'s ``rv.Alert``. Reading the alert's own ``type``
-    is also what pins fatal-vs-not, which the old bold-or-not markdown could
-    only express as a string prefix -- so the warning case above is now
-    asserted to be a warning, not merely to be unbolded.
+    Problems and prose are read separately: the inherited-period line is
+    still ordinary markdown, while validation messages ride on the control
+    (``app/panels/fields.py``). ``periods.soc`` is this step's ONLY prefix, so
+    every problem it owns reaches a control and the alert stays empty --
+    asserted, not assumed, because an empty alert is also what a step that
+    showed nothing at all would produce.
+
+    Both severities are still pinned here: ``soc_start_before_cci`` is a
+    warning on the start year, ``soc_period_collapses`` a fatal one on the
+    period itself, and ``field_messages`` reports which is which.
     """
     spec_r = solara.reactive(spec)
     box, rc = solara.render(SocStep(spec=spec_r), handle_error=False)
     assert rc is not None
     assert markdown_texts(box) == expected_markdown
-    assert alert_texts(box) == expected_alerts
+    assert field_messages(box) == expected_fields
+    assert alert_texts(box) == []

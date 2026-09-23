@@ -13,7 +13,7 @@ from app.steps.productivity import ProductivityStep, selectable_trajectories
 from sdg1531.catalog import DISABLED_TRAJECTORIES, SENSORS
 from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
 from sdg1531.spec import PeriodOverride, PrecomputedViAsset, RunSpec, SensorSelection
-from tests.app.render_helpers import alert_texts, find_widgets, markdown_texts
+from tests.app.render_helpers import alert_texts, field_messages, find_widgets, markdown_texts
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # `Trajectory` has four members and one (`S_RES_TREND`) is disabled -- named
@@ -267,15 +267,16 @@ def test_moving_the_threshold_slider_updates_only_threshold():
 
 
 @pytest.mark.parametrize(
-    ("spec", "expected_alerts"),
+    ("spec", "expected_fields", "expected_alerts"),
     [
-        (default_spec(), []),
-        (RunSpec(), [("error", "Select at least one sensor.")]),
+        (default_spec(), [], []),
+        (RunSpec(), [("error", "Select at least one sensor.")], []),
         (
             default_spec(trajectory=Trajectory.S_RES_TREND),
             [("error", "The water use efficiency trajectory is not implemented.")],
+            [],
         ),
-        (default_spec(aoi=None), []),
+        (default_spec(aoi=None), [], []),
         (
             # `periods.state` under four years. This USED to be this file's
             # one `warning` case; it is now fatal, because the empty baseline
@@ -285,6 +286,7 @@ def test_moving_the_threshold_slider_updates_only_threshold():
             # actually hit, so it is worth pinning that the step now shows it
             # as blocking.
             default_spec(periods=replace(DEFAULT_PERIODS, state=PeriodOverride(2018, 2020))),
+            [],
             [
                 (
                     "error",
@@ -297,7 +299,7 @@ def test_moving_the_threshold_slider_updates_only_threshold():
         ),
     ],
 )
-def test_the_step_renders_only_its_own_problems(spec, expected_alerts):
+def test_the_step_renders_only_its_own_problems(spec, expected_fields, expected_alerts):
     """Pins what the step actually shows: a fully-configured spec renders
     nothing (task 30 moved the description into ``ParamsPanel``'s own
     ``SectionHeader`` -- see ``app/panels/params.py``); a spec with a fatal
@@ -314,12 +316,16 @@ def test_the_step_renders_only_its_own_problems(spec, expected_alerts):
     each still carry a genuine warning case, so the two-severity rendering is
     not left unproven anywhere -- it is just not provable here.
 
-    Read off ``rv.Alert``, since every validation message now goes through
-    ``app/panels/problems.py``; the severity is asserted directly rather than
-    inferred from a ``<strong>`` wrapper.
+    Read off BOTH routes. ``missing_sensors`` and ``unsupported_trajectory``
+    name fields this step has controls for, so they are drawn by the Sensors
+    and Trend method Selects themselves; ``state_period_too_short`` names
+    ``periods.state``, which has no control here at all, so it still reaches
+    the alert. Splitting the expectation that way is what pins WHICH route
+    each message takes, not merely that it appears somewhere.
     """
     spec_r = solara.reactive(spec)
     box, rc = solara.render(ProductivityStep(spec=spec_r), handle_error=False)
     assert rc is not None
+    assert field_messages(box) == expected_fields
     assert alert_texts(box) == expected_alerts
     assert markdown_texts(box) == []
