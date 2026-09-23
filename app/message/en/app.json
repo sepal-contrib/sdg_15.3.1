@@ -67,7 +67,7 @@
   },
   "layers": {
     "title": "Layers",
-    "description": "Draw any computed layer on the map, clipped to your area of interest. The eye shows or hides a layer; the export icon sends it to an Earth Engine asset, to Google Drive, or to your SEPAL workspace.",
+    "description": "Draw any computed layer on the map, clipped to your area of interest.",
     "columns": {
       "name": "Layer",
       "action": "Action"

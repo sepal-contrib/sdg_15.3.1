@@ -67,7 +67,7 @@
   },
   "layers": {
     "title": "Capas",
-    "description": "Dibuje cualquier capa calculada en el mapa, recortada a su área de interés. El ojo muestra u oculta una capa; el icono de exportación la envía a un asset de Earth Engine, a Google Drive o a su espacio de trabajo de SEPAL.",
+    "description": "Dibuje cualquier capa calculada en el mapa, recortada a su área de interés.",
     "columns": {
       "name": "Capa",
       "action": "Acción"

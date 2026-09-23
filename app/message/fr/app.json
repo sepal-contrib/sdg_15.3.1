@@ -67,7 +67,7 @@
   },
   "layers": {
     "title": "Couches",
-    "description": "Affichez n'importe quelle couche calculée sur la carte, découpée à votre zone d'intérêt. L'œil affiche ou masque une couche ; l'icône d'exportation l'envoie vers un asset Earth Engine, vers Google Drive ou vers votre espace de travail SEPAL.",
+    "description": "Affichez n'importe quelle couche calculée sur la carte, découpée selon votre zone d'intérêt.",
     "columns": {
       "name": "Couche",
       "action": "Action"
