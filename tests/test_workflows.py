@@ -554,7 +554,7 @@ def test_every_test_directory_is_reached_by_some_job() -> None:
             f"pysepal.i18n is missing here, so {excused}'s own collection is empty "
             "no matter which job's invocation names it; this environment cannot "
             "verify whether it is reached. Run under an environment with pysepal>=4 "
-            "(e.g. the sdg_app env) to check it."
+            "(e.g. the sdg_15.3.1 env) to check it."
         )
 
 
