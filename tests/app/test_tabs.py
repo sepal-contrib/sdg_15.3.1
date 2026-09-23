@@ -666,3 +666,29 @@ def test_switching_away_from_aoi_clears_the_draw_control_and_restores_it_on_retu
 
     _select_tab(box, rc, _AOI_INDEX)
     assert sepal_map.dc in sepal_map.controls
+
+
+def test_neither_tab_surface_paints_over_the_panel():
+    """The strip and the tab content stay transparent.
+
+    Vuetify paints ``.v-tabs-bar`` and ``.v-tabs-items`` with the theme's
+    SURFACE colour, which is not the navigation drawer's -- measured in the
+    browser as rgb(30,30,30) over the panel's rgb(26,26,26). The result was a
+    lighter rectangle behind every tab's controls that read as a card, which
+    pysepal's own ``demo_apps/solara_map_app`` (no tabs, content straight on
+    the drawer) does not have.
+
+    Asserted on the widgets rather than by eye because the difference is four
+    values of grey: it went unnoticed through the whole of this app's
+    development, and a default that comes back would go unnoticed again.
+    """
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    workflow = _workflow_widget(box)
+
+    strip = find_widget(workflow, v.Tabs)
+    items = find_widget(workflow, v.TabsItems)
+    assert strip is not None and items is not None
+
+    assert strip.background_color == "transparent"
+    assert "background-color: transparent" in (items.style_ or "")

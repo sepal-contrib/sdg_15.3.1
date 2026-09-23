@@ -216,7 +216,21 @@ def WorkflowTabs(
     # if a translation makes them narrow enough not to fill it. No
     # `show-arrows`: three tabs fit, and the overflow chevrons it adds are the
     # very control this strip exists to avoid.
-    with rv.Tabs(v_model=active_tab, on_v_model=set_active_tab, grow=True, centered=True):
+    # `background_color="transparent"`, and the same on `TabsItems` below.
+    # Vuetify paints both the strip (`.v-tabs-bar`) and the content
+    # (`.v-tabs-items`) with the theme's SURFACE colour, which is not the
+    # navigation drawer's: measured in the browser, rgb(30,30,30) over the
+    # panel's rgb(26,26,26). That lighter rectangle read as a card sitting
+    # behind the AOI controls -- pysepal's own `demo_apps/solara_map_app` has
+    # no tabs, so its panel content sits straight on the drawer and showed the
+    # difference.
+    with rv.Tabs(
+        v_model=active_tab,
+        on_v_model=set_active_tab,
+        grow=True,
+        centered=True,
+        background_color="transparent",
+    ):
         for tab in tabs:
             # Vuetify draws a disabled tab (dimmed, not clickable) and refuses
             # to activate it, which is the whole of what the old hand-built
@@ -227,7 +241,7 @@ def WorkflowTabs(
                 children=[tab.title],
             )
 
-    with rv.TabsItems(v_model=active_tab):
+    with rv.TabsItems(v_model=active_tab, style_="background-color: transparent;"):
         for tab in tabs:
             rv.TabItem(children=list(tab.content))
 
