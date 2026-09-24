@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.metadata
+import re
 import sys
 import tomllib
 from fnmatch import fnmatch
@@ -174,9 +175,21 @@ def test_dev_and_app_extras_exist() -> None:
     # Exact equality, not a substring check: tests/test_plots.py transcribes
     # OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS from the ipecharts 1.0.x
     # sources, so a dropped version floor here is a real regression -- and one a
-    # substring check already missed once. The pysepal floor is load-bearing too:
-    # below 4.0.0rc2 `pysepal.i18n` does not exist, and `app/` imports it.
-    assert extras["app"] == ["solara", "pysepal>=4.0.0rc2", "ipecharts>=1.0.8"]
+    # substring check already missed once.
+    assert extras["app"][0] == "solara"
+    assert extras["app"][2] == "ipecharts>=1.0.8"
+    assert len(extras["app"]) == 3
+
+    # pysepal is a git direct reference until the footer slot
+    # (`MapApp.right_panel_footer`, which `app/tabs.py` renders into) reaches a
+    # release. Pinned to an IMMUTABLE commit: `@main` or a branch would let CI and
+    # the SEPAL image resolve to something other than what was tested here, which
+    # is the whole failure mode a pin exists to prevent.
+    pysepal = extras["app"][1]
+    assert pysepal.startswith("pysepal @ git+https://github.com/openforis/pysepal.git@")
+    assert re.fullmatch(r"[0-9a-f]{40}", pysepal.rsplit("@", 1)[1]), (
+        "pin pysepal to a full commit sha, not a branch or tag: " + pysepal
+    )
 
 
 def test_only_the_domain_and_app_packages_are_discovered() -> None:
