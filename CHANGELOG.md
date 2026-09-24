@@ -1,3 +1,9 @@
+## 2.1.0 (2026-09-24)
+
+### Feat
+
+- inline validation, a workflow footer, and an editable transition matrix (#149)
+
 ## 2.0.1 (2026-09-21)
 
 ### Fix
