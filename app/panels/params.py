@@ -88,8 +88,9 @@ def ParamsPanel(
     gee_interface: Any = None,
 ) -> None:
     """The PARAMS tab's whole content: four flat, headed sections over
-    ``param_sections()``, stacked and always visible -- identical structure to
-    ``app.panels.outputs.OutputsPanel``, just over a different four sections.
+    ``param_sections()``, stacked and always visible -- the same structure as
+    ``app.panels.outputs.OutputsPanel`` over a different four sections, with
+    a tighter gap between them (see the comment below).
     """
     sections = param_sections(spec=spec, outcome=outcome, gee_interface=gee_interface)
 
@@ -98,4 +99,10 @@ def ParamsPanel(
         # A plain, unstyled `rv.Html` div -- see `OutputsPanel`'s identical
         # comment on the same construction for why this introduces no CSS
         # visibility toggle of its own.
-        rv.Html(tag="div", style_="margin-bottom: 16px;", children=section.content)
+        #
+        # 8px, half of what `OutputsPanel` uses: every control in these four
+        # sections reserves a Vuetify message row under itself, so a params
+        # section already ends in whitespace an outputs section (charts and
+        # tables) does not. The same 16px read as a gap here and as the right
+        # spacing there.
+        rv.Html(tag="div", style_="margin-bottom: 8px;", children=section.content)

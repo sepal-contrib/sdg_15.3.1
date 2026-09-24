@@ -19,7 +19,9 @@ from collections.abc import Iterable
 import solara
 
 from app.message import msg
-from app.panels.problems import ProblemsAlert
+from app.panels.fields import ProblemRouter, SelectField, SliderField
+from app.panels.problems import ProblemsList
+from app.state import problems_for
 from sdg1531.catalog import DISABLED_TRAJECTORIES, SENSORS
 from sdg1531.enums import Lceu, ProductivityLookup, Trajectory, VegetationIndex
 from sdg1531.spec import RunSpec, SensorSelection
@@ -63,65 +65,75 @@ def ProductivityStep(spec: solara.Reactive[RunSpec]) -> None:
     # this step renders only its own controls.
 
     current = spec.value
+    router = ProblemRouter(problems_for("productivity", spec.value))
 
-    solara.SelectMultiple(
+    SelectField(
         label=msg("productivity.sensors"),
+        multiple=True,
         # isinstance, not a truthiness guard: `vi_source` is a union, and the
         # other arm (PrecomputedViAsset) has no `.names` at all -- `asset_id`
         # and `scale` are its only fields, so `.names` is an AttributeError
         # rather than an empty list. This step only ever WRITES the sensor arm,
         # but a spec restored from `to_dict()` can carry the other one.
-        values=(
+        value=(
             list(current.vi_source.names) if isinstance(current.vi_source, SensorSelection) else []
         ),
-        all_values=sorted(SENSORS),
+        items=sorted(SENSORS),
         on_value=lambda names: spec.set(
             spec.value.evolve(vi_source=SensorSelection(names=tuple(names)))
         ),
+        # The whole `vi_source` subtree, so `missing_sensors` and
+        # `sensor_period_no_overlap` (both on `vi_source.names`) land here --
+        # the empty-field error that used to sit five controls below this one.
+        problems=router.take("vi_source"),
     )
 
     index_labels = _catalog_labels("index", [v.value for v in VegetationIndex])
     index_by_label = {label: value for value, label in index_labels.items()}
-    solara.Select(
+    SelectField(
         label=msg("productivity.index"),
         value=index_labels[current.vegetation_index.value],
-        values=list(index_labels.values()),
+        items=list(index_labels.values()),
         on_value=lambda label: spec.set(
             spec.value.evolve(vegetation_index=VegetationIndex(index_by_label[label]))
         ),
+        problems=router.take("vegetation_index"),
     )
 
     trajectory_labels = _catalog_labels("trajectory", [t.value for t in selectable_trajectories()])
     trajectory_by_label = {label: value for value, label in trajectory_labels.items()}
-    solara.Select(
+    SelectField(
         label=msg("productivity.trajectory"),
         # `.get(..., raw value)`: a spec restored from disk can hold the
         # disabled trajectory (see the module trap note above), which this
         # step never offers and therefore has no label for.
         value=trajectory_labels.get(current.trajectory.value, current.trajectory.value),
-        values=list(trajectory_labels.values()),
+        items=list(trajectory_labels.values()),
         on_value=lambda label: spec.set(
             spec.value.evolve(trajectory=Trajectory(trajectory_by_label[label]))
         ),
+        problems=router.take("trajectory"),
     )
 
     lceu_labels = _catalog_labels("lceu", [u.value for u in Lceu])
     lceu_by_label = {label: value for value, label in lceu_labels.items()}
-    solara.Select(
+    SelectField(
         label=msg("productivity.lceu"),
         value=lceu_labels[current.lceu.value],
-        values=list(lceu_labels.values()),
+        items=list(lceu_labels.values()),
         on_value=lambda label: spec.set(spec.value.evolve(lceu=Lceu(lceu_by_label[label]))),
+        problems=router.take("lceu"),
     )
 
-    solara.Select(
+    SelectField(
         label=msg("productivity.lookup"),
         # No catalogue table for this one: the legacy's own labels
         # ("GPGv2"/"GPGv1") are identical to `ProductivityLookup`'s enum
         # values, unlike the other three vocabularies above.
         value=current.productivity_lookup.value,
-        values=[p.value for p in ProductivityLookup],
+        items=[p.value for p in ProductivityLookup],
         on_value=lambda v: spec.set(spec.value.evolve(productivity_lookup=ProductivityLookup(v))),
+        problems=router.take("productivity_lookup"),
     )
 
     # The VI threshold. Transcribed from the legacy slider (input_tile.py:31-39):
@@ -134,13 +146,17 @@ def ProductivityStep(spec: solara.Reactive[RunSpec]) -> None:
     # exists for (see `app/steps/run.py`). `_seed_threshold` above is what
     # actually closes that gap; this fallback only keeps the display in sync
     # during the one render before the effect commits it.
-    solara.SliderFloat(
+    SliderField(
         label=msg("productivity.threshold"),
         value=current.threshold if current.threshold is not None else 0.0,
         min=-1.0,
         max=1.0,
         step=0.01,
         on_value=lambda v: spec.set(spec.value.evolve(threshold=v)),
+        problems=router.take("threshold"),
     )
 
-    ProblemsAlert(step="productivity", spec=spec.value)
+    # `climate.coefficient` and the trend / state / performance period
+    # overrides route here (`app.state.STEP_PREFIXES`) and have no control in
+    # this step, so the alert is still where their messages appear.
+    ProblemsList(problems=router.rest)

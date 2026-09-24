@@ -27,11 +27,10 @@ dependencies = [
 [project.optional-dependencies]
 app = [
     "solara",
-    # `app/` imports `pysepal.i18n`, which is 4.0-only. Without this floor the extra
-    # installs cleanly against the `pysepal<4` that `sepal_environment.yml` pins and
-    # every module under `app/` fails to import -- which `tests/app/conftest.py` then
-    # converts into an empty collection rather than an error.
-    "pysepal>=4.0.0rc2",
+    # `app/` imports `pysepal.i18n`, and `app/tabs.py` renders Back/Next into
+    # `MapApp.right_panel_footer`. Both are 4.x; the footer slot landed in
+    # 4.1.0, which is why the floor is not 4.0.
+    "pysepal>=4.1.0",
     # tests/test_plots.py transcribes OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS
     # from the ipecharts 1.0.x sources; an unfloored install could resolve a later
     # release whose ECharts option schema no longer matches those rosters.
@@ -106,6 +105,29 @@ files = ["sdg1531", "app", "tools", "tests/parity"]
 # `app` extra pins it above) ships no py.typed marker either; `app/panels/results.py`
 # is its first import site.
 module = ["ee.*", "geopandas.*", "shapely.*", "pyproj.*", "pysepal.*", "pygaul.*", "ipecharts.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# ipyvuetify ships no stubs, so `v.VuetifyTemplate` is `Any` and strict mode's
+# disallow_subclassing_any rejects the subclass. Scoped to the one module that
+# needs a real widget class rather than a reacton element:
+# `app/panels/transition_matrix.py` carries the matrix editor's synced traits,
+# which is the pattern pysepal's own widgets use (MapApp, RightPanel) and the
+# only way to hand a `.vue` template its props. Everywhere else in `app/` goes
+# through `reacton.ipyvuetify`, which needs none of this.
+module = ["app.panels.transition_matrix"]
+disallow_subclassing_any = false
+
+[[tool.mypy.overrides]]
+# ipyvuetify builds its widget classes dynamically from the Vuetify component
+# list, so `VuetifyTemplate` is not statically visible and mypy reports it as
+# undefined rather than untyped. `follow_imports = skip` makes the module `Any`,
+# which is the honest description -- the same treatment `component.*` gets
+# above, and the reason it is safe here is that `app/` has exactly one direct
+# ipyvuetify import (the matrix widget); everything else goes through
+# `reacton.ipyvuetify`, which mypy reads fine.
+module = ["ipyvuetify.*", "traitlets.*"]
+follow_imports = "skip"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

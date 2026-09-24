@@ -27,7 +27,7 @@ from sdg1531.resolve import resolve
 from sdg1531.spec import RunSpec
 from sdg1531.validate import Problem, validate
 
-__all__ = ("STEP_PREFIXES", "is_runnable", "problems_for")
+__all__ = ("STEP_PREFIXES", "is_runnable", "owns", "problems_for")
 
 STEP_PREFIXES: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
@@ -56,12 +56,15 @@ STEP_PREFIXES: Mapping[str, tuple[str, ...]] = MappingProxyType(
 )
 
 
-def _owns(prefix: str, field: str) -> bool:
+def owns(prefix: str, field: str) -> bool:
     """True when `prefix` claims `field`: itself, or one of its dotted children.
 
-    The one place this rule is written. ``problems_for`` and the coverage test in
-    ``tests/app/test_state.py`` both call it, rather than each keeping its own copy
-    that could drift out of sync with the other.
+    The one place this rule is written. ``problems_for``, the coverage test in
+    ``tests/app/test_state.py`` and ``app/panels/fields.py``'s per-control
+    router all call it, rather than each keeping its own copy that could drift
+    out of sync with the others. Public for that third caller: the routing a
+    step does between its own controls is the same subtree question this
+    module already answers between steps.
     """
     return field == prefix or field.startswith(prefix + ".")
 
@@ -77,7 +80,7 @@ def problems_for(step: str, spec: RunSpec) -> tuple[Problem, ...]:
     never shows any.
     """
     prefixes = STEP_PREFIXES[step]
-    return tuple(p for p in validate(spec) if any(_owns(prefix, p.field) for prefix in prefixes))
+    return tuple(p for p in validate(spec) if any(owns(prefix, p.field) for prefix in prefixes))
 
 
 def is_runnable(spec: RunSpec) -> bool:

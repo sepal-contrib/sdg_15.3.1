@@ -261,7 +261,10 @@ def _LayerRow(
     """
     with rv.Html(tag="tr"):
         rv.Html(tag="td", children=[name])
-        with rv.Html(tag="td", style_="text-align: right; white-space: nowrap;"):
+        # Centred, not right-aligned: an icon button carries its own padding,
+        # so a right-aligned cell puts the glyphs visibly left of the column
+        # heading's own right edge. The heading below is centred to match.
+        with rv.Html(tag="td", style_="text-align: center; white-space: nowrap;"):
             _LayerToggle(
                 is_shown=is_shown,
                 is_pending=is_pending,
@@ -270,7 +273,12 @@ def _LayerRow(
                 on_toggle=on_toggle,
             )
             _IconAction(
-                icon_name="mdi-export-variant",
+                # A cloud, not an arrow: every destination the export dialog
+                # offers -- an Earth Engine asset, Google Drive, the SEPAL
+                # workspace -- is remote, and `mdi-export-variant` read as
+                # "download to this machine", which is the one thing it does
+                # not do.
+                icon_name="mdi-cloud-upload-outline",
                 tooltip=msg("layers.export", name=name),
                 on_click=on_export,
                 disabled=not can_export,
@@ -411,7 +419,7 @@ def MapLayersPanel(
             rv.Html(tag="th", children=[msg("layers.columns.name")])
             rv.Html(
                 tag="th",
-                style_="text-align: right;",
+                style_="text-align: center;",
                 children=[msg("layers.columns.action")],
             )
         with rv.Html(tag="tbody"):

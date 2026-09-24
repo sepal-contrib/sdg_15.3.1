@@ -18,17 +18,17 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import date
 
-import reacton.ipyvuetify as rv
 import solara
 
 from app.message import msg
-from app.panels.problems import ProblemsAlert, ProblemsList
-from app.state import is_runnable
-from sdg1531.catalog import L4_START, SENSORS
+from app.panels.fields import ProblemRouter, SelectField
+from app.panels.problems import ProblemsList
+from app.state import is_runnable, problems_for
+from sdg1531.catalog import L4_START
 from sdg1531.engine.context import ExecutionContext
 from sdg1531.engine.indicator import IndicatorMaps, build_indicator_maps
 from sdg1531.resolve import resolve
-from sdg1531.spec import Period, RunSpec, SensorSelection
+from sdg1531.spec import Period, RunSpec
 from sdg1531.validate import Problem
 
 __all__ = ("BuildOutcome", "RunStep", "build", "build_outcome")
@@ -82,31 +82,6 @@ def build_outcome(spec: RunSpec) -> BuildOutcome:
     return BuildOutcome(maps=maps, ctx=ctx)
 
 
-def _sensor_coverage_hint(spec: RunSpec) -> str | None:
-    """What the currently selected sensors can actually deliver, or ``None``
-    when no recognised sensor is selected yet.
-
-    Informational only -- ``sdg1531.validate``'s ``sensor_period_no_overlap`` is
-    what actually blocks a run (see that module's docstring, note 5); this just
-    shows the constraint next to the two year Selects so a user sees it before
-    hitting that refusal. Deliberately does NOT truncate or rewrite either
-    Select's own range: a user who picks a period and then changes sensor must
-    not have that period silently rewritten out from under them.
-    """
-    source = spec.vi_source
-    if not isinstance(source, SensorSelection) or not source.names:
-        return None
-    known = [SENSORS[name] for name in source.names if name in SENSORS]
-    if not known:
-        return None
-
-    first = min(info.first_year for info in known)
-    last_years = [info.last_year for info in known if info.last_year is not None]
-    if len(last_years) < len(known):  # at least one selected sensor is still active
-        return str(msg("run.sensor_coverage_open", start=first))
-    return str(msg("run.sensor_coverage_bounded", start=first, end=max(last_years)))
-
-
 @solara.component
 def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
     # The title is the PARAMS section header's (`app/panels/params.py`);
@@ -125,41 +100,47 @@ def RunStep(spec: solara.Reactive[RunSpec], outcome: BuildOutcome) -> None:
     years = list(range(date.today().year - 1, L4_START - 1, -1))
     overall = spec.value.periods.overall
 
-    solara.Select(
+    # `start_not_before_end` is emitted on `periods.overall.start`, so it draws
+    # on the first Select. The end year claims its own subtree anyway: no rule
+    # writes `periods.overall.end` today, and a control that silently dropped
+    # one added later is exactly what `ProblemRouter` exists to prevent.
+    router = ProblemRouter(problems_for("run", spec.value))
+
+    SelectField(
         label=msg("run.start_year"),
         value=overall.start,
-        values=years,
+        items=years,
         on_value=lambda y: spec.set(
             spec.value.evolve(periods=replace(spec.value.periods, overall=Period(y, overall.end)))
         ),
+        problems=router.take("periods.overall.start"),
     )
-    solara.Select(
+    SelectField(
         label=msg("run.end_year"),
         value=overall.end,
-        values=years,
+        items=years,
         on_value=lambda y: spec.set(
             spec.value.evolve(periods=replace(spec.value.periods, overall=Period(overall.start, y)))
         ),
+        problems=router.take("periods.overall.end"),
     )
 
-    # A field hint, not a status message: it describes what the two Selects
-    # above it can usefully be set to, so it stays a muted caption under them
-    # rather than going through `ProblemsAlert`. `app/panels/problems.py`
-    # explains why every OTHER informational line here is gone -- what it does
-    # not cover is this one, which is the only survivor, and only because it is
-    # the thing that stops a user choosing a period no selected sensor has data
-    # for (the crash `sensor_period_no_overlap` now refuses).
-    coverage_hint = _sensor_coverage_hint(spec.value)
-    if coverage_hint is not None:
-        rv.Html(tag="div", class_="caption text--secondary mb-2", children=[coverage_hint])
+    # No sensor-coverage caption here any more. It restated, on every render
+    # and under the wrong control, what `sensor_period_no_overlap` already
+    # says only when it matters and on the control that owns it: that rule is
+    # emitted on `vi_source.names` and names each sensor with its own range
+    # ("None of the selected sensors has data in 2020-2024: Landsat 4
+    # (1982-1993), ..."), so it draws on the Productivity step's Sensors
+    # field. A period is chosen here, but it is the SENSORS that fail to
+    # cover it.
 
-    ProblemsAlert(step="run", spec=spec.value)
-
-    # A build refusal `validate()` has no rule for (`spec.threshold`
-    # unresolved is the standing example). Not a `Problem`, so it is wrapped
-    # in one to reach the same styled component rather than falling back to a
-    # bold `solara.Markdown` -- see `ProblemsList`'s own docstring.
-    if outcome.error is not None:
-        ProblemsList(
-            problems=(Problem(field="", code="build_refused", message=outcome.error, fatal=True),)
-        )
+    # Whatever the two Selects did not claim -- `internal_error`, on the empty
+    # field this step also owns -- plus the build refusal, which is a real
+    # error with no `Problem` behind it and so is wrapped in one to reach the
+    # same styling.
+    refusal = (
+        (Problem(field="", code="build_refused", message=outcome.error, fatal=True),)
+        if outcome.error is not None
+        else ()
+    )
+    ProblemsList(problems=router.rest + refusal)

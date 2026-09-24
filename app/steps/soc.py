@@ -23,7 +23,7 @@ from datetime import date
 import solara
 
 from app.message import msg
-from app.panels.problems import ProblemsAlert
+from app.state import problems_for
 from app.steps.period_override import PeriodOverrideControl
 from sdg1531.catalog import L4_START
 from sdg1531.spec import PeriodOverride, RunSpec
@@ -49,6 +49,9 @@ def SocStep(spec: solara.Reactive[RunSpec]) -> None:
     # year".
     years = list(range(date.today().year - 1, L4_START - 1, -1))
 
+    # Every problem this step owns goes to the control -- `periods.soc` is
+    # the step's ONLY prefix (`app.state.STEP_PREFIXES`), so there is no
+    # residual here and no alert to put one in.
     PeriodOverrideControl(
         override=spec.value.periods.soc,
         overall=spec.value.periods.overall,
@@ -56,6 +59,6 @@ def SocStep(spec: solara.Reactive[RunSpec]) -> None:
         start_label=msg("soc.start"),
         end_label=msg("soc.end"),
         on_change=set_override,
+        field="periods.soc",
+        problems=problems_for("soc", spec.value),
     )
-
-    ProblemsAlert(step="soc", spec=spec.value)

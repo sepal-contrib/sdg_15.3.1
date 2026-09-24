@@ -16,7 +16,7 @@
     "description": "Elija el área sobre la que se calcula el indicador."
   },
   "productivity": {
-    "description": "Índice de vegetación, método de tendencia y unidades ecológicas.",
+    "description": "Cómo se mide la productividad de la vegetación y cómo se detecta su descenso. Los sensores determinan la resolución del análisis y los años con datos. El umbral de IV anula los valores del índice iguales o inferiores a él; Terra NPP es el único sensor que lo ignora.",
     "sensors": "Sensores",
     "index": "Índice de vegetación",
     "trajectory": "Método de tendencia",
@@ -42,7 +42,7 @@
     }
   },
   "land_cover": {
-    "description": "Fuente de la cobertura del suelo y máscara de agua.",
+    "description": "De dónde procede la cobertura terrestre y qué píxeles se tratan como agua. ESA CCI abarca de 1992 a 2022, y los años fuera de ese rango se ajustan a él. Los assets personalizados necesitan códigos de clase de dos dígitos (10–99) que la matriz de transición reconozca.",
     "source": "Fuente de la cobertura del suelo",
     "water_mask": "Máscara de agua",
     "water_mask_other_arm": "Ya hay configurada una máscara de agua diferente; este control solo modifica el umbral de estacionalidad.",
@@ -54,20 +54,18 @@
     "period_end": "Año final"
   },
   "soc": {
-    "description": "El período durante el cual se mide el cambio del carbono orgánico del suelo.",
+    "description": "El período sobre el que se mide el cambio del carbono orgánico del suelo. Hereda el período de evaluación salvo que lo sustituya aquí. Un año final posterior a 2022 se ajusta al final del registro de cobertura CCI, y un año inicial anterior a 1992 se notifica en lugar de moverse en silencio.",
     "start": "Año de inicio",
     "end": "Año final"
   },
   "run": {
-    "description": "Elija el período de evaluación general; su estado aparece a continuación.",
+    "description": "Los años sobre los que se mide todo el indicador. Cada subindicador se deriva de él, y la cobertura terrestre y el carbono orgánico del suelo pueden sustituirlo en su propia sección, así que defínalo primero. La línea bajo los dos años muestra lo que cubren los sensores que eligió.",
     "start_year": "Año de inicio",
-    "end_year": "Año final",
-    "sensor_coverage_bounded": "Los sensores seleccionados tienen datos de {start} a {end}.",
-    "sensor_coverage_open": "Los sensores seleccionados tienen datos desde {start}."
+    "end_year": "Año final"
   },
   "layers": {
     "title": "Capas",
-    "description": "Dibuje cualquier capa calculada en el mapa, recortada a su área de interés. El ojo muestra u oculta una capa; el icono de exportación la envía a un asset de Earth Engine, a Google Drive o a su espacio de trabajo de SEPAL.",
+    "description": "Dibuje cualquier capa calculada en el mapa, recortada a su área de interés.",
     "columns": {
       "name": "Capa",
       "action": "Acción"
@@ -160,5 +158,35 @@
     "aoi": "AOI",
     "params": "Parámetros",
     "results": "Resultados"
+  },
+  "nav": {
+    "next": "Siguiente: {target}",
+    "locked_params": "Seleccione primero un área de interés.",
+    "locked_results": "Complete primero todos los parámetros obligatorios.",
+    "back": "Atrás",
+    "forward": "Siguiente",
+    "back_to": "Volver a {target}"
+  },
+  "matrix": {
+    "reset": "Restaurar la matriz IPCC predeterminada",
+    "from": "De:",
+    "to": "A:",
+    "value": {
+      "degradation": {
+        "abrv": "D",
+        "label": "Degradación"
+      },
+      "stable": {
+        "abrv": "E",
+        "label": "Estable"
+      },
+      "improvement": {
+        "abrv": "M",
+        "label": "Mejora"
+      }
+    },
+    "cycle": "haga clic para cambiar",
+    "description": "Cada celda representa un cambio de la clase de cobertura de la fila a la de la columna, y define si el indicador lo cuenta como degradación, estable o mejora. Parte de la matriz IPCC predeterminada; haga clic en una celda para cambiar su valor, o restaure para volver a todas.",
+    "title": "Matriz de transición"
   }
 }

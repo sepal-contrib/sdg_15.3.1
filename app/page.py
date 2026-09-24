@@ -30,7 +30,7 @@ from pysepal.solara.notifications import NotificationProvider
 from app.message import messages, msg
 from app.panels.legend import MapLegend
 from app.steps.run import build_outcome
-from app.tabs import WorkflowTabs
+from app.tabs import WorkflowFooter, WorkflowTabs
 from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
@@ -55,6 +55,9 @@ def Sdg1531App() -> None:
     outcome = solara.use_memo(lambda: build_outcome(spec.value), [spec.value])
 
     shown_layers = solara.use_reactive(frozenset[IndicatorLayer]())
+    # Owned here, not inside `WorkflowTabs`: the footer renders into a
+    # separate `MapApp` subtree and drives the same index (`app/tabs.py`).
+    active_tab = solara.use_reactive(0)
 
     gee_interface = get_current_gee_interface()
     theme_state = get_current_theme_state()
@@ -79,6 +82,10 @@ def Sdg1531App() -> None:
     MapApp.element(
         app_title=msg("app.title"),
         app_icon="mdi-earth",
+        # The drawer holds one item (the map) and nothing the user returns to,
+        # so it starts collapsed and re-collapses after use; the whole window
+        # is the map and the right panel.
+        is_pinned=False,
         main_map=[sepal_map],
         steps_data=[],
         right_panel_config={
@@ -95,6 +102,7 @@ def Sdg1531App() -> None:
                         sepal_map=sepal_map,
                         outcome=outcome,
                         shown_layers=shown_layers,
+                        active_tab=active_tab,
                         gee_interface=gee_interface,
                         sepal_client=get_current_sepal_client(),
                     )
@@ -104,6 +112,9 @@ def Sdg1531App() -> None:
         right_panel_open=True,
         theme_state=theme_state,
         locales=messages.available_locales(),
+        right_panel_footer=[
+            WorkflowFooter(active_tab=active_tab, spec=spec.value, outcome=outcome)
+        ],
     )
 
 

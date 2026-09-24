@@ -744,3 +744,58 @@ def test_an_empty_request_leaves_the_real_dialog_shut(monkeypatch):
     asyncio.run(render_host())
 
     assert captured["controller"].open.value is False
+
+
+def _cells(box: object, tag: str) -> list[object]:
+    """Every ``<th>`` or ``<td>`` widget, in tree order -- the widgets
+    themselves, where ``cell_texts`` returns only their text."""
+    return [w for w in find_widgets(box, ipyvuetify.Html) if w.tag == tag]
+
+
+def test_the_action_column_and_its_icons_are_centred_on_the_same_axis(monkeypatch):
+    """The repo owner's report: *"the icons in the action column should be
+    centered with it, right now they're not centered against the title"*.
+
+    Both were right-aligned, and an icon button carries its own padding, so
+    the glyphs sat visibly left of where the heading's right edge fell.
+    Asserting the pair together is the point -- either one centred alone
+    reproduces the same misalignment.
+    """
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: _FakeNotifier())
+    box, rc = solara.render(
+        MapLayersPanel(
+            maps=_FakeMaps(_THREE_LAYERS), ctx=_CTX, map_=_RecordingMap(), gee_interface=None
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+
+    # The second `<th>` is the action column; the action `<td>`s are the ones
+    # holding buttons rather than a layer name.
+    action_heading = _cells(box, "th")[1]
+    action_cells = [td for td in _cells(box, "td") if find_widget(td, ipyvuetify.Btn) is not None]
+
+    assert len(action_cells) == len(_THREE_LAYERS)
+    assert "text-align: center" in action_heading.style_
+    for cell in action_cells:
+        assert "text-align: center" in cell.style_
+
+
+def test_the_export_icon_is_a_cloud(monkeypatch):
+    """Every destination the export dialog offers -- an Earth Engine asset,
+    Google Drive, the SEPAL workspace -- is remote, and the arrow this used to
+    carry read as a download to the user's own machine. The name itself is
+    checked against the shipped webfont by ``tests/app/test_icons.py``; what
+    this pins is that the row still uses it.
+    """
+    monkeypatch.setattr("app.panels.map_layers.use_notifications", lambda: _FakeNotifier())
+    box, rc = solara.render(
+        MapLayersPanel(
+            maps=_FakeMaps(_THREE_LAYERS), ctx=_CTX, map_=_RecordingMap(), gee_interface=None
+        ),
+        handle_error=False,
+    )
+    assert rc is not None
+
+    icons = [export.children[0].children[0] for _eye, export in _row_actions(box)]
+    assert icons == ["mdi-cloud-upload-outline"] * len(_THREE_LAYERS)

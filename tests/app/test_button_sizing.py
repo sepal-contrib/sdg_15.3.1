@@ -156,13 +156,14 @@ def test_every_button_call_carries_small_true():
         f"(regression in the scan itself, not necessarily the source): {sorted(missing)}"
     )
 
-    # A floor on the roster itself: today's app/ has five such call SITES in
-    # source (transitions.py, results.py, zonal.py x2, and map_layers.py's
-    # `_IconAction` -- one call site in source, even though it is INVOKED
-    # twice per layer row, once for the eye and once for export; this is a
-    # static scan, not a trace). Not `>= 1` -- a regression that dropped this
-    # to one or two sites would still clear a bare non-empty check.
-    assert len(calls) >= 5, f"expected at least 5 button call sites, found {len(calls)}: {calls}"
+    # A floor on the roster itself: today's app/ has six such call SITES in
+    # source (transitions.py, results.py, zonal.py x2, tabs.py's
+    # `NextStepButton`, and map_layers.py's `_IconAction` -- one call site in
+    # source, even though it is INVOKED twice per layer row, once for the eye
+    # and once for export; this is a static scan, not a trace). Not `>= 1` --
+    # a regression that dropped this to one or two sites would still clear a
+    # bare non-empty check.
+    assert len(calls) >= 6, f"expected at least 6 button call sites, found {len(calls)}: {calls}"
 
     violations = [
         f"{rel}:{lineno} ({target})"
@@ -199,14 +200,16 @@ def test_every_non_icon_button_call_carries_block_true():
     icon_calls = [c for c in calls if _is_icon_call(c[3])]
     content_calls = [c for c in calls if not _is_icon_call(c[3])]
 
-    # A floor on each half of the split, for the same reason the bare `>= 5`
+    # A floor on each half of the split, for the same reason the bare `>= 6`
     # above is a floor: today's app/ has exactly one icon call site
-    # (`_IconAction`) and four non-icon ones. A regression that misclassified
-    # a real content button as an icon button (exempting it by mistake) or the
-    # reverse would still pass a bare non-empty check on either side.
+    # (`_IconAction`) and five non-icon ones -- the fifth is `app/tabs.py`'s
+    # `NextStepButton`, whose whole point is to be full width. A regression
+    # that misclassified a real content button as an icon button (exempting it
+    # by mistake) or the reverse would still pass a bare non-empty check on
+    # either side.
     assert len(icon_calls) == 1, f"expected exactly one icon button call site: {icon_calls}"
-    assert len(content_calls) == 4, (
-        f"expected exactly four non-icon button call sites: {content_calls}"
+    assert len(content_calls) == 5, (
+        f"expected exactly five non-icon button call sites: {content_calls}"
     )
 
     violations = [

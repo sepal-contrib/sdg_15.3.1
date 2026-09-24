@@ -29,7 +29,7 @@ from app.message import msg
 from app.panels import params as params_module
 from app.panels.params import param_sections
 from app.steps.run import BuildOutcome
-from tests.app.render_helpers import cell_texts, find_widget, find_widgets
+from tests.app.render_helpers import find_widget, find_widgets
 
 # `param_sections()`'s own DISPLAY order -- see that function's docstring.
 _RUN_INDEX = 0
@@ -118,6 +118,40 @@ def test_each_sections_own_description_travels_with_it():
 # ---------------------------------------------------------------------------
 
 
+def _section_titles(root: object) -> list[str]:
+    """Every ``SectionHeader`` title in ``root``, in tree order.
+
+    Selected on the header's own class rather than by taking every ``<span>``:
+    a step is free to render spans of its own -- the transition matrix's value
+    legend does -- and an unfiltered sweep would read those as section titles
+    and fail for a reason that has nothing to do with what this test is for.
+    """
+    return [
+        child
+        for span in find_widgets(root, v.Html)
+        if span.tag == "span" and "subtitle-2" in (span.class_ or "")
+        for child in (span.children or [])
+        if isinstance(child, str)
+    ]
+
+
+def _section_descriptions(root: object) -> list[str]:
+    """Every ``SectionHeader`` description in ``root``, in tree order.
+
+    Filtered on the header's own ``body-2`` class for the same reason
+    ``_section_titles`` filters: a step may render prose of its own -- the
+    transition matrix explains itself under its grid -- and an unfiltered
+    sweep of every ``<p>`` would read that as a section description.
+    """
+    return [
+        child
+        for para in find_widgets(root, v.Html)
+        if para.tag == "p" and "body-2" in (para.class_ or "")
+        for child in (para.children or [])
+        if isinstance(child, str)
+    ]
+
+
 def test_every_sections_title_and_description_render_on_screen():
     """The render-level half of ``test_each_sections_own_description_travels_
     with_it`` above. Scoped to the PARAMS ``TabItem`` alone
@@ -133,8 +167,8 @@ def test_every_sections_title_and_description_render_on_screen():
 
     workflow_widget = _workflow_widget(box)
     params_sheet = find_widgets(workflow_widget, v.TabItem)[_PARAMS_TAB_INDEX]
-    assert cell_texts(params_sheet, "span") == list(_SECTION_TITLES_IN_ORDER)
-    assert cell_texts(params_sheet, "p") == list(_SECTION_DESCRIPTIONS_IN_ORDER)
+    assert _section_titles(params_sheet) == list(_SECTION_TITLES_IN_ORDER)
+    assert _section_descriptions(params_sheet) == list(_SECTION_DESCRIPTIONS_IN_ORDER)
 
 
 # ---------------------------------------------------------------------------
