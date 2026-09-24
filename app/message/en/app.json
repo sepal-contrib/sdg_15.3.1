@@ -166,5 +166,27 @@
     "back": "Back",
     "forward": "Next",
     "back_to": "Back to {target}"
+  },
+  "matrix": {
+    "title": "Transition matrix",
+    "reset": "Restore the default IPCC matrix",
+    "from": "From:",
+    "to": "To:",
+    "value": {
+      "degradation": {
+        "abrv": "D",
+        "label": "Degradation"
+      },
+      "stable": {
+        "abrv": "S",
+        "label": "Stable"
+      },
+      "improvement": {
+        "abrv": "I",
+        "label": "Improvement"
+      }
+    },
+    "cycle": "click to change",
+    "description": "Each cell reads as a change from the row's land cover class to the column's, and sets whether the indicator counts that change as degradation, stable or improvement. It starts from the default IPCC matrix; click a cell to cycle its value, or reset to restore them all."
   }
 }

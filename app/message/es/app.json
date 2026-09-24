@@ -166,5 +166,27 @@
     "back": "Atrás",
     "forward": "Siguiente",
     "back_to": "Volver a {target}"
+  },
+  "matrix": {
+    "title": "Matriz de transición",
+    "reset": "Restaurar la matriz IPCC predeterminada",
+    "from": "De:",
+    "to": "A:",
+    "value": {
+      "degradation": {
+        "abrv": "D",
+        "label": "Degradación"
+      },
+      "stable": {
+        "abrv": "E",
+        "label": "Estable"
+      },
+      "improvement": {
+        "abrv": "M",
+        "label": "Mejora"
+      }
+    },
+    "cycle": "haga clic para cambiar",
+    "description": "Cada celda representa un cambio de la clase de cobertura de la fila a la de la columna, y define si el indicador lo cuenta como degradación, estable o mejora. Parte de la matriz IPCC predeterminada; haga clic en una celda para cambiar su valor, o restaure para volver a todas."
   }
 }

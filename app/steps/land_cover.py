@@ -1,7 +1,6 @@
 """Land cover configuration.
 
 Owns: land_cover, transition_matrix, water_mask and the land-cover period.
-``transition_matrix`` has no control here yet.
 
 The ``land_cover`` union keeps its two arms apart: ``EsaCciSource`` has no
 fields, while ``CustomLandCoverSource`` needs a start and an end asset before
@@ -26,10 +25,11 @@ from pysepal.solara.notifications import use_notifications
 from app.message import msg
 from app.panels.fields import FieldMessages, ProblemRouter, SelectField, SliderField
 from app.panels.problems import ProblemsList
+from app.panels.transition_matrix import TransitionMatrixField
 from app.state import problems_for
 from app.steps.period_override import PeriodOverrideControl
 from sdg1531.catalog import L4_START
-from sdg1531.scheme import LandCoverScheme
+from sdg1531.scheme import LandCoverScheme, TransitionMatrix
 from sdg1531.spec import (
     CustomLandCoverSource,
     EsaCciSource,
@@ -156,6 +156,7 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
     # choice still has somewhere to appear.
     asset_problems = router.take("land_cover") if is_custom else ()
     period_problems = router.take("periods.land_cover")
+    matrix_problems = router.take("transition_matrix")
     # Same conditional-claim reasoning: the slider exists only for the JRC
     # arm, and `missing_water_mask` fires when there is no arm at all.
     water_problems = (
@@ -257,7 +258,25 @@ def LandCoverStep(spec: solara.Reactive[RunSpec], gee_interface: Any = None) -> 
     elif current.water_mask is not None:
         solara.Markdown(msg("land_cover.water_mask_other_arm"))
 
-    # `transition_matrix` has no control in this step, and the conditional
-    # claims above deliberately leave their problems here whenever the control
-    # that would draw them is not rendered.
+    def _set_matrix(new: TransitionMatrix) -> None:
+        spec.set(spec.value.evolve(transition_matrix=new))
+
+    # The class names the grid is labelled with come from the SAME scheme the
+    # run resolves against, so a custom source that brings its own classes
+    # relabels the axes instead of showing the default seven under a
+    # different vocabulary.
+    scheme = (
+        _scheme_for_pixel_check(current.land_cover, current)
+        if isinstance(current.land_cover, CustomLandCoverSource)
+        else LandCoverScheme.default(matrix=current.transition_matrix)
+    )
+    TransitionMatrixField(
+        value=current.transition_matrix,
+        on_value=_set_matrix,
+        class_names=scheme.start_names,
+        problems=matrix_problems,
+    )
+
+    # The conditional claims above deliberately leave their problems here
+    # whenever the control that would draw them is not rendered.
     ProblemsList(problems=router.rest)

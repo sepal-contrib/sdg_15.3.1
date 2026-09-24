@@ -118,6 +118,23 @@ def test_each_sections_own_description_travels_with_it():
 # ---------------------------------------------------------------------------
 
 
+def _section_titles(root: object) -> list[str]:
+    """Every ``SectionHeader`` title in ``root``, in tree order.
+
+    Selected on the header's own class rather than by taking every ``<span>``:
+    a step is free to render spans of its own -- the transition matrix's value
+    legend does -- and an unfiltered sweep would read those as section titles
+    and fail for a reason that has nothing to do with what this test is for.
+    """
+    return [
+        child
+        for span in find_widgets(root, v.Html)
+        if span.tag == "span" and "subtitle-2" in (span.class_ or "")
+        for child in (span.children or [])
+        if isinstance(child, str)
+    ]
+
+
 def test_every_sections_title_and_description_render_on_screen():
     """The render-level half of ``test_each_sections_own_description_travels_
     with_it`` above. Scoped to the PARAMS ``TabItem`` alone
@@ -133,7 +150,7 @@ def test_every_sections_title_and_description_render_on_screen():
 
     workflow_widget = _workflow_widget(box)
     params_sheet = find_widgets(workflow_widget, v.TabItem)[_PARAMS_TAB_INDEX]
-    assert cell_texts(params_sheet, "span") == list(_SECTION_TITLES_IN_ORDER)
+    assert _section_titles(params_sheet) == list(_SECTION_TITLES_IN_ORDER)
     assert cell_texts(params_sheet, "p") == list(_SECTION_DESCRIPTIONS_IN_ORDER)
 
 
