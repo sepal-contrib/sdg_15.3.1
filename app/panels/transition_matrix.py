@@ -96,12 +96,10 @@ class TransitionMatrixInput(v.VuetifyTemplate):
     default_matrix = List(List(), default_value=[]).tag(sync=True)
     decode = Dict(default_value={}).tag(sync=True)
     disabled = Bool(False).tag(sync=True)
-    title = Unicode("").tag(sync=True)
     reset_label = Unicode("").tag(sync=True)
     from_label = Unicode("").tag(sync=True)
     to_label = Unicode("").tag(sync=True)
     cycle_label = Unicode("").tag(sync=True)
-    description = Unicode("").tag(sync=True)
 
 
 @solara.component
@@ -138,12 +136,10 @@ def TransitionMatrixField(
         default_matrix=TransitionMatrix.default().to_list(),
         decode={str(k): v for k, v in decode.items()},
         disabled=disabled,
-        title=msg("matrix.title"),
         reset_label=msg("matrix.reset"),
         from_label=msg("matrix.from"),
         to_label=msg("matrix.to"),
         cycle_label=msg("matrix.cycle"),
-        description=msg("matrix.description"),
         on_matrix=_on_grid,
     )
 
@@ -166,5 +162,14 @@ def TransitionMatrixField(
                     class_="caption text--secondary",
                     children=[f"{entry['abrv']} — {entry['label']}"],
                 )
+
+    # Underneath the grid, not a subtitle above it: the section header already
+    # names what this step is, and a second heading inside it read as a
+    # sub-panel. The prose explains a control the reader has just looked at.
+    rv.Html(
+        tag="p",
+        class_="caption text--secondary mt-1 mb-0",
+        children=[msg("matrix.description")],
+    )
 
     FieldMessages(problems=problems)

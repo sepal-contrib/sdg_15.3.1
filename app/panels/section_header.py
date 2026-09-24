@@ -36,11 +36,17 @@ __all__ = ("SectionHeader",)
 #: separately and neither is this app's to fix.
 _DIVIDER_LIGHT = "rgba(0, 0, 0, 0.12)"
 _DIVIDER_DARK = "rgba(255, 255, 255, 0.12)"
+#: The header's own bottom margin depends on what follows it. A description
+#: belongs to its title and reads as one block, so the two used to be 20px
+#: apart (12 below the rule plus 8 above the text) for no reason; content
+#: with no description in between still wants the full gap.
 _HEADER_STYLE = (
-    "display: flex; align-items: center; padding: 8px 0; margin-bottom: 12px; "
+    "display: flex; align-items: center; padding: 8px 0; margin-bottom: {gap}px; "
     "border-bottom: 1px solid {divider};"
 )
-_DESCRIPTION_STYLE = "padding-left: 16px; margin: 8px 0 12px;"
+_GAP_BEFORE_DESCRIPTION = 6
+_GAP_BEFORE_CONTENT = 12
+_DESCRIPTION_STYLE = "padding-left: 16px; margin: 0 0 12px;"
 
 
 @solara.component
@@ -49,7 +55,8 @@ def SectionHeader(title: str, icon: str, description: str | None = None) -> None
     # reads a process-wide default disconnected from this app's own toggle
     # (see `app/tabs.py`'s comment on the same trap).
     divider = _DIVIDER_DARK if use_theme_dark() else _DIVIDER_LIGHT
-    with rv.Html(tag="div", style_=_HEADER_STYLE.format(divider=divider)):
+    gap = _GAP_BEFORE_DESCRIPTION if description else _GAP_BEFORE_CONTENT
+    with rv.Html(tag="div", style_=_HEADER_STYLE.format(divider=divider, gap=gap)):
         rv.Icon(children=[icon], small=True, class_="mr-2")
         rv.Html(tag="span", class_="subtitle-2 font-weight-medium", children=[title])
     if description:

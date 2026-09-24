@@ -96,6 +96,10 @@ def Sdg1531App() -> None:
     MapApp.element(
         app_title=msg("app.title"),
         app_icon="mdi-earth",
+        # The drawer holds one item (the map) and nothing the user returns to,
+        # so it starts collapsed and re-collapses after use; the whole window
+        # is the map and the right panel.
+        is_pinned=False,
         main_map=[sepal_map],
         steps_data=[],
         right_panel_config={

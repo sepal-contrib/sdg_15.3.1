@@ -168,7 +168,6 @@
     "back_to": "Volver a {target}"
   },
   "matrix": {
-    "title": "Matriz de transición",
     "reset": "Restaurar la matriz IPCC predeterminada",
     "from": "De:",
     "to": "A:",

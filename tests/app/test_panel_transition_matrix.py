@@ -197,21 +197,30 @@ def test_a_grid_of_strings_round_trips_back_to_ints() -> None:
     assert captured == []
 
 
-def test_the_widget_is_handed_its_prose() -> None:
-    """Title, description and the cycle hint all route through ``msg()``.
+def test_the_editor_explains_itself_below_the_grid() -> None:
+    """The prose sits UNDER the matrix, and the widget carries no heading.
 
-    The description says what a cell means and that clicking changes it --
-    the grid is seven letters with no other affordance, so nothing else on
-    screen explains either.
+    A subtitle above it read as a sub-panel inside a section that already has
+    a header; the description does the same job better after the reader has
+    looked at the grid. The cycle hint stays on the widget, since it is a
+    per-cell tooltip.
     """
     box = _render(TransitionMatrix.default(), [])
     widget = find_widget(box, TransitionMatrixInput)
     assert widget is not None
+    assert not hasattr(widget, "title"), "the grid must not carry a heading of its own"
 
-    assert widget.title == msg("matrix.title")
-    assert widget.description == msg("matrix.description")
     assert widget.cycle_label == msg("matrix.cycle")
     assert widget.reset_label == msg("matrix.reset")
+
+    paragraphs = [
+        child
+        for node in _all(box, v.Html)
+        if node.tag == "p"
+        for child in (node.children or [])
+        if isinstance(child, str)
+    ]
+    assert paragraphs == [msg("matrix.description")]
 
 
 def test_the_editor_renders_a_legend_for_every_value() -> None:

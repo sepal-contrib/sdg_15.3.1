@@ -1,16 +1,16 @@
 <template>
   <div>
-    <v-toolbar flat dense class="mb-1">
-      <span class="subtitle-2 font-weight-medium">{{ title }}</span>
-      <v-spacer></v-spacer>
-      <v-btn icon small :disabled="disabled || is_default" :title="reset_label" @click="resetToDefault">
+    <div class="d-flex justify-end">
+      <v-btn
+        icon
+        x-small
+        :disabled="disabled || is_default"
+        :title="reset_label"
+        @click="resetToDefault"
+      >
         <v-icon small>mdi-broom</v-icon>
       </v-btn>
-    </v-toolbar>
-
-    <p v-if="description" class="caption text--secondary mb-2 px-1">
-      {{ description }}
-    </p>
+    </div>
 
     <v-simple-table dense class="sdg-matrix" v-if="grid.length > 0">
       <template v-slot:default>
@@ -82,12 +82,10 @@ module.exports = {
     default_matrix: { type: Array, default: () => [] },
     decode: { type: Object, default: () => ({}) },
     disabled: { type: Boolean, default: false },
-    title: { type: String, default: "" },
     reset_label: { type: String, default: "" },
     from_label: { type: String, default: "" },
     to_label: { type: String, default: "" },
     cycle_label: { type: String, default: "" },
-    description: { type: String, default: "" },
   },
 
   computed: {
