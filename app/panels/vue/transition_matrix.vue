@@ -1,6 +1,8 @@
 <template>
   <div>
-    <div class="d-flex justify-end">
+    <div class="d-flex align-center">
+      <span class="subtitle-2 font-weight-medium">{{ title }}</span>
+      <v-spacer></v-spacer>
       <v-btn
         icon
         x-small
@@ -86,6 +88,7 @@ module.exports = {
     from_label: { type: String, default: "" },
     to_label: { type: String, default: "" },
     cycle_label: { type: String, default: "" },
+    title: { type: String, default: "" },
   },
 
   computed: {

@@ -186,6 +186,7 @@
       }
     },
     "cycle": "cliquez pour modifier",
-    "description": "Chaque cellule représente un passage de la classe de couverture de la ligne à celle de la colonne, et définit si l'indicateur le compte comme dégradation, stable ou amélioration. Elle part de la matrice IPCC par défaut ; cliquez sur une cellule pour changer sa valeur, ou rétablissez-les toutes."
+    "description": "Chaque cellule représente un passage de la classe de couverture de la ligne à celle de la colonne, et définit si l'indicateur le compte comme dégradation, stable ou amélioration. Elle part de la matrice IPCC par défaut ; cliquez sur une cellule pour changer sa valeur, ou rétablissez-les toutes.",
+    "title": "Matrice de transition"
   }
 }

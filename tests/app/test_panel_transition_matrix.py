@@ -23,6 +23,7 @@ import solara
 from app.message import msg
 from app.panels.transition_matrix import (
     CELL_VALUES,
+    FOOTNOTE_MARK,
     TransitionMatrixField,
     TransitionMatrixInput,
     decode_table,
@@ -197,30 +198,31 @@ def test_a_grid_of_strings_round_trips_back_to_ints() -> None:
     assert captured == []
 
 
-def test_the_editor_explains_itself_below_the_grid() -> None:
-    """The prose sits UNDER the matrix, and the widget carries no heading.
+def test_the_heading_and_the_note_under_the_grid_are_tied_together() -> None:
+    """The grid is named above and explained below, keyed by one mark.
 
-    A subtitle above it read as a sub-panel inside a section that already has
-    a header; the description does the same job better after the reader has
-    looked at the grid. The cycle hint stays on the widget, since it is a
-    per-cell tooltip.
+    The explanation reads better after the reader has looked at what it
+    describes, but prose that far from its heading needs something to say it
+    belongs to it -- so the same ``FOOTNOTE_MARK`` ends the title and opens
+    the note. Both ends come from one constant so the pair cannot drift.
     """
     box = _render(TransitionMatrix.default(), [])
     widget = find_widget(box, TransitionMatrixInput)
     assert widget is not None
-    assert not hasattr(widget, "title"), "the grid must not carry a heading of its own"
 
+    assert widget.title == f"{msg('matrix.title')}{FOOTNOTE_MARK}"
     assert widget.cycle_label == msg("matrix.cycle")
     assert widget.reset_label == msg("matrix.reset")
 
-    paragraphs = [
-        child
+    notes = [
+        node
         for node in _all(box, v.Html)
-        if node.tag == "p"
-        for child in (node.children or [])
-        if isinstance(child, str)
+        if node.tag == "p" and any(isinstance(c, str) for c in (node.children or []))
     ]
-    assert paragraphs == [msg("matrix.description")]
+    assert len(notes) == 1
+    assert notes[0].children == [f"{FOOTNOTE_MARK} {msg('matrix.description')}"]
+    # Centred under the grid, like the legend above it.
+    assert "text-center" in (notes[0].class_ or "")
 
 
 def test_the_editor_renders_a_legend_for_every_value() -> None:

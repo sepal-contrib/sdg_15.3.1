@@ -109,14 +109,28 @@ def FieldMessages(problems: Sequence[Problem] = ()) -> None:
 
 
 def _input_kwargs(problems: Sequence[Problem]) -> dict[str, Any]:
-    """The ``v-input`` props that draw ``problems``' blocking half.
+    """The ``v-input`` props every field in this panel shares.
 
     ``error_count`` is set explicitly because Vuetify defaults it to 1 and
     silently renders only the first message -- two rules failing on one field
     would look like one.
+
+    ``dense`` and ``hide_details="auto"`` are what make four sections fit a
+    450px panel. A stock ``v-input`` is ~72px tall: the control, plus a
+    message row it reserves whether or not it has a message. Measured in a
+    browser, that reserved row was most of the space between two year Selects
+    and most of the gap between one section and the next -- the margins
+    between sections were never the size of the problem. ``"auto"``, not
+    ``True``: the row still appears the moment a field has something to say,
+    which is the whole of ``app/panels/fields.py``'s reason to exist.
     """
     errors, _ = _split(problems)
-    return {"error_messages": errors, "error_count": max(1, len(errors))}
+    return {
+        "error_messages": errors,
+        "error_count": max(1, len(errors)),
+        "dense": True,
+        "hide_details": "auto",
+    }
 
 
 def _advisory(problems: Sequence[Problem]) -> tuple[Problem, ...]:

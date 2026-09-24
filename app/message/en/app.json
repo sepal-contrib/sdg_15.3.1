@@ -186,6 +186,7 @@
       }
     },
     "cycle": "click to change",
-    "description": "Each cell reads as a change from the row's land cover class to the column's, and sets whether the indicator counts that change as degradation, stable or improvement. It starts from the default IPCC matrix; click a cell to cycle its value, or reset to restore them all."
+    "description": "Each cell reads as a change from the row's land cover class to the column's, and sets whether the indicator counts that change as degradation, stable or improvement. It starts from the default IPCC matrix; click a cell to cycle its value, or reset to restore them all.",
+    "title": "Transition matrix"
   }
 }

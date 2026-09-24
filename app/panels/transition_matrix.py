@@ -37,7 +37,13 @@ from app.panels.fields import FieldMessages
 from sdg1531.scheme import TransitionMatrix
 from sdg1531.validate import Problem
 
-__all__ = ("CELL_VALUES", "TransitionMatrixField", "TransitionMatrixInput", "decode_table")
+__all__ = (
+    "CELL_VALUES",
+    "FOOTNOTE_MARK",
+    "TransitionMatrixField",
+    "TransitionMatrixInput",
+    "decode_table",
+)
 
 #: The vocabulary a cell may hold, in the order the dropdown offers it.
 #: ``sdg1531.validate`` rejects anything outside this set
@@ -57,6 +63,12 @@ _CELL_COLORS: Mapping[int, str] = MappingProxyType(
         1: "rgba(76, 175, 80, 0.28)",
     }
 )
+
+
+#: Ties the grid's heading to the note under it. One constant for both ends,
+#: so the mark cannot drift; and it lives here rather than in the catalogue
+#: because it is punctuation, not something a translator should have to carry.
+FOOTNOTE_MARK = "*"
 
 
 def decode_table() -> dict[int, dict[str, str]]:
@@ -100,6 +112,7 @@ class TransitionMatrixInput(v.VuetifyTemplate):
     from_label = Unicode("").tag(sync=True)
     to_label = Unicode("").tag(sync=True)
     cycle_label = Unicode("").tag(sync=True)
+    title = Unicode("").tag(sync=True)
 
 
 @solara.component
@@ -140,6 +153,7 @@ def TransitionMatrixField(
         from_label=msg("matrix.from"),
         to_label=msg("matrix.to"),
         cycle_label=msg("matrix.cycle"),
+        title=f"{msg('matrix.title')}{FOOTNOTE_MARK}",
         on_matrix=_on_grid,
     )
 
@@ -163,13 +177,13 @@ def TransitionMatrixField(
                     children=[f"{entry['abrv']} — {entry['label']}"],
                 )
 
-    # Underneath the grid, not a subtitle above it: the section header already
-    # names what this step is, and a second heading inside it read as a
-    # sub-panel. The prose explains a control the reader has just looked at.
+    # Underneath the grid, keyed to the heading by FOOTNOTE_MARK: the grid
+    # needs a name, but the explanation is only wanted once and reads better
+    # after the reader has looked at what it describes.
     rv.Html(
         tag="p",
-        class_="caption text--secondary mt-1 mb-0",
-        children=[msg("matrix.description")],
+        class_="caption text--secondary text-center mt-1 mb-0",
+        children=[f"{FOOTNOTE_MARK} {msg('matrix.description')}"],
     )
 
     FieldMessages(problems=problems)
