@@ -878,42 +878,14 @@ def test_tab_reachable_agrees_with_the_lock_the_strip_draws():
     assert tab_reachable(tabs, len(tabs), empty, has_maps=False) is False
 
 
-def test_the_inline_fallback_renders_the_same_footer_inside_the_tabs(monkeypatch):
-    """The degraded mode for a pysepal whose right panel has no footer slot.
+def test_the_tabs_subtree_holds_no_navigation_of_its_own():
+    """Navigation lives in the panel's footer slot, nowhere else.
 
-    ``app/page.py``'s ``PANEL_FOOTER_SLOT`` is False there, and navigation
-    falls back into this subtree so the app still navigates on the published
-    pysepal that CI and the SEPAL image install. It is the SAME
-    ``WorkflowFooter`` -- there is no second set of buttons to keep in sync,
-    only a second place to put the one.
+    ``WorkflowTabs`` briefly took an ``inline_footer`` flag, for a pysepal
+    whose right panel had no slot to render into; the floor is 4.1.0 now, so
+    the tabs never carry a button. This is the half of that which still
+    matters: a footer drawn here as well as in the slot would be two.
     """
-    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
-    spec = solara.reactive(RunSpec())
-    active_tab = solara.reactive(0)
-
-    box, rc = solara.render(
-        tabs_module.WorkflowTabs(
-            spec=spec,
-            sepal_map=None,
-            outcome=BuildOutcome(),
-            shown_layers=solara.reactive(frozenset()),
-            active_tab=active_tab,
-            inline_footer=True,
-        ),
-        handle_error=False,
-    )
-    assert rc is not None
-
-    # The footer's button -- Next alone, since tab 0 has nothing behind it --
-    # and it is outside every TabItem.
-    in_tabs = sum(len(find_widgets(item, v.Btn)) for item in find_widgets(box, v.TabItem))
-    assert len(find_widgets(box, v.Btn)) == 1
-    assert in_tabs == 0
-
-
-def test_no_inline_footer_is_rendered_when_the_panel_slot_carries_it():
-    """The other half: with the slot available the tabs subtree holds no
-    navigation at all, so the footer is never drawn twice."""
     spec = solara.reactive(RunSpec())
 
     box, rc = solara.render(
@@ -930,31 +902,23 @@ def test_no_inline_footer_is_rendered_when_the_panel_slot_carries_it():
     assert find_widgets(box, v.Btn) == []
 
 
-def test_the_page_uses_the_footer_slot_when_the_installed_pysepal_has_one():
-    """The capability gate itself, against the pysepal actually installed.
+def test_the_page_mounts_exactly_one_footer_in_the_panel_slot():
+    """One footer, in ``MapApp``'s slot, and none inside the tabs.
 
-    ``PANEL_FOOTER_SLOT`` is read off ``MapApp.class_traits()`` rather than a
-    version string, so this asserts the two agree: whichever branch the gate
-    picks, the app must end up with exactly one footer -- in the slot, or
-    inline, never both and never neither.
+    ``app/page.py`` used to choose between the slot and an inline fallback
+    depending on whether the installed pysepal had ``right_panel_footer``;
+    the floor is now 4.1.0, which carries it, so the choice is gone. This is
+    what would catch the footer being mounted twice, or in neither place.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     mapapp = find_widget(box, MapApp)
     assert mapapp is not None
-    in_slot = len(getattr(mapapp, "right_panel_footer", []))
-    inline = sum(
-        len(find_widgets(item, v.Btn)) for item in find_widgets(_workflow_widget(box), v.TabItem)
-    )
-    inline += len(find_widgets(_workflow_widget(box), v.Btn)) - inline
+    assert len(mapapp.right_panel_footer) == 1
 
-    if page_module.PANEL_FOOTER_SLOT:
-        assert in_slot == 1
-        assert inline == 0
-    else:
-        assert in_slot == 0
-        assert inline == 1  # Next alone: the page opens on the first tab
+    items = find_widgets(_workflow_widget(box), v.TabItem)
+    assert [len(find_widgets(item, v.Btn)) for item in items] == [0, 0, 0]
 
 
 def test_neither_tab_surface_paints_over_the_panel():

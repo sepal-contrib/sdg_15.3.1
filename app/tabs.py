@@ -360,7 +360,6 @@ def WorkflowTabs(
     active_tab: solara.Reactive[int],
     gee_interface: Any = None,
     sepal_client: Any = None,
-    inline_footer: bool = False,
 ) -> None:
     """The whole right-panel workflow: an ``rv.Tabs`` strip and its three tabs.
 
@@ -375,12 +374,6 @@ def WorkflowTabs(
     other side of the panel -- it renders into ``MapApp``'s footer slot, a
     separate subtree from this one. Same reason ``shown_layers`` is threaded
     down rather than owned here.
-
-    ``inline_footer`` renders the footer at the bottom of this subtree instead
-    of the panel's, for a pysepal without the slot (see ``app/page.py``). It
-    scrolls with the content there, which is exactly the problem the slot was
-    added to fix -- it exists so the app still navigates on the published
-    pysepal, and comes out when the floor is raised.
     """
     tabs = workflow_tabs(
         spec=spec,
@@ -436,9 +429,6 @@ def WorkflowTabs(
     with rv.TabsItems(v_model=active_tab.value, style_="background-color: transparent;"):
         for tab in tabs:
             rv.TabItem(children=list(tab.content))
-
-    if inline_footer:
-        WorkflowFooter(active_tab=active_tab, spec=spec.value, outcome=outcome)
 
 
 def _sync_draw_control(map_: Any, aoi_active: bool, was_hidden: bool) -> bool:

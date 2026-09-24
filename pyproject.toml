@@ -27,20 +27,10 @@ dependencies = [
 [project.optional-dependencies]
 app = [
     "solara",
-    # `app/` imports `pysepal.i18n`, which is 4.0-only. Without this the extra
-    # installs cleanly against the `pysepal<4` that `sepal_environment.yml` pins and
-    # every module under `app/` fails to import -- which `tests/app/conftest.py` then
-    # converts into an empty collection rather than an error.
-    #
-    # A git pin, not a version floor, because `MapApp.right_panel_footer` (the panel
-    # footer `app/tabs.py` renders Back/Next into) is merged on pysepal main and is
-    # in no release yet. Pinned to the MERGE COMMIT rather than `@main`: a branch ref
-    # would let CI and the image drift under us, and this is the same shape the
-    # earthengine-api fork is already pinned with in the Dockerfile.
-    #
-    # **Back to a plain `pysepal>=<release>` once that release exists**, and delete
-    # `app/page.py`'s PANEL_FOOTER_SLOT gate with it.
-    "pysepal @ git+https://github.com/openforis/pysepal.git@260673b1e501ca1e8344e03b643833a99edb6126",
+    # `app/` imports `pysepal.i18n`, and `app/tabs.py` renders Back/Next into
+    # `MapApp.right_panel_footer`. Both are 4.x; the footer slot landed in
+    # 4.1.0, which is why the floor is not 4.0.
+    "pysepal>=4.1.0",
     # tests/test_plots.py transcribes OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS
     # from the ipecharts 1.0.x sources; an unfloored install could resolve a later
     # release whose ECharts option schema no longer matches those rosters.

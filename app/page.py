@@ -34,23 +34,9 @@ from app.tabs import WorkflowFooter, WorkflowTabs
 from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import RunSpec
 
-__all__ = ("PANEL_FOOTER_SLOT", "Page", "Sdg1531App")
+__all__ = ("Page", "Sdg1531App")
 
 setup_solara_server(extra_asset_locations=[])
-
-#: Whether the installed pysepal's right panel has a footer slot.
-#:
-#: The slot lands in pysepal after this app wanted it: `MapApp` is a
-#: `VuetifyTemplate` with declared traitlets, so an undeclared
-#: `right_panel_footer=` is a `TypeError` at construction, not a prop the
-#: template quietly ignores -- passing it unconditionally would take the whole
-#: app down on the published pysepal that CI and the SEPAL image install.
-#: Asked of the class rather than of `pysepal.__version__` so a checkout that
-#: has the slot before it has a version number still gets it.
-#:
-#: **Delete this, the `inline_footer` fallback, and the branch below once
-#: `pyproject.toml`'s pysepal floor names a release that carries the slot.**
-PANEL_FOOTER_SLOT = "right_panel_footer" in MapApp.class_traits()
 
 
 @solara.lab.on_kernel_start
@@ -119,7 +105,6 @@ def Sdg1531App() -> None:
                         active_tab=active_tab,
                         gee_interface=gee_interface,
                         sepal_client=get_current_sepal_client(),
-                        inline_footer=not PANEL_FOOTER_SLOT,
                     )
                 ],
             },
@@ -127,15 +112,9 @@ def Sdg1531App() -> None:
         right_panel_open=True,
         theme_state=theme_state,
         locales=messages.available_locales(),
-        **(
-            {
-                "right_panel_footer": [
-                    WorkflowFooter(active_tab=active_tab, spec=spec.value, outcome=outcome)
-                ]
-            }
-            if PANEL_FOOTER_SLOT
-            else {}
-        ),
+        right_panel_footer=[
+            WorkflowFooter(active_tab=active_tab, spec=spec.value, outcome=outcome)
+        ],
     )
 
 
