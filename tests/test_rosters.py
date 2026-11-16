@@ -579,9 +579,12 @@ def _defined_public_names(tree: ast.Module) -> set[str]:
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             if not node.name.startswith("_"):
                 found.add(node.name)
-        elif isinstance(node, ast.TypeAlias) and isinstance(node.name, ast.Name):
-            if not node.name.id.startswith("_"):
-                found.add(node.name.id)
+        elif (
+            isinstance(node, ast.TypeAlias)
+            and isinstance(node.name, ast.Name)
+            and not node.name.id.startswith("_")
+        ):
+            found.add(node.name.id)
     return found
 
 
