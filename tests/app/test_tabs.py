@@ -721,6 +721,19 @@ def _nav_buttons(root: object) -> dict[str, Any]:
     return found
 
 
+def _nav_button_count(root: object) -> int:
+    """Back/Next buttons under ``root``.
+
+    Other buttons don't count: since pysepal 4.2.0 the AOI tab always shows
+    AoiView's own Select AOI button.
+    """
+    labels = {msg("nav.back"), msg("nav.forward")}
+    buttons: list[Any] = find_widgets(root, v.Btn)
+    return len(
+        [b for b in buttons if next((c for c in b.children if isinstance(c, str)), None) in labels]
+    )
+
+
 def test_the_footer_is_mounted_in_the_panels_footer_slot_not_inside_a_tab():
     """The whole point of the pysepal slot: navigation sits outside the
     scrolling sections, so no tab's content carries it. Asserting BOTH halves
@@ -731,7 +744,7 @@ def test_the_footer_is_mounted_in_the_panels_footer_slot_not_inside_a_tab():
 
     assert set(_nav_buttons(_footer_widget(box))) == {"next"}  # AOI is the first tab
     items = find_widgets(_workflow_widget(box), v.TabItem)
-    assert [len(find_widgets(item, v.Btn)) for item in items] == [0, 0, 0]
+    assert [_nav_button_count(item) for item in items] == [0, 0, 0]
 
 
 def test_the_footer_buttons_are_back_and_next(monkeypatch):
@@ -918,7 +931,7 @@ def test_the_page_mounts_exactly_one_footer_in_the_panel_slot():
     assert len(mapapp.right_panel_footer) == 1
 
     items = find_widgets(_workflow_widget(box), v.TabItem)
-    assert [len(find_widgets(item, v.Btn)) for item in items] == [0, 0, 0]
+    assert [_nav_button_count(item) for item in items] == [0, 0, 0]
 
 
 def test_neither_tab_surface_paints_over_the_panel():

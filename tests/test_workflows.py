@@ -87,7 +87,7 @@ _SUPPRESSORS = ("|| true", "|| :", "|| exit 0", "; true", "set +e")
 # What a test run may carry besides its marker: flags that change how the run is
 # REPORTED, never which tests it selects. See `_runs_the_selection` for why this is
 # an allowlist and not a list of the flags that narrow.
-_REPORTING_FLAGS = ("-q", "--quiet", "--durations")
+_REPORTING_FLAGS = ("-q", "--quiet", "--durations", "--tb")
 
 
 def _load(path: Path) -> dict[str, Any]:

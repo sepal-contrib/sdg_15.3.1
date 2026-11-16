@@ -53,4 +53,6 @@ jobs:
             exit 1
           fi
           echo "selected ${selected} network tests"
-          pytest -m "network" -q
+          # --tb=short: a long traceback prints frame arguments, and one of them
+          # was the parsed credential key.
+          pytest -m "network" -q --tb=short

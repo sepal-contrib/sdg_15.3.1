@@ -28,9 +28,9 @@ dependencies = [
 app = [
     "solara",
     # `app/` imports `pysepal.i18n`, and `app/tabs.py` renders Back/Next into
-    # `MapApp.right_panel_footer`. Both are 4.x; the footer slot landed in
-    # 4.1.0, which is why the floor is not 4.0.
-    "pysepal>=4.1.0",
+    # `MapApp.right_panel_footer`. Both are 4.x and the footer slot landed in
+    # 4.1.0, so the floor must not drop below that; it tracks the latest 4.x.
+    "pysepal>=4.2.0",
     # tests/test_plots.py transcribes OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS
     # from the ipecharts 1.0.x sources; an unfloored install could resolve a later
     # release whose ECharts option schema no longer matches those rosters.
