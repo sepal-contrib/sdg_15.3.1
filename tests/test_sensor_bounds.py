@@ -28,6 +28,7 @@ way.
 from __future__ import annotations
 
 import datetime
+import json
 import os
 from pathlib import Path
 
@@ -67,7 +68,15 @@ def _initialize() -> None:
             f"or write {credentials}. This file fails rather than skipping, because "
             "the nightly job is the only thing that runs it."
         )
-    ee.Initialize()
+    key = json.loads(credentials.read_text())
+    if key.get("type") == "service_account":
+        # `ee.Initialize()` only reads the user-token format from that file; the
+        # CI secret is a service-account key, which needs its own credentials.
+        ee.Initialize(
+            ee.ServiceAccountCredentials(key_file=str(credentials)), project=key["project_id"]
+        )
+    else:
+        ee.Initialize()
 
 
 def _real_year_bounds(collection_id: str) -> tuple[int, int]:
