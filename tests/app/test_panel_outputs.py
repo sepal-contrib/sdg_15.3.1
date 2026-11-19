@@ -23,7 +23,6 @@ from typing import Any
 
 import ipyvuetify as v
 import solara
-from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app import tabs as tabs_module
@@ -33,7 +32,13 @@ from app.panels import outputs as outputs_module
 from app.panels import params as params_module
 from app.panels.outputs import output_sections
 from sdg1531.spec import Period, RunSpec
-from tests.app.render_helpers import cell_texts, find_widget, find_widgets
+from tests.app.render_helpers import (
+    cell_texts,
+    find_widget,
+    find_widgets,
+    mapapp_map,
+    panel_sections,
+)
 from tests.spec_factory import DEFAULT_PERIODS, default_spec
 
 # `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
@@ -94,12 +99,10 @@ def _noop_export_dialog_host(**_kwargs: Any) -> None:
 def _workflow_widget(box: object) -> Any:
     """The real, reconciled ``WorkflowTabs`` widget -- same helper as
     ``tests/app/test_tabs.py``'s, duplicated rather than imported: it is
-    three lines, and every other fixture/fake in this suite is per-file
+    two lines, and every other fixture/fake in this suite is per-file
     already (``_FakeMaps``, ``_FakeNotifier``, ...).
     """
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-    workflow_widget: Any = mapapp.right_panel_content[0]["content"][0]
+    ((workflow_widget,),) = panel_sections(box)
     return workflow_widget
 
 
@@ -286,16 +289,13 @@ def test_the_layers_panel_is_wired_with_the_shared_outcome_and_the_real_map_and_
 
     captured["spec"].value = _BUILDABLE_SPEC
 
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-
     assert captured["outcome"].maps is not None
     assert captured["panel_maps"] is captured["outcome"].maps
     # `ctx` is what every drawn layer is clipped to (`app/panels/layer_style.py`'s
     # `display_image`); a panel handed `maps` without it would draw the whole
     # world in the palette's first colour.
     assert captured["panel_ctx"] is captured["outcome"].ctx
-    assert captured["map_"] is mapapp.main_map[0]
+    assert captured["map_"] is mapapp_map(box)
     assert captured["gee_interface"] is not None
     assert isinstance(captured["panel_shown"], solara.Reactive)
 

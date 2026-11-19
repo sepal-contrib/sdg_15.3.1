@@ -21,7 +21,6 @@ from typing import Any
 
 import ipyvuetify as v
 import solara
-from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app import tabs as tabs_module
@@ -29,7 +28,7 @@ from app.message import msg
 from app.panels import params as params_module
 from app.panels.params import param_sections
 from app.steps.run import BuildOutcome
-from tests.app.render_helpers import find_widget, find_widgets
+from tests.app.render_helpers import find_widgets, panel_sections
 
 # `param_sections()`'s own DISPLAY order -- see that function's docstring.
 _RUN_INDEX = 0
@@ -65,9 +64,7 @@ def _workflow_widget(box: object) -> Any:
     ``tests/app/test_tabs.py``'s and ``tests/app/test_panel_outputs.py``'s,
     duplicated rather than imported, matching this suite's existing per-file
     convention."""
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-    workflow_widget: Any = mapapp.right_panel_content[0]["content"][0]
+    ((workflow_widget,),) = panel_sections(box)
     return workflow_widget
 
 

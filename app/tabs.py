@@ -100,10 +100,7 @@ def NavButton(
 
     A disabled button reacts to nothing -- no hover tint, no ripple -- which
     is Vuetify's own ``.v-btn--disabled { pointer-events: none }`` doing its
-    job. That took a pysepal fix to get back: ``MapApp.vue``'s
-    ``.v-navigation-drawer .v-btn`` rule is specificity 0,2,0 against
-    Vuetify's 0,1,0 and was handing every disabled control in the panel its
-    pointer events back, so a dead button still lit up under the cursor.
+    job.
 
     ``rv.Btn`` + ``use_event``, not ``solara.Button``: the same missing
     return-type annotation in solara's own stubs that

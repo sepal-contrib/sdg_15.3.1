@@ -301,13 +301,10 @@ def MapLayersPanel(
     no ``maps`` either, so the two are always present or absent together.
 
     ``gee_interface`` is threaded into the export dialog rather than left for
-    its own internal ``get_current_gee_interface()`` fallback: ``MapApp``'s
-    ``right_panel_content`` is a separate render root from the
-    ``@with_sepal_sessions`` page that establishes the session, so a nested
-    panel resolving it itself can raise ``SepalSessionError`` even though the
-    page-level lookup succeeded (the same reason ``app/panels/exports.py``
-    already gave). It is NOT needed for drawing: ``map_.add_ee_layer_async``
-    already carries the interface the map itself was constructed with.
+    its own internal ``get_current_gee_interface()`` fallback, so the dialog
+    and the map use the one interface the page resolved. It is NOT needed for
+    drawing: ``map_.add_ee_layer_async`` already carries the interface the map
+    itself was constructed with.
 
     ``shown`` follows ``solara.use_reactive``'s own flexible-argument shape: a
     plain value (the default, and every test that does not care) makes this

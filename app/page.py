@@ -15,7 +15,6 @@ from collections.abc import Callable
 
 import solara
 from pysepal.mapping.sepal_map import SepalMap
-from pysepal.sepalwidgets.vue_app import MapApp
 from pysepal.solara import (
     get_current_gee_interface,
     get_current_sepal_client,
@@ -25,6 +24,7 @@ from pysepal.solara import (
     setup_theme_colors,
     with_sepal_sessions,
 )
+from pysepal.solara.components.map_app import MapApp
 from pysepal.solara.notifications import NotificationProvider
 
 from app.message import messages, msg
@@ -79,7 +79,7 @@ def Sdg1531App() -> None:
     # it stays visible whichever tab is active.
     MapLegend(maps=outcome.maps, shown=shown_layers)
 
-    MapApp.element(
+    MapApp(
         app_title=msg("app.title"),
         app_icon="mdi-earth",
         # The drawer holds one item (the map) and nothing the user returns to,

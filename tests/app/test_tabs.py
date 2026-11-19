@@ -39,7 +39,6 @@ from typing import Any, ClassVar
 import ipyvuetify as v
 import pytest
 import solara
-from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app import tabs as tabs_module
@@ -56,7 +55,14 @@ from app.tabs import (
     workflow_tabs,
 )
 from sdg1531.spec import RunSpec
-from tests.app.render_helpers import alert_texts, find_widget, find_widgets
+from tests.app.render_helpers import (
+    alert_texts,
+    find_widget,
+    find_widgets,
+    mapapp_map,
+    panel_footer,
+    panel_sections,
+)
 from tests.spec_factory import default_spec
 
 # `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
@@ -99,17 +105,10 @@ _OUTPUTS_INDEX = _index_of(None)  # the merged outputs tab carries no step id
 
 
 def _workflow_widget(box: object) -> Any:
-    """The real, reconciled ``WorkflowTabs`` widget.
-
-    ``right_panel_content`` is a widget PROPERTY of ``MapApp``, not a reacton
-    child of ``box`` -- ``find_widgets(box, ...)`` walks ``.children`` and
-    finds nothing under it, the same reason ``markdown_texts(box)`` finds
-    nothing there either (see ``test_a_real_refusal_reaches_the_screen_
-    through_the_real_wiring``). This is the one section's sole content item.
+    """The real, reconciled ``WorkflowTabs`` widget: the panel's one section's
+    sole content item, read out of the shell's rendered tree.
     """
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-    workflow_widget: Any = mapapp.right_panel_content[0]["content"][0]
+    ((workflow_widget,),) = panel_sections(box)
     return workflow_widget
 
 
@@ -447,17 +446,16 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
     Land cover and SOC). Only ``AoiStep`` is substituted, and only to reach
     the shared spec reactive without rendering its own ``AssetSelectComponent``.
 
-    ``RunStep``'s rendered content is read back off the PARAMS ``TabItem`` --
-    a widget PROPERTY of ``MapApp.right_panel_content``'s sole section, not a
-    reacton child of ``box`` -- the same reason every other test in this file
-    reads identity off a spy instead of rendered text. Checked by MEMBERSHIP
-    in every alert the PARAMS tab renders, not by position: since task 30,
-    Run's own section is FIRST among four (see ``app/panels/params.py``), not
-    the tab's only content, so its refusal is no longer reliably the last
-    message on the tab the way it was when Run held its own tab. Read off
-    ``rv.Alert`` (``app/panels/problems.py``) rather than markdown, and as an
-    ``"error"`` -- a build refusal is blocking, and the styled component is
-    what now says so.
+    ``RunStep``'s rendered content is read back off the PARAMS ``TabItem``
+    of the panel's sole section, so a refusal shown in some other tab does
+    not count. Checked by MEMBERSHIP in every alert the PARAMS tab renders,
+    not by position: since task 30, Run's own section is FIRST among four
+    (see ``app/panels/params.py``), not the tab's only content, so its
+    refusal is no longer reliably the last message on the tab the way it was
+    when Run held its own tab. Read off ``rv.Alert``
+    (``app/panels/problems.py``) rather than markdown, and as an ``"error"``
+    -- a build refusal is blocking, and the styled component is what now says
+    so.
 
     Anchored against a direct call to ``build()``, not a hardcoded guess at
     the domain's wording, so a change to that message updates both sides
@@ -473,8 +471,6 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
 
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
 
     refusing_spec = default_spec()  # threshold=None: is_runnable() True, build() refuses
     with pytest.raises(Exception) as exc_info:
@@ -482,8 +478,7 @@ def test_a_real_refusal_reaches_the_screen_through_the_real_wiring(monkeypatch):
 
     captured["spec"].value = refusing_spec
 
-    workflow_widget = mapapp.right_panel_content[0]["content"][0]
-    tab_items = find_widgets(workflow_widget, v.TabItem)
+    tab_items = find_widgets(_workflow_widget(box), v.TabItem)
     assert len(tab_items) == 3
     params_sheet = tab_items[_PARAMS_INDEX]
     assert ("error", str(exc_info.value)) in alert_texts(params_sheet)
@@ -652,9 +647,7 @@ def test_switching_away_from_aoi_clears_the_draw_control_and_restores_it_on_retu
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-    sepal_map = mapapp.main_map[0]
+    sepal_map = mapapp_map(box)
 
     # Simulate the user having chosen the DRAW method while on the AOI tab --
     # `AoiView`'s own effect is what would normally do this; this test's
@@ -692,15 +685,10 @@ def _capture_spec(monkeypatch: Any, captured: dict[str, Any]) -> None:
 
 
 def _footer_widget(box: object) -> Any:
-    """The rendered ``WorkflowFooter``, out of ``MapApp``'s footer slot.
-
-    ``right_panel_footer`` is a widget PROPERTY of ``MapApp``, reached the
-    same way ``_workflow_widget`` reaches the panel's content -- neither is a
-    reacton child of ``box``, so ``find_widgets(box, ...)`` walks past both.
+    """The rendered ``WorkflowFooter``, out of the panel's footer, which
+    the shell renders below the scrolling sections.
     """
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-    footer: Any = mapapp.right_panel_footer[0]
+    (footer,) = panel_footer(box)
     return footer
 
 
@@ -828,8 +816,9 @@ def test_next_unlocks_once_an_aoi_exists_and_names_where_it_goes(monkeypatch):
 def test_the_footer_moves_the_active_tab_in_both_directions(monkeypatch):
     """The footer and the tab strip drive the SAME index, which is why
     ``active_tab`` is owned by ``page.py`` rather than by either of them: the
-    footer renders into a separate ``MapApp`` subtree, so a ``use_state``
-    inside ``WorkflowTabs`` would be invisible to it.
+    footer renders in the panel's footer, beside ``WorkflowTabs`` rather than
+    inside it, so a ``use_state`` inside ``WorkflowTabs`` would be invisible
+    to it.
     """
     captured: dict[str, Any] = {}
     _capture_spec(monkeypatch, captured)
@@ -916,19 +905,21 @@ def test_the_tabs_subtree_holds_no_navigation_of_its_own():
 
 
 def test_the_page_mounts_exactly_one_footer_in_the_panel_slot():
-    """One footer, in ``MapApp``'s slot, and none inside the tabs.
+    """One footer, in the panel's footer slot, and none inside the tabs.
 
     ``app/page.py`` used to choose between the slot and an inline fallback
     depending on whether the installed pysepal had ``right_panel_footer``;
-    the floor is now 4.1.0, which carries it, so the choice is gone. This is
-    what would catch the footer being mounted twice, or in neither place.
+    the floor carries it now, so the choice is gone. This is what would catch
+    the footer being mounted twice, or in neither place. The native shell
+    renders the whole page as one tree, so the page's Back/Next buttons can
+    be counted all at once: they must all be the footer's.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-    assert len(mapapp.right_panel_footer) == 1
+    (footer,) = panel_footer(box)
+    assert _nav_button_count(footer) > 0
+    assert _nav_button_count(box) == _nav_button_count(footer)
 
     items = find_widgets(_workflow_widget(box), v.TabItem)
     assert [_nav_button_count(item) for item in items] == [0, 0, 0]
