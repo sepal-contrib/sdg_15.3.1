@@ -1,3 +1,9 @@
+## 2.2.0 (2026-11-19)
+
+### Feat
+
+- move to the native Solara MapApp (#152)
+
 ## 2.1.1 (2026-11-16)
 
 ### Fix
