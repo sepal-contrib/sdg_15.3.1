@@ -4,9 +4,7 @@ Task 27 folded the five output tabs (Layers, Transitions, Results, Zonal,
 Export) into one, ``app.panels.outputs.OutputsPanel``, as an
 ``rv.ExpansionPanels`` accordion. Task 28 replaced that accordion with flat
 sections, each introduced by ``app/panels/section_header.py``'s
-``SectionHeader`` -- see ``app/panels/outputs.py``'s module docstring for the
-chart-mount trap this move carried over (in a new shape) from the accordion.
-The identity-wiring tests for the five panels moved here from
+``SectionHeader``. The identity-wiring tests for the five panels moved here from
 ``tests/app/test_tabs.py`` back in task 21 -- a monkeypatch targets the
 module that actually calls the thing, and that is no longer ``app.tabs`` for
 these five. Several tests below also spy on ``RunStep`` -- not one of the
@@ -106,19 +104,6 @@ def _workflow_widget(box: object) -> Any:
     return workflow_widget
 
 
-def _select_tab(box: object, rc: Any, index: int) -> None:
-    """Activate a workflow tab the way a real click does -- duplicated from
-    ``tests/app/test_tabs.py``'s identical helper rather than imported,
-    matching this suite's existing per-file convention. Writing the strip's
-    ``v_model`` is the path Vuetify's own click handler takes; see that
-    module for the full reasoning.
-    """
-    strip = find_widget(_workflow_widget(box), v.Tabs)
-    assert strip is not None
-    strip.v_model = index
-    rc.force_update()
-
-
 # ---------------------------------------------------------------------------
 # `output_sections()` -- pure, no render context. Mirrors `app.tabs.
 # workflow_tabs`'s own order/shape tests.
@@ -198,8 +183,7 @@ def test_each_sections_own_description_travels_with_it():
 
 
 # ---------------------------------------------------------------------------
-# `OutputsPanel` rendered -- flat sections (no accordion), and the
-# chart-mount `is_open`/`is_active` wiring for Results/Transitions.
+# `OutputsPanel` rendered -- flat sections (no accordion).
 # ---------------------------------------------------------------------------
 
 
@@ -323,14 +307,7 @@ def test_the_layers_panel_and_the_legend_share_the_same_shown_reactive(monkeypat
     assert captured["panel_shown"] is captured["legend_shown"]
 
 
-def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is_open(monkeypatch):
-    """``is_open`` now reflects whether the merged outputs TAB itself is the
-    active one (task 28's flat sections removed the accordion this used to
-    key on) -- driven here by clicking the outputs tab's own segment cell,
-    the same real control a user would use, rather than an accordion
-    ``v_model``. See ``app/panels/outputs.py``'s module docstring for the
-    chart-mount trap this still guards against.
-    """
+def test_the_results_panel_is_wired_with_the_shared_outcome_and_gee_interface(monkeypatch):
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -339,18 +316,14 @@ def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is
         captured["outcome"] = outcome
 
     @solara.component
-    def _spy_results_panel(
-        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, is_open: Any = None
-    ) -> None:
-        captured.update(
-            panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, panel_is_open=is_open
-        )
+    def _spy_results_panel(*, maps: Any = None, ctx: Any = None, gee_interface: Any = None) -> None:
+        captured.update(panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface)
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
     monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     captured["spec"].value = _BUILDABLE_SPEC
@@ -359,17 +332,9 @@ def test_the_results_panel_is_wired_with_the_shared_outcome_gee_interface_and_is
     assert captured["panel_maps"] is captured["outcome"].maps
     assert captured["panel_ctx"] is captured["outcome"].ctx
     assert captured["gee_interface"] is not None
-    # The workflow starts on the AOI tab, not the merged outputs tab.
-    assert captured["panel_is_open"] is False
-
-    _select_tab(box, rc, _OUTPUTS_TAB_INDEX)
-    assert captured["panel_is_open"] is True
 
 
-def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_and_is_open(
-    monkeypatch,
-):
-    """See ``test_the_results_panel_...``'s identical docstring above."""
+def test_the_transitions_panel_is_wired_with_the_shared_outcome_and_gee_interface(monkeypatch):
     captured: dict[str, Any] = {}
 
     @solara.component
@@ -379,17 +344,15 @@ def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_an
 
     @solara.component
     def _spy_transitions_panel(
-        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None, is_open: Any = None
+        *, maps: Any = None, ctx: Any = None, gee_interface: Any = None
     ) -> None:
-        captured.update(
-            panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface, panel_is_open=is_open
-        )
+        captured.update(panel_maps=maps, panel_ctx=ctx, gee_interface=gee_interface)
 
     monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
     monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
     monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
 
-    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
 
     captured["spec"].value = _BUILDABLE_SPEC
@@ -398,48 +361,6 @@ def test_the_transitions_panel_is_wired_with_the_shared_outcome_gee_interface_an
     assert captured["panel_maps"] is captured["outcome"].maps
     assert captured["panel_ctx"] is captured["outcome"].ctx
     assert captured["gee_interface"] is not None
-    assert captured["panel_is_open"] is False
-
-    _select_tab(box, rc, _OUTPUTS_TAB_INDEX)
-    assert captured["panel_is_open"] is True
-
-
-def test_both_chart_panels_stay_closed_while_a_different_workflow_tab_is_active(monkeypatch):
-    """The exact regression a naive "sections are always open now, delete
-    ``is_open``" edit would reintroduce: measured with a real browser probe
-    (see ``app/panels/outputs.py``'s module docstring) that a chart built for
-    the first time while the merged outputs TAB is inactive bakes in a wrong,
-    fixed canvas size. Pinned here without a browser: with the outputs tab
-    never visited, both chart panels' ``is_open`` must read ``False``, not
-    ``True`` merely because their OWN accordion section no longer exists.
-    """
-    captured: dict[str, Any] = {}
-
-    @solara.component
-    def _spy_run_step(*, spec: Any = None, outcome: Any = None) -> None:
-        captured["spec"] = spec
-
-    @solara.component
-    def _spy_results_panel(*, is_open: Any = None, **_kwargs: Any) -> None:
-        captured["results_is_open"] = is_open
-
-    @solara.component
-    def _spy_transitions_panel(*, is_open: Any = None, **_kwargs: Any) -> None:
-        captured["transitions_is_open"] = is_open
-
-    monkeypatch.setattr(params_module, "RunStep", _spy_run_step)
-    monkeypatch.setattr(outputs_module, "ResultsPanel", _spy_results_panel)
-    monkeypatch.setattr(outputs_module, "TransitionsPanel", _spy_transitions_panel)
-    monkeypatch.setattr(map_layers_module, "_ExportDialogHost", _noop_export_dialog_host)
-
-    _box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
-    assert rc is not None
-
-    captured["spec"].value = _BUILDABLE_SPEC
-    rc.force_update()
-
-    assert captured["results_is_open"] is False
-    assert captured["transitions_is_open"] is False
 
 
 def test_the_zonal_panel_is_wired_with_the_shared_outcome_and_a_sepal_client(monkeypatch):

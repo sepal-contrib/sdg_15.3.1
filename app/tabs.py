@@ -151,7 +151,6 @@ def workflow_tabs(
     gee_interface: Any = None,
     sepal_client: Any = None,
     shown_layers: solara.Reactive[frozenset[IndicatorLayer]] | None = None,
-    active_tab: int | None = None,
 ) -> list[TabDescriptor]:
     """The three workflow tabs, in display order.
 
@@ -162,10 +161,6 @@ def workflow_tabs(
     ``mypy --strict`` narrows each argument before it reaches a component
     declaring a bare type. Deleting one leaves every test green and adds one
     mypy error.
-
-    ``active_tab`` is threaded down only so ``OutputsPanel`` can tell whether
-    its own tab is active; see that module for why that gates more than
-    visibility.
 
     Navigation is NOT here. It used to append a button to each configuration
     tab's own content, which put it at the end of whatever that tab happened
@@ -193,8 +188,6 @@ def workflow_tabs(
             params_content,
         ),
     ]
-    # Its own length, so the index cannot drift from the list below.
-    outputs_index = len(configuration_tabs)
 
     outputs_content: list[object] = (
         [
@@ -208,7 +201,6 @@ def workflow_tabs(
                 shown_layers=shown_layers
                 if shown_layers is not None
                 else frozenset[IndicatorLayer](),
-                is_active=active_tab == outputs_index,
             )
         ]
         if spec is not None
@@ -379,7 +371,6 @@ def WorkflowTabs(
         gee_interface=gee_interface,
         sepal_client=sepal_client,
         shown_layers=shown_layers,
-        active_tab=active_tab.value,
     )
     has_maps = outcome.maps is not None
     aoi_index = next(i for i, tab in enumerate(tabs) if tab.step == "aoi")

@@ -181,7 +181,7 @@ def test_dev_and_app_extras_exist() -> None:
     # was merged but unreleased. The native MapApp `app/page.py` uses is new in
     # 4.2.0, so the floor is at least that -- and an older 4.x must NOT satisfy
     # this extra, or `app/page.py` has no shell to import.
-    assert extras["app"] == ["solara", "pysepal>=4.2.0", "ipecharts>=1.0.8"]
+    assert extras["app"] == ["solara", "pysepal>=4.2.0", "ipecharts>=1.4.2"]
 
 
 def test_only_the_domain_and_app_packages_are_discovered() -> None:

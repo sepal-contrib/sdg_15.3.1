@@ -269,55 +269,14 @@ def test_the_click_snapshot_is_what_the_fetch_receives_not_a_later_read(monkeypa
     assert fake.successes == [msg("transitions.computed")]
 
 
-def test_a_chart_ready_while_its_section_is_collapsed_does_not_mount_until_reopened(monkeypatch):
-    """``is_open`` gates the chart widget's CONSTRUCTION, not just whether it
-    shows: an ``EChartsRawWidget`` built while its ``rv.ExpansionPanel`` is
-    collapsed measures a fixed, wrong canvas size that reopening never fixes
-    (verified with a browser probe; see ``app/panels/outputs.py``'s module
-    docstring). Proven here without a browser: the fetch resolves while
-    ``is_open=False``, and ``solara.display`` must not be called until a
-    later render flips it to ``True``.
-    """
-    fake = _FakeNotifier()
-    monkeypatch.setattr("app.panels.transitions.use_notifications", lambda: fake)
-
-    async def fake_fetch(gee_interface, maps, ctx):
-        return _FRAME
-
-    monkeypatch.setattr("app.panels.transitions.fetch_transition_areas", fake_fetch)
-
-    displayed: list[Any] = []
-    monkeypatch.setattr(solara, "display", lambda obj: displayed.append(obj))
-
-    the_maps = _FakeMaps(FakeResolved())
-
-    async def main():
-        box, rc = solara.render(
-            TransitionsPanel(maps=the_maps, ctx=object(), gee_interface=None, is_open=False),
-            handle_error=False,
-        )
-        assert rc is not None
-        button = find_widget(box, ipyvuetify.Btn)
-        assert button is not None
-        button.click()
-        assert await _wait_for(lambda: fake.successes or fake.errors)
-        assert displayed == []  # data arrived, but the section is collapsed
-
-        rc.render(TransitionsPanel(maps=the_maps, ctx=object(), gee_interface=None, is_open=True))
-
-    asyncio.run(main())
-
-    assert displayed  # reopening builds the widget now that data is ready
-
-
 def test_a_new_run_discards_the_chart_the_previous_one_produced(monkeypatch):
     """The repo owner's request: *"if I change params, the map should gone and
     the graphs and calculations should also gone, right? the same if I change
     the AOI"*.
 
     Same claim, probe and floor as ``test_panel_results.py``'s test of the
-    same name -- see it for why closing and reopening the section is what
-    makes ``solara.display`` say anything at all here.
+    same name -- see it for why a re-render with a fresh ``gee_interface`` is
+    what makes ``solara.display`` say anything at all here.
     """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.transitions.use_notifications", lambda: fake)
@@ -334,24 +293,22 @@ def test_a_new_run_discards_the_chart_the_previous_one_produced(monkeypatch):
     first_run, second_run = _FakeMaps(resolved), _FakeMaps(resolved)
     ctx = object()
 
-    def show(maps: Any, *, is_open: bool) -> Any:
-        return TransitionsPanel(maps=maps, ctx=ctx, gee_interface=None, is_open=is_open)
+    def show(maps: Any) -> Any:
+        return TransitionsPanel(maps=maps, ctx=ctx, gee_interface=object())
 
     async def main():
-        box, rc = solara.render(show(first_run, is_open=True), handle_error=False)
+        box, rc = solara.render(show(first_run), handle_error=False)
         assert rc is not None
         find_widget(box, ipyvuetify.Btn).click()
         assert await _wait_for(lambda: fake.successes or fake.errors)
 
-        rc.render(show(first_run, is_open=False))
         displayed.clear()
-        rc.render(show(first_run, is_open=True))
+        rc.render(show(first_run))
         assert displayed, "the chart vanished without any run change"
 
-        rc.render(show(second_run, is_open=True))
-        rc.render(show(second_run, is_open=False))
+        rc.render(show(second_run))
         displayed.clear()
-        rc.render(show(second_run, is_open=True))
+        rc.render(show(second_run))
 
     asyncio.run(main())
 

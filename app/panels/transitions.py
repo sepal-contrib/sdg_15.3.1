@@ -71,13 +71,9 @@ def TransitionsPanel(
     maps: IndicatorMaps | None,
     ctx: ExecutionContext | None,
     gee_interface: Any,
-    is_open: bool = True,
 ) -> None:
-    """``is_open``: see ``ResultsPanel``'s identical parameter -- same
-    chart-mount trap, same fix, now keyed on the merged outputs tab's own
-    active state rather than an accordion section. The description this
-    panel used to render itself now lives in its section's own header
-    (``app/panels/outputs.py``)."""
+    """The description this panel used to render itself now lives in its
+    section's own header (``app/panels/outputs.py``)."""
     notifications = use_notifications()
     option: solara.Reactive[dict[str, Any] | None] = solara.use_reactive(None)
     current_maps = maps
@@ -148,19 +144,17 @@ def TransitionsPanel(
 
     # `use_memo`, not `if option.value is not None: EChartsRawWidget(...)`:
     # solara flags a `use_*` hook inside an `if`, so whether the widget exists
-    # at all is decided INSIDE the factory. Keyed on `is_open` too because an
-    # `EChartsRawWidget` measures its canvas once, at construction -- built
-    # while hidden it bakes a 100x500 fallback that reopening never fixes.
-    # Themed here rather than in the fetch: the option stored is the domain's,
-    # and the theme can flip long after the fetch finished.
+    # at all is decided INSIDE the factory. Themed here rather than in the
+    # fetch: the option stored is the domain's, and the theme can flip long
+    # after the fetch finished.
     dark = use_theme_dark()
 
     def _build_chart() -> EChartsRawWidget | None:
-        if option.value is None or not is_open:
+        if option.value is None:
             return None
         return EChartsRawWidget(option=themed_option(option.value, dark))
 
-    chart = solara.use_memo(_build_chart, [option.value, is_open, dark])
+    chart = solara.use_memo(_build_chart, [option.value, dark])
 
     if current_maps is None or current_ctx is None:
         solara.Markdown(msg("transitions.build_first"))

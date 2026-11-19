@@ -33,8 +33,10 @@ app = [
     "pysepal>=4.2.0",
     # tests/test_plots.py transcribes OPTION_KEYS / BAR_SERIES_KEYS / SANKEY_SERIES_KEYS
     # from the ipecharts 1.0.x sources; an unfloored install could resolve a later
-    # release whose ECharts option schema no longer matches those rosters.
-    "ipecharts>=1.0.8",
+    # release whose ECharts option schema no longer matches those rosters. 1.4.2 is
+    # the first release whose charts follow their container's size, so a chart
+    # built in a hidden tab still draws at the right size once shown.
+    "ipecharts>=1.4.2",
 ]
 dev = [
     "pytest>=8.0",
