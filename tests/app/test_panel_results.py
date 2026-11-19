@@ -311,47 +311,6 @@ def test_the_click_snapshot_is_what_the_fetch_receives_not_a_later_read(monkeypa
     assert fake.successes == [msg("results.computed")]
 
 
-def test_a_chart_ready_while_its_section_is_collapsed_does_not_mount_until_reopened(monkeypatch):
-    """``is_open`` gates the chart widget's CONSTRUCTION, not just whether it
-    shows: an ``EChartsRawWidget`` built while its ``rv.ExpansionPanel`` is
-    collapsed measures a fixed, wrong canvas size that reopening never fixes
-    (verified with a browser probe; see ``app/panels/outputs.py``'s module
-    docstring). Proven here without a browser: the fetch resolves while
-    ``is_open=False``, and ``solara.display`` must not be called until a
-    later render flips it to ``True``.
-    """
-    fake = _FakeNotifier()
-    monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
-
-    async def fake_fetch(gee_interface, maps, ctx, *, layer):
-        return _FRAME
-
-    monkeypatch.setattr("app.panels.results.fetch_areas_by_land_cover", fake_fetch)
-
-    displayed: list[Any] = []
-    monkeypatch.setattr(solara, "display", lambda obj: displayed.append(obj))
-
-    the_maps = _FakeMaps(FakeResolved())
-
-    async def main():
-        box, rc = solara.render(
-            ResultsPanel(maps=the_maps, ctx=object(), gee_interface=None, is_open=False),
-            handle_error=False,
-        )
-        assert rc is not None
-        button = find_widget(box, ipyvuetify.Btn)
-        assert button is not None
-        button.click()
-        assert await _wait_for(lambda: fake.successes or fake.errors)
-        assert displayed == []  # data arrived, but the section is collapsed
-
-        rc.render(ResultsPanel(maps=the_maps, ctx=object(), gee_interface=None, is_open=True))
-
-    asyncio.run(main())
-
-    assert displayed  # reopening builds the widget now that data is ready
-
-
 def test_a_new_run_discards_the_chart_the_previous_one_produced(monkeypatch):
     """The repo owner's request: *"if I change params, the map should gone and
     the graphs and calculations should also gone, right? the same if I change
@@ -364,14 +323,15 @@ def test_a_new_run_discards_the_chart_the_previous_one_produced(monkeypatch):
     ``BuildOutcome`` design exists to prevent, reappearing one layer up.
     ``MapLayersPanel`` already discarded on this signal; this panel did not.
 
-    The ``is_open`` toggle is the probe, not decoration. ``solara.display`` is
-    this harness's only vantage point on a displayed widget, and it is called
-    from the render body -- which reacton skips entirely when nothing about
-    the element changed, so neither ``force_update`` nor a re-render with
-    equal props says anything about what is on screen. Closing and reopening
-    the section re-runs the body AND re-runs the chart memo (``is_open`` is
-    one of its dependencies), so what it displays afterwards is exactly "does
-    this panel still hold an option".
+    The re-render with a fresh ``gee_interface`` is the probe, not decoration.
+    ``solara.display`` is this harness's only vantage point on a displayed
+    widget, and it is called from the render body -- which reacton skips
+    entirely when nothing about the element changed, so neither
+    ``force_update`` nor a re-render with equal props says anything about
+    what is on screen. ``show`` passes a new ``gee_interface`` each time,
+    which the panel reads only when a fetch starts, so every call re-runs the
+    body and what it displays afterwards is exactly "does this panel still
+    hold a chart".
     """
     fake = _FakeNotifier()
     monkeypatch.setattr("app.panels.results.use_notifications", lambda: fake)
@@ -388,27 +348,25 @@ def test_a_new_run_discards_the_chart_the_previous_one_produced(monkeypatch):
     first_run, second_run = _FakeMaps(resolved), _FakeMaps(resolved)
     ctx = object()
 
-    def show(maps: Any, *, is_open: bool) -> Any:
-        return ResultsPanel(maps=maps, ctx=ctx, gee_interface=None, is_open=is_open)
+    def show(maps: Any) -> Any:
+        return ResultsPanel(maps=maps, ctx=ctx, gee_interface=object())
 
     async def main():
-        box, rc = solara.render(show(first_run, is_open=True), handle_error=False)
+        box, rc = solara.render(show(first_run), handle_error=False)
         assert rc is not None
         find_widget(box, ipyvuetify.Btn).click()
         assert await _wait_for(lambda: fake.successes or fake.errors)
 
-        # The floor: the SAME run survives a close/reopen with its chart, so
-        # the assertion below cannot pass merely because this probe stopped
+        # The floor: the SAME run survives a re-render with its chart, so the
+        # assertion below cannot pass merely because this probe stopped
         # displaying anything at all.
-        rc.render(show(first_run, is_open=False))
         displayed.clear()
-        rc.render(show(first_run, is_open=True))
+        rc.render(show(first_run))
         assert displayed, "the chart vanished without any run change"
 
-        rc.render(show(second_run, is_open=True))
-        rc.render(show(second_run, is_open=False))
+        rc.render(show(second_run))
         displayed.clear()
-        rc.render(show(second_run, is_open=True))
+        rc.render(show(second_run))
 
     asyncio.run(main())
 

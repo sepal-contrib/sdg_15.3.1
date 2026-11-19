@@ -7,7 +7,6 @@ from typing import Any
 import reacton.core
 import solara
 from pysepal.mapping.sepal_map import SepalMap
-from pysepal.sepalwidgets.vue_app import MapApp
 
 from app import page as page_module
 from app import tabs as tabs_module
@@ -16,7 +15,12 @@ from app.panels import map_layers as map_layers_module
 from app.tabs import workflow_tabs
 from sdg1531.enums import IndicatorLayer
 from sdg1531.spec import AdminAoi
-from tests.app.render_helpers import find_widget
+from tests.app.render_helpers import (
+    mapapp_map,
+    panel_footer,
+    panel_sections,
+    widgets_with_class,
+)
 from tests.spec_factory import default_spec
 
 #: `threshold=0.0`: `default_spec()`'s MODIS sensor needs a resolved float
@@ -46,52 +50,115 @@ def test_the_shell_renders():
     assert rc is not None
 
 
+def _walk(root: object) -> list[Any]:
+    found = [root]
+    for child in getattr(root, "children", None) or []:
+        if not isinstance(child, str):
+            found.extend(_walk(child))
+    return found
+
+
+def _strings(root: object, icons: bool) -> list[str]:
+    return [
+        child
+        for widget in _walk(root)
+        if (type(widget).__name__ == "Icon") is icons
+        for child in getattr(widget, "children", None) or []
+        if isinstance(child, str)
+    ]
+
+
+def _texts(root: object) -> list[str]:
+    return _strings(root, icons=False)
+
+
+def _icons(root: object) -> list[str]:
+    return _strings(root, icons=True)
+
+
+def _resize(box: object, width: int, height: int) -> None:
+    """Report a window size the way the browser does, through the shell's
+    ``ViewportBridge`` (the one widget carrying ``css_vars``)."""
+    bridge = next(w for w in _walk(box) if hasattr(w, "css_vars"))
+    bridge.vue_window_size({"w": width, "h": height})
+
+
 def test_the_shell_builds_a_correctly_configured_mapapp():
-    """A source grep for ``MapApp.element(`` only proves a spelling. This is
-    the behavioural check that dominates it: ``MapApp(...)`` builds a widget
-    outside Reacton's render tree, so no ``MapApp`` instance is reachable from
-    the rendered box at all under that mistake -- and, unlike a grep, it also
-    catches a dropped or misspelled kwarg for every field this task gives a
-    genuinely non-empty expected value (an empty map, a wrong title, a wrong
-    panel config, no language selector).
+    """A source grep for ``MapApp(`` only proves a spelling. This is the
+    behavioural check that dominates it: it reads the shell the native
+    ``MapApp`` actually rendered, which the legacy
+    ``pysepal.sepalwidgets.vue_app.MapApp`` widget does not render at all,
+    and, unlike a grep, it also catches a dropped or misspelled kwarg for
+    every field this task gives a genuinely non-empty expected value (an
+    empty map, a wrong icon, a wrong panel config, no language selector).
+    The title is not drawn by the collapsed drawer ``is_pinned=False`` starts
+    with; the narrow-window test below reads it off the top bar.
 
     The whole workflow lives in ONE ``right_panel_content`` section now, not
     ten (Task 21 moved the ten steps into ``app.tabs.WorkflowTabs``, itself the
-    section's sole content) -- ``steps_data`` is asserted empty here for the
-    same reason it always was: a leftover copy of a step in the old home would
-    render it twice. The section carries no ``title``/``icon``/``description``
-    at all: pysepal's ``RightPanel.vue`` renders a section with none of those
-    as bare content, which is what gives the tab component the full panel
-    width (see ``app/tabs.py``'s module docstring). This check only proves the
-    section's SHAPE -- that it is titleless and its content is length 1 --
-    not that the one item is really ``WorkflowTabs`` wired to the real spec,
-    map and outcome; ``tests/app/test_tabs.py`` proves that identity instead.
+    section's sole content) -- the drawer is asserted to hold no step for the
+    same reason ``steps_data`` always had to be empty: a leftover copy of a
+    step in the old home would render it twice. The section draws no header
+    and no description: pysepal renders a section with no ``title``, ``icon``
+    or ``description`` as bare content, which is what gives the tab component
+    the full panel width (see ``app/tabs.py``'s module docstring). This check
+    only proves the section's SHAPE -- that it is titleless and holds one
+    item -- not that the one item is really ``WorkflowTabs`` wired to the real
+    spec, map and outcome; ``tests/app/test_tabs.py`` proves that identity
+    instead.
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
+    _resize(box, 1400, 900)
 
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None, "no MapApp in the render tree; MapApp(...) builds outside it"
+    (drawer,) = widgets_with_class(box, "sepal-mapapp__drawer")
+    assert "sepal-mapapp__drawer--rail" in drawer.class_.split()
+    (app_header,) = widgets_with_class(drawer, "sepal-mapapp__app-title")
+    assert _icons(app_header) == ["mdi-earth"]
+    steps = [
+        w for w in _walk(drawer) if "data-step-id" in (getattr(w, "item_attributes", None) or {})
+    ]
+    assert steps == []
 
-    assert mapapp.app_title == msg("app.title")
-    assert mapapp.app_icon == "mdi-earth"
-    assert len(mapapp.main_map) == 1
-    assert isinstance(mapapp.main_map[0], SepalMap)
-    assert mapapp.right_panel_config == {
-        "title": msg("panel.title"),
-        "icon": "mdi-format-list-checks",
-        "width": 450,
-        "description": msg("panel.description"),
-    }
-    assert mapapp.steps_data == []
-    assert len(mapapp.right_panel_content) == 1
-    workflow_section = mapapp.right_panel_content[0]
-    assert set(workflow_section.keys()) == {"content"}
-    assert len(workflow_section["content"]) == 1
-    assert mapapp.right_panel_open is True
-    assert len(mapapp.language_selector) == 1
-    offered = {locale["code"] for locale in mapapp.language_selector[0].available_locales}
+    assert isinstance(mapapp_map(box), SepalMap)
+
+    (panel,) = widgets_with_class(box, "sepal-right-panel")
+    assert "sepal-right-panel--open" in panel.class_.split()
+    assert panel.style_ == "width: 450px"
+    (panel_header,) = widgets_with_class(panel, "sepal-mapapp__app-title")
+    assert _icons(panel_header) == ["mdi-format-list-checks"]
+    assert _texts(panel_header) == [msg("panel.title")]
+    (description,) = widgets_with_class(panel, "panel-description")
+    assert _texts(description) == [msg("panel.description")]
+
+    (section,) = panel_sections(box)
+    assert len(section) == 1
+    assert widgets_with_class(panel, "section-header") == []
+    assert widgets_with_class(panel, "section-description") == []
+
+    (selector,) = [w for w in _walk(drawer) if hasattr(w, "available_locales")]
+    offered = {locale["code"] for locale in selector.available_locales}
     assert offered == set(messages.available_locales())
+
+
+def test_a_narrow_window_moves_the_drawer_to_the_top_and_the_panel_to_the_bottom():
+    """What moving to the native shell is for: below 960px the drawer becomes a
+    bar across the top, which carries the app title, and the panel, with the
+    workflow and its footer, docks at the bottom of the window."""
+    box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
+    assert rc is not None
+    _resize(box, 800, 600)
+
+    assert widgets_with_class(box, "sepal-mapapp__drawer") == []
+    (belt,) = widgets_with_class(box, "sepal-mapapp__belt")
+    (title,) = widgets_with_class(belt, "sepal-mapapp__belt-title")
+    assert _texts(title) == [msg("app.title")]
+
+    (panel,) = widgets_with_class(box, "sepal-right-panel")
+    assert "sepal-right-panel--narrow" in panel.class_.split()
+    assert "sepal-right-panel--open" in panel.class_.split()
+    assert [len(section) for section in panel_sections(box)] == [1]
+    assert len(panel_footer(box)) == 1
 
 
 def test_the_panel_title_names_no_single_tab_it_contains():
@@ -121,15 +188,11 @@ def test_the_map_is_memoized_across_rerenders():
     """
     box, rc = solara.render(page_module.Sdg1531App(), handle_error=False)
     assert rc is not None
-    mapapp = find_widget(box, MapApp)
-    assert mapapp is not None
-    first_map = mapapp.main_map[0]
+    first_map = mapapp_map(box)
 
     rc.force_update()
 
-    mapapp_again = find_widget(box, MapApp)
-    assert mapapp_again is not None
-    assert mapapp_again.main_map[0] is first_map
+    assert mapapp_map(box) is first_map
 
 
 def test_changing_the_spec_takes_the_previous_runs_tiles_off_the_map(monkeypatch):

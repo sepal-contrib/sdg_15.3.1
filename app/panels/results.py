@@ -82,16 +82,10 @@ def ResultsPanel(
     maps: IndicatorMaps | None,
     ctx: ExecutionContext | None,
     gee_interface: Any,
-    is_open: bool = True,
 ) -> None:
-    """``is_open`` used to say whether THIS panel's own accordion section (an
-    ``rv.ExpansionPanel`` since task 27) was the one currently expanded; task
-    28's move to flat sections removed the accordion, so it now says whether
-    the merged outputs TAB itself (``app/tabs.py``'s ``WorkflowTabs``) is the
-    one currently active -- see ``app/panels/outputs.py``'s module docstring
-    for why that still gates more than visibility. The description this
-    panel used to render itself (``solara.Markdown(msg("results.description"))``)
-    now lives in its section's own header there too."""
+    """The description this panel used to render itself
+    (``solara.Markdown(msg("results.description"))``) now lives in its
+    section's own header (``app/panels/outputs.py``)."""
     notifications = use_notifications()
     option: solara.Reactive[dict[str, Any] | None] = solara.use_reactive(None)
     current_maps = maps
@@ -162,19 +156,17 @@ def ResultsPanel(
 
     # `use_memo`, not `if option.value is not None: EChartsRawWidget(...)`:
     # solara flags a `use_*` hook inside an `if`, so whether the widget exists
-    # at all is decided INSIDE the factory. Keyed on `is_open` too because an
-    # `EChartsRawWidget` measures its canvas once, at construction -- built
-    # while hidden it bakes a 100x500 fallback that reopening never fixes.
-    # Themed here rather than in the fetch: the option stored is the domain's,
-    # and the theme can flip long after the fetch finished.
+    # at all is decided INSIDE the factory. Themed here rather than in the
+    # fetch: the option stored is the domain's, and the theme can flip long
+    # after the fetch finished.
     dark = use_theme_dark()
 
     def _build_chart() -> EChartsRawWidget | None:
-        if option.value is None or not is_open:
+        if option.value is None:
             return None
         return EChartsRawWidget(option=themed_option(option.value, dark))
 
-    chart = solara.use_memo(_build_chart, [option.value, is_open, dark])
+    chart = solara.use_memo(_build_chart, [option.value, dark])
 
     if current_maps is None or current_ctx is None:
         solara.Markdown(msg("results.build_first"))

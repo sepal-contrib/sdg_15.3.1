@@ -11,6 +11,7 @@ distinction matters.
 from __future__ import annotations
 
 import re
+from typing import Any
 
 __all__ = (
     "alert_texts",
@@ -18,7 +19,11 @@ __all__ = (
     "field_messages",
     "find_widget",
     "find_widgets",
+    "mapapp_map",
     "markdown_texts",
+    "panel_footer",
+    "panel_sections",
+    "widgets_with_class",
 )
 
 _MARKDOWN_RE = re.compile(r'<div class="solara-markdown[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
@@ -61,6 +66,59 @@ def find_widgets(root: object, cls: type) -> list[object]:
     for child in getattr(root, "children", None) or []:
         found.extend(find_widgets(child, cls))
     return found
+
+
+def widgets_with_class(root: object, name: str) -> list[Any]:
+    """Every widget whose ``class_`` holds ``name``, in tree order."""
+    found = [root] if name in (getattr(root, "class_", None) or "").split() else []
+    for child in getattr(root, "children", None) or []:
+        if not isinstance(child, str):
+            found.extend(widgets_with_class(child, name))
+    return found
+
+
+def _only(found: list[Any], what: str) -> Any:
+    assert len(found) == 1, f"expected one {what} in the render tree, found {len(found)}"
+    return found[0]
+
+
+# The native MapApp (`pysepal.solara.components.map_app`) is a plain component:
+# its map, panel sections and footer render as real children of the tree. The
+# helpers below find them by the class names its `shell.py` and
+# `right_panel.py` give them.
+
+
+def mapapp_map(root: object) -> Any:
+    """The widget the MapApp shell shows as its map."""
+    container = _only(widgets_with_class(root, "sepal-mapapp__map"), "MapApp map container")
+    return _only(list(container.children), "map in the MapApp map container")
+
+
+def _slot_items(parent: Any, what: str) -> list[Any]:
+    """The items of the shell's ``Slot`` under ``parent``: its one classless
+    child div, which wraps each item in a div of its own."""
+    slot = _only([c for c in parent.children if not getattr(c, "class_", None)], what)
+    return [wrapper.children[0] for wrapper in slot.children]
+
+
+def panel_sections(root: object) -> list[list[Any]]:
+    """Each right-panel section's content items, in section order.
+
+    The header, description and divider of a section are optional siblings of
+    its content, each with a class of its own.
+    """
+    body = _only(widgets_with_class(root, "sepal-right-panel__body"), "right-panel body")
+    (column,) = body.children
+    return [_slot_items(section, "section content") for section in column.children]
+
+
+def panel_footer(root: object) -> list[Any]:
+    """The items pinned below the right panel's scrolling sections; empty without a footer."""
+    panel = _only(widgets_with_class(root, "sepal-right-panel"), "right panel")
+    footers = widgets_with_class(panel, "drawer-footer")
+    if not footers:
+        return []
+    return _slot_items(_only(footers, "right-panel footer"), "footer content")
 
 
 def cell_texts(node: object, tag: str) -> list[str]:
